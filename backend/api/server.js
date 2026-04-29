@@ -1,4 +1,8 @@
-require("dotenv").config();
+// Load dotenv only in development (not in Docker/production)
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
+
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -22,10 +26,23 @@ const { admin, db, bucket } = require("./firebase");
 const app = express();
 
 // 1. MUST BE FIRST: CORS
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_LOCAL,
+  "http://localhost:3000"
+].filter(Boolean);
+
 app.use(cors({
-  origin: "*",
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
 }));
 
 // 2. Body Parsers
