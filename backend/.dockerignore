@@ -1,0 +1,10 @@
+.env
+.env.*
+node_modules
+npm-debug.log
+api/serviceAccountKey.json
+serviceAccountKey.json
+.git
+.gitignore
+backend-for-test.zip
+my_extracted_image.png
