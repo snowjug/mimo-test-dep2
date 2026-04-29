@@ -991,10 +991,11 @@ app.get("/download/:id", async (req, res) => {
   }
 });
 // ================= START =================
-if (process.env.NODE_ENV !== "production") {
+// Start the server when run directly. This ensures Docker/production runs the app.
+if (require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`🚀 Local server running on port ${PORT}`);
+    console.log(`?? Server running on port ${PORT}`);
   });
 }
 
