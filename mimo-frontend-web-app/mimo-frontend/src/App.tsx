@@ -52,7 +52,7 @@ function App() {
     validationTimerRef.current = window.setTimeout(async () => {
       try {
         // 🔐 VERIFY CODE
-        const res = await fetch("http://localhost:3000/get-documents-by-code", {
+        const res = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/get-documents-by-code", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -70,7 +70,7 @@ function App() {
         const doc = data.documents[0];
 
         // ⬇️ DOWNLOAD FILE (NO ACCESS DENIED)
-        const fileRes = await fetch(`http://localhost:3000/download/${doc.id}`);
+        const fileRes = await fetch(`https://p01--mimo-backend--4b94y9s4jyc5.code.run/download/${doc.id}`);
         if (!fileRes.ok) {
           throw new Error("Failed to download file");
         }
