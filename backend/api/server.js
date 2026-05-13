@@ -154,6 +154,7 @@ app.post("/register", async (req, res) => {
       id: uuidv4(),
       username,
       password: hashedPassword,
+      passwordHash: hashedPassword,
       email,
       mobileNumber,
       googleUser: false,
@@ -177,7 +178,9 @@ app.post("/login", async (req, res) => {
     const doc = snapshot.docs[0];
     const user = doc.data();
     if (user.googleUser) return res.status(400).send("Use Google login");
-    const valid = await bcrypt.compare(password, user.password);
+    const storedPassword = user.password || user.passwordHash;
+    if (!storedPassword) return res.status(500).send("Password missing in database");
+    const valid = await bcrypt.compare(password, storedPassword);
     if (!valid) return res.status(400).send("Wrong password");
     // Fall back to Firestore doc ID if custom id field is missing
     const userId = doc.id;
