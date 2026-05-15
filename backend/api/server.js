@@ -663,17 +663,18 @@ app.post("/create-order", authenticateToken, async (req, res) => {
 app.get("/verify-payment/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
-    const response = await axios.get(
-      `${CASHFREE_BASE_URL}/orders/${orderId}`,
-      { headers: cashfreeHeaders }
-    );
-    const { order_status } = response.data;
     
-    // Update order status in Firestore
+    // Check order status in Firestore instead of calling Cashfree API (more reliable)
     const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
-    if (!orderSnapshot.empty) {
-      await orderSnapshot.docs[0].ref.update({ status: order_status });
+    if (orderSnapshot.empty) {
+      console.warn(`Order ${orderId} not found in Firestore`);
+      return res.status(404).json({ error: "Order not found" });
     }
+
+    const orderData = orderSnapshot.docs[0].data();
+    const order_status = orderData.status;
+    
+    console.log(`[VERIFY-PAYMENT] Order ${orderId} status: ${order_status}`);
 
     res.json({ order_status });
   } catch (err) {
