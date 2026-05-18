@@ -1,0 +1,116 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isSelfDoc() {
+      return signedIn() && resource.data.id == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isSelfDoc();
+      allow create: if signedIn() && request.resource.data.id == request.auth.uid;
+      allow update, delete: if isOwner(userId) || isSelfDoc();
+    }
+
+    match /orders/{orderId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /print_jobs/{jobId} {
+      allow read, create, update, delete: if signedIn() && (
+        resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
+      );
+    }
+
+    match /printJobs/{jobId} {
+      allow read, create, update, delete: if signedIn() && (
+        resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
+      );
+    }
+
+    match /payments/{paymentId} {
+      allow read, create, update, delete: if signedIn() && (
+        resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
+      );
+    }
+
+    match /pointsTransactions/{transactionId} {
+      allow read, create, update, delete: if signedIn() && (
+        resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
+      );
+    }
+
+    match /mimo_coin_transactions/{transactionId} {
+      allow read, create, update, delete: if signedIn() && (
+        resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
+      );
+    }
+
+    match /notifications/{notificationId} {
+      allow read, create, update, delete: if signedIn() && (
+        resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
+      );
+    }
+
+    match /sharedDocuments/{documentId} {
+      allow read, create, update, delete: if signedIn() && (
+        resource.data.sharedBy == request.auth.uid || request.resource.data.sharedBy == request.auth.uid
+      );
+    }
+
+    match /kiosks/{kioskId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /paperInventory/{inventoryId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /couponCodes/{couponId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /posts/{postId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /activityLogs/{logId} {
+      allow read, write: if false;
+    }
+
+    match /admin/{docId} {
+      allow read, write: if false;
+    }
+
+    match /adminSettings/{docId} {
+      allow read, write: if false;
+    }
+
+    match /admins/{docId} {
+      allow read, write: if false;
+    }
+
+    match /refillHistory/{entryId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
