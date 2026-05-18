@@ -66,30 +66,50 @@ export function UploadFile() {
     setUploading(true);
 
     try {
-      const response = await api.post("/upload", formData, {
+      await api.post("/upload", formData, {
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 100));
+          // Stop at 99% until processing is done
+          const displayProgress = percentCompleted === 100 ? 99 : percentCompleted;
           setFiles((prev) =>
             prev.map((f) =>
-              newFiles.some((nf) => nf.name === f.name) ? { ...f, progress: percentCompleted } : f
+              newFiles.some((nf) => nf.name === f.name) ? { ...f, progress: displayProgress } : f
             )
           );
         },
       });
 
-      setFiles((prev) =>
-        prev.map((f) =>
-          newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "completed", progress: 100 } : f
-        )
-      );
-      toast.success("Files uploaded successfully!");
+      // Start polling for processing status
+      const pollTimer = setInterval(async () => {
+        try {
+          const statusRes = await api.get("/mimo/conversion-status");
+          if (statusRes.data.status === "completed") {
+            clearInterval(pollTimer);
+            setFiles((prev) =>
+              prev.map((f) =>
+                newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "completed", progress: 100 } : f
+              )
+            );
+            toast.success("Files processed successfully!");
 
-      // Update local state with real page count from backend
-      setBackendTotalPages(response.data.totalPages);
+            setBackendTotalPages(statusRes.data.totalPages);
+            sessionStorage.setItem("uploadAmount", statusRes.data.amount);
+            sessionStorage.setItem("uploadTotalPages", statusRes.data.totalPages);
+            setUploading(false);
+          }
+        } catch (pollErr) {
+          console.error("Polling error", pollErr);
+          clearInterval(pollTimer);
+          setFiles((prev) =>
+            prev.map((f) =>
+              newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "failed", progress: 0 } : f
+            )
+          );
+          toast.error("File processing failed");
+          setUploading(false);
+        }
+      }, 3000);
 
-      // Navigate to options with the total amount from backend
-      sessionStorage.setItem("uploadAmount", response.data.amount);
-      sessionStorage.setItem("uploadTotalPages", response.data.totalPages);
     } catch (err) {
       console.error(err);
       setFiles((prev) =>
@@ -98,7 +118,6 @@ export function UploadFile() {
         )
       );
       toast.error("Upload failed");
-    } finally {
       setUploading(false);
     }
   };

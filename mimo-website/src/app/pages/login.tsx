@@ -24,8 +24,20 @@ export function Login() {
       const { jwtToken } = response.data;
 
       localStorage.setItem("jwtToken", jwtToken);
+      
+      // Check if user already has a name
+      const profileRes = await api.get("/profile", {
+        headers: { Authorization: `Bearer ${jwtToken}` }
+      });
+      
       toast.success("Signed in successfully!");
-      navigate("/onboarding");
+      
+      if (profileRes.data.username) {
+        localStorage.setItem("mimo_user_name", profileRes.data.username);
+        navigate("/upload");
+      } else {
+        navigate("/onboarding");
+      }
     } catch (err: any) {
       console.error(err);
       toast.error(err.response?.data || "Login failed");
@@ -129,8 +141,15 @@ export function Login() {
                       token: credentialResponse.credential,
                     });
                     localStorage.setItem("jwtToken", res.data.jwtToken);
-                    toast.success("Signed in with Google!");
-                    navigate("/onboarding");
+                    
+                    if (res.data.name) {
+                      localStorage.setItem("mimo_user_name", res.data.name);
+                      toast.success("Signed in with Google!");
+                      navigate("/upload");
+                    } else {
+                      toast.success("Signed in with Google!");
+                      navigate("/onboarding");
+                    }
                   } catch (err: any) {
                     console.error(err);
                     toast.error("Google sign-in failed");

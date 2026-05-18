@@ -19,11 +19,53 @@ const { promisify } = require("util");
 const { OAuth2Client } = require("google-auth-library");
 const crypto = require("crypto");
 
+// ================= PDF CACHE =================
+const pdfCache = new Map();
+const PDF_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const MAX_CACHE_SIZE = 200 * 1024 * 1024; // 200MB max
+let cacheSize = 0;
+
+function cacheJobPdf(pin, buffer) {
+  cacheSize += buffer.length;
+  
+  // Evict oldest if over limit
+  if (cacheSize > MAX_CACHE_SIZE) {
+    const oldestPin = Array.from(pdfCache.keys())[0];
+    const oldestBuffer = pdfCache.get(oldestPin).buffer;
+    cacheSize -= oldestBuffer.length;
+    pdfCache.delete(oldestPin);
+    console.log(`🧹 Evicted oldest PDF from cache: ${oldestPin}`);
+  }
+  
+  pdfCache.set(pin, {
+    buffer,
+    expiry: Date.now() + PDF_CACHE_TTL
+  });
+}
+
+// Cleanup expired cache periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of pdfCache.entries()) {
+    if (value.expiry < now) {
+      cacheSize -= value.buffer.length;
+      pdfCache.delete(key);
+    }
+  }
+}, 5 * 60 * 1000); // Run cleanup every 5 minutes
+
 const libreConvert = promisify(libre.convert);
 const { admin, db, bucket } = require("./firebase");
+const rateLimit = require("express-rate-limit");
 
 // ================= APP =================
 const app = express();
+
+const kioskLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // limit each IP to 20 requests per windowMs
+  message: { error: "Too many requests. Please wait." }
+});
 
 // 1. MUST BE FIRST: CORS
 const allowedOrigins = [
@@ -326,24 +368,7 @@ app.get("/settings", authenticateToken, async (req, res) => {
   }
 });
 
-// ================= COINS =================
-app.get("/mimo/coins", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const doc = await db.collection("users").doc(userId).get();
-    if (!doc.exists) return res.status(404).send("User not found");
-    const user = doc.data();
-    const coins = user.mimo_coins || { balance: 0, total_earned: 0, total_used: 0 };
-    res.json({
-      balance: coins.balance,
-      totalEarned: coins.total_earned,
-      totalUsed: coins.total_used,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error fetching coins" });
-  }
-});
+// Duplicate /mimo/coins removed, see further down
 
 // ================= PROFILE =================
 app.get("/profile", authenticateToken, async (req, res) => {
@@ -367,6 +392,38 @@ app.put("/profile", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).send("Error updating profile");
+  }
+});
+
+// ================= PRINT HISTORY =================
+app.get("/print-history", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const snapshot = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .orderBy("createdAt", "desc")
+      .get();
+      
+    const history = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      // Format to match frontend expectations
+      history.push({
+        id: doc.id,
+        printCode: data.printCode || "",
+        status: data.status,
+        file: data.fileName,
+        cost: `₹${((data.pageCount || 0) * 2.3).toFixed(2)}`,
+        details: `${data.pageCount || 0} pages • B&W`,
+        copies: 1, // Currently fixed to 1 in backend
+        date: data.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()
+      });
+    });
+    
+    res.json(history);
+  } catch (err) {
+    console.error("Print history error:", err);
+    res.status(500).send("Failed to fetch history");
   }
 });
 
@@ -514,6 +571,22 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
 
     await batch.commit();
 
+    // 🚀 PREFETCH PDFS TO CACHE (Background)
+    setTimeout(() => {
+      snapshot.forEach(async (doc) => {
+        try {
+          const data = doc.data();
+          const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
+          const file = bucket.file(filePath);
+          const [buffer] = await file.download();
+          cacheJobPdf(doc.id, buffer);
+          console.log(`🚀 Prefetched PDF into cache: ${doc.id}`);
+        } catch (err) {
+          console.error("Prefetch failed for", doc.id, err);
+        }
+      });
+    }, 0);
+
     res.json({
       message: "Payment success",
       printCode,   // ✅ RETURN TO FRONTEND
@@ -522,6 +595,37 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Payment update failed" });
+  }
+});
+
+app.get("/mimo/conversion-status", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const pendingConversions = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("status", "in", ["pending_conversion", "processing"])
+      .get();
+      
+    if (!pendingConversions.empty) {
+      return res.json({ status: "processing" });
+    }
+    
+    const pendingJobs = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("status", "==", "pending")
+      .get();
+      
+    let totalPages = 0;
+    pendingJobs.forEach(doc => totalPages += (doc.data().pageCount || 0));
+    
+    res.json({ 
+      status: "completed", 
+      totalPages, 
+      amount: Number((totalPages * 2.3).toFixed(2)) 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to get status" });
   }
 });
 
@@ -561,25 +665,20 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res) =
 
     console.log(`📂 Received ${req.files.length} files for processing`);
 
-    let totalPages = 0;
     for (let file of req.files) {
-      console.log(`📄 Processing file: ${file.originalname} (${file.mimetype})`);
-      const pages = await getPageCount(file);
-      totalPages += pages;
+      console.log(`📄 Saving raw file: ${file.originalname}`);
       const fileUrl = await uploadToStorage(file);
-      console.log(`Saving print_job for userId: ${userId}, file: ${file.originalname}`);
       await db.collection("print_jobs").add({
         userId,
         fileName: file.originalname,
         fileUrl,
-        status: "pending",
-        pageCount: pages,
+        mimetype: file.mimetype,
+        status: "pending_conversion",
         createdAt: new Date(),
       });
     }
 
-    const amount = Number((totalPages * 2.3).toFixed(2));
-    res.json({ totalPages, amount });
+    res.json({ message: "Files queued for processing" });
   } catch (err) {
     console.error(err);
     res.status(500).send("Upload failed");
@@ -633,7 +732,10 @@ app.post("/create-order", authenticateToken, async (req, res) => {
           return_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/payment-verify?order_id={order_id}`
         },
       },
-      { headers: cashfreeHeaders }
+      { 
+        headers: cashfreeHeaders,
+        timeout: 10000 // 10 second timeout
+      }
     );
 
     console.log(`✅ Cashfree order created: ${orderId}, session: ${response.data.payment_session_id}`);
@@ -759,7 +861,7 @@ app.get("/generate-print-code", authenticateToken, async (req, res) => {
   }
 });
 // ================= PRINT BY CODE =================
-app.post("/get-documents-by-code", async (req, res) => {
+app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
   try {
     const { printCode } = req.body;
     const now = new Date();
@@ -926,7 +1028,7 @@ app.get("/print-summary", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/mark-printed", async (req, res) => {
+app.post("/mark-printed", authenticateToken, async (req, res) => {
   try {
     const { printCode } = req.body;
 
@@ -980,24 +1082,95 @@ app.get("/download/:id", async (req, res) => {
     // 🔥 EXTRACT FILE PATH FROM URL
     const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
 
-    const file = bucket.file(filePath);
-
-    // 🔥 DOWNLOAD FROM FIREBASE STORAGE
-    const [fileBuffer] = await file.download();
-
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${data.fileName}"`
     );
     res.setHeader("Content-Type", "application/pdf");
 
-    res.send(fileBuffer);
+    // 🚀 CHECK CACHE FIRST
+    const cached = pdfCache.get(docId);
+    if (cached) {
+      console.log(`⚡ CACHE HIT for ${docId}`);
+      return res.send(cached.buffer);
+    }
+
+    // 🔥 STREAM FALLBACK
+    console.log(`⬇️ STREAMING from Firebase: ${docId}`);
+    const file = bucket.file(filePath);
+    file.createReadStream()
+      .on('error', (err) => {
+        console.error("❌ STREAM ERROR:", err);
+        if (!res.headersSent) res.status(500).send("Stream failed");
+      })
+      .pipe(res);
 
   } catch (err) {
     console.error("❌ DOWNLOAD ERROR:", err);
     res.status(500).send("Download failed");
   }
 });
+// ================= BACKGROUND CONVERSION =================
+setInterval(async () => {
+  try {
+    const snapshot = await db.collection("print_jobs")
+      .where("status", "==", "pending_conversion")
+      .limit(1)
+      .get();
+      
+    if (snapshot.empty) return;
+    
+    const doc = snapshot.docs[0];
+    const data = doc.data();
+    
+    // Mark as processing
+    await doc.ref.update({ status: "processing" });
+    
+    console.log(`[BG PROCESSOR] Processing ${data.fileName}`);
+    
+    let pages = 0;
+    let finalFileUrl = data.fileUrl;
+    
+    // Download to get page count or convert
+    const bucketFile = bucket.file(data.fileUrl.split(`${bucket.name}/`)[1]);
+    const [buffer] = await bucketFile.download();
+    
+    if (data.mimetype === "application/pdf") {
+      const { PDFDocument } = require("pdf-lib");
+      const pdfDoc = await PDFDocument.load(buffer);
+      pages = pdfDoc.getPageCount();
+    } else {
+      const tempInput = path.join(os.tmpdir(), `temp_${Date.now()}${path.extname(data.fileName).toLowerCase()}`);
+      fs.writeFileSync(tempInput, buffer);
+      
+      const pdfBuffer = await libreConvert(buffer, ".pdf", undefined);
+      
+      const { PDFDocument } = require("pdf-lib");
+      const pdfDoc = await PDFDocument.load(pdfBuffer);
+      pages = pdfDoc.getPageCount();
+      
+      // Upload new PDF
+      const newFileName = `converted_${Date.now()}.pdf`;
+      const newFile = bucket.file(newFileName);
+      await newFile.save(pdfBuffer, { contentType: "application/pdf" });
+      await newFile.makePublic();
+      finalFileUrl = `https://storage.googleapis.com/${bucket.name}/${newFileName}`;
+      
+      fs.unlinkSync(tempInput);
+    }
+    
+    await doc.ref.update({
+      status: "pending",
+      pageCount: pages,
+      fileUrl: finalFileUrl
+    });
+    
+    console.log(`[BG PROCESSOR] Finished ${data.fileName} (${pages} pages)`);
+  } catch (err) {
+    console.error("[BG PROCESSOR ERROR]", err);
+  }
+}, 5000); // Check every 5 seconds
+
 // ================= START =================
 // Start the server when run directly. This ensures Docker/production runs the app.
 if (require.main === module) {
