@@ -10,6 +10,11 @@ This repository contains the MIMO printing platform split into three parts:
 
 The system supports user login, payment verification, print job creation, and kiosk-based printing workflows.
 
+## Live Deployments
+
+- **Main Frontend URL**: https://mimo-test-dep2.vercel.app/
+- **Kiosk URL**: https://kisokmechine.vercel.app/
+
 Key backend responsibilities include:
 
 - authentication and session handling
