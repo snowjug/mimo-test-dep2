@@ -22,6 +22,7 @@
   "main": "api/server.js",
   "scripts": {
     "start": "node api/server.js",
+    "seed:firestore": "node api/seed-firestore-collections.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
