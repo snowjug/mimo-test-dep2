@@ -23,6 +23,15 @@ Key backend responsibilities include:
 - print job lifecycle updates
 - webhook handling for payment confirmation
 
+## Recent Features & Optimizations
+**Production Hardening (v2.0):**
+- **Async File Processing:** Document uploads now instantly queue as `pending_conversion` instead of blocking Node.js, resolving Out-of-Memory crashes.
+- **Frontend Polling:** UI gracefully holds upload progress at 99% until the background worker completes file parsing.
+- **Direct PDF Streaming:** Kiosk PDF downloads use Node.js `ReadStreams` bypassing RAM buffers entirely.
+- **In-Memory Cache:** 200MB maximum LRU Cache stores recent Kiosk PDFs ensuring fast downloads while strictly preventing memory leaks.
+- **Mimo Coins & Print History:** Fully functional backend integration for displaying previous prints and managing virtual currency.
+- **Brute Force Protection:** Rate limiters added to Kiosk API endpoints (20 req/min).
+
 ## Folder Structure
 
 ```text
