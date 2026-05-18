@@ -101,7 +101,7 @@ app.get("/test-cors", (req, res) => res.json({ message: "CORS is working!" }));
 
 const upload = multer({ storage: multer.memoryStorage() });
 const SECRET_KEY = process.env.JWT_SECRET;
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com");
 
 // ================= CASHFREE =================
 const CASHFREE_BASE_URL = "https://sandbox.cashfree.com/pg";
@@ -247,7 +247,7 @@ app.post("/google-login", async (req, res) => {
     if (!token) return res.status(400).send("Token missing");
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID || "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com",
     });
     const payload = ticket.getPayload();
     const email = payload.email;

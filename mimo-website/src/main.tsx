@@ -6,7 +6,8 @@ import "./styles/index.css";
 import { ThemeProvider } from "./app/components/theme-provider.tsx";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+// Hardcoded to ensure Vercel uses the correct client ID without needing a dashboard login
+const GOOGLE_CLIENT_ID = "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com";
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
