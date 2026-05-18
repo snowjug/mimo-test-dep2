@@ -788,23 +788,28 @@ app.get("/verify-payment/:orderId", async (req, res) => {
 // ================= CASHFREE WEBHOOK =================
 app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (req, res) => {
   try {
-    const rawBody = req.body.toString("utf8");
-    const receivedSignature = req.headers["x-webhook-signature"];
-    const timestamp = req.headers["x-webhook-timestamp"];
+    let event;
+    if (Buffer.isBuffer(req.body)) {
+      const rawBody = req.body.toString("utf8");
+      const receivedSignature = req.headers["x-webhook-signature"];
+      const timestamp = req.headers["x-webhook-timestamp"];
 
-    if (receivedSignature && timestamp) {
-      const signedPayload = timestamp + rawBody;
-      const expectedSignature = crypto
-        .createHmac("sha256", process.env.CASHFREE_SECRET_KEY)
-        .update(signedPayload)
-        .digest("base64");
-      if (receivedSignature !== expectedSignature) {
-        console.warn("Webhook signature mismatch");
-        return res.status(403).send("Invalid signature");
+      if (receivedSignature && timestamp) {
+        const signedPayload = timestamp + rawBody;
+        const expectedSignature = crypto
+          .createHmac("sha256", process.env.CASHFREE_SECRET_KEY)
+          .update(signedPayload)
+          .digest("base64");
+        if (receivedSignature !== expectedSignature) {
+          console.warn("Webhook signature mismatch");
+          return res.status(403).send("Invalid signature");
+        }
       }
+      event = JSON.parse(rawBody);
+    } else {
+      // Body already parsed by express.json()
+      event = req.body;
     }
-
-    const event = JSON.parse(rawBody);
 
     if (event.type === "PAYMENT_SUCCESS_WEBHOOK") {
       const orderId = event.data.order.order_id;
