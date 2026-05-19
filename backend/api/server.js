@@ -765,18 +765,39 @@ app.post("/create-order", authenticateToken, async (req, res) => {
 app.get("/verify-payment/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
-    
-    // Check order status in Firestore instead of calling Cashfree API (more reliable)
+
+    // 1. Query Cashfree directly for real-time status (don't rely on webhook timing)
+    let cashfreeStatus = null;
+    try {
+      const cfRes = await axios.get(
+        `${CASHFREE_BASE_URL}/orders/${orderId}`,
+        { headers: cashfreeHeaders, timeout: 10000 }
+      );
+      cashfreeStatus = cfRes.data.order_status; // "PAID", "ACTIVE", "EXPIRED" etc
+      console.log(`[VERIFY-PAYMENT] Cashfree status for ${orderId}: ${cashfreeStatus}`);
+    } catch (cfErr) {
+      console.warn("[VERIFY-PAYMENT] Cashfree API failed, falling back to Firestore:", cfErr.message);
+    }
+
+    // 2. If Cashfree says PAID, update Firestore immediately (don't wait for webhook)
+    if (cashfreeStatus === "PAID") {
+      const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+      if (!orderSnapshot.empty) {
+        await orderSnapshot.docs[0].ref.update({ status: "PAID" });
+      }
+      return res.json({ order_status: "PAID" });
+    }
+
+    // 3. Fallback: check Firestore (in case webhook already fired)
     const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
     if (orderSnapshot.empty) {
-      console.warn(`Order ${orderId} not found in Firestore`);
-      return res.status(404).json({ error: "Order not found" });
+      // If not in Firestore at all yet but Cashfree says paid, return cashfree status
+      return res.json({ order_status: cashfreeStatus || "CREATED" });
     }
 
     const orderData = orderSnapshot.docs[0].data();
     const order_status = orderData.status;
-    
-    console.log(`[VERIFY-PAYMENT] Order ${orderId} status: ${order_status}`);
+    console.log(`[VERIFY-PAYMENT] Firestore status for ${orderId}: ${order_status}`);
 
     res.json({ order_status });
   } catch (err) {
@@ -1172,7 +1193,15 @@ setInterval(async () => {
     
     console.log(`[BG PROCESSOR] Finished ${data.fileName} (${pages} pages)`);
   } catch (err) {
-    console.error("[BG PROCESSOR ERROR]", err);
+    console.error("[BG PROCESSOR ERROR]", err.message);
+    // Reset status so it can be retried next interval
+    try {
+      const snapshot = await db.collection("print_jobs")
+        .where("status", "==", "processing").limit(1).get();
+      if (!snapshot.empty) {
+        await snapshot.docs[0].ref.update({ status: "pending_conversion" });
+      }
+    } catch (_) {}
   }
 }, 5000); // Check every 5 seconds
 

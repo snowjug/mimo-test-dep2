@@ -152,11 +152,10 @@ export function PrintOptions() {
                     B&W
                   </button>
                   <button
-                    disabled
-                    className="px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 text-slate-400 cursor-not-allowed flex items-center gap-1.5 opacity-50"
+                    onClick={() => setColorMode("color")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${colorMode === "color" ? "bg-white text-orange-500 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
                   >
                     Color
-                    <Badge variant="secondary" className="text-[7px] font-black uppercase tracking-wider bg-slate-200/50 text-slate-400 py-0 px-1.5 rounded-full border-0 leading-tight">Soon</Badge>
                   </button>
                 </div>
               </div>
