@@ -1305,8 +1305,9 @@ app.post("/mark-printed", authenticateToken, async (req, res) => {
   }
 });
 
-// ================= KIOSK: TRIGGER PI PRINT =================
-// Called by kiosk after user confirms. Backend calls Pi, Pi prints via CUPS.
+// ================= KIOSK: PULL MECHANISM (STAGE 1: QUEUE) =================
+// Called by iPad kiosk after user confirms print. We mark it as 'printing'
+// so the Raspberry Pi can pull it automatically via Firestore listeners.
 app.post("/kiosk/print", kioskLimiter, async (req, res) => {
   try {
     const { printCode } = req.body;
@@ -1315,7 +1316,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
     const snapshot = await db
       .collection("print_jobs")
       .where("printCode", "==", printCode)
-      .where("status", "in", ["paid", "printing"]) // accept both in case of retry
+      .where("status", "in", ["paid", "printing"])
       .get();
 
     if (snapshot.empty) {
@@ -1324,6 +1325,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
 
     const now = new Date();
     const results = [];
+    const batch = db.batch();
 
     for (const doc of snapshot.docs) {
       const data = doc.data();
@@ -1331,7 +1333,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
 
       // Skip expired
       if (data.codeExpiresAt && data.codeExpiresAt.toDate() < now) {
-        await doc.ref.update({ status: "expired", printerStatus: "Expired" });
+        batch.update(doc.ref, { status: "expired", printerStatus: "Expired" });
         results.push({ file: fileName, status: "expired" });
         continue;
       }
@@ -1343,57 +1345,88 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
       }
 
       // Mark sending to Pi
-      await doc.ref.update({
+      batch.update(doc.ref, {
         status: "printing",
-        printerStatus: "Sending to Pi...",
+        printerStatus: "Queued for Pi",
+        kioskId: "KIOSK_001",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-
-      try {
-        const opts = data.printOptions || {};
-        const copies = Number(opts.copies || 1);
-        const fileUrl = data.fileUrl; // Already public from uploadToStorage
-
-        console.log(`🖨️ Sending to Pi: ${fileName} | copies: ${copies} | url: ${fileUrl}`);
-        const piResults = await triggerPiPrint(fileUrl, copies);
-        console.log(`✅ Pi response for ${fileName}:`, piResults);
-
-        await doc.ref.update({
-          status: "completed",
-          isPrinted: true,
-          printerStatus: "Printed",
-          printedAt: admin.firestore.FieldValue.serverTimestamp(),
-          kioskId: "KIOSK_001",
-          inventoryUpdated: true,
-          inventoryUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          piResponse: JSON.stringify(piResults[0] || {}),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        results.push({ file: fileName, status: "printed", piResponse: piResults });
-      } catch (piErr) {
-        const errMsg = piErr.response?.data?.detail || piErr.message || "Unknown error";
-        console.error(`❌ Pi print failed for ${fileName}:`, errMsg);
-
-        await doc.ref.update({
-          printerStatus: `Pi error: ${errMsg.substring(0, 100)}`,
-          piError: errMsg,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        results.push({ file: fileName, status: "failed", error: errMsg });
-      }
+      results.push({ file: fileName, status: "queued" });
     }
 
-    const allDone = results.every((r) => ["printed", "already_printed"].includes(r.status));
+    await batch.commit();
+
+    const allQueued = results.every((r) => ["queued", "already_printed"].includes(r.status));
     res.json({
-      success: allDone,
-      message: allDone ? "All documents sent to printer" : "Some documents failed",
+      success: allQueued,
+      message: allQueued ? "All documents queued for printer" : "Some documents failed",
       results,
     });
   } catch (err) {
-    console.error("❌ KIOSK PRINT ERROR:", err);
-    res.status(500).json({ error: "Print trigger failed", details: err.message });
+    console.error("❌ KIOSK QUEUE ERROR:", err);
+    res.status(500).json({ error: "Print queue failed", details: err.message });
+  }
+});
+
+// ================= KIOSK: PI STATUS UPDATE & AUTO REFUNDS =================
+// The Pi calls this after printing finishes or encounters a hardware jam
+app.post("/kiosk/job-status", async (req, res) => {
+  try {
+    const { jobId, status, errorDetails } = req.body;
+    if (!jobId || !status) return res.status(400).json({ error: "jobId and status required" });
+
+    const jobDoc = await db.collection("print_jobs").doc(jobId).get();
+    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+
+    const data = jobDoc.data();
+    
+    if (status === "completed") {
+      await jobDoc.ref.update({
+        status: "completed",
+        isPrinted: true,
+        printerStatus: "Printed",
+        printedAt: admin.firestore.FieldValue.serverTimestamp(),
+        printTime: admin.firestore.FieldValue.serverTimestamp(),
+        inventoryUpdated: true,
+        inventoryUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return res.json({ success: true, message: "Marked completed" });
+    } 
+    
+    if (status === "failed") {
+      await jobDoc.ref.update({
+        status: "failed",
+        printerStatus: errorDetails || "Printer Error",
+        piError: errorDetails || "Unknown Hardware Error",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // --- AUTO REFUND LOGIC ---
+      if (data.finalCost > 0 && data.orderId) {
+        console.log(`[AUTO-REFUND] Triggering Cashfree refund for order: ${data.orderId}, amount: ₹${data.finalCost}`);
+        try {
+          const refundData = {
+            refund_amount: data.finalCost,
+            refund_id: `ref_${Date.now()}_${data.orderId.substring(0,10)}`, // limit length if needed
+            refund_note: `Hardware Error: ${errorDetails || "Printer Jam"}`
+          };
+          await axios.post(`${CASHFREE_BASE_URL}/orders/${data.orderId}/refunds`, refundData, { headers: cashfreeHeaders });
+          console.log(`[AUTO-REFUND] Refund successful for ${data.orderId}`);
+          
+          await jobDoc.ref.update({ refundStatus: "completed", refundAmount: data.finalCost });
+        } catch (cfErr) {
+          console.error(`[AUTO-REFUND] Refund failed for ${data.orderId}:`, cfErr.response?.data || cfErr.message);
+          await jobDoc.ref.update({ refundStatus: "failed", refundError: cfErr.message });
+        }
+      }
+      return res.json({ success: true, message: "Marked failed and triggered refund pipeline" });
+    }
+
+    res.status(400).json({ error: "Invalid status string. Use 'completed' or 'failed'." });
+  } catch (err) {
+    console.error("❌ PI JOB STATUS ERROR:", err);
+    res.status(500).json({ error: "Failed to update status", details: err.message });
   }
 });
 
@@ -1526,6 +1559,59 @@ setInterval(async () => {
     } catch (_) {}
   }
 }, 2000); // Check every 2 seconds (faster response for DOCX/PPT)
+
+// ================= CRON: AUTO DELETE DEAD FILES =================
+// Frees up Google Cloud Storage by deleting 48-hour old PDF files
+app.get("/cron/cleanup-files", async (req, res) => {
+  try {
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000); // 48 hours ago
+    
+    // We fetch jobs older than 48h that haven't been deleted yet
+    const snapshot = await db.collection("print_jobs")
+      .where("createdAt", "<", admin.firestore.Timestamp.fromDate(cutoff))
+      .get();
+      
+    // Filter locally to avoid index creation for fileDeleted != true
+    const jobsToDelete = snapshot.docs.filter(doc => !doc.data().fileDeleted);
+    
+    let deletedCount = 0;
+    const batch = db.batch();
+    let batchOperations = 0;
+    
+    for (const doc of jobsToDelete) {
+      if (batchOperations >= 450) break; // Firestore batch limits
+      const data = doc.data();
+      
+      if (data.fileUrl) {
+        try {
+          const bucketStr = bucket.name + "/";
+          const parts = data.fileUrl.split(bucketStr);
+          if (parts.length > 1) {
+            const filePath = parts[1];
+            await bucket.file(filePath).delete();
+          }
+        } catch (bucketErr) {
+          // 404 means already deleted
+          if (bucketErr.code !== 404) {
+             console.error(`[CRON] Failed deleting ${data.fileUrl}:`, bucketErr);
+             continue; // Skip DB update if delete failed
+          }
+        }
+      }
+      batch.update(doc.ref, { fileDeleted: true, fileDeletedAt: admin.firestore.FieldValue.serverTimestamp() });
+      deletedCount++;
+      batchOperations++;
+    }
+    
+    if (deletedCount > 0) await batch.commit();
+    
+    console.log(`[CRON] Cleaned up ${deletedCount} files.`);
+    res.json({ success: true, deletedCount, message: `Deleted ${deletedCount} old files` });
+  } catch (err) {
+    console.error("[CRON ERROR]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ================= START =================
 // Start the server when run directly. This ensures Docker/production runs the app.
