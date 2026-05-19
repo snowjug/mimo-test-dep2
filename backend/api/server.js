@@ -238,6 +238,17 @@ app.post("/register", async (req, res) => {
     await userRef.update({ id: userRef.id });
 
     const userId = userRef.id;
+    
+    // Auth Log
+    await db.collection("auth_logs").add({
+      userId,
+      email,
+      action: "register",
+      ipAddress: req.ip || "",
+      userAgent: req.get("user-agent") || "",
+      timestamp: now
+    });
+
     const token = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "30d" });
     console.log(`✅ Registered new user: ${email}, docId: ${userId}`);
     res.json({ jwtToken: token });
@@ -264,6 +275,17 @@ app.post("/login", async (req, res) => {
     const userId = doc.id;
     if (!userId) return res.status(500).send("User ID missing in database");
     console.log(`✅ User logged in: ${email}, userId: ${userId}`);
+    
+    // Auth Log
+    await db.collection("auth_logs").add({
+      userId,
+      email,
+      action: "login",
+      ipAddress: req.ip || "",
+      userAgent: req.get("user-agent") || "",
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
     const token = jwt.sign({ userId }, SECRET_KEY);
     res.json({ jwtToken: token });
   } catch (err) {
@@ -314,6 +336,16 @@ app.post("/google-login", async (req, res) => {
       // Update lastLoginAt
       await snapshot.docs[0].ref.update({ lastLoginAt: now });
     }
+
+    // Auth Log
+    await db.collection("auth_logs").add({
+      userId,
+      email,
+      action: "google_login",
+      ipAddress: req.ip || "",
+      userAgent: req.get("user-agent") || "",
+      timestamp: now
+    });
 
     const jwtToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "30d" });
     res.json({ jwtToken, name, email, userId });
@@ -598,12 +630,15 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       batch.update(doc.ref, {
         status: "paid",
         "paymentStatus.status": "completed",
-        "timeline.paymentCompletedAt": admin.firestore.FieldValue.serverTimestamp(),
+        "paymentStatus.paidAt": admin.firestore.FieldValue.serverTimestamp(),
+        paymentTime: admin.firestore.FieldValue.serverTimestamp(),
         printCode,
+        tokenId: printCode,
         codeCreatedAt: now,
         codeExpiresAt: expiresAt,
         isPrinted: false,
         printerStatus: "ready",
+        "printStatus.status": "ready"
       });
     });
 
@@ -901,7 +936,10 @@ app.post("/create-order", authenticateToken, async (req, res) => {
       transactionId: txnId,
       userId,
       orderId,
+      merchantTransactionId: orderId, // Flat field for analytics
       paymentGateway: "cashfree",
+      cashfreeSessionId: response.data.payment_session_id,
+      cashfreeOrderId: response.data.cf_order_id || null, // Cashfree's internal order ID
       gatewayTransactionId: response.data.payment_session_id,
       orderDetails: { description: `Print order ${orderId}`, amount, currency: "INR", orderTimestamp: new Date() },
       paymentAttempt: { attemptNumber: 1, initiatedAt: new Date(), sessionId: response.data.payment_session_id, paymentMethod: "unknown" },
@@ -1047,7 +1085,8 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         jobsBatch.update(doc.ref, { 
           status: "paid",
           "paymentStatus.status": "completed",
-          "paymentStatus.paidAt": now
+          "paymentStatus.paidAt": now,
+          paymentTime: now
         });
       });
       await jobsBatch.commit();
@@ -1062,10 +1101,16 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       // Update Payment Transactions Audit (V2 Schema)
       const txnSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
       if (!txnSnapshot.empty) {
+        const paymentData = event.data.payment || {};
         await txnSnapshot.docs[0].ref.update({
           "transactionStatus.status": "completed",
-          "transactionStatus.gatewayStatus": "success",
-          "transactionStatus.completedAt": now
+          "transactionStatus.gatewayStatus": paymentData.payment_status || "SUCCESS",
+          "transactionStatus.completedAt": now,
+          cashfreePaymentId: paymentData.cf_payment_id || null,
+          paymentMethod: paymentData.payment_group || "unknown",
+          paymentCurrency: paymentData.payment_currency || "INR",
+          paymentMessage: paymentData.payment_message || "Success",
+          paymentTime: paymentData.payment_time || now
         });
       }
     }
