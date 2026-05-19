@@ -69,23 +69,20 @@ function App() {
         // 📄 GET DOCUMENT
         const doc = data.documents[0];
 
-        // ⬇️ DOWNLOAD FILE (NO ACCESS DENIED)
-        const fileRes = await fetch(`https://p01--mimo-backend--4b94y9s4jyc5.code.run/download/${doc.id}`);
-        if (!fileRes.ok) {
-          throw new Error("Failed to download file");
+        // 🖨️ TRIGGER PRINT VIA PI (BACKEND INTEGRATION)
+        const printRes = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/kiosk/print", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ printCode: code }),
+        });
+
+        const printData = await printRes.json();
+        
+        if (!printRes.ok) {
+          throw new Error(printData.error || "Failed to trigger printer");
         }
-
-        const blob = await fileRes.blob();
-        const url = window.URL.createObjectURL(blob);
-
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = doc.file || "print.pdf";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        window.URL.revokeObjectURL(url);
 
         // 📊 SET JOB DATA
         const job = {
