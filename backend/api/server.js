@@ -731,8 +731,10 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res) =
       // Common metadata for all files
       const baseJobData = {
         // --- Backward Compatibility (V1 schema) ---
+        // --- Backward Compatibility (V1 schema) ---
         userId,
         fileName: file.originalname,
+        documentUrl: fileUrl,
         fileUrl,
         mimetype: file.mimetype,
         fileSize: file.size || file.buffer?.length || 0,
@@ -740,6 +742,9 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res) =
         isImage: file.mimetype.startsWith("image/"),
         createdAt: now,
         updatedAt: now,
+        files: [
+          { name: file.originalname, size: file.size || file.buffer?.length || 0, type: file.mimetype, url: fileUrl }
+        ],
         
         // --- Analytics / V2 Schema (FIREBASE_SCHEMA_DESIGN.md) ---
         sourceFile: {
@@ -826,28 +831,41 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     const orderId = "order_" + Date.now();
     const jobIds = [];
 
-    // Save printer configuration and orderId to each job
-    const batchUpdate = db.batch();
-    jobsSnapshot.forEach((doc) => {
-      jobIds.push(doc.id);
-      batchUpdate.update(doc.ref, { 
-        printOptions: printOptions || {},
-        orderId,
-      });
-    });
-    await batchUpdate.commit();
+    const userDoc = await db.collection("users").doc(userId).get();
+    const userEmail = userDoc.exists ? userDoc.data().email : "unknown";
 
     let totalPages = 0;
     let totalAmount = 0;
     const colorMode = printOptions?.colorMode || "bw";
-    const pricePerPage = colorMode === "color" ? 10.00 : 2.30;
+    const pricePerPage = colorMode === "color" ? 9.20 : 2.30;
     const copies = Number(printOptions?.copies || 1);
 
+    const batchUpdate = db.batch();
     jobsSnapshot.forEach((doc) => {
+      jobIds.push(doc.id);
       const pages = doc.data().pageCount || 0;
+      const jobCost = pages * copies * pricePerPage;
+      
       totalPages += pages;
-      totalAmount += pages * copies * pricePerPage;
+      totalAmount += jobCost;
+
+      batchUpdate.update(doc.ref, { 
+        printOptions: printOptions || {},
+        orderId,
+        totalCost: jobCost,
+        finalCost: jobCost,
+        merchantTransactionId: orderId,
+        userEmail,
+        colorMode,
+        color: colorMode === "color",
+        copies,
+        duplex: printOptions?.doubleSided === "double",
+        orientation: printOptions?.orientation || "portrait",
+        paperSize: "A4",
+        settings: printOptions || {}
+      });
     });
+    await batchUpdate.commit();
 
     const amount = Number(totalAmount.toFixed(2));
     console.log(`[CREATE-ORDER] ${totalPages} pages × ${copies} copies × ₹${pricePerPage} (${colorMode}) = ₹${amount}`);
@@ -1300,6 +1318,9 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
           isPrinted: true,
           printerStatus: "Printed",
           printedAt: admin.firestore.FieldValue.serverTimestamp(),
+          kioskId: "KIOSK_001",
+          inventoryUpdated: true,
+          inventoryUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           piResponse: JSON.stringify(piResults[0] || {}),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
