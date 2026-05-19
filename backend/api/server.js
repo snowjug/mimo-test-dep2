@@ -646,9 +646,8 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res) =
     let cleanupCount = 0;
     oldJobs.forEach(doc => {
       const data = doc.data();
-      // Only delete jobs that are still 'pending' (unpaid)
-      // This protects 'paid', 'printing', and 'completed' jobs from being cleared
-      if (data.status === "pending") {
+      // Delete unpaid and unconverted jobs to make room for new upload
+      if (["pending", "pending_conversion", "processing"].includes(data.status)) {
         cleanupBatch.delete(doc.ref);
         cleanupCount++;
       }
@@ -666,8 +665,32 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res) =
     console.log(`📂 Received ${req.files.length} files for processing`);
 
     for (let file of req.files) {
-      console.log(`📄 Saving raw file: ${file.originalname}`);
+      console.log(`📄 Saving raw file: ${file.originalname} (${file.mimetype})`);
       const fileUrl = await uploadToStorage(file);
+
+      // ⚡ FAST PATH: PDFs don't need LibreOffice — count pages immediately
+      if (file.mimetype === "application/pdf") {
+        try {
+          const { PDFDocument } = require("pdf-lib");
+          const pdfDoc = await PDFDocument.load(file.buffer);
+          const pages = pdfDoc.getPageCount();
+          await db.collection("print_jobs").add({
+            userId,
+            fileName: file.originalname,
+            fileUrl,
+            mimetype: file.mimetype,
+            status: "pending",  // Skip the queue — ready immediately!
+            pageCount: pages,
+            createdAt: new Date(),
+          });
+          console.log(`⚡ PDF fast-tracked: ${file.originalname} (${pages} pages)`);
+          continue;
+        } catch (pdfErr) {
+          console.warn(`⚠️ PDF fast-path failed for ${file.originalname}, falling back to queue:`, pdfErr.message);
+        }
+      }
+
+      // 🐢 SLOW PATH: DOCX/PPT/etc need LibreOffice — queue for background
       await db.collection("print_jobs").add({
         userId,
         fileName: file.originalname,
@@ -1203,7 +1226,7 @@ setInterval(async () => {
       }
     } catch (_) {}
   }
-}, 5000); // Check every 5 seconds
+}, 2000); // Check every 2 seconds (faster response for DOCX/PPT)
 
 // ================= START =================
 // Start the server when run directly. This ensures Docker/production runs the app.

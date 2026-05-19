@@ -108,7 +108,7 @@ export function UploadFile() {
           toast.error("File processing failed");
           setUploading(false);
         }
-      }, 3000);
+      }, 1000); // Poll every 1 second for fast feedback
 
     } catch (err) {
       console.error(err);
