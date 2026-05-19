@@ -57,7 +57,7 @@ export function UploadFile() {
     // Extract image data URLs BEFORE upload (while we have the File objects)
     const imageDataUrls: { name: string; mimetype: string; dataUrl: string }[] = [];
     for (const file of fileArray) {
-      if (file.type.startsWith("image/")) {
+      if (file.type.startsWith("image/") || file.type === "application/pdf") {
         const dataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => resolve(e.target?.result as string);
@@ -408,11 +408,18 @@ export function UploadFile() {
                       </div>
                       <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                       {file.status === "uploading" && (
-                        <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3 overflow-hidden">
-                          <div
-                            className="bg-indigo-600 h-full rounded-full transition-all duration-300"
-                            style={{ width: `${file.progress}%` }}
-                          />
+                        <div className="mt-3">
+                          <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                              style={{ width: `${file.progress}%` }}
+                            />
+                          </div>
+                          {file.progress >= 99 && (
+                            <p className="text-[10px] text-indigo-600 font-semibold mt-1 animate-pulse">
+                              Processing on server... this may take a moment.
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

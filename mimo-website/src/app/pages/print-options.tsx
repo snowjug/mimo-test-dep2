@@ -62,11 +62,10 @@ export function PrintOptions() {
 
   // Pricing
   const pricePerPageBW = 2.30;
-  const pricePerPageColor = 10.00;
+  const pricePerPageColor = 9.20; // Updated as per requirements
   const basePrice = colorMode === "bw" ? pricePerPageBW : pricePerPageColor;
   
-  // If we have the total cost from the backend, use it as a base, otherwise calculate
-  const totalCost = baseTotalCost > 0 ? (baseTotalCost / totalPages) * actualPages * copies : actualPages * copies * basePrice;
+  const totalCost = actualPages * copies * basePrice;
 
   const handleContinue = () => {
     // Store print options for payment page
@@ -472,28 +471,55 @@ export function PrintOptions() {
           </div>
         </div>
 
-        {/* Preview Modal (placeholder) */}
+        {/* Preview Modal */}
         {selectedPreview !== null && (
           <div
             className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
             onClick={() => setSelectedPreview(null)}
           >
-            <Card className="max-w-2xl w-full animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
-              <CardHeader>
+            <Card className="max-w-4xl w-full h-[90vh] flex flex-col animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+              <CardHeader className="flex-shrink-0">
                 <CardTitle>Document Preview</CardTitle>
                 <CardDescription>{files[selectedPreview]?.name}</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="bg-gray-100 rounded-lg p-8 text-center min-h-96 flex items-center justify-center">
-                  <div>
-                    <FileText className="w-24 h-24 mx-auto text-gray-400 mb-4" />
-                    <p className="text-gray-600 font-bold">Preview not available</p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      Document will be printed as uploaded
-                    </p>
-                  </div>
+              <CardContent className="flex-1 flex flex-col min-h-0">
+                <div className="bg-gray-100 rounded-lg p-2 flex-1 flex items-center justify-center overflow-hidden">
+                  {(() => {
+                    const previewFile = files[selectedPreview];
+                    const previewDataUrl = uploadedImages.find(img => img.name === previewFile?.name)?.dataUrl;
+                    const isPdf = previewFile?.name.toLowerCase().endsWith(".pdf");
+                    const isImage = uploadedImages.some(img => img.name === previewFile?.name && img.mimetype.startsWith("image/"));
+                    
+                    if (previewDataUrl) {
+                      if (isPdf) {
+                        return (
+                          <div className={`w-full h-full transition-transform duration-300 ${orientation === "landscape" ? "rotate-90 scale-[0.7] transform-origin-center" : ""}`}>
+                            <object data={previewDataUrl} type="application/pdf" className="w-full h-full min-h-[400px]">
+                              <p>Preview not supported in this browser.</p>
+                            </object>
+                          </div>
+                        );
+                      } else if (isImage) {
+                        return (
+                          <div className={`w-full h-full flex items-center justify-center transition-transform duration-300 ${orientation === "landscape" ? "rotate-90" : ""}`}>
+                            <img src={previewDataUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
+                          </div>
+                        );
+                      }
+                    }
+                    
+                    return (
+                      <div className="text-center">
+                        <FileText className="w-24 h-24 mx-auto text-gray-400 mb-4" />
+                        <p className="text-gray-600 font-bold">Preview not available</p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Document will be printed as uploaded
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
-                <div className="flex gap-2 mt-4">
+                <div className="flex gap-2 mt-4 flex-shrink-0">
                   <Button variant="outline" className="flex-1" onClick={() => setSelectedPreview(null)}>
                     Close
                   </Button>
