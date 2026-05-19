@@ -178,10 +178,33 @@ const getPageCount = async (file) => {
 
 // ================= STORAGE =================
 const uploadToStorage = async (file) => {
-  const fileName = `files/${Date.now()}_${file.originalname}`;
+  const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const fileName = `files/${Date.now()}_${safeFileName}`;
   const fileUpload = bucket.file(fileName);
-  await fileUpload.save(file.buffer);
+  await fileUpload.save(file.buffer, {
+    contentType: file.mimetype,
+    metadata: { cacheControl: "public, max-age=86400" },
+  });
+  // Make publicly accessible so Pi can download directly
+  await fileUpload.makePublic();
   return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+};
+
+// Pi Print Server
+const PI_BASE_URL = process.env.PI_BASE_URL || "http://100.108.118.38:8000";
+
+// Helper: call the Pi print API for one file
+const triggerPiPrint = async (fileUrl, copies = 1) => {
+  const results = [];
+  for (let i = 0; i < copies; i++) {
+    const res = await axios.post(
+      `${PI_BASE_URL}/print`,
+      { file_url: fileUrl },
+      { timeout: 30000, headers: { "Content-Type": "application/json" } }
+    );
+    results.push(res.data);
+  }
+  return results;
 };
 
 // ================= REGISTER =================
@@ -750,9 +773,19 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     await batchUpdate.commit();
 
     let totalPages = 0;
-    jobsSnapshot.forEach((doc) => { totalPages += doc.data().pageCount; });
+    let totalAmount = 0;
+    const colorMode = printOptions?.colorMode || "bw";
+    const pricePerPage = colorMode === "color" ? 10.00 : 2.30;
+    const copies = Number(printOptions?.copies || 1);
 
-    const amount = Number((totalPages * 2.3).toFixed(2));
+    jobsSnapshot.forEach((doc) => {
+      const pages = doc.data().pageCount || 0;
+      totalPages += pages;
+      totalAmount += pages * copies * pricePerPage;
+    });
+
+    const amount = Number(totalAmount.toFixed(2));
+    console.log(`[CREATE-ORDER] ${totalPages} pages × ${copies} copies × ₹${pricePerPage} (${colorMode}) = ₹${amount}`);
     const orderId = "order_" + Date.now();
 
     const response = await axios.post(
@@ -950,18 +983,16 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
     const firstDoc = snapshot.docs[0].data();
     const userId = firstDoc.userId;
 
-    // 🔥 fetch user
+    // Fetch user name using Firestore doc ID (since auth now resolves to doc ID)
     let userName = "User";
-
     if (userId) {
-      const userSnap = await db
-        .collection("users")
-        .where("id", "==", userId)
-        .limit(1)
-        .get();
-
-      if (!userSnap.empty) {
-        userName = userSnap.docs[0].data().username;
+      const userDoc = await db.collection("users").doc(userId).get();
+      if (userDoc.exists) {
+        userName = userDoc.data().username || "User";
+      } else {
+        // Fallback for old tokens that stored UUID in 'id' field
+        const userSnap = await db.collection("users").where("id", "==", userId).limit(1).get();
+        if (!userSnap.empty) userName = userSnap.docs[0].data().username || "User";
       }
     }
 
@@ -1129,8 +1160,113 @@ app.post("/mark-printed", authenticateToken, async (req, res) => {
   }
 });
 
+// ================= KIOSK: TRIGGER PI PRINT =================
+// Called by kiosk after user confirms. Backend calls Pi, Pi prints via CUPS.
+app.post("/kiosk/print", kioskLimiter, async (req, res) => {
+  try {
+    const { printCode } = req.body;
+    if (!printCode) return res.status(400).json({ error: "Print code required" });
 
-// Test route
+    const snapshot = await db
+      .collection("print_jobs")
+      .where("printCode", "==", printCode)
+      .where("status", "in", ["paid", "printing"]) // accept both in case of retry
+      .get();
+
+    if (snapshot.empty) {
+      return res.status(404).json({ error: "Invalid or already used print code" });
+    }
+
+    const now = new Date();
+    const results = [];
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const fileName = data.fileName || "file";
+
+      // Skip expired
+      if (data.codeExpiresAt && data.codeExpiresAt.toDate() < now) {
+        await doc.ref.update({ status: "expired", printerStatus: "Expired" });
+        results.push({ file: fileName, status: "expired" });
+        continue;
+      }
+
+      // Skip already printed
+      if (data.isPrinted) {
+        results.push({ file: fileName, status: "already_printed" });
+        continue;
+      }
+
+      // Mark sending to Pi
+      await doc.ref.update({
+        status: "printing",
+        printerStatus: "Sending to Pi...",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      try {
+        const opts = data.printOptions || {};
+        const copies = Number(opts.copies || 1);
+        const fileUrl = data.fileUrl; // Already public from uploadToStorage
+
+        console.log(`🖨️ Sending to Pi: ${fileName} | copies: ${copies} | url: ${fileUrl}`);
+        const piResults = await triggerPiPrint(fileUrl, copies);
+        console.log(`✅ Pi response for ${fileName}:`, piResults);
+
+        await doc.ref.update({
+          status: "completed",
+          isPrinted: true,
+          printerStatus: "Printed",
+          printedAt: admin.firestore.FieldValue.serverTimestamp(),
+          piResponse: JSON.stringify(piResults[0] || {}),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        results.push({ file: fileName, status: "printed", piResponse: piResults });
+      } catch (piErr) {
+        const errMsg = piErr.response?.data?.detail || piErr.message || "Unknown error";
+        console.error(`❌ Pi print failed for ${fileName}:`, errMsg);
+
+        await doc.ref.update({
+          printerStatus: `Pi error: ${errMsg.substring(0, 100)}`,
+          piError: errMsg,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        results.push({ file: fileName, status: "failed", error: errMsg });
+      }
+    }
+
+    const allDone = results.every((r) => ["printed", "already_printed"].includes(r.status));
+    res.json({
+      success: allDone,
+      message: allDone ? "All documents sent to printer" : "Some documents failed",
+      results,
+    });
+  } catch (err) {
+    console.error("❌ KIOSK PRINT ERROR:", err);
+    res.status(500).json({ error: "Print trigger failed", details: err.message });
+  }
+});
+
+// ================= KIOSK: PI HEALTH CHECK =================
+app.get("/kiosk/health", async (req, res) => {
+  try {
+    const piRes = await axios.get(`${PI_BASE_URL}/`, { timeout: 5000 });
+    res.json({
+      pi_status: "online",
+      pi_response: piRes.data,
+      pi_url: PI_BASE_URL,
+    });
+  } catch (err) {
+    res.status(503).json({
+      pi_status: "offline",
+      error: err.message,
+      pi_url: PI_BASE_URL,
+    });
+  }
+});
+
 app.get("/download/:id", async (req, res) => {
   try {
     const docId = req.params.id;
