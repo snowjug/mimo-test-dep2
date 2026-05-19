@@ -430,21 +430,33 @@ app.get("/print-history", authenticateToken, async (req, res) => {
       const opts = data.printOptions || {};
       const colorMode = opts.colorMode || data.colorMode || "bw";
       const copies = opts.copies || data.copies || 1;
-      const pricePerPage = colorMode === "color" ? 10 : 2.3;
+      const pricePerPage = colorMode === "color" ? 9.2 : 2.3;
       const cost = (data.pageCount || 0) * copies * pricePerPage;
+
+      let printerStatus = data.printerStatus || "Pending";
+      if (!data.printerStatus) {
+        if (data.status === "pending") printerStatus = "Pending Payment";
+        else if (data.status === "paid") printerStatus = "Ready to Print";
+        else if (data.status === "completed") printerStatus = "Completed";
+        else if (data.status === "expired") printerStatus = "Expired";
+      }
+
+      let details = `${data.pageCount || 0} pages • ${colorMode === 'bw' ? 'B&W' : 'Color'}`;
+      if (opts.doubleSided === 'double') details += ' • 2-Sided';
+      else details += ' • 1-Sided';
 
       return {
         id: doc.id,
-        printCode: data.printCode || "",
+        printCode: data.printCode || "-",
         status: data.status,
-        printerStatus: data.printerStatus || "",
+        printerStatus,
         file: data.fileName,
         fileType: data.mimetype || "unknown",
         fileSize: data.fileSize || 0,
         cost: `₹${cost.toFixed(2)}`,
         colorMode,
         copies,
-        details: `${data.pageCount || 0} pages • ${colorMode === "color" ? "Color" : "B&W"} • ${copies}x`,
+        details,
         date: data.createdAt?.toDate
           ? new Date(data.createdAt.toDate()).toLocaleString()
           : new Date().toLocaleString(),
@@ -1159,54 +1171,6 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
   } catch (err) {
     console.error("❌ SERVER ERROR:", err);
     res.status(500).json({ error: "Failed to fetch documents" });
-  }
-});
-
-
-// ================= PRINT HISTORY =================
-app.get("/print-history", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const snapshot = await db
-      .collection("print_jobs")
-      .where("userId", "==", userId)
-      .get();
-
-    const history = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      const opts = data.printOptions || {};
-      
-      let details = `${data.pageCount || 0} pages • ${opts.colorMode === 'bw' ? 'B&W' : 'Color'}`;
-      if (opts.doubleSided === 'double') details += ' • 2-Sided';
-      else details += ' • 1-Sided';
-
-      let printerStatus = data.printerStatus || "Pending";
-      if (!data.printerStatus) {
-        if (data.status === "pending") printerStatus = "Pending Payment";
-        else if (data.status === "paid") printerStatus = "Ready to Print";
-        else if (data.status === "completed") printerStatus = "Completed";
-        else if (data.status === "expired") printerStatus = "Expired";
-      }
-
-      return {
-        id: doc.id,
-        file: data.fileName,
-        details,
-        copies: opts.copies || 1,
-        cost: `₹${((data.pageCount || 0) * (opts.copies || 1) * 2.3).toFixed(2)}`,
-        status: data.status,
-        printerStatus,
-        printCode: data.printCode || "-",
-        date: data.createdAt
-          ? new Date(data.createdAt.toDate()).toLocaleString()
-          : "N/A",
-      };
-    });
-
-    res.json(history);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Failed to fetch history");
   }
 });
 

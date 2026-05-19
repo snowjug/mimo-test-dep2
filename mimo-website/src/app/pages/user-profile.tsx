@@ -97,7 +97,11 @@ export function UserProfile() {
                 <p className="text-blue-100/90 text-sm sm:text-base mb-4">{email}</p>
                 
 
-                <Button variant="outline" className="w-full sm:w-auto bg-white/10 hover:bg-white/20 border-white/20 text-white hover:text-white transition-all shadow-sm relative z-20">
+                <Button 
+                  variant="outline" 
+                  className="w-full sm:w-auto bg-white/10 hover:bg-white/20 border-white/20 text-white hover:text-white transition-all shadow-sm relative z-20"
+                  onClick={() => toast.info("Profile photo uploads are coming soon!")}
+                >
                   <User className="w-4 h-4 mr-2" />
                   Change Photo
                 </Button>
