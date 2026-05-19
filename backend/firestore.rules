@@ -32,19 +32,7 @@ service cloud.firestore {
       );
     }
 
-    match /printJobs/{jobId} {
-      allow read, create, update, delete: if signedIn() && (
-        resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
-      );
-    }
-
-    match /payments/{paymentId} {
-      allow read, create, update, delete: if signedIn() && (
-        resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
-      );
-    }
-
-    match /pointsTransactions/{transactionId} {
+    match /payment_transactions/{transactionId} {
       allow read, create, update, delete: if signedIn() && (
         resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
       );
@@ -56,59 +44,7 @@ service cloud.firestore {
       );
     }
 
-    match /notifications/{notificationId} {
-      allow read, create, update, delete: if signedIn() && (
-        resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid
-      );
-    }
-
-    match /sharedDocuments/{documentId} {
-      allow read, create, update, delete: if signedIn() && (
-        resource.data.sharedBy == request.auth.uid || request.resource.data.sharedBy == request.auth.uid
-      );
-    }
-
-    match /kiosks/{kioskId} {
-      allow read: if signedIn();
-      allow write: if false;
-    }
-
-    match /paperInventory/{inventoryId} {
-      allow read: if signedIn();
-      allow write: if false;
-    }
-
-    match /couponCodes/{couponId} {
-      allow read: if signedIn();
-      allow write: if false;
-    }
-
-    match /posts/{postId} {
-      allow read: if signedIn();
-      allow write: if false;
-    }
-
-    match /activityLogs/{logId} {
-      allow read, write: if false;
-    }
-
-    match /admin/{docId} {
-      allow read, write: if false;
-    }
-
-    match /adminSettings/{docId} {
-      allow read, write: if false;
-    }
-
-    match /admins/{docId} {
-      allow read, write: if false;
-    }
-
-    match /refillHistory/{entryId} {
-      allow read: if signedIn();
-      allow write: if false;
-    }
-
+    // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;
     }

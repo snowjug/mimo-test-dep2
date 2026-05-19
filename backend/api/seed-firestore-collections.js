@@ -13,91 +13,11 @@ const now = admin.firestore.Timestamp.now();
 
 const seedDocs = [
   {
-    collection: 'activityLogs',
-    docId: '01AbwnCfEZbdLyJ0hT0O',
-    data: {
-      action: 'invalid_code',
-      details: {
-        enteredCode: '123456',
-        kioskId: 'kiosk-001',
-      },
-      timestamp: now,
-    },
-  },
-  {
-    collection: 'admin',
-    docId: 'seed_admin',
-    data: {
-      email: 'admin@mimo.com',
-      role: 'superadmin',
-      status: 'active',
-      createdAt: now,
-    },
-  },
-  {
-    collection: 'adminSettings',
-    docId: 'seed_admin_settings',
-    data: {
-      theme: 'default',
-      maintenanceMode: false,
-      updatedAt: now,
-    },
-  },
-  {
-    collection: 'admins',
-    docId: 'seed_admins',
-    data: {
-      name: 'Seed Admin',
-      email: 'admin@mimo.com',
-      permissions: ['read', 'write'],
-      createdAt: now,
-    },
-  },
-  {
-    collection: 'couponCodes',
-    docId: 'seed_coupon',
-    data: {
-      code: 'WELCOME10',
-      discountType: 'percentage',
-      discountValue: 10,
-      active: true,
-      createdAt: now,
-    },
-  },
-  {
-    collection: 'kiosks',
-    docId: 'kiosk-001',
-    data: {
-      kioskId: 'kiosk-001',
-      name: 'Print Kiosk 001',
-      location: {
-        branch: 'Main Office',
-        floor: 'Ground',
-        area: 'Lobby',
-      },
-      status: 'online',
-      lastSeenAt: now,
-      currentJobCount: 0,
-      allowedPrintModes: ['bw', 'color'],
-    },
-  },
-  {
-    collection: 'notifications',
-    docId: 'seed_notification',
-    data: {
-      title: 'Welcome',
-      message: 'Seed notification created',
-      read: false,
-      createdAt: now,
-    },
-  },
-  {
     collection: 'orders',
     docId: 'seed_order',
     data: {
       orderId: 'seed_order',
       userId: 'seed_user',
-      kioskId: 'kiosk-001',
       status: 'CREATED',
       orderType: 'print',
       amount: 0,
@@ -111,18 +31,7 @@ const seedDocs = [
     },
   },
   {
-    collection: 'paperInventory',
-    docId: 'seed_paper_inventory',
-    data: {
-      kioskId: 'kiosk-001',
-      paperSize: 'A4',
-      sheetsAvailable: 1000,
-      lowStockThreshold: 100,
-      updatedAt: now,
-    },
-  },
-  {
-    collection: 'payments',
+    collection: 'payment_transactions',
     docId: 'seed_payment',
     data: {
       paymentId: 'seed_payment',
@@ -136,7 +45,7 @@ const seedDocs = [
     },
   },
   {
-    collection: 'pointsTransactions',
+    collection: 'mimo_coin_transactions',
     docId: 'seed_points_txn',
     data: {
       userId: 'seed_user',
@@ -147,35 +56,11 @@ const seedDocs = [
     },
   },
   {
-    collection: 'posts',
-    docId: 'seed_post',
-    data: {
-      title: 'Seed Post',
-      content: 'Placeholder post for Firestore structure.',
-      published: false,
-      createdAt: now,
-    },
-  },
-  {
-    collection: 'printJobs',
-    docId: 'seed_print_job_upper',
-    data: {
-      jobId: 'seed_print_job_upper',
-      userId: 'seed_user',
-      kioskId: 'kiosk-001',
-      status: 'pending',
-      fileName: 'seed.pdf',
-      pageCount: 1,
-      createdAt: now,
-    },
-  },
-  {
     collection: 'print_jobs',
-    docId: 'seed_print_job_snake',
+    docId: 'seed_print_job',
     data: {
-      jobId: 'seed_print_job_snake',
+      jobId: 'seed_print_job',
       userId: 'seed_user',
-      kioskId: 'kiosk-001',
       status: 'pending',
       fileName: 'seed.pdf',
       pageCount: 1,
@@ -184,25 +69,6 @@ const seedDocs = [
         colorMode: 'bw',
         layout: 'single',
       },
-      createdAt: now,
-    },
-  },
-  {
-    collection: 'refillHistory',
-    docId: 'seed_refill',
-    data: {
-      kioskId: 'kiosk-001',
-      item: 'paper',
-      quantity: 500,
-      createdAt: now,
-    },
-  },
-  {
-    collection: 'sharedDocuments',
-    docId: 'seed_shared_doc',
-    data: {
-      documentName: 'seed.pdf',
-      sharedBy: 'seed_user',
       createdAt: now,
     },
   },
@@ -233,7 +99,7 @@ async function seedCollections() {
     console.log(`Seeded ${seed.collection}/${seed.docId}`);
   }
 
-  console.log('✅ Firestore collections seeded successfully');
+  console.log('✅ Minimal Firestore collections seeded successfully');
 }
 
 seedCollections()
