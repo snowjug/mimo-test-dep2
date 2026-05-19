@@ -52,7 +52,27 @@ export function UploadFile() {
     if (!fileList || fileList.length === 0) return;
 
     const formData = new FormData();
-    const newFiles: UploadedFile[] = Array.from(fileList).map((file) => {
+    const fileArray = Array.from(fileList);
+
+    // Extract image data URLs BEFORE upload (while we have the File objects)
+    const imageDataUrls: { name: string; mimetype: string; dataUrl: string }[] = [];
+    for (const file of fileArray) {
+      if (file.type.startsWith("image/")) {
+        const dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+        imageDataUrls.push({ name: file.name, mimetype: file.type, dataUrl });
+      }
+    }
+    if (imageDataUrls.length > 0) {
+      sessionStorage.setItem("uploadedImages", JSON.stringify(imageDataUrls));
+    } else {
+      sessionStorage.removeItem("uploadedImages");
+    }
+
+    const newFiles: UploadedFile[] = fileArray.map((file) => {
       formData.append("files", file);
       return {
         name: file.name,

@@ -113,35 +113,32 @@ const cashfreeHeaders = {
 };
 
 // ================= AUTH MIDDLEWARE =================
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(" ")[1];
 
-  if (!token) {
-    console.error("❌ No token. Authorization header:", authHeader);
-    return res.status(401).send("Token missing");
-  }
+  if (!token) return res.status(401).send("Token missing");
 
-  jwt.verify(token, SECRET_KEY, (err, decoded) => {
-    if (err) {
-      console.error("❌ JWT verify error:", err.message);
-      return res.status(403).send("Invalid token");
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    let userId = decoded.userId || decoded.id || decoded.user?.id;
+    if (!userId) return res.status(403).send("Invalid token payload");
+
+    // ✅ Resolve userId to the actual Firestore doc ID
+    // Handles both new tokens (doc ID) and old tokens (UUID in 'id' field)
+    const directDoc = await db.collection("users").doc(userId).get();
+    if (!directDoc.exists) {
+      // Old token: userId is a UUID stored in 'id' field, not Firestore doc ID
+      const snap = await db.collection("users").where("id", "==", userId).get();
+      if (!snap.empty) userId = snap.docs[0].id;
     }
 
-    // DEBUG — shows what is inside your token so we can diagnose issues
-    console.log("🔍 Decoded token payload:", JSON.stringify(decoded));
-
-    // Supports { userId }, { id }, or { user: { id } } shaped tokens
-    const userId = decoded.userId || decoded.id || decoded.user?.id;
-
-    if (!userId) {
-      console.error("❌ No userId found in token. Payload:", JSON.stringify(decoded));
-      return res.status(403).send("Invalid token payload");
-    }
-
-    req.user = { ...decoded, userId };
+    req.user = { userId };
     next();
-  });
+  } catch (err) {
+    console.error("❌ Auth error:", err.message);
+    return res.status(403).send("Invalid token");
+  }
 };
 
 // ================= PAGE COUNT =================
@@ -192,22 +189,28 @@ app.post("/register", async (req, res) => {
   try {
     const { username, password, email, mobileNumber } = req.body;
     const existing = await db.collection("users").where("email", "==", email).get();
-    if (!existing.empty) {
-      return res.status(400).send("User already exists");
-    }
+    if (!existing.empty) return res.status(400).send("User already exists");
+
     const hashedPassword = await bcrypt.hash(password, 10);
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
     const userRef = await db.collection("users").add({
-      id: uuidv4(),
       username,
-      password: hashedPassword,
-      passwordHash: hashedPassword,
       email,
-      mobileNumber,
+      mobileNumber: mobileNumber || "",
+      password: hashedPassword,
       googleUser: false,
+      createdAt: now,
+      updatedAt: now,
+      mimo_coins: { balance: 0, total_earned: 0, total_used: 0 },
     });
+
+    // Store Firestore doc ID as the 'id' field for consistency
+    await userRef.update({ id: userRef.id });
+
     const userId = userRef.id;
-    const token = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "7d" });
-    console.log(`✅ Registered new user: ${email}, userId: ${userId}`);
+    const token = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "30d" });
+    console.log(`✅ Registered new user: ${email}, docId: ${userId}`);
     res.json({ jwtToken: token });
   } catch (err) {
     console.error(err);
@@ -254,24 +257,31 @@ app.post("/google-login", async (req, res) => {
     const name = payload.name;
     const snapshot = await db.collection("users").where("email", "==", email).get();
     let userId;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
     if (snapshot.empty) {
-      userId = uuidv4();
-      await db.collection("users").add({
-        id: userId,
+      // New Google user — use Firestore doc ID as userId
+      const userRef = await db.collection("users").add({
         username: name,
         email,
-        password: null,
         mobileNumber: "",
+        password: null,
         googleUser: true,
+        createdAt: now,
+        updatedAt: now,
+        mimo_coins: { balance: 0, total_earned: 0, total_used: 0 },
       });
+      userId = userRef.id;
+      await userRef.update({ id: userId }); // Store doc ID as 'id' field too
     } else {
-      const doc = snapshot.docs[0];
-      // Fall back to Firestore doc ID if custom id field is missing
-      userId = doc.data().id || doc.id;
+      // Existing user — always use Firestore doc ID
+      userId = snapshot.docs[0].id;
+      // Update lastLoginAt
+      await snapshot.docs[0].ref.update({ lastLoginAt: now });
     }
-    if (!userId) return res.status(500).send("User ID missing in database");
-    const jwtToken = jwt.sign({ userId }, SECRET_KEY);
-    res.json({ jwtToken, name, email });
+
+    const jwtToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "30d" });
+    res.json({ jwtToken, name, email, userId });
   } catch (err) {
     console.error(err);
     res.status(401).send("Google login failed");
@@ -301,14 +311,14 @@ app.get("/mimo/user", authenticateToken, async (req, res) => {
     const doc = await db.collection("users").doc(userId).get();
     if (!doc.exists) return res.status(404).send("User not found");
     const user = doc.data();
-    res.json({ name: user.username, email: user.email });
+    res.json({ name: user.username, email: user.email, userId });
   } catch (err) {
     console.error(err);
     res.status(500).send("Error fetching user");
   }
 });
 
-// ================= PROFILE =================
+// ================= PROFILE (consolidated) =================
 app.get("/profile", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -316,9 +326,13 @@ app.get("/profile", authenticateToken, async (req, res) => {
     if (!doc.exists) return res.status(404).send("User not found");
     const user = doc.data();
     res.json({
+      id: userId,
       username: user.username,
       email: user.email,
-      mobileNumber: user.mobileNumber,
+      mobileNumber: user.mobileNumber || "",
+      googleUser: user.googleUser || false,
+      mimo_coins: user.mimo_coins || { balance: 0, total_earned: 0, total_used: 0 },
+      createdAt: user.createdAt,
     });
   } catch (err) {
     console.error(err);
@@ -330,13 +344,15 @@ app.put("/profile", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { username, mobileNumber } = req.body;
-    const snapshot = await db.collection("users").where("id", "==", userId).get();
-    if (snapshot.empty) return res.status(404).send("User not found");
-    await snapshot.docs[0].ref.update({ username, mobileNumber });
-    res.send("Profile updated");
+    await db.collection("users").doc(userId).update({
+      username,
+      mobileNumber: mobileNumber || "",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ message: "Profile updated" });
   } catch (err) {
     console.error(err);
-    res.status(500).send("Update failed");
+    res.status(500).send("Error updating profile");
   }
 });
 
@@ -345,9 +361,7 @@ app.post("/settings", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const settings = req.body;
-    const snapshot = await db.collection("users").where("id", "==", userId).get();
-    if (snapshot.empty) return res.status(404).send("User not found");
-    await snapshot.docs[0].ref.update({ settings });
+    await db.collection("users").doc(userId).update({ settings, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     res.send("Settings saved");
   } catch (err) {
     console.error(err);
@@ -360,38 +374,10 @@ app.get("/settings", authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const doc = await db.collection("users").doc(userId).get();
     if (!doc.exists) return res.status(404).send("User not found");
-    const user = doc.data();
-    res.json(user.settings || {});
+    res.json(doc.data().settings || {});
   } catch (err) {
     console.error(err);
     res.status(500).send("Failed to fetch settings");
-  }
-});
-
-// Duplicate /mimo/coins removed, see further down
-
-// ================= PROFILE =================
-app.get("/profile", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists) return res.status(404).send("User not found");
-    res.json(userDoc.data());
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching profile");
-  }
-});
-
-app.put("/profile", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { username, mobileNumber } = req.body;
-    await db.collection("users").doc(userId).update({ username, mobileNumber });
-    res.json({ message: "Profile updated" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error updating profile");
   }
 });
 
@@ -404,20 +390,30 @@ app.get("/print-history", authenticateToken, async (req, res) => {
       .orderBy("createdAt", "desc")
       .get();
       
-    const history = [];
-    snapshot.forEach(doc => {
+    const history = snapshot.docs.map(doc => {
       const data = doc.data();
-      // Format to match frontend expectations
-      history.push({
+      const opts = data.printOptions || {};
+      const colorMode = opts.colorMode || data.colorMode || "bw";
+      const copies = opts.copies || data.copies || 1;
+      const pricePerPage = colorMode === "color" ? 10 : 2.3;
+      const cost = (data.pageCount || 0) * copies * pricePerPage;
+
+      return {
         id: doc.id,
         printCode: data.printCode || "",
         status: data.status,
+        printerStatus: data.printerStatus || "",
         file: data.fileName,
-        cost: `₹${((data.pageCount || 0) * 2.3).toFixed(2)}`,
-        details: `${data.pageCount || 0} pages • B&W`,
-        copies: 1, // Currently fixed to 1 in backend
-        date: data.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()
-      });
+        fileType: data.mimetype || "unknown",
+        fileSize: data.fileSize || 0,
+        cost: `₹${cost.toFixed(2)}`,
+        colorMode,
+        copies,
+        details: `${data.pageCount || 0} pages • ${colorMode === "color" ? "Color" : "B&W"} • ${copies}x`,
+        date: data.createdAt?.toDate
+          ? new Date(data.createdAt.toDate()).toLocaleString()
+          : new Date().toLocaleString(),
+      };
     });
     
     res.json(history);
@@ -664,40 +660,58 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res) =
 
     console.log(`📂 Received ${req.files.length} files for processing`);
 
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
     for (let file of req.files) {
       console.log(`📄 Saving raw file: ${file.originalname} (${file.mimetype})`);
       const fileUrl = await uploadToStorage(file);
 
-      // ⚡ FAST PATH: PDFs don't need LibreOffice — count pages immediately
+      // Common metadata for all files
+      const baseJobData = {
+        userId,
+        fileName: file.originalname,
+        fileUrl,
+        mimetype: file.mimetype,
+        fileSize: file.size || file.buffer?.length || 0,
+        fileType: file.mimetype.split("/")[1] || "unknown",
+        isImage: file.mimetype.startsWith("image/"),
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      // ⚡ FAST PATH: PDFs — count pages immediately, skip the queue
       if (file.mimetype === "application/pdf") {
         try {
           const { PDFDocument } = require("pdf-lib");
           const pdfDoc = await PDFDocument.load(file.buffer);
           const pages = pdfDoc.getPageCount();
           await db.collection("print_jobs").add({
-            userId,
-            fileName: file.originalname,
-            fileUrl,
-            mimetype: file.mimetype,
-            status: "pending",  // Skip the queue — ready immediately!
+            ...baseJobData,
+            status: "pending",
             pageCount: pages,
-            createdAt: new Date(),
           });
           console.log(`⚡ PDF fast-tracked: ${file.originalname} (${pages} pages)`);
           continue;
         } catch (pdfErr) {
-          console.warn(`⚠️ PDF fast-path failed for ${file.originalname}, falling back to queue:`, pdfErr.message);
+          console.warn(`⚠️ PDF fast-path failed, queuing:`, pdfErr.message);
         }
       }
 
-      // 🐢 SLOW PATH: DOCX/PPT/etc need LibreOffice — queue for background
+      // ⚡ FAST PATH: Images — 1 page each, no conversion needed
+      if (file.mimetype.startsWith("image/")) {
+        await db.collection("print_jobs").add({
+          ...baseJobData,
+          status: "pending",
+          pageCount: 1,
+        });
+        console.log(`⚡ Image fast-tracked: ${file.originalname}`);
+        continue;
+      }
+
+      // 🐢 SLOW PATH: DOCX/PPT/etc — queue for LibreOffice background conversion
       await db.collection("print_jobs").add({
-        userId,
-        fileName: file.originalname,
-        fileUrl,
-        mimetype: file.mimetype,
+        ...baseJobData,
         status: "pending_conversion",
-        createdAt: new Date(),
       });
     }
 

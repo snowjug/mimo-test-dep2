@@ -25,6 +25,7 @@ export function PrintOptions() {
   const [orientation, setOrientation] = useState("portrait");
   const [photoLayout, setPhotoLayout] = useState("1");
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<{ name: string; mimetype: string; dataUrl: string }[]>([]);
 
   // Standard grid layouts
   const gridLayouts = [
@@ -47,7 +48,12 @@ export function PrintOptions() {
     setFiles(JSON.parse(storedFiles));
     if (uploadTotalPages) setTotalPages(Number(uploadTotalPages));
     if (uploadAmount) setBaseTotalCost(Number(uploadAmount));
+
+    const imagesRaw = sessionStorage.getItem("uploadedImages");
+    if (imagesRaw) setUploadedImages(JSON.parse(imagesRaw));
   }, [navigate]);
+
+  const hasImages = uploadedImages.length > 0;
 
   const [totalPages, setTotalPages] = useState(0);
   const [baseTotalCost, setBaseTotalCost] = useState(0);
@@ -259,54 +265,105 @@ export function PrintOptions() {
 
                 <Separator className="opacity-50" />
 
-                {/* Grid Layout */}
+                {/* Grid Layout - Image preview for images, placeholder grid for docs */}
                 <div>
                   <p className="text-sm font-bold text-slate-800 mb-1">Layout</p>
-                  <p className="text-[10px] text-slate-500 mb-3">Arrange multiple pages or images on a single sheet</p>
+                  <p className="text-[10px] text-slate-500 mb-3">
+                    {hasImages ? "Arrange your photos on a single sheet" : "Arrange multiple pages on a single sheet"}
+                  </p>
 
                   <div className="flex gap-2">
-                    {gridLayouts.map((layout) => {
+                    {[
+                      { id: "1", label: "1 per page", cols: 1, rows: 1, desc: "Full page" },
+                      ...gridLayouts,
+                    ].map((layout) => {
                       const isSelected = photoLayout === layout.id;
+                      const cellCount = layout.cols * layout.rows;
                       return (
                         <button
                           key={layout.id}
                           onClick={() => setPhotoLayout(layout.id)}
-                          className={`flex-1 flex flex-col items-center gap-2 p-2.5 sm:p-3 rounded-xl border-2 transition-all duration-300 cursor-pointer ${isSelected
+                          className={`flex-1 flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
+                            isSelected
                               ? "border-blue-500 bg-blue-50/70 shadow-md scale-[1.03]"
                               : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
-                            }`}
+                          }`}
                         >
-                          {/* Mini page with grid */}
                           <div
-                            className={`w-8 h-10 sm:w-10 sm:h-13 rounded border-2 p-[3px] grid transition-all duration-300 ${isSelected
-                                ? "border-blue-400 bg-blue-50"
-                                : "border-slate-300 bg-slate-50"
-                              }`}
+                            className={`w-8 h-10 rounded border-2 p-[3px] overflow-hidden ${
+                              isSelected ? "border-blue-400" : "border-slate-300"
+                            }`}
                             style={{
+                              display: "grid",
                               gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
                               gridTemplateRows: `repeat(${layout.rows}, 1fr)`,
                               gap: "2px",
                             }}
                           >
-                            {Array.from({ length: layout.cols * layout.rows }).map((_, i) => (
-                              <div
-                                key={i}
-                                className={`rounded-[2px] transition-colors duration-300 ${isSelected ? "bg-blue-400" : "bg-slate-300"
-                                  }`}
-                              />
-                            ))}
+                            {Array.from({ length: cellCount }).map((_, i) =>
+                              hasImages ? (
+                                <div key={i} className="overflow-hidden rounded-[1px]">
+                                  <img
+                                    src={uploadedImages[i % uploadedImages.length]?.dataUrl}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div
+                                  key={i}
+                                  className={`rounded-[2px] ${isSelected ? "bg-blue-400" : "bg-slate-300"}`}
+                                />
+                              )
+                            )}
                           </div>
                           <div className="text-center">
-                            <p className={`text-[11px] sm:text-xs font-bold transition-colors ${isSelected ? "text-blue-700" : "text-slate-700"
-                              }`}>
+                            <p className={`text-[10px] font-bold ${isSelected ? "text-blue-700" : "text-slate-700"}`}>
                               {layout.label}
                             </p>
-                            <p className="text-[8px] sm:text-[9px] text-slate-400">{layout.desc}</p>
                           </div>
                         </button>
                       );
                     })}
                   </div>
+
+                  {/* Live image layout preview */}
+                  {hasImages && (
+                    <div
+                      className="mt-4 rounded-xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm"
+                      style={{ aspectRatio: "3/4" }}
+                    >
+                      <div
+                        className="w-full h-full p-2"
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: `repeat(${
+                            photoLayout === "1" ? 1 : gridLayouts.find((l) => l.id === photoLayout)?.cols ?? 1
+                          }, 1fr)`,
+                          gridTemplateRows: `repeat(${
+                            photoLayout === "1" ? 1 : gridLayouts.find((l) => l.id === photoLayout)?.rows ?? 1
+                          }, 1fr)`,
+                          gap: "4px",
+                        }}
+                      >
+                        {Array.from({
+                          length:
+                            photoLayout === "1"
+                              ? 1
+                              : (gridLayouts.find((l) => l.id === photoLayout)?.cols ?? 1) *
+                                (gridLayouts.find((l) => l.id === photoLayout)?.rows ?? 1),
+                        }).map((_, i) => (
+                          <div key={i} className="overflow-hidden rounded-md bg-slate-100">
+                            <img
+                              src={uploadedImages[i % uploadedImages.length]?.dataUrl}
+                              alt="preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
