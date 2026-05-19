@@ -225,6 +225,12 @@ app.post("/register", async (req, res) => {
       googleUser: false,
       createdAt: now,
       updatedAt: now,
+      accountStatus: "active",
+      totalSpent: 0,
+      totalPagesPrinted: 0,
+      preferredPaymentMethod: "cashfree",
+      defaultPrintSettings: { colorMode: "bw", layout: "single", paperSize: "a4" },
+      isVerified: true,
       mimo_coins: { balance: 0, total_earned: 0, total_used: 0 },
     });
 
@@ -292,6 +298,12 @@ app.post("/google-login", async (req, res) => {
         googleUser: true,
         createdAt: now,
         updatedAt: now,
+        accountStatus: "active",
+        totalSpent: 0,
+        totalPagesPrinted: 0,
+        preferredPaymentMethod: "cashfree",
+        defaultPrintSettings: { colorMode: "bw", layout: "single", paperSize: "a4" },
+        isVerified: true,
         mimo_coins: { balance: 0, total_earned: 0, total_used: 0 },
       });
       userId = userRef.id;
@@ -538,13 +550,25 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     const snapshot = await db
       .collection("print_jobs")
       .where("userId", "==", userId)
-      .where("status", "==", "pending")
+      .where("status", "in", ["pending", "paid"])
       .get();
 
-    console.log(`[PAYMENT-SUCCESS] Found ${snapshot.size} pending jobs for userId: ${userId}`);
+    // Filter jobs that don't have a printCode yet
+    const jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
+    
+    // If all jobs already have a print code, return the most recent one
+    if (jobsToUpdate.length === 0 && !snapshot.empty) {
+      const recentJob = snapshot.docs.find(doc => doc.data().printCode);
+      if (recentJob) {
+        console.log(`[PAYMENT-SUCCESS] Returning existing code for user ${userId}`);
+        return res.json({ printCode: recentJob.data().printCode });
+      }
+    }
 
-    if (snapshot.empty) {
-      console.error(`❌ No pending jobs found for userId: ${userId}`);
+    console.log(`[PAYMENT-SUCCESS] Found ${jobsToUpdate.length} jobs needing print codes for userId: ${userId}`);
+
+    if (jobsToUpdate.length === 0) {
+      console.error(`❌ No jobs found requiring a print code for userId: ${userId}`);
       return res.status(400).json({ error: "No pending jobs found" });
     }
 
@@ -555,12 +579,14 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     const batch = db.batch();
     let totalAmountForCoins = 0;
 
-    snapshot.forEach((doc) => {
+    jobsToUpdate.forEach((doc) => {
       const data = doc.data();
-      totalAmountForCoins += (data.pageCount || 0) * 2.3;
+      totalAmountForCoins += (data.pageCount || 0) * 2.3; // Defaulting to BW price for coins
       
       batch.update(doc.ref, {
         status: "paid",
+        "paymentStatus.status": "completed",
+        "timeline.paymentCompletedAt": admin.firestore.FieldValue.serverTimestamp(),
         printCode,
         codeCreatedAt: now,
         codeExpiresAt: expiresAt,
@@ -692,6 +718,7 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res) =
 
       // Common metadata for all files
       const baseJobData = {
+        // --- Backward Compatibility (V1 schema) ---
         userId,
         fileName: file.originalname,
         fileUrl,
@@ -701,6 +728,27 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res) =
         isImage: file.mimetype.startsWith("image/"),
         createdAt: now,
         updatedAt: now,
+        
+        // --- Analytics / V2 Schema (FIREBASE_SCHEMA_DESIGN.md) ---
+        sourceFile: {
+          fileName: file.originalname,
+          originalExtension: require('path').extname(file.originalname) || "",
+          mimeType: file.mimetype,
+          fileSizeBytes: file.size || file.buffer?.length || 0,
+          uploadedAt: now,
+        },
+        conversionDetails: {
+          convertedAt: null,
+          originalPageCount: 0,
+          actualPageCount: 0,
+          isConverting: false,
+        },
+        printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex" },
+        pricing: { pricePerPage: 0, totalPages: 0, copiesRequested: 1, totalPagesToPrint: 0, estimatedAmount: 0, finalAmount: 0, currency: "INR" },
+        paymentStatus: { status: "pending", paymentMethod: "cashfree", transactionId: null, paidAt: null },
+        printStatus: { status: "pending", retrievedAt: null, printStartedAt: null, printCompletedAt: null },
+        timeline: { createdAt: now, uploadedAt: now, orderCreatedAt: null, expiresAt: null },
+        metadata: { ipAddress: req.ip || "", userAgent: req.get("user-agent") || "", tags: [] }
       };
 
       // ⚡ FAST PATH: PDFs — count pages immediately, skip the queue
@@ -763,11 +811,16 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     const { printOptions } = req.body;
     if (jobsSnapshot.empty) return res.status(400).send("No pending jobs");
 
-    // Save printer configuration to each job
+    const orderId = "order_" + Date.now();
+    const jobIds = [];
+
+    // Save printer configuration and orderId to each job
     const batchUpdate = db.batch();
     jobsSnapshot.forEach((doc) => {
+      jobIds.push(doc.id);
       batchUpdate.update(doc.ref, { 
         printOptions: printOptions || {},
+        orderId,
       });
     });
     await batchUpdate.commit();
@@ -786,7 +839,6 @@ app.post("/create-order", authenticateToken, async (req, res) => {
 
     const amount = Number(totalAmount.toFixed(2));
     console.log(`[CREATE-ORDER] ${totalPages} pages × ${copies} copies × ₹${pricePerPage} (${colorMode}) = ₹${amount}`);
-    const orderId = "order_" + Date.now();
 
     const response = await axios.post(
       `${CASHFREE_BASE_URL}/orders`,
@@ -811,14 +863,41 @@ app.post("/create-order", authenticateToken, async (req, res) => {
 
     console.log(`✅ Cashfree order created: ${orderId}, session: ${response.data.payment_session_id}`);
 
+    // --- V2 Schema: Create Payment Transaction Audit Record ---
+    const paymentTxnRef = db.collection("payment_transactions").doc();
+    const txnId = paymentTxnRef.id;
+
+    await paymentTxnRef.set({
+      transactionId: txnId,
+      userId,
+      orderId,
+      paymentGateway: "cashfree",
+      gatewayTransactionId: response.data.payment_session_id,
+      orderDetails: { description: `Print order ${orderId}`, amount, currency: "INR", orderTimestamp: new Date() },
+      paymentAttempt: { attemptNumber: 1, initiatedAt: new Date(), sessionId: response.data.payment_session_id, paymentMethod: "unknown" },
+      transactionStatus: { status: "pending", gatewayStatus: "initiated", completedAt: null },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // --- V1 + V2 Schema: Create Order ---
     await db.collection("orders").add({
       orderId,
       userId,
       amount,
       totalPages,
       totalDocs: jobsSnapshot.size,
-      status: "CREATED",
+      status: "CREATED", // V1 compat
       createdAt: new Date(),
+      updatedAt: new Date(),
+      
+      // V2 Schema fields
+      paymentTransactionId: txnId,
+      jobIds, // Add mapping to jobs
+      orderStatus: "created",
+      orderType: "print",
+      totals: { subtotalAmount: amount, taxAmount: 0, totalAmount: amount, currency: "INR" },
+      paymentDetails: { paymentMethod: "cashfree", paymentStatus: "pending" },
     });
 
     res.json({
@@ -906,20 +985,59 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
     if (event.type === "PAYMENT_SUCCESS_WEBHOOK") {
       const orderId = event.data.order.order_id;
       const userId = event.data.customer_details.customer_id;
+      const paidAmount = event.data.order.order_amount;
+      const now = admin.firestore.FieldValue.serverTimestamp();
 
+      // Update Orders (V1 + V2 Schema)
       const orders = await db.collection("orders").where("orderId", "==", orderId).get();
       const orderBatch = db.batch();
-      orders.forEach((doc) => orderBatch.update(doc.ref, { status: "PAID" }));
+      orders.forEach((doc) => {
+        orderBatch.update(doc.ref, { 
+          status: "PAID",
+          orderStatus: "completed",
+          "paymentDetails.paymentStatus": "completed",
+          "paymentDetails.paidAt": now
+        });
+      });
       await orderBatch.commit();
 
+      // Update Print Jobs (V1 + V2 Schema)
       const jobs = await db
         .collection("print_jobs")
         .where("userId", "==", userId)
         .where("status", "==", "pending")
         .get();
+        
       const jobsBatch = db.batch();
-      jobs.forEach((doc) => jobsBatch.update(doc.ref, { status: "paid" }));
+      let newTotalPages = 0;
+      
+      jobs.forEach((doc) => {
+        const pages = doc.data().pageCount || 0;
+        newTotalPages += pages;
+        jobsBatch.update(doc.ref, { 
+          status: "paid",
+          "paymentStatus.status": "completed",
+          "paymentStatus.paidAt": now
+        });
+      });
       await jobsBatch.commit();
+      
+      // Update User Statistics (V2 Schema)
+      const userRef = db.collection("users").doc(userId);
+      await userRef.update({
+        totalSpent: admin.firestore.FieldValue.increment(paidAmount),
+        totalPagesPrinted: admin.firestore.FieldValue.increment(newTotalPages)
+      });
+      
+      // Update Payment Transactions Audit (V2 Schema)
+      const txnSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      if (!txnSnapshot.empty) {
+        await txnSnapshot.docs[0].ref.update({
+          "transactionStatus.status": "completed",
+          "transactionStatus.gatewayStatus": "success",
+          "transactionStatus.completedAt": now
+        });
+      }
     }
 
     res.sendStatus(200);
