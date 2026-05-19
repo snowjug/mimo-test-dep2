@@ -1305,9 +1305,8 @@ app.post("/mark-printed", authenticateToken, async (req, res) => {
   }
 });
 
-// ================= KIOSK: PULL MECHANISM (STAGE 1: QUEUE) =================
-// Called by iPad kiosk after user confirms print. We mark it as 'printing'
-// so the Raspberry Pi can pull it automatically via Firestore listeners.
+// ================= KIOSK: TRIGGER PI PRINT (PUSH MECHANISM) =================
+// Called by kiosk after user confirms. Backend calls Pi, Pi prints via CUPS.
 app.post("/kiosk/print", kioskLimiter, async (req, res) => {
   try {
     const { printCode } = req.body;
@@ -1325,7 +1324,6 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
 
     const now = new Date();
     const results = [];
-    const batch = db.batch();
 
     for (const doc of snapshot.docs) {
       const data = doc.data();
@@ -1333,7 +1331,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
 
       // Skip expired
       if (data.codeExpiresAt && data.codeExpiresAt.toDate() < now) {
-        batch.update(doc.ref, { status: "expired", printerStatus: "Expired" });
+        await doc.ref.update({ status: "expired", printerStatus: "Expired" });
         results.push({ file: fileName, status: "expired" });
         continue;
       }
@@ -1345,88 +1343,84 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
       }
 
       // Mark sending to Pi
-      batch.update(doc.ref, {
+      await doc.ref.update({
         status: "printing",
-        printerStatus: "Queued for Pi",
+        printerStatus: "Sending to Pi...",
         kioskId: "KIOSK_001",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      results.push({ file: fileName, status: "queued" });
+
+      try {
+        const opts = data.printOptions || {};
+        const copies = Number(opts.copies || 1);
+        const fileUrl = data.fileUrl; 
+
+        console.log(`🖨️ Sending to Pi: ${fileName} | copies: ${copies} | url: ${fileUrl}`);
+        const piResults = await triggerPiPrint(fileUrl, copies);
+        console.log(`✅ Pi response for ${fileName}:`, piResults);
+
+        await doc.ref.update({
+          status: "completed",
+          isPrinted: true,
+          printerStatus: "Printed",
+          printedAt: admin.firestore.FieldValue.serverTimestamp(),
+          printTime: admin.firestore.FieldValue.serverTimestamp(),
+          inventoryUpdated: true,
+          inventoryUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          piResponse: JSON.stringify(piResults[0] || {}),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        results.push({ file: fileName, status: "printed", piResponse: piResults });
+      } catch (piErr) {
+        const errMsg = piErr.response?.data?.detail || piErr.message || "Unknown error";
+        console.error(`❌ Pi print failed for ${fileName}:`, errMsg);
+
+        await doc.ref.update({
+          status: "failed", // Mark as failed
+          printerStatus: `Pi error: ${errMsg.substring(0, 100)}`,
+          piError: errMsg,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        // --- AUTO REFUND LOGIC ---
+        if (data.finalCost > 0 && data.orderId) {
+          console.log(`[AUTO-REFUND] Triggering Cashfree refund for order: ${data.orderId}, amount: ₹${data.finalCost}`);
+          try {
+            const cashfreeHeaders = {
+              "x-client-id": process.env.CASHFREE_APP_ID,
+              "x-client-secret": process.env.CASHFREE_SECRET_KEY,
+              "x-api-version": "2023-08-01",
+              "Content-Type": "application/json"
+            };
+            const refundData = {
+              refund_amount: data.finalCost,
+              refund_id: `ref_${Date.now()}_${data.orderId.substring(0,10)}`,
+              refund_note: `Hardware Error: ${errMsg.substring(0, 50)}`
+            };
+            await axios.post(`${CASHFREE_BASE_URL}/orders/${data.orderId}/refunds`, refundData, { headers: cashfreeHeaders });
+            console.log(`[AUTO-REFUND] Refund successful for ${data.orderId}`);
+            
+            await doc.ref.update({ refundStatus: "completed", refundAmount: data.finalCost });
+          } catch (cfErr) {
+            console.error(`[AUTO-REFUND] Refund failed for ${data.orderId}:`, cfErr.response?.data || cfErr.message);
+            await doc.ref.update({ refundStatus: "failed", refundError: cfErr.message });
+          }
+        }
+
+        results.push({ file: fileName, status: "failed", error: errMsg });
+      }
     }
 
-    await batch.commit();
-
-    const allQueued = results.every((r) => ["queued", "already_printed"].includes(r.status));
+    const allDone = results.every((r) => ["printed", "already_printed"].includes(r.status));
     res.json({
-      success: allQueued,
-      message: allQueued ? "All documents queued for printer" : "Some documents failed",
+      success: allDone,
+      message: allDone ? "All documents sent to printer" : "Some documents failed",
       results,
     });
   } catch (err) {
     console.error("❌ KIOSK QUEUE ERROR:", err);
     res.status(500).json({ error: "Print queue failed", details: err.message });
-  }
-});
-
-// ================= KIOSK: PI STATUS UPDATE & AUTO REFUNDS =================
-// The Pi calls this after printing finishes or encounters a hardware jam
-app.post("/kiosk/job-status", async (req, res) => {
-  try {
-    const { jobId, status, errorDetails } = req.body;
-    if (!jobId || !status) return res.status(400).json({ error: "jobId and status required" });
-
-    const jobDoc = await db.collection("print_jobs").doc(jobId).get();
-    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
-
-    const data = jobDoc.data();
-    
-    if (status === "completed") {
-      await jobDoc.ref.update({
-        status: "completed",
-        isPrinted: true,
-        printerStatus: "Printed",
-        printedAt: admin.firestore.FieldValue.serverTimestamp(),
-        printTime: admin.firestore.FieldValue.serverTimestamp(),
-        inventoryUpdated: true,
-        inventoryUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      return res.json({ success: true, message: "Marked completed" });
-    } 
-    
-    if (status === "failed") {
-      await jobDoc.ref.update({
-        status: "failed",
-        printerStatus: errorDetails || "Printer Error",
-        piError: errorDetails || "Unknown Hardware Error",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      // --- AUTO REFUND LOGIC ---
-      if (data.finalCost > 0 && data.orderId) {
-        console.log(`[AUTO-REFUND] Triggering Cashfree refund for order: ${data.orderId}, amount: ₹${data.finalCost}`);
-        try {
-          const refundData = {
-            refund_amount: data.finalCost,
-            refund_id: `ref_${Date.now()}_${data.orderId.substring(0,10)}`, // limit length if needed
-            refund_note: `Hardware Error: ${errorDetails || "Printer Jam"}`
-          };
-          await axios.post(`${CASHFREE_BASE_URL}/orders/${data.orderId}/refunds`, refundData, { headers: cashfreeHeaders });
-          console.log(`[AUTO-REFUND] Refund successful for ${data.orderId}`);
-          
-          await jobDoc.ref.update({ refundStatus: "completed", refundAmount: data.finalCost });
-        } catch (cfErr) {
-          console.error(`[AUTO-REFUND] Refund failed for ${data.orderId}:`, cfErr.response?.data || cfErr.message);
-          await jobDoc.ref.update({ refundStatus: "failed", refundError: cfErr.message });
-        }
-      }
-      return res.json({ success: true, message: "Marked failed and triggered refund pipeline" });
-    }
-
-    res.status(400).json({ error: "Invalid status string. Use 'completed' or 'failed'." });
-  } catch (err) {
-    console.error("❌ PI JOB STATUS ERROR:", err);
-    res.status(500).json({ error: "Failed to update status", details: err.message });
   }
 });
 
