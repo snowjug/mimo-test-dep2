@@ -265,10 +265,15 @@ export function PrintOptions() {
                 <Separator className="opacity-50" />
 
                 {/* Grid Layout - Image preview for images, placeholder grid for docs */}
-                <div>
+                <div className={!hasImages ? "opacity-40 pointer-events-none select-none relative" : ""}>
+                  {!hasImages && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center">
+                      <Badge variant="secondary" className="bg-slate-200/80 text-slate-600 backdrop-blur-sm">Not available for documents</Badge>
+                    </div>
+                  )}
                   <p className="text-sm font-bold text-slate-800 mb-1">Layout</p>
                   <p className="text-[10px] text-slate-500 mb-3">
-                    {hasImages ? "Arrange your photos on a single sheet" : "Arrange multiple pages on a single sheet"}
+                    {hasImages ? "Arrange your photos on a single sheet" : "Photo layout only available for images"}
                   </p>
 
                   <div className="flex gap-2">
@@ -491,18 +496,39 @@ export function PrintOptions() {
                     const isImage = uploadedImages.some(img => img.name === previewFile?.name && img.mimetype.startsWith("image/"));
                     
                     if (previewDataUrl) {
+                      const filterStyle = colorMode === "bw" ? "grayscale(100%) contrast(1.1)" : "none";
+                      const transformStyle = orientation === "landscape" ? "rotate(-90deg) scale(0.7)" : "none";
+                      
                       if (isPdf) {
                         return (
-                          <div className={`w-full h-full transition-transform duration-300 ${orientation === "landscape" ? "rotate-90 scale-[0.7] transform-origin-center" : ""}`}>
-                            <object data={previewDataUrl} type="application/pdf" className="w-full h-full min-h-[400px]">
+                          <div className="w-full h-full flex items-center justify-center overflow-hidden bg-slate-200/50 rounded-md">
+                            <object 
+                              data={previewDataUrl} 
+                              type="application/pdf" 
+                              className="w-full h-full min-h-[400px] transition-all duration-300"
+                              style={{ 
+                                filter: filterStyle,
+                                transform: transformStyle,
+                                transformOrigin: "center center"
+                              }}
+                            >
                               <p>Preview not supported in this browser.</p>
                             </object>
                           </div>
                         );
                       } else if (isImage) {
                         return (
-                          <div className={`w-full h-full flex items-center justify-center transition-transform duration-300 ${orientation === "landscape" ? "rotate-90" : ""}`}>
-                            <img src={previewDataUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
+                          <div className="w-full h-full flex items-center justify-center overflow-hidden bg-slate-200/50 rounded-md">
+                            <img 
+                              src={previewDataUrl} 
+                              alt="Preview" 
+                              className="max-w-full max-h-full object-contain transition-all duration-300"
+                              style={{ 
+                                filter: filterStyle,
+                                transform: transformStyle,
+                                transformOrigin: "center center"
+                              }}
+                            />
                           </div>
                         );
                       }
