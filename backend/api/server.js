@@ -427,7 +427,8 @@ app.get("/mimo/coins", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const userDoc = await db.collection("users").doc(userId).get();
-    const data = userDoc.data();
+    if (!userDoc.exists) return res.status(404).json({ balance: 0, totalEarned: 0, totalUsed: 0, history: [] });
+    const data = userDoc.data() || {};
     
     const historySnapshot = await db
       .collection("mimo_coin_transactions")
