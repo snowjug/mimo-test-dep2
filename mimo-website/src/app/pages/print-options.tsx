@@ -53,7 +53,8 @@ export function PrintOptions() {
     if (imagesRaw) setUploadedImages(JSON.parse(imagesRaw));
   }, [navigate]);
 
-  const hasImages = uploadedImages.length > 0;
+  // Only true if there are actual images (not PDFs)
+  const hasImages = uploadedImages.some(img => img.mimetype.startsWith('image/'));
 
   const [totalPages, setTotalPages] = useState(0);
   const [baseTotalCost, setBaseTotalCost] = useState(0);
@@ -265,10 +266,10 @@ export function PrintOptions() {
                 <Separator className="opacity-50" />
 
                 {/* Grid Layout - Image preview for images, placeholder grid for docs */}
-                <div className={!hasImages ? "opacity-40 pointer-events-none select-none relative" : ""}>
+                <div className={!hasImages ? "opacity-30 pointer-events-none grayscale blur-[1px] relative select-none" : "relative"}>
                   {!hasImages && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center">
-                      <Badge variant="secondary" className="bg-slate-200/80 text-slate-600 backdrop-blur-sm">Not available for documents</Badge>
+                      <Badge variant="secondary" className="bg-slate-800 text-white shadow-xl px-4 py-1 text-sm rounded-full pointer-events-auto">Layout only available for Images</Badge>
                     </div>
                   )}
                   <p className="text-sm font-bold text-slate-800 mb-1">Layout</p>
@@ -332,7 +333,7 @@ export function PrintOptions() {
                   </div>
 
                   {/* Live image layout preview */}
-                  {hasImages && (
+                  {hasImages && photoLayout !== "1" && (
                     <div
                       className="mt-4 rounded-xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm"
                       style={{ aspectRatio: "3/4" }}
