@@ -390,7 +390,8 @@ app.get("/print-history", authenticateToken, async (req, res) => {
         return {
           id: doc.id,
           ...data,
-          amount: data.totalCost || data.amount || 0,
+          cost: `₹${(data.totalCost || data.amount || 0).toFixed(2)}`,
+          file: data.fileName || data.sourceFile?.fileName || "Print Order",
           date: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "N/A",
           timestamp: data.createdAt ? data.createdAt.toDate().getTime() : 0,
           details: `${data.pageCount || 0} pages • ${data.colorMode === "color" ? "Color" : "B&W"}`
