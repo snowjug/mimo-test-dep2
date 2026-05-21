@@ -1,4 +1,4 @@
-# MIMO Test Dep2
+# MIMO V2
 
 This repository contains the MIMO printing platform split into three parts:
 
@@ -29,8 +29,12 @@ Key backend responsibilities include:
 - **Frontend Polling:** UI gracefully holds upload progress at 99% until the background worker completes file parsing.
 - **Direct PDF Streaming:** Kiosk PDF downloads use Node.js `ReadStreams` bypassing RAM buffers entirely.
 - **In-Memory Cache:** 200MB maximum LRU Cache stores recent Kiosk PDFs ensuring fast downloads while strictly preventing memory leaks.
-- **Mimo Coins & Print History:** Fully functional backend integration for displaying previous prints and managing virtual currency.
+- **Mimo Coins & Print History:** Fully functional backend integration for displaying previous prints and managing virtual currency. Print History gracefully filters and maps data in-memory to bypass Firebase composite index limits.
+- **Profile Enhancements:** Added secure profile photo uploads directly to Firebase Storage using long-lived Signed URLs.
+- **Secret Promotional Codes:** Implemented a 'ASDFG' coupon system for 100% free prints, fully bypassing the Cashfree payment gateway and instantly generating the 4-digit PIN.
+- **Kiosk UI Polish:** Replaced the bulky full-screen loading overlay with a sleek, inline button spinner on the numpad screen.
 - **Brute Force Protection:** Rate limiters added to Kiosk API endpoints (20 req/min).
+- **Index Optimization:** Re-architected backend queries for Server-Sent Events (SSE) and history to filter in-memory, completely removing the need for strict composite indexes.
 
 ## Folder Structure
 
