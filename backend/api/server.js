@@ -1,3 +1,4 @@
+require("../instrument.js");
 // Load dotenv only in development (not in Docker/production)
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
@@ -1570,6 +1571,15 @@ app.get("/cron/cleanup-files", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get("/debug-sentry", function mainHandler(req, res) {
+  const Sentry = require("@sentry/node");
+  Sentry.metrics.count('test_counter', 1);
+  throw new Error("My first Backend Sentry error!");
+});
+
+const Sentry = require("@sentry/node");
+Sentry.setupExpressErrorHandler(app);
 
 // ================= START =================
 // Start the server when run directly. This ensures Docker/production runs the app.
