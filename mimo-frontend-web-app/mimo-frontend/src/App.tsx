@@ -49,42 +49,11 @@ function App() {
   const handleValidationSuccess = useCallback(async () => {
     if (validationTimerRef.current) clearTimeout(validationTimerRef.current);
 
-    validationTimerRef.current = window.setTimeout(async () => {
-      try {
-        // 🔐 VERIFY CODE
-        const res = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/get-documents-by-code", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ printCode: code }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.error || "Invalid Code");
-        }
-
-        // 📄 GET DOCUMENT
-        const doc = data.documents[0];
-
-        // 📊 SET JOB DATA
-        const job = {
-          userName: data.userName || "User",
-          fileName: doc.file,
-          pages: 1,
-          copies: doc.copies,
-          mode: "Black & White",
-        };
-
-        setJobData(job);
-        setPrintStatus("printing");
-        setCurrentScreen("printing-screen");
-
-        // 🖨️ TRIGGER PRINT VIA PI (BACKEND INTEGRATION)
+    return new Promise<void>((resolve, reject) => {
+      validationTimerRef.current = window.setTimeout(async () => {
         try {
-          const printRes = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/kiosk/print", {
+          // 🔐 VERIFY CODE
+          const res = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/get-documents-by-code", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -92,30 +61,65 @@ function App() {
             body: JSON.stringify({ printCode: code }),
           });
 
-          const printData = await printRes.json();
-          
-          if (!printRes.ok) {
-            console.error("Print Failed", printData.error);
-            showToast(printData.error || "Failed to trigger printer", true);
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error || "Invalid Code");
+          }
+
+          // 📄 GET DOCUMENT
+          const doc = data.documents[0];
+
+          // 📊 SET JOB DATA
+          const job = {
+            userName: data.userName || "User",
+            fileName: doc.file,
+            pages: 1,
+            copies: doc.copies,
+            mode: "Black & White",
+          };
+
+          setJobData(job);
+          setPrintStatus("printing");
+          setCurrentScreen("printing-screen");
+
+          // 🖨️ TRIGGER PRINT VIA PI (BACKEND INTEGRATION)
+          try {
+            const printRes = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/kiosk/print", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ printCode: code }),
+            });
+
+            const printData = await printRes.json();
+            
+            if (!printRes.ok) {
+              console.error("Print Failed", printData.error);
+              showToast(printData.error || "Failed to trigger printer", true);
+              setCurrentScreen("system-error-screen");
+            }
+          } catch (printErr: any) {
+            console.error("Printer trigger error:", printErr);
+            showToast(printErr.message || "Failed to communicate with printer", true);
             setCurrentScreen("system-error-screen");
           }
-        } catch (printErr: any) {
-          console.error("Printer trigger error:", printErr);
-          showToast(printErr.message || "Failed to communicate with printer", true);
-          setCurrentScreen("system-error-screen");
+
+          resolve();
+        } catch (err: any) {
+          console.error("❌ CODE ERROR:", err.message);
+
+          setCurrentScreen('code-entry-screen');
+          showToast(err.message || 'Invalid Code - Access Denied', true);
+
+          setTimeout(() => setCode(''), 600);
+          reject(err);
+        } finally {
+          validationTimerRef.current = null;
         }
-
-      } catch (err: any) {
-        console.error("❌ CODE ERROR:", err.message);
-
-        setCurrentScreen('code-entry-screen');
-        showToast(err.message || 'Invalid Code - Access Denied', true);
-
-        setTimeout(() => setCode(''), 600);
-      }
-
-      validationTimerRef.current = null;
-    }, 300);
+      }, 300);
+    });
   }, [code, showToast]);
 
   // ================= RESET =================
