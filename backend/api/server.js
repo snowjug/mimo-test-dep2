@@ -251,6 +251,9 @@ app.post("/login", async (req, res) => {
       userAgent: req.get("user-agent") || "",
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
+    
+    // Update lastLoginAt
+    await doc.ref.update({ lastLoginAt: admin.firestore.FieldValue.serverTimestamp() });
 
     const token = jwt.sign({ userId }, SECRET_KEY);
     res.json({ jwtToken: token });
