@@ -97,7 +97,8 @@ export function UploadFile() {
 
       // Start real-time SSE stream for processing status
       const token = localStorage.getItem("jwtToken");
-      const API_URL = import.meta.env.VITE_API_URL || "https://p01--mimo-backend--4b94y9s4jyc5.code.run";
+      const rawApiUrl = import.meta.env.VITE_API_URL || "https://p01--mimo-backend--4b94y9s4jyc5.code.run";
+      const API_URL = rawApiUrl.replace(/\/$/, ""); // Strip trailing slash if present
       const eventSource = new EventSource(`${API_URL}/mimo/conversion-stream?token=${token}`);
 
       const handleUploadError = () => {
