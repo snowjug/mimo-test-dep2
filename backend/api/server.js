@@ -19,41 +19,6 @@ const { promisify } = require("util");
 const { OAuth2Client } = require("google-auth-library");
 const crypto = require("crypto");
 
-// ================= PDF CACHE =================
-const pdfCache = new Map();
-const PDF_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
-const MAX_CACHE_SIZE = 200 * 1024 * 1024; // 200MB max
-let cacheSize = 0;
-
-function cacheJobPdf(pin, buffer) {
-  cacheSize += buffer.length;
-  
-  // Evict oldest if over limit
-  if (cacheSize > MAX_CACHE_SIZE) {
-    const oldestPin = Array.from(pdfCache.keys())[0];
-    const oldestBuffer = pdfCache.get(oldestPin).buffer;
-    cacheSize -= oldestBuffer.length;
-    pdfCache.delete(oldestPin);
-    console.log(`🧹 Evicted oldest PDF from cache: ${oldestPin}`);
-  }
-  
-  pdfCache.set(pin, {
-    buffer,
-    expiry: Date.now() + PDF_CACHE_TTL
-  });
-}
-
-// Cleanup expired cache periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of pdfCache.entries()) {
-    if (value.expiry < now) {
-      cacheSize -= value.buffer.length;
-      pdfCache.delete(key);
-    }
-  }
-}, 5 * 60 * 1000); // Run cleanup every 5 minutes
-
 const libreConvert = promisify(libre.convert);
 const { admin, db, bucket } = require("./firebase");
 const rateLimit = require("express-rate-limit");
@@ -115,7 +80,7 @@ const cashfreeHeaders = {
 // ================= AUTH MIDDLEWARE =================
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.split(" ")[1];
+  const token = authHeader?.split(" ")[1] || req.query.token;
 
   if (!token) return res.status(401).send("Token missing");
 
@@ -664,21 +629,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
 
     await batch.commit();
 
-    // 🚀 PREFETCH PDFS TO CACHE (Background)
-    setTimeout(() => {
-      snapshot.forEach(async (doc) => {
-        try {
-          const data = doc.data();
-          const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
-          const file = bucket.file(filePath);
-          const [buffer] = await file.download();
-          cacheJobPdf(doc.id, buffer);
-          console.log(`🚀 Prefetched PDF into cache: ${doc.id}`);
-        } catch (err) {
-          console.error("Prefetch failed for", doc.id, err);
-        }
-      });
-    }, 0);
+    // We no longer prefetch to RAM. Signed URLs will be generated when Kiosk requests them.
 
     res.json({
       message: "Payment success",
@@ -720,6 +671,48 @@ app.get("/mimo/conversion-status", authenticateToken, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Failed to get status" });
   }
+});
+
+app.get("/mimo/conversion-stream", authenticateToken, (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  
+  // To avoid timeouts on some proxies (like Nginx/Cloudflare)
+  res.flushHeaders();
+
+  const userId = req.user.userId;
+
+  // Listen to Firestore for real-time updates
+  const unsubscribe = db.collection("print_jobs")
+    .where("userId", "==", userId)
+    .where("status", "in", ["pending_conversion", "processing", "pending"])
+    .onSnapshot((snapshot) => {
+      let isProcessing = false;
+      let totalPages = 0;
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.status === "pending_conversion" || data.status === "processing") {
+          isProcessing = true;
+        } else if (data.status === "pending") {
+          totalPages += (data.pageCount || 0);
+        }
+      });
+
+      if (isProcessing) {
+        res.write(`data: ${JSON.stringify({ status: "processing" })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ status: "completed", totalPages, amount: Number((totalPages * 2.3).toFixed(2)) })}\n\n`);
+      }
+    }, (err) => {
+      console.error("SSE Snapshot Error:", err);
+      res.write(`data: ${JSON.stringify({ error: "Stream error" })}\n\n`);
+    });
+
+  req.on("close", () => {
+    unsubscribe();
+  });
 });
 
 // ================= UPLOAD =================
@@ -1206,11 +1199,18 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       // ❌ Already printed
       if (data.isPrinted) continue;
 
+      const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
+      const file = bucket.file(filePath);
+      const [signedUrl] = await file.getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+      });
+
       validDocs.push({
         id: doc.id,
-        file: data.fileName, // ✅ FIX (you used wrong key before)
+        file: data.fileName,
         copies: data.copies || 1,
-        url: data.fileUrl,
+        url: signedUrl,
       });
 
       // 🔄 Mark as printing
@@ -1353,10 +1353,16 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
       try {
         const opts = data.printOptions || {};
         const copies = Number(opts.copies || 1);
-        const fileUrl = data.fileUrl; 
+        
+        const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
+        const file = bucket.file(filePath);
+        const [signedUrl] = await file.getSignedUrl({
+          action: 'read',
+          expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+        });
 
-        console.log(`🖨️ Sending to Pi: ${fileName} | copies: ${copies} | url: ${fileUrl}`);
-        const piResults = await triggerPiPrint(fileUrl, copies);
+        console.log(`🖨️ Sending to Pi: ${fileName} | copies: ${copies} | url: ${signedUrl}`);
+        const piResults = await triggerPiPrint(signedUrl, copies);
         console.log(`✅ Pi response for ${fileName}:`, piResults);
 
         await doc.ref.update({
@@ -1442,49 +1448,7 @@ app.get("/kiosk/health", async (req, res) => {
   }
 });
 
-app.get("/download/:id", async (req, res) => {
-  try {
-    const docId = req.params.id;
-
-    const docSnap = await db.collection("print_jobs").doc(docId).get();
-
-    if (!docSnap.exists) {
-      return res.status(404).send("File not found");
-    }
-
-    const data = docSnap.data();
-
-    // 🔥 EXTRACT FILE PATH FROM URL
-    const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
-
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${data.fileName}"`
-    );
-    res.setHeader("Content-Type", "application/pdf");
-
-    // 🚀 CHECK CACHE FIRST
-    const cached = pdfCache.get(docId);
-    if (cached) {
-      console.log(`⚡ CACHE HIT for ${docId}`);
-      return res.send(cached.buffer);
-    }
-
-    // 🔥 STREAM FALLBACK
-    console.log(`⬇️ STREAMING from Firebase: ${docId}`);
-    const file = bucket.file(filePath);
-    file.createReadStream()
-      .on('error', (err) => {
-        console.error("❌ STREAM ERROR:", err);
-        if (!res.headersSent) res.status(500).send("Stream failed");
-      })
-      .pipe(res);
-
-  } catch (err) {
-    console.error("❌ DOWNLOAD ERROR:", err);
-    res.status(500).send("Download failed");
-  }
-});
+// Endpoint removed: /download/:id is no longer needed as Pi fetches from Signed URLs directly.
 // ================= BACKGROUND CONVERSION =================
 setInterval(async () => {
   try {

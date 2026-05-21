@@ -54,15 +54,11 @@ export function UploadFile() {
     const formData = new FormData();
     const fileArray = Array.from(fileList);
 
-    // Extract image data URLs BEFORE upload (while we have the File objects)
+    // Extract image data URLs BEFORE upload using memory-efficient Object URLs
     const imageDataUrls: { name: string; mimetype: string; dataUrl: string }[] = [];
     for (const file of fileArray) {
       if (file.type.startsWith("image/") || file.type === "application/pdf") {
-        const dataUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(file);
-        });
+        const dataUrl = URL.createObjectURL(file);
         imageDataUrls.push({ name: file.name, mimetype: file.type, dataUrl });
       }
     }
@@ -99,12 +95,25 @@ export function UploadFile() {
         },
       });
 
-      // Start polling for processing status
-      const pollTimer = setInterval(async () => {
+      // Start real-time SSE stream for processing status
+      const token = localStorage.getItem("token");
+      const eventSource = new EventSource(`${import.meta.env.VITE_API_URL}/mimo/conversion-stream?token=${token}`);
+
+      const handleUploadError = () => {
+        setFiles((prev) =>
+          prev.map((f) =>
+            newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "failed", progress: 0 } : f
+          )
+        );
+        toast.error("File processing failed");
+        setUploading(false);
+      };
+
+      eventSource.onmessage = (event) => {
         try {
-          const statusRes = await api.get("/mimo/conversion-status");
-          if (statusRes.data.status === "completed") {
-            clearInterval(pollTimer);
+          const data = JSON.parse(event.data);
+          if (data.status === "completed") {
+            eventSource.close();
             setFiles((prev) =>
               prev.map((f) =>
                 newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "completed", progress: 100 } : f
@@ -112,23 +121,26 @@ export function UploadFile() {
             );
             toast.success("Files processed successfully!");
 
-            setBackendTotalPages(statusRes.data.totalPages);
-            sessionStorage.setItem("uploadAmount", statusRes.data.amount);
-            sessionStorage.setItem("uploadTotalPages", statusRes.data.totalPages);
+            setBackendTotalPages(data.totalPages);
+            sessionStorage.setItem("uploadAmount", data.amount);
+            sessionStorage.setItem("uploadTotalPages", data.totalPages);
             setUploading(false);
+          } else if (data.error) {
+            eventSource.close();
+            throw new Error(data.error);
           }
-        } catch (pollErr) {
-          console.error("Polling error", pollErr);
-          clearInterval(pollTimer);
-          setFiles((prev) =>
-            prev.map((f) =>
-              newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "failed", progress: 0 } : f
-            )
-          );
-          toast.error("File processing failed");
-          setUploading(false);
+        } catch (err) {
+          eventSource.close();
+          console.error("SSE parse error", err);
+          handleUploadError();
         }
-      }, 1000); // Poll every 1 second for fast feedback
+      };
+
+      eventSource.onerror = (err) => {
+        eventSource.close();
+        console.error("SSE connection error", err);
+        handleUploadError();
+      };
 
     } catch (err) {
       console.error(err);
