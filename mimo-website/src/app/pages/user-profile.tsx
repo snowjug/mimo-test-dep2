@@ -24,6 +24,8 @@ export function UserProfile() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [printHistory, setPrintHistory] = useState<any[]>([]);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
@@ -38,6 +40,7 @@ export function UserProfile() {
         setName(profileRes.data.username);
         setEmail(profileRes.data.email);
         setPhone(profileRes.data.mobileNumber || "");
+        setPhotoUrl(profileRes.data.photoUrl || null);
 
         const historyRes = await api.get("/print-history");
         setPrintHistory(historyRes.data);
@@ -67,6 +70,28 @@ export function UserProfile() {
     }
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    try {
+      const res = await api.post("/upload-profile-photo", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      setPhotoUrl(res.data.photoUrl);
+      toast.success("Profile photo updated!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload photo");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
   return (
     <div className="min-h-[100dvh] w-full bg-slate-50/50 p-3 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-4 sm:space-y-8">
@@ -87,9 +112,13 @@ export function UserProfile() {
           <CardContent className="p-6 sm:p-8 relative z-10">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8">
               <Avatar className="w-24 h-24 sm:w-32 sm:h-32 border-4 border-white shadow-xl flex-shrink-0">
-                <AvatarFallback className="text-3xl sm:text-4xl bg-gradient-to-br from-[#093765] to-blue-600 text-white font-bold">
-                  {name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
-                </AvatarFallback>
+                {photoUrl ? (
+                  <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <AvatarFallback className="text-3xl sm:text-4xl bg-gradient-to-br from-[#093765] to-blue-600 text-white font-bold">
+                    {name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
+                  </AvatarFallback>
+                )}
               </Avatar>
               
               <div className="flex-1 flex flex-col items-center sm:items-start text-center sm:text-left mt-0 sm:mt-2">
@@ -97,14 +126,29 @@ export function UserProfile() {
                 <p className="text-blue-100/90 text-sm sm:text-base mb-4">{email}</p>
                 
 
-                <Button 
-                  variant="outline" 
-                  className="w-full sm:w-auto bg-white/10 hover:bg-white/20 border-white/20 text-white hover:text-white transition-all shadow-sm relative z-20"
-                  onClick={() => toast.info("Profile photo uploads are coming soon!")}
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  Change Photo
-                </Button>
+                <div className="relative w-full sm:w-auto">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    id="photo-upload" 
+                    className="hidden" 
+                    onChange={handlePhotoUpload} 
+                    disabled={isUploadingPhoto}
+                  />
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto bg-white/10 hover:bg-white/20 border-white/20 text-white hover:text-white transition-all shadow-sm relative z-20"
+                    onClick={() => document.getElementById("photo-upload")?.click()}
+                    disabled={isUploadingPhoto}
+                  >
+                    {isUploadingPhoto ? (
+                      <div className="w-4 h-4 mr-2 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <User className="w-4 h-4 mr-2" />
+                    )}
+                    {isUploadingPhoto ? "Uploading..." : "Change Photo"}
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>

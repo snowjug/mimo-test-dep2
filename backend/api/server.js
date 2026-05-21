@@ -224,6 +224,43 @@ app.post("/register", async (req, res) => {
   }
 });
 
+// ================= PROFILE PHOTO UPLOAD =================
+app.post("/upload-profile-photo", authenticateToken, upload.single("photo"), async (req, res, next) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).send("No file uploaded");
+
+    const userId = req.user.userId;
+    
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const fileName = `profiles/${userId}_${Date.now()}_${safeFileName}`;
+    const fileUpload = bucket.file(fileName);
+
+    await fileUpload.save(file.buffer, {
+      contentType: file.mimetype,
+      metadata: { cacheControl: "public, max-age=86400" },
+    });
+
+    // We no longer make it public because we use Signed URLs for better security
+    // Instead, just save the gs:// path and generate signed urls later if needed, 
+    // OR we can make just profile pictures public if desired. 
+    // For simplicity, let's use a signed URL valid for 100 years for the profile pic.
+    const [url] = await fileUpload.getSignedUrl({
+      action: "read",
+      expires: "01-01-2100",
+    });
+
+    await db.collection("users").doc(userId).update({
+      photoUrl: url
+    });
+
+    res.json({ photoUrl: url });
+  } catch (err) {
+    console.error("❌ /upload-profile-photo error:", err);
+    next(err);
+  }
+});
+
 // ================= LOGIN =================
 app.post("/login", async (req, res) => {
   try {
@@ -341,13 +378,41 @@ app.post("/onboarding", authenticateToken, async (req, res) => {
 });
 
 // ================= USER =================
+app.get("/print-history", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const snapshot = await db.collection("print_jobs").where("userId", "==", userId).get();
+
+    // Filter and sort locally to avoid requiring composite indexes
+    const history = snapshot.docs
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          amount: data.totalCost || data.amount || 0,
+          date: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "N/A",
+          timestamp: data.createdAt ? data.createdAt.toDate().getTime() : 0,
+          details: `${data.pageCount || 0} pages • ${data.colorMode === "color" ? "Color" : "B&W"}`
+        };
+      })
+      .filter((job) => ["paid", "completed", "printed"].includes(job.status))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    res.json(history);
+  } catch (err) {
+    console.error("❌ /print-history error:", err);
+    res.status(500).send("Failed to fetch print history");
+  }
+});
+
 app.get("/mimo/user", authenticateToken, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const doc = await db.collection("users").doc(userId).get();
     if (!doc.exists) return res.status(404).send("User not found");
     const user = doc.data();
-    res.json({ name: user.username, email: user.email, userId });
+    res.json({ name: user.username, email: user.email, userId, photoUrl: user.photoUrl });
   } catch (err) {
     console.error("❌ /mimo/user error:", err);
     next(err);
@@ -365,6 +430,7 @@ app.get("/profile", authenticateToken, async (req, res) => {
       id: userId,
       username: user.username,
       email: user.email,
+      photoUrl: user.photoUrl,
       mobileNumber: user.mobileNumber || "",
       googleUser: user.googleUser || false,
       mimo_coins: user.mimo_coins || { balance: 0, total_earned: 0, total_used: 0 },
@@ -408,9 +474,10 @@ app.post("/settings", authenticateToken, async (req, res) => {
 app.get("/settings", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const doc = await db.collection("users").doc(userId).get();
-    if (!doc.exists) return res.status(404).send("User not found");
-    res.json(doc.data().settings || {});
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) return res.status(404).send("User not found");
+    const data = userDoc.data();
+    res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).send("Failed to fetch settings");
