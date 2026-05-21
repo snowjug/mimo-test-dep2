@@ -64,6 +64,10 @@ export function Payment() {
       setPromoDiscount(discount);
       setAppliedPromo("MIMO20");
       toast.success("Promo code applied: 20% discount!");
+    } else if (promoCode.toUpperCase() === "ASDFG") {
+      setPromoDiscount(totalCost); // 100% free
+      setAppliedPromo("ASDFG");
+      toast.success("Secret coupon applied! Free print unlocked.");
     } else if (promoCode.trim() === "") {
       toast.error("Please enter a promo code");
     } else {
@@ -89,14 +93,26 @@ export function Payment() {
     setIsProcessing(true);
 
     try {
-      // 1. Create order in backend
+      // 1. If order is totally free (via ASDFG or coins), bypass Cashfree entirely
+      if (totalAmount <= 0) {
+        const successResponse = await api.post("/payment-success");
+        const { printCode } = successResponse.data;
+
+        sessionStorage.setItem("printCode", printCode);
+        toast.success("Order confirmed!");
+        
+        navigate("/print-code");
+        return;
+      }
+
+      // 2. Otherwise, create order in backend
       const storedOptions = sessionStorage.getItem("printOptions");
       const printOptions = storedOptions ? JSON.parse(storedOptions) : {};
       
       const orderResponse = await api.post("/create-order", { printOptions });
       const { orderId, paymentSessionId } = orderResponse.data;
 
-      // 2. Trigger Cashfree SDK
+      // 3. Trigger Cashfree SDK
       const cashfree = (window as any).Cashfree({
         mode: "sandbox", // For testing. Use "production" for real keys.
       });
