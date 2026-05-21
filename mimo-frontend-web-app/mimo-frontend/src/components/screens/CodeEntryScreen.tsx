@@ -67,35 +67,11 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({ onSuccess, isA
         style={{ display: isActive ? 'flex' : 'none' }}
     >
       <div className="keypad-layout" style={{ position: 'relative' }}>
-        {loading && (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundColor: 'rgba(255, 255, 255, 0.7)',
-            zIndex: 50,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backdropFilter: 'blur(5px)',
-            borderRadius: '24px'
-          }}>
-            <div className="spinner" style={{
-              width: '45px',
-              height: '45px',
-              border: '4px solid rgba(79, 195, 247, 0.2)',
-              borderTopColor: '#4fc3f7',
-              borderRadius: '50%',
-              animation: 'mimo-spin 1s linear infinite'
-            }}></div>
-            <p style={{ marginTop: '16px', fontWeight: 'bold', color: '#111', fontSize: '1.2rem', letterSpacing: '1px' }}>Verifying Code...</p>
-            <style>{`
-              @keyframes mimo-spin {
-                to { transform: rotate(360deg); }
-              }
-            `}</style>
-          </div>
-        )}
+        <style>{`
+          @keyframes mimo-spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
         <div className="input-display-area">
           <div className="entry-instruction">
             <h2>Enter Your Mimo <br /> Code Here</h2>
@@ -127,9 +103,18 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({ onSuccess, isA
             onClick={handleSubmit}
             disabled={code.length !== 4 || loading}
           >
-            <span className="material-symbols-outlined">
-              {loading ? "hourglass_empty" : "check"}
-            </span>
+            {loading ? (
+              <div style={{
+                width: '28px',
+                height: '28px',
+                border: '3px solid rgba(255, 255, 255, 0.3)',
+                borderTopColor: '#fff',
+                borderRadius: '50%',
+                animation: 'mimo-spin 1s linear infinite'
+              }}></div>
+            ) : (
+              <span className="material-symbols-outlined">check</span>
+            )}
           </button>
         </div>
       </div>
