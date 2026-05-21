@@ -1572,11 +1572,7 @@ app.get("/cron/cleanup-files", async (req, res) => {
   }
 });
 
-app.get("/debug-sentry", function mainHandler(req, res) {
-  const Sentry = require("@sentry/node");
-  Sentry.metrics.count('test_counter', 1);
-  throw new Error("My first Backend Sentry error!");
-});
+
 
 const Sentry = require("@sentry/node");
 Sentry.setupExpressErrorHandler(app);
