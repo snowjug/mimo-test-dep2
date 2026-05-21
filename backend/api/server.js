@@ -336,12 +336,12 @@ app.post("/onboarding", authenticateToken, async (req, res) => {
     res.send("Onboarding complete");
   } catch (err) {
     console.error(err);
-    res.status(500).send("Failed onboarding");
+    next(err);
   }
 });
 
 // ================= USER =================
-app.get("/mimo/user", authenticateToken, async (req, res) => {
+app.get("/mimo/user", authenticateToken, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const doc = await db.collection("users").doc(userId).get();
@@ -349,8 +349,8 @@ app.get("/mimo/user", authenticateToken, async (req, res) => {
     const user = doc.data();
     res.json({ name: user.username, email: user.email, userId });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching user");
+    console.error("❌ /mimo/user error:", err);
+    next(err);
   }
 });
 
@@ -497,8 +497,8 @@ app.get("/mimo/coins", authenticateToken, async (req, res) => {
       history
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching coins");
+    console.error("❌ /mimo/coins error:", err);
+    next(err);
   }
 });
 
