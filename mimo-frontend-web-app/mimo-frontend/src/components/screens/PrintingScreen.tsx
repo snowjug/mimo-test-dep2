@@ -159,6 +159,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             <div className="circular-progress-container" style={{ position: 'relative', width: '380px', height: '380px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 
                 <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2 }}>
+                    <defs>
+                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#4fc3f7" />
+                            <stop offset="100%" stopColor="#0288d1" />
+                        </linearGradient>
+                    </defs>
                     <g style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
                         <circle 
                           cx="190" cy="190" r={radius} 
