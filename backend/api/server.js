@@ -151,8 +151,8 @@ const uploadToStorage = async (file) => {
     contentType: file.mimetype,
     metadata: { cacheControl: "public, max-age=86400" },
   });
-  // Make publicly accessible so Pi can download directly
-  await fileUpload.makePublic();
+  // We no longer make it public because we use Signed URLs for better security
+  // await fileUpload.makePublic();
   return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
 };
 
@@ -835,8 +835,9 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res) =
 
     res.json({ message: "Files queued for processing" });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Upload failed");
+    console.error("❌ /upload Error:", err);
+    // Explicitly pass to next() so Sentry Express Error Handler catches it!
+    next(err);
   }
 });
 
