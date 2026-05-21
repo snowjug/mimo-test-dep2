@@ -688,9 +688,9 @@ app.get("/mimo/conversion-stream", authenticateToken, (req, res) => {
   const userId = req.user.userId;
 
   // Listen to Firestore for real-time updates
+  // We removed .where("status", "in", ...) to avoid needing a Composite Index
   const unsubscribe = db.collection("print_jobs")
     .where("userId", "==", userId)
-    .where("status", "in", ["pending_conversion", "processing", "pending"])
     .onSnapshot((snapshot) => {
       let isProcessing = false;
       let totalPages = 0;
