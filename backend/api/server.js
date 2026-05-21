@@ -720,7 +720,7 @@ app.get("/mimo/conversion-stream", authenticateToken, (req, res) => {
 });
 
 // ================= UPLOAD =================
-app.post("/upload", authenticateToken, upload.array("files"), async (req, res) => {
+app.post("/upload", authenticateToken, upload.array("files"), async (req, res, next) => {
   try {
     const userId = req.user.userId;
     console.log(`[UPLOAD] userId from token: ${userId}`);
