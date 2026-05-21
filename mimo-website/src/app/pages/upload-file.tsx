@@ -96,8 +96,9 @@ export function UploadFile() {
       });
 
       // Start real-time SSE stream for processing status
-      const token = localStorage.getItem("token");
-      const eventSource = new EventSource(`${import.meta.env.VITE_API_URL}/mimo/conversion-stream?token=${token}`);
+      const token = localStorage.getItem("jwtToken");
+      const API_URL = import.meta.env.VITE_API_URL || "https://p01--mimo-backend--4b94y9s4jyc5.code.run";
+      const eventSource = new EventSource(`${API_URL}/mimo/conversion-stream?token=${token}`);
 
       const handleUploadError = () => {
         setFiles((prev) =>
