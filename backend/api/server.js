@@ -1,4 +1,4 @@
-require("../instrument.js");
+require("./instrument.js");
 // Load dotenv only in development (not in Docker/production)
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
