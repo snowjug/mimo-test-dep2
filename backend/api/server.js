@@ -215,6 +215,18 @@ app.post("/register", async (req, res) => {
       timestamp: now
     });
 
+    // Sync to Firebase Auth for console visibility
+    try {
+      await admin.auth().createUser({
+        uid: userId,
+        email,
+        password,
+        displayName: username
+      });
+    } catch (authErr) {
+      console.warn("⚠️ Could not sync to Firebase Auth:", authErr.message);
+    }
+
     const token = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "30d" });
     console.log(`✅ Registered new user: ${email}, docId: ${userId}`);
     res.json({ jwtToken: token });
@@ -292,6 +304,23 @@ app.post("/login", async (req, res) => {
     // Update lastLoginAt
     await doc.ref.update({ lastLoginAt: admin.firestore.FieldValue.serverTimestamp() });
 
+    // Sync legacy users to Firebase Auth for console visibility
+    try {
+      await admin.auth().getUserByEmail(email);
+    } catch (e) {
+      if (e.code === 'auth/user-not-found') {
+        try {
+          await admin.auth().createUser({
+            uid: userId,
+            email,
+            displayName: user.username
+          });
+        } catch (authErr) {
+          console.warn("⚠️ Could not sync legacy user to Firebase Auth:", authErr.message);
+        }
+      }
+    }
+
     const token = jwt.sign({ userId }, SECRET_KEY);
     res.json({ jwtToken: token });
   } catch (err) {
@@ -339,8 +368,25 @@ app.post("/google-login", async (req, res) => {
     } else {
       // Existing user — always use Firestore doc ID
       userId = snapshot.docs[0].id;
-      // Update lastLoginAt
+      // Update last login
       await snapshot.docs[0].ref.update({ lastLoginAt: now });
+    }
+
+    // Sync to Firebase Auth for console visibility
+    try {
+      await admin.auth().getUserByEmail(email);
+    } catch (e) {
+      if (e.code === 'auth/user-not-found') {
+        try {
+          await admin.auth().createUser({
+            uid: userId,
+            email,
+            displayName: name
+          });
+        } catch (authErr) {
+          console.warn("⚠️ Could not sync Google user to Firebase Auth:", authErr.message);
+        }
+      }
     }
 
     // Auth Log
