@@ -458,7 +458,7 @@ app.get("/print-history", authenticateToken, async (req, res) => {
           details: `${data.pageCount || 0} pages • ${data.colorMode === "color" ? "Color" : "B&W"}`
         };
       })
-      .filter((job) => ["paid", "completed", "printed"].includes(job.status))
+      .filter((job) => ["paid", "printing", "completed", "printed"].includes(job.status))
       .sort((a, b) => b.timestamp - a.timestamp);
 
     res.json(history);
