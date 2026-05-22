@@ -986,7 +986,17 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     let totalPages = 0;
     let totalAmount = 0;
     const colorMode = printOptions?.colorMode || "bw";
-    const pricePerPage = colorMode === "color" ? 9.20 : 2.30;
+    
+    // Determine price based on paper type and color
+    const isBlankSheet = printOptions?.isBlankSheet === true;
+    const sheetType = printOptions?.sheetType || "a4";
+    
+    let pricePerPage = 2.30; // Default A4 BW
+    if (colorMode === "color") {
+      pricePerPage = 10.00;
+    } else if (isBlankSheet && sheetType === "graph") {
+      pricePerPage = 2.00;
+    }
     const copies = Number(printOptions?.copies || 1);
 
     const batchUpdate = db.batch();

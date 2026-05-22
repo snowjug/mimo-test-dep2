@@ -1,10 +1,10 @@
 const Sentry = require("@sentry/node");
-const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+// const { nodeProfilingIntegration } = require("@sentry/profiling-node");
 
 Sentry.init({
   dsn: "https://9670a9de356ab8c6be84e7c6b80ac857@o4511427600384000.ingest.us.sentry.io/4511427641868288",
   integrations: [
-    nodeProfilingIntegration(),
+    // nodeProfilingIntegration(),
   ],
 
   // Send structured logs to Sentry

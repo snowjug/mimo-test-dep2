@@ -14,7 +14,7 @@ export function BlankPages() {
 
   const isGraph = type === "graph";
   const label = isGraph ? "Mimo Graph Sheet" : "A4 Blank Sheet";
-  const pricePerPage = isGraph ? 3.00 : 2.00;
+  const pricePerPage = isGraph ? 2.00 : 2.30;
   const totalCost = pageCount * pricePerPage;
 
   const increment = () => {

@@ -63,7 +63,7 @@ export function PrintOptions() {
 
   // Pricing
   const pricePerPageBW = 2.30;
-  const pricePerPageColor = 9.20; // Updated as per requirements
+  const pricePerPageColor = 10.00; // Updated as per requirements
   const basePrice = colorMode === "bw" ? pricePerPageBW : pricePerPageColor;
   
   const totalCost = actualPages * copies * basePrice;
