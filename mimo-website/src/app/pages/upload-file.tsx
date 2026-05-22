@@ -69,7 +69,6 @@ export function UploadFile() {
     }
 
     const newFiles: UploadedFile[] = fileArray.map((file) => {
-      formData.append("files", file);
       return {
         name: file.name,
         size: file.size,
@@ -82,18 +81,52 @@ export function UploadFile() {
     setUploading(true);
 
     try {
-      await api.post("/upload", formData, {
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 100));
-          // Stop at 99% until processing is done
-          const displayProgress = percentCompleted === 100 ? 99 : percentCompleted;
-          setFiles((prev) =>
-            prev.map((f) =>
-              newFiles.some((nf) => nf.name === f.name) ? { ...f, progress: displayProgress } : f
-            )
-          );
-        },
+      // 1. Get Signed URLs from Backend
+      const filesMeta = fileArray.map(f => ({ name: f.name, type: f.type, size: f.size }));
+      const { data: { urls } } = await api.post("/generate-upload-urls", { files: filesMeta });
+
+      // 2. Upload directly to Google Cloud Storage
+      const uploadPromises = fileArray.map(async (file) => {
+        const urlData = urls.find((u: any) => u.name === file.name);
+        if (!urlData) throw new Error("Failed to get upload URL");
+
+        // Use standard axios or fetch for the PUT request (import axios if needed, but we can just use native fetch, wait, we want progress, so let's import axios at top if not imported. Wait, import axios from 'axios'; is it imported? Let's check. If not, we can use XMLHttpRequest or just api.put which is axios instance but we need to bypass base url. Let's use standard XMLHttpRequest for progress without adding dependencies to this file.)
+        // Actually, `api` is an axios instance. We can use it, but we need to pass the full URL and bypass headers.
+        // It's safer to use a fresh XMLHttpRequest for raw file PUTs with progress.
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", urlData.signedUrl, true);
+          xhr.setRequestHeader("Content-Type", file.type);
+          
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const percentCompleted = Math.round((e.loaded * 100) / e.total);
+              const displayProgress = percentCompleted === 100 ? 99 : percentCompleted;
+              setFiles((prev) =>
+                prev.map((f) =>
+                  f.name === file.name ? { ...f, progress: displayProgress } : f
+                )
+              );
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(urlData);
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          };
+          
+          xhr.onerror = () => reject(new Error("Upload network error"));
+          xhr.send(file);
+        });
       });
+
+      await Promise.all(uploadPromises);
+
+      // 3. Tell backend to finalize and start processing
+      await api.post("/finalize-upload", { files: urls });
 
       // Start real-time SSE stream for processing status
       const token = localStorage.getItem("jwtToken");

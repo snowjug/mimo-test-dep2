@@ -24,6 +24,21 @@ const libreConvert = promisify(libre.convert);
 const { admin, db, bucket } = require("./firebase");
 const rateLimit = require("express-rate-limit");
 
+// Automatically configure CORS for Google Cloud Storage bucket
+(async () => {
+  try {
+    await bucket.setCorsConfiguration([{
+      origin: ["*"],
+      method: ["GET", "PUT", "POST", "OPTIONS"],
+      responseHeader: ["Content-Type", "Authorization", "Content-Length", "User-Agent", "x-goog-resumable"],
+      maxAgeSeconds: 3600
+    }]);
+    console.log("✅ Firebase Storage CORS configured for Signed URL uploads");
+  } catch (err) {
+    console.error("⚠️ Failed to configure Storage CORS:", err.message);
+  }
+})();
+
 // ================= APP =================
 const app = express();
 
@@ -833,24 +848,56 @@ app.get("/mimo/conversion-stream", authenticateToken, (req, res) => {
   });
 });
 
-// ================= UPLOAD =================
-app.post("/upload", authenticateToken, upload.array("files"), async (req, res, next) => {
+// ================= NEW UPLOAD: DIRECT SIGNED URLS =================
+app.post("/generate-upload-urls", authenticateToken, async (req, res, next) => {
   try {
-    const userId = req.user.userId;
-    console.log(`[UPLOAD] userId from token: ${userId}`);
-    if (!userId) return res.status(401).send("User ID missing from token");
+    const { files } = req.body;
+    if (!files || !files.length) return res.status(400).send("No files provided");
 
-    // Clear all old jobs that aren't completed or printing
-    const oldJobs = await db
-      .collection("print_jobs")
-      .where("userId", "==", userId)
-      .get();
-    
+    const userId = req.user.userId;
+    const urls = [];
+
+    for (const file of files) {
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const storagePath = `uploads/${userId}_${Date.now()}_${safeFileName}`;
+      const fileRef = bucket.file(storagePath);
+      
+      const [signedUrl] = await fileRef.getSignedUrl({
+        version: "v4",
+        action: "write",
+        expires: Date.now() + 15 * 60 * 1000, // 15 mins
+        contentType: file.type,
+      });
+
+      urls.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        storagePath,
+        signedUrl,
+      });
+    }
+
+    res.json({ urls });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
+  try {
+    const { files } = req.body;
+    if (!files || !files.length) return res.status(400).send("No files provided");
+
+    const userId = req.user.userId;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    // Clean up old jobs for this user
+    const oldJobsSnapshot = await db.collection("print_jobs").where("userId", "==", userId).get();
     const cleanupBatch = db.batch();
     let cleanupCount = 0;
-    oldJobs.forEach(doc => {
+    oldJobsSnapshot.forEach(doc => {
       const data = doc.data();
-      // Delete unpaid and unconverted jobs to make room for new upload
       if (["pending", "pending_conversion", "processing"].includes(data.status)) {
         cleanupBatch.delete(doc.ref);
         cleanupCount++;
@@ -861,51 +908,29 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res, n
       console.log(`🧹 Cleaned up ${cleanupCount} old jobs for user ${userId}`);
     }
 
-    if (!req.files || req.files.length === 0) {
-      console.error("❌ No files received in /upload");
-      return res.status(400).send("No files uploaded");
-    }
-
-    console.log(`📂 Received ${req.files.length} files for processing`);
-
-    const now = admin.firestore.FieldValue.serverTimestamp();
-
-    for (let file of req.files) {
-      console.log(`📄 Saving raw file: ${file.originalname} (${file.mimetype})`);
-      const fileUrl = await uploadToStorage(file);
-
-      // Common metadata for all files
+    for (const file of files) {
+      const fileUrl = `https://storage.googleapis.com/${bucket.name}/${file.storagePath}`;
+      
       const baseJobData = {
-        // --- Backward Compatibility (V1 schema) ---
-        // --- Backward Compatibility (V1 schema) ---
         userId,
-        fileName: file.originalname,
+        fileName: file.name,
         documentUrl: fileUrl,
         fileUrl,
-        mimetype: file.mimetype,
-        fileSize: file.size || file.buffer?.length || 0,
-        fileType: file.mimetype.split("/")[1] || "unknown",
-        isImage: file.mimetype.startsWith("image/"),
+        mimetype: file.type,
+        fileSize: file.size || 0,
+        fileType: file.type.split("/")[1] || "unknown",
+        isImage: file.type.startsWith("image/"),
         createdAt: now,
         updatedAt: now,
-        files: [
-          { name: file.originalname, size: file.size || file.buffer?.length || 0, type: file.mimetype, url: fileUrl }
-        ],
-        
-        // --- Analytics / V2 Schema (FIREBASE_SCHEMA_DESIGN.md) ---
+        files: [{ name: file.name, size: file.size || 0, type: file.type, url: fileUrl }],
         sourceFile: {
-          fileName: file.originalname,
-          originalExtension: require('path').extname(file.originalname) || "",
-          mimeType: file.mimetype,
-          fileSizeBytes: file.size || file.buffer?.length || 0,
+          fileName: file.name,
+          originalExtension: require('path').extname(file.name) || "",
+          mimeType: file.type,
+          fileSizeBytes: file.size || 0,
           uploadedAt: now,
         },
-        conversionDetails: {
-          convertedAt: null,
-          originalPageCount: 0,
-          actualPageCount: 0,
-          isConverting: false,
-        },
+        conversionDetails: { convertedAt: null, originalPageCount: 0, actualPageCount: 0, isConverting: false },
         printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex" },
         pricing: { pricePerPage: 0, totalPages: 0, copiesRequested: 1, totalPagesToPrint: 0, estimatedAmount: 0, finalAmount: 0, currency: "INR" },
         paymentStatus: { status: "pending", paymentMethod: "cashfree", transactionId: null, paidAt: null },
@@ -914,46 +939,23 @@ app.post("/upload", authenticateToken, upload.array("files"), async (req, res, n
         metadata: { ipAddress: req.ip || "", userAgent: req.get("user-agent") || "", tags: [] }
       };
 
-      // ⚡ FAST PATH: PDFs — count pages immediately, skip the queue
-      if (file.mimetype === "application/pdf") {
-        try {
-          const { PDFDocument } = require("pdf-lib");
-          const pdfDoc = await PDFDocument.load(file.buffer);
-          const pages = pdfDoc.getPageCount();
-          await db.collection("print_jobs").add({
-            ...baseJobData,
-            status: "pending",
-            pageCount: pages,
-          });
-          console.log(`⚡ PDF fast-tracked: ${file.originalname} (${pages} pages)`);
-          continue;
-        } catch (pdfErr) {
-          console.warn(`⚠️ PDF fast-path failed, queuing:`, pdfErr.message);
-        }
-      }
-
-      // ⚡ FAST PATH: Images — 1 page each, no conversion needed
-      if (file.mimetype.startsWith("image/")) {
+      if (file.type.startsWith("image/")) {
         await db.collection("print_jobs").add({
           ...baseJobData,
           status: "pending",
           pageCount: 1,
         });
-        console.log(`⚡ Image fast-tracked: ${file.originalname}`);
-        continue;
+      } else {
+        // PDF and Office docs get queued for background processing to prevent API timeout
+        await db.collection("print_jobs").add({
+          ...baseJobData,
+          status: "pending_conversion",
+        });
       }
-
-      // 🐢 SLOW PATH: DOCX/PPT/etc — queue for LibreOffice background conversion
-      await db.collection("print_jobs").add({
-        ...baseJobData,
-        status: "pending_conversion",
-      });
     }
 
-    res.json({ message: "Files queued for processing" });
+    res.json({ message: "Files finalized and queued for processing" });
   } catch (err) {
-    console.error("❌ /upload Error:", err);
-    // Explicitly pass to next() so Sentry Express Error Handler catches it!
     next(err);
   }
 });
