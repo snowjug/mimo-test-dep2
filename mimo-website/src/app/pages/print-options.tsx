@@ -151,7 +151,7 @@ export function PrintOptions() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Color Mode</p>
-                  <p className="text-[10px] text-slate-500">₹{pricePerPageBW}/page • B&W</p>
+                  <p className="text-[10px] text-slate-500">₹{colorMode === "bw" ? pricePerPageBW : pricePerPageColor}/page • {colorMode === "bw" ? "B&W" : "Color"}</p>
                 </div>
                 <div className="flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100">
                   <button
