@@ -8,6 +8,7 @@ import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { Upload, FileText, X, Printer, CheckCircle, AlertCircle, ImageIcon, History, Layers, Wallet, FileIcon, Grid3X3, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
+import { PDFDocument } from "pdf-lib";
 
 interface UploadedFile {
   name: string;
@@ -83,8 +84,22 @@ export function UploadFile() {
     setUploading(true);
 
     try {
-      // 1. Get Signed URLs from Backend
-      const filesMeta = fileArray.map(f => ({ name: f.name, type: f.type, size: f.size }));
+      // 1. Get Signed URLs from Backend & Parse PDFs locally
+      const filesMeta = await Promise.all(fileArray.map(async (f) => {
+        let pageCount = 0;
+        if (f.type.startsWith("image/")) {
+          pageCount = 1;
+        } else if (f.type === "application/pdf") {
+          try {
+            const arrayBuffer = await f.arrayBuffer();
+            const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+            pageCount = pdfDoc.getPageCount();
+          } catch (err) {
+            console.error("Failed to parse PDF on client:", err);
+          }
+        }
+        return { name: f.name, type: f.type, size: f.size, pageCount };
+      }));
       const { data: { urls } } = await api.post("/generate-upload-urls", { files: filesMeta });
 
       // 2. Upload directly to Google Cloud Storage

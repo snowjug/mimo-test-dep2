@@ -873,6 +873,7 @@ app.post("/generate-upload-urls", authenticateToken, async (req, res, next) => {
         name: file.name,
         type: file.type,
         size: file.size,
+        pageCount: file.pageCount || 0,
         storagePath,
         signedUrl,
       });
@@ -939,14 +940,14 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
         metadata: { ipAddress: req.ip || "", userAgent: req.get("user-agent") || "", tags: [] }
       };
 
-      if (file.type.startsWith("image/")) {
+      if (file.type.startsWith("image/") || (file.type === "application/pdf" && file.pageCount > 0)) {
         await db.collection("print_jobs").add({
           ...baseJobData,
           status: "pending",
-          pageCount: 1,
+          pageCount: file.type.startsWith("image/") ? 1 : file.pageCount,
         });
       } else {
-        // PDF and Office docs get queued for background processing to prevent API timeout
+        // Office docs (and PDFs that failed client parsing) get queued for background processing
         await db.collection("print_jobs").add({
           ...baseJobData,
           status: "pending_conversion",
