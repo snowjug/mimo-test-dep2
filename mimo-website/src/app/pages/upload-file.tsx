@@ -12,6 +12,7 @@ import api from "../api";
 interface UploadedFile {
   name: string;
   size: number;
+  type?: string;
   status: "uploading" | "completed" | "failed";
   progress: number;
 }
@@ -72,6 +73,7 @@ export function UploadFile() {
       return {
         name: file.name,
         size: file.size,
+        type: file.type,
         status: "uploading",
         progress: 0,
       };
@@ -443,7 +445,7 @@ export function UploadFile() {
                         <p className="text-sm font-medium truncate">{file.name}</p>
                         {file.status === "completed" && (
                           <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 whitespace-nowrap text-[10px] sm:text-xs">
-                            ~{file.size > 2000000 ? Math.floor(file.size / 500000) : 1} pgs
+                            ~{file.type?.startsWith('image/') ? 1 : (file.size > 2000000 ? Math.floor(file.size / 500000) : 1)} pgs
                           </Badge>
                         )}
                         {file.status === "failed" && (
