@@ -34,13 +34,18 @@ export function MimoHeader() {
   return (
     <>
       <style>
-        {`@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap');`}
+        {`
+          @font-face {
+            font-family: 'Lovelo';
+            src: local('Lovelo'), local('Lovelo Black');
+          }
+        `}
       </style>
-      <div className="flex items-end justify-between border-b-[8px] border-[#093765] mb-2 sm:mb-8 pt-4">
+      <div className="flex items-end justify-between border-b-[8px] border-[#194059] mb-2 sm:mb-8 pt-4">
         <div className="flex items-end gap-2 cursor-pointer group" onClick={() => navigate("/upload")}>
           <h1 
-            className="text-5xl sm:text-6xl font-black tracking-widest text-[#093765] leading-none select-none m-0 -mb-[4px] sm:-mb-[6px] relative top-1"
-            style={{ fontFamily: "'Montserrat', sans-serif" }}
+            className="text-5xl sm:text-6xl font-black tracking-widest text-[#194059] leading-none select-none m-0 -mb-[4px] sm:-mb-[6px] relative top-1"
+            style={{ fontFamily: "'Lovelo', sans-serif" }}
           >
             MIMO
           </h1>
@@ -56,7 +61,7 @@ export function MimoHeader() {
             <p className="text-xs text-gray-500">View Profile</p>
           </div>
           <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
-            <AvatarFallback className="bg-[#093765] text-white font-bold">
+            <AvatarFallback className="bg-[#194059] text-white font-bold">
               {name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
             </AvatarFallback>
           </Avatar>

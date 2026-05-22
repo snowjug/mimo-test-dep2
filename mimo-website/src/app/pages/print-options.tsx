@@ -51,6 +51,9 @@ export function PrintOptions() {
 
     const imagesRaw = sessionStorage.getItem("uploadedImages");
     if (imagesRaw) setUploadedImages(JSON.parse(imagesRaw));
+    
+    // Scroll to top when page loads
+    window.scrollTo(0, 0);
   }, [navigate]);
 
   // Only true if there are actual images (not PDFs)
