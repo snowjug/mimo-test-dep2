@@ -47,11 +47,13 @@ body {
     touch-action: none;
 }
 
-/* Base App Wrapper keeps everything constraint and allows smooth screen switching */
+/* Base App Wrapper — locked to tablet screen resolution: 1333×794px */
 #root {
-    width: 100%;
-    height: 100%;
+    width: 1333px;
+    height: 794px;
     position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
 }
 
 /* ---- SCREEN SYSTEM ---- */
@@ -286,6 +288,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
+    position: relative; /* needed for absolutely-positioned action-panel */
 }
 
 .kiosk-footer {
@@ -309,7 +312,7 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0 40px;
+    padding: 0 40px 220px; /* bottom padding to keep brand panel from overlapping the absolute slider */
     position: relative;
     z-index: 10;
 }
@@ -363,11 +366,17 @@ body {
 }
 
 .action-panel {
+    /* Pinned to exact bottom: 152px to align with tablet bezel */
+    position: absolute;
+    bottom: 152px;
+    left: 0;
+    right: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     width: 100%;
     z-index: 10;
+    padding: 0 40px;
 }
 
 .swipe-track-glass {
