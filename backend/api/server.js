@@ -85,7 +85,11 @@ const SECRET_KEY = process.env.JWT_SECRET;
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com");
 
 // ================= CASHFREE =================
-const CASHFREE_BASE_URL = "https://sandbox.cashfree.com/pg";
+// Enable Cashfree Production if environment variable is set, otherwise default to Sandbox
+const CASHFREE_BASE_URL = process.env.CASHFREE_ENV === "production" 
+  ? "https://api.cashfree.com/pg" 
+  : "https://sandbox.cashfree.com/pg";
+
 const cashfreeHeaders = {
   "Content-Type": "application/json",
   "x-client-id": process.env.CASHFREE_APP_ID,
