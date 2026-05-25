@@ -174,7 +174,7 @@ export function Login() {
         </p>
 
         <div className="text-center text-xs text-slate-400 space-y-2 mt-8 pb-4">
-          <p className="font-semibold text-slate-500">Vision Printt Technologies</p>
+          <p className="font-bold text-slate-700 uppercase tracking-wide">Vision Printt Technologies</p>
           <p>REVA NEST, Rukmini Knowledge Park<br/>Kattegenahalli, Yelahanka, Bengaluru - 560064</p>
           <div className="flex items-center justify-center gap-4 mt-2">
             <span>🆘 Support: +91 8123028797</span>
