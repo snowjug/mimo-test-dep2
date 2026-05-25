@@ -174,7 +174,7 @@ export function Login() {
         </p>
 
         <p className="text-center text-xs text-slate-400">
-          © 2026 MIMO Technologies. All rights reserved.
+          © 2026 VASUDEVA VISHAL (Vision Printt Technologies). All rights reserved.
         </p>
       </div>
     </div>
