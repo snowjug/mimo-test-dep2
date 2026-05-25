@@ -114,7 +114,7 @@ export function Payment() {
 
       // 3. Trigger Cashfree SDK
       const cashfree = (window as any).Cashfree({
-        mode: "production", // Switched to production
+        mode: "sandbox", // For testing. Use "production" for real keys.
       });
 
       const checkoutOptions = {

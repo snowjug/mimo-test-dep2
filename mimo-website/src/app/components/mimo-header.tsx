@@ -33,14 +33,6 @@ export function MimoHeader() {
 
   return (
     <>
-      <style>
-        {`
-          @font-face {
-            font-family: 'Lovelo';
-            src: local('Lovelo'), local('Lovelo Black');
-          }
-        `}
-      </style>
       <div className="flex items-end justify-between border-b-[5px] border-[#194059] mb-2 sm:mb-8 pt-4 pb-0">
         <div className="flex items-end gap-2 cursor-pointer group overflow-hidden" onClick={() => navigate("/upload")}>
           <h1 

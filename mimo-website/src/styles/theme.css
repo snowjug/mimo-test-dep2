@@ -196,3 +196,71 @@
     line-height: 1.5;
   }
 }
+
+/* Tactile sliding segmented control animations */
+.sliding-pill {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), scale 0.15s ease-out !important;
+  transform-origin: center center;
+}
+
+.control-btn:active ~ .sliding-pill {
+  scale: 0.94 0.97;
+}
+
+/* Micro-animations for icons */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+@keyframes rotate-subtle {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(15deg); }
+}
+
+@keyframes slide-double {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(3px, -3px); }
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.85); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-float {
+  animation: float 2s ease-in-out infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+.animate-rotate-subtle {
+  animation: rotate-subtle 2s ease-in-out infinite;
+}
+
+.animate-slide-double {
+  animation: slide-double 2s ease-in-out infinite;
+}
+
+.animate-pop-in {
+  animation: pop-in 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: inline-block;
+}
+
+@keyframes eye-blink {
+  0%, 80%, 100% { opacity: 1; }
+  90% { opacity: 0.15; }
+}
+
+.animate-eye-blink {
+  animation: eye-blink 4s ease-in-out infinite;
+}
+
+

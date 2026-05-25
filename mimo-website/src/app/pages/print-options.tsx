@@ -7,7 +7,7 @@ import { Separator } from "../components/ui/separator";
 import { Badge } from "../components/ui/badge";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { MimoHeader } from "../components/mimo-header";
-import { ArrowLeft, FileText, Minus, Plus, Eye, Printer } from "lucide-react";
+import { ArrowLeft, FileText, Minus, Plus, Eye, Printer, Palette, Contrast, File, Files, Copy, Sliders } from "lucide-react";
 
 interface UploadedFile {
   name: string;
@@ -107,7 +107,7 @@ export function PrintOptions() {
             <ArrowLeft className="w-4 h-4 sm:w-6 sm:h-6" strokeWidth={2.5} />
           </Button>
           <div className="min-w-0 pt-1 sm:pt-1.5 flex flex-col">
-            <h1 className="text-2xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-700 bg-clip-text text-transparent tracking-tight leading-none mb-1.5">Print Configuration</h1>
+            <h1 className="text-2xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-700 bg-clip-text text-transparent tracking-tight leading-tight pb-1 mb-0.5">Print Configuration</h1>
             <p className="text-xs sm:text-sm text-slate-500 font-medium">Customize how you want your documents to look</p>
           </div>
         </div>
@@ -115,28 +115,30 @@ export function PrintOptions() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Options Panel */}
           <div className="lg:col-span-2 space-y-3 sm:space-y-4">
-            {/* Number of Copies - Compact */}
+            {/* Number of Copies - Responsive & Interactive */}
             <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Number of Copies</p>
-                  <p className="text-[10px] text-slate-500">Select quantity</p>
+                  <p className="text-[10px] text-slate-500 font-medium">Select print quantity</p>
                 </div>
-                <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100 w-full sm:w-auto">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-lg border bg-white hover:text-blue-600 active:scale-95 transition-all"
+                    type="button"
+                    className="h-8 w-8 rounded-lg border bg-white hover:text-[#093765] active:scale-95 transition-all cursor-pointer"
                     onClick={decrementCopies}
                     disabled={copies <= 1}
                   >
                     <Minus className="w-3 h-3" />
                   </Button>
-                  <span className="w-8 text-center text-sm font-black text-slate-800">{copies}</span>
+                  <span key={copies} className="w-12 text-center text-sm font-black text-slate-800 animate-pop-in">{copies}</span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-lg border bg-white hover:text-blue-600 active:scale-95 transition-all"
+                    type="button"
+                    className="h-8 w-8 rounded-lg border bg-white hover:text-[#093765] active:scale-95 transition-all cursor-pointer"
                     onClick={incrementCopies}
                     disabled={copies >= 99}
                   >
@@ -146,33 +148,58 @@ export function PrintOptions() {
               </div>
             </Card>
 
-            {/* Color Mode - Compact Toggle */}
+            {/* Color Mode - Responsive & Interactive Segmented Control */}
             <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Color Mode</p>
-                  <p className="text-[10px] text-slate-500">₹{colorMode === "bw" ? pricePerPageBW : pricePerPageColor}/page • {colorMode === "bw" ? "B&W" : "Color"}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">₹{colorMode === "bw" ? pricePerPageBW : pricePerPageColor}/page • {colorMode === "bw" ? "B&W" : "Color"}</p>
                 </div>
-                <div className="flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
                   <button
                     onClick={() => setColorMode("bw")}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${colorMode === "bw" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
+                    type="button"
+                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                      colorMode === "bw"
+                        ? "text-[#093765]"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
                   >
-                    B&W
+                    <div className={`w-3.5 h-3.5 rounded-full border overflow-hidden flex shrink-0 transition-all duration-300 group-hover:scale-110 ${
+                      colorMode === "bw" ? "scale-110 border-slate-600 rotate-180" : "scale-100 border-slate-400"
+                    }`}>
+                      <div className="w-1/2 h-full bg-slate-800" />
+                      <div className="w-1/2 h-full bg-white" />
+                    </div>
+                    <span>B&W</span>
                   </button>
                   <button
                     onClick={() => setColorMode("color")}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${colorMode === "color" ? "bg-white text-orange-500 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
+                    type="button"
+                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                      colorMode === "color"
+                        ? "text-[#093765] font-black"
+                        : "text-slate-500 hover:text-slate-700 font-bold"
+                    }`}
                   >
-                    Color
+                    <div className={`w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-[#093765] via-blue-500 to-cyan-400 border border-slate-200/50 shrink-0 transition-all duration-300 group-hover:scale-110 ${
+                      colorMode === "color" ? "scale-110 rotate-180 shadow-sm" : "scale-100 rotate-0"
+                    }`} />
+                    <span>Color</span>
                   </button>
+                  {/* Sliding Background Pill */}
+                  <div
+                    className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
+                      colorMode === "bw" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                    }`}
+                  />
                 </div>
               </div>
             </Card>
 
-            {/* Print Layout - Compact Toggle */}
+            {/* Print Layout - Responsive & Interactive Segmented Control */}
             <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-slate-800">Print Layout</p>
@@ -180,45 +207,89 @@ export function PrintOptions() {
                       Eco
                     </Badge>
                   </div>
-                  <p className="text-[10px] text-slate-500">Single or double-sided</p>
+                  <p className="text-[10px] text-slate-500 font-medium">Single or double-sided</p>
                 </div>
-                <div className="flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
                   <button
                     onClick={() => setDoubleSided("single")}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${doubleSided === "single" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
+                    type="button"
+                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                      doubleSided === "single"
+                        ? "text-[#093765]"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
                   >
-                    1-Sided
+                    <File className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
+                      doubleSided === "single" ? "scale-110 text-[#093765]" : "scale-100 text-slate-400"
+                    }`} />
+                    <span>1-Sided</span>
                   </button>
                   <button
                     onClick={() => setDoubleSided("double")}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${doubleSided === "double" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
+                    type="button"
+                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                      doubleSided === "double"
+                        ? "text-[#093765]"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
                   >
-                    2-Sided
+                    <Files className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
+                      doubleSided === "double" ? "scale-110 text-[#093765]" : "scale-100 text-slate-400"
+                    }`} />
+                    <span>2-Sided</span>
                   </button>
+                  {/* Sliding Background Pill */}
+                  <div
+                    className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
+                      doubleSided === "single" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                    }`}
+                  />
                 </div>
               </div>
             </Card>
 
-            {/* Page Selection - Compact Toggle */}
+            {/* Page Selection - Responsive & Interactive Segmented Control */}
             <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Pages to Print</p>
-                  <p className="text-[10px] text-slate-500">{pageSelection === "all" ? "All pages" : "Custom range"}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">{pageSelection === "all" ? "All pages" : "Custom range"}</p>
                 </div>
-                <div className="flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
                   <button
                     onClick={() => setPageSelection("all")}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${pageSelection === "all" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
+                    type="button"
+                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                      pageSelection === "all"
+                        ? "text-[#093765]"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
                   >
-                    All
+                    <Copy className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
+                      pageSelection === "all" ? "scale-110 text-[#093765]" : "scale-100 text-slate-400"
+                    }`} />
+                    <span>All Pages</span>
                   </button>
                   <button
                     onClick={() => setPageSelection("custom")}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${pageSelection === "custom" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
+                    type="button"
+                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                      pageSelection === "custom"
+                        ? "text-[#093765]"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
                   >
-                    Custom
+                    <Sliders className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
+                      pageSelection === "custom" ? "scale-110 text-[#093765] rotate-90" : "scale-100 text-slate-400"
+                    }`} />
+                    <span>Custom</span>
                   </button>
+                  {/* Sliding Background Pill */}
+                  <div
+                    className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
+                      pageSelection === "all" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                    }`}
+                  />
                 </div>
               </div>
               {pageSelection === "custom" && (
@@ -243,26 +314,46 @@ export function PrintOptions() {
               </CardHeader>
               <CardContent className="space-y-5">
                 {/* Orientation Toggle */}
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                   <div>
                     <p className="text-sm font-bold text-slate-800">Orientation</p>
-                    <p className="text-[10px] text-slate-500">Page direction</p>
+                    <p className="text-[10px] text-slate-500 font-medium">Page direction</p>
                   </div>
-                  <div className="flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                  <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-60 h-10 select-none">
                     <button
                       onClick={() => setOrientation("portrait")}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 flex items-center gap-1.5 ${orientation === "portrait" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
+                      type="button"
+                      className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
+                        orientation === "portrait"
+                          ? "text-[#093765]"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
                     >
-                      <div className={`w-3 h-4 rounded-[2px] border-2 ${orientation === "portrait" ? "border-blue-500" : "border-slate-400"}`} />
+                      <div className={`w-3 h-4 rounded-[2px] border-2 transition-all duration-300 group-hover:scale-110 ${
+                        orientation === "portrait" ? "scale-110 border-[#093765] bg-[#093765]/10" : "scale-100 border-slate-400"
+                      }`} />
                       Portrait
                     </button>
                     <button
                       onClick={() => setOrientation("landscape")}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 flex items-center gap-1.5 ${orientation === "landscape" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
+                      type="button"
+                      className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
+                        orientation === "landscape"
+                          ? "text-[#093765]"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
                     >
-                      <div className={`w-4 h-3 rounded-[2px] border-2 ${orientation === "landscape" ? "border-blue-500" : "border-slate-400"}`} />
+                      <div className={`w-4 h-3 rounded-[2px] border-2 transition-all duration-300 group-hover:scale-110 ${
+                        orientation === "landscape" ? "scale-110 border-[#093765] bg-[#093765]/10" : "scale-100 border-slate-400"
+                      }`} />
                       Landscape
                     </button>
+                    {/* Sliding Background Pill */}
+                    <div
+                      className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
+                        orientation === "portrait" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                      }`}
+                    />
                   </div>
                 </div>
 
@@ -276,11 +367,11 @@ export function PrintOptions() {
                     </div>
                   )}
                   <p className="text-sm font-bold text-slate-800 mb-1">Layout</p>
-                  <p className="text-[10px] text-slate-500 mb-3">
+                  <p className="text-[10px] text-slate-500 mb-3 font-medium">
                     {hasImages ? "Arrange your photos on a single sheet" : "Photo layout only available for images"}
                   </p>
 
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {[
                       { id: "1", label: "1 per page", cols: 1, rows: 1, desc: "Full page" },
                       ...gridLayouts,
@@ -387,21 +478,22 @@ export function PrintOptions() {
                   {files.map((file, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 border border-gray-100 rounded-xl hover:bg-slate-50 transition-all duration-200"
+                      className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 border border-slate-100 rounded-xl hover:bg-slate-50/50 hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5 hover:-translate-y-0.5 active:scale-[0.98] active:bg-blue-50/40 active:border-blue-200/60 transition-all duration-300 cursor-pointer group/row"
+                      onClick={() => setSelectedPreview(index)}
                     >
-                      <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-5 h-5 text-gray-600" />
+                      <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors group-hover/row:bg-blue-100">
+                        <FileText className="w-5 h-5 text-indigo-600 group-hover/row:text-blue-700 transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{file.name}</p>
+                        <p className="text-sm font-medium truncate group-hover/row:text-[#093765] transition-colors">{file.name}</p>
                         <p className="text-xs text-gray-500">Document {index + 1}</p>
                       </div>
                       <Button
-                        variant="ghost"
-                        size="sm" className="hover:text-indigo-600 transition-colors"
-                        onClick={() => setSelectedPreview(index)}
+                        variant="outline"
+                        size="sm"
+                        className="bg-blue-50/50 border-blue-200 hover:bg-blue-100 hover:border-blue-300 text-blue-700 hover:text-[#093765] shadow-xs transition-all duration-200 rounded-lg cursor-pointer active:scale-95"
                       >
-                        <Eye className="w-4 h-4 mr-2" />
+                        <Eye className="w-4 h-4 mr-2 text-blue-600 transition-colors animate-eye-blink" />
                         Preview
                       </Button>
                     </div>
@@ -455,14 +547,14 @@ export function PrintOptions() {
                 <div className="flex justify-between items-center py-1 sm:py-2">
                   <span className="font-bold text-base sm:text-lg">Total Payable</span>
                   <div className="text-right">
-                    <span className="text-2xl sm:text-3xl font-black text-white tracking-tighter block">
+                    <span key={totalCost.toFixed(2)} className="text-2xl sm:text-3xl font-black text-white tracking-tighter block animate-pop-in">
                       ₹{totalCost.toFixed(2)}
                     </span>
                   </div>
                 </div>
 
                 <Button
-                  className="w-full h-12 sm:h-14 bg-[#093765] hover:bg-[#052345] border border-white/10 text-white font-bold text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-3"
+                  className="w-full h-12 sm:h-14 bg-[#093765] hover:bg-[#052345] border border-white/10 text-white font-bold text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 hover:-translate-y-0.5 transition-all duration-300 active:scale-95 flex items-center justify-center gap-3"
                   onClick={handleContinue}
                 >
                   Continue to Pay
