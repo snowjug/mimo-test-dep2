@@ -4,6 +4,7 @@ import { Toaster } from "./app/components/ui/sonner";
 import { motion, AnimatePresence } from "motion/react";
 import { Printer } from "lucide-react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import { Analytics } from "@vercel/analytics/react";
 
 import { Login } from "./app/pages/login";
 import { Register } from "./app/pages/register";
@@ -89,6 +90,8 @@ export default function App() {
         </Routes>
         <Toaster />
       </BrowserRouter>
+      <SpeedInsights />
+      <Analytics />
       <SpeedInsights />
     </>
   );
