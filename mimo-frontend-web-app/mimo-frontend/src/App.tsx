@@ -136,7 +136,10 @@ function App() {
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ printCode: code }),
+              body: JSON.stringify({ 
+                printCode: code,
+                kioskId: import.meta.env.VITE_KIOSK_ID || "KIOSK_1"
+              }),
             });
 
             const printData = await printRes.json();

@@ -179,14 +179,17 @@ const uploadToStorage = async (file) => {
 const PI_BASE_URL = process.env.PI_BASE_URL || "http://100.108.118.38:8000";
 
 // Helper: call the Pi print API for one file
-const triggerPiPrint = async (fileUrl, copies = 1) => {
+const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
+  const targetPiUrl = piUrl || process.env.PI_BASE_URL || "http://100.108.118.38:8000";
+  const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
+
   const results = [];
   for (let i = 0; i < copies; i++) {
     const res = await axios.post(
-      `${PI_BASE_URL}/print`,
+      `${targetPiUrl}/print`,
       { 
         file_url: fileUrl,
-        printer_name: process.env.PRINTER_NAME || "Brother_HL_L5210DN_series"
+        printer_name: targetPrinter
       },
       { timeout: 30000, headers: { "Content-Type": "application/json" } }
     );
@@ -1448,8 +1451,12 @@ app.post("/mark-printed", authenticateToken, async (req, res) => {
 // Called by kiosk after user confirms. Backend calls Pi, Pi prints via CUPS.
 app.post("/kiosk/print", kioskLimiter, async (req, res) => {
   try {
-    const { printCode } = req.body;
+    const { printCode, kioskId = "KIOSK_1" } = req.body;
     if (!printCode) return res.status(400).json({ error: "Print code required" });
+
+    // Dynamic routing configuration based on which kiosk is calling
+    const targetPiUrl = process.env[`${kioskId}_PI_URL`] || process.env.PI_BASE_URL;
+    const targetPrinterName = process.env[`${kioskId}_PRINTER_NAME`] || process.env.PRINTER_NAME;
 
     const snapshot = await db
       .collection("print_jobs")
@@ -1485,7 +1492,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
       await doc.ref.update({
         status: "printing",
         printerStatus: "Sending to Pi...",
-        kioskId: "KIOSK_001",
+        kioskId: kioskId,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -1507,8 +1514,8 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
           continue; // Skip the FastAPI Push call!
         }
 
-        console.log(`🖨️ Sending to Pi: ${fileName} | copies: ${copies} | url: ${signedUrl}`);
-        const piResults = await triggerPiPrint(signedUrl, copies);
+        console.log(`🖨️ Sending to ${kioskId} Pi: ${fileName} | copies: ${copies} | printer: ${targetPrinterName}`);
+        const piResults = await triggerPiPrint(signedUrl, copies, targetPiUrl, targetPrinterName);
         console.log(`✅ Pi response for ${fileName}:`, piResults);
 
         await doc.ref.update({
