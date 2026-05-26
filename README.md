@@ -12,7 +12,7 @@ The system supports user login, payment verification, print job creation, and ki
 
 ## Live Deployments
 
-- **Main Frontend URL**: https://mimo-test-dep2.vercel.app/
+- **Main Frontend URL**: https://printmimo.tech (or https://www.printmimo.tech)
 - **Kiosk URL**: https://kisokmechine.vercel.app/
 
 Key backend responsibilities include:
@@ -34,6 +34,8 @@ Key backend responsibilities include:
 - **Kiosk UI Polish:** Replaced the bulky full-screen loading overlay with a sleek, inline button spinner on the numpad screen.
 - **Brute Force Protection:** Rate limiters added to Kiosk API endpoints (20 req/min).
 - **Index Optimization:** Re-architected backend queries for Server-Sent Events (SSE) and history to filter in-memory, completely removing the need for strict composite indexes.
+- **Hardware Integration (Pi Architecture):** The Node backend dynamically supports both Firebase Listener "Pull" architectures (for the Old Pi) and FastAPI "Push" mechanisms (for the New Pi).
+- **Production Payments:** Fully integrated Cashfree Production APIs for live order creation and automatic refunds on hardware failure.
 
 ## Folder Structure
 

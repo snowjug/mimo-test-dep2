@@ -173,9 +173,17 @@ export function Login() {
           </Link>
         </p>
 
-        <p className="text-center text-xs text-slate-400">
-          © 2026 MIMO Technologies. All rights reserved.
-        </p>
+        <div className="text-center text-xs text-slate-700 font-bold space-y-2 mt-8 pb-4">
+          <p className="uppercase tracking-wide text-sm">Vision Printt Technologies</p>
+          <p>REVA NEST, Rukmini Knowledge Park<br/>Kattegenahalli, Yelahanka, Bengaluru - 560064</p>
+          <div className="flex items-center justify-center gap-4 mt-2">
+            <span>🆘 Support: +91 8123028797</span>
+            <span>🕐 Mon-Fri: 9AM-6PM IST</span>
+          </div>
+          <p className="pt-2 border-t border-slate-300 mt-2 w-3/4 mx-auto text-slate-500 font-normal">
+            © 2026 VASUDEVA VISHAL (Vision Printt Technologies). All rights reserved.
+          </p>
+        </div>
       </div>
     </div>
   );
