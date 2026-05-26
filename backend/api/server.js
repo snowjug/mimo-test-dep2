@@ -184,7 +184,10 @@ const triggerPiPrint = async (fileUrl, copies = 1) => {
   for (let i = 0; i < copies; i++) {
     const res = await axios.post(
       `${PI_BASE_URL}/print`,
-      { file_url: fileUrl },
+      { 
+        file_url: fileUrl,
+        printer_name: process.env.PRINTER_NAME || "Brother_HL_L5210DN_series"
+      },
       { timeout: 30000, headers: { "Content-Type": "application/json" } }
     );
     results.push(res.data);
