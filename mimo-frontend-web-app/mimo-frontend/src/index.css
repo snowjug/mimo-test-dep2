@@ -400,6 +400,23 @@ body {
     animation: float-pod 6s ease-in-out infinite;
 }
 
+@keyframes float-pod {
+    0%, 100% {
+        transform: translateY(0);
+        box-shadow: 
+            0 30px 80px rgba(0, 0, 0, 0.5),
+            inset 0 2px 0 rgba(255, 255, 255, 0.1),
+            inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+    }
+    50% {
+        transform: translateY(-6px);
+        box-shadow: 
+            0 45px 95px rgba(0, 0, 0, 0.6),
+            inset 0 2.5px 0 rgba(255, 255, 255, 0.15),
+            inset 0 -2px 0 rgba(0, 0, 0, 0.25);
+    }
+}
+
 .swipe-track-glass.unlocked {
     border-color: rgba(79, 195, 247, 0.8);
     box-shadow: 
