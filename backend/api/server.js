@@ -1497,6 +1497,13 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
           expires: Date.now() + 15 * 60 * 1000, // 15 minutes
         });
 
+        // --- OLD PI COMPATIBILITY (PULL ARCHITECTURE) ---
+        if (process.env.PI_ARCHITECTURE === "pull") {
+          console.log(`[PULL ARCHITECTURE] Job ${fileName} marked as printing. Waiting for old Pi to pull...`);
+          results.push({ file: fileName, status: "pull_mode_active" });
+          continue; // Skip the FastAPI Push call!
+        }
+
         console.log(`🖨️ Sending to Pi: ${fileName} | copies: ${copies} | url: ${signedUrl}`);
         const piResults = await triggerPiPrint(signedUrl, copies);
         console.log(`✅ Pi response for ${fileName}:`, piResults);
@@ -1554,7 +1561,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
       }
     }
 
-    const allDone = results.every((r) => ["printed", "already_printed"].includes(r.status));
+    const allDone = results.every((r) => ["printed", "already_printed", "pull_mode_active"].includes(r.status));
     res.json({
       success: allDone,
       message: allDone ? "All documents sent to printer" : "Some documents failed",
