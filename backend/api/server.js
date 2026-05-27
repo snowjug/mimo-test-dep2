@@ -41,6 +41,7 @@ const rateLimit = require("express-rate-limit");
 
 // ================= APP =================
 const app = express();
+app.set("trust proxy", 1);
 
 const kioskLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
