@@ -700,6 +700,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const now = new Date();
+    const { printOptions: bodyPrintOptions } = req.body || {};
 
     const snapshot = await db
       .collection("print_jobs")
