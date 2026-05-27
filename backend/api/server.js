@@ -1779,12 +1779,15 @@ setInterval(async () => {
     console.log(`[BG PROCESSOR] Finished ${data.fileName} (${pages} pages)`);
   } catch (err) {
     console.error("[BG PROCESSOR ERROR]", err.message);
-    // Reset status so it can be retried next interval
+    // Mark as failed instead of resetting to pending_conversion to prevent infinite loops
     try {
       const snapshot = await db.collection("print_jobs")
         .where("status", "==", "processing").limit(1).get();
       if (!snapshot.empty) {
-        await snapshot.docs[0].ref.update({ status: "pending_conversion" });
+        await snapshot.docs[0].ref.update({ 
+          status: "failed",
+          "conversionDetails.error": err.message 
+        });
       }
     } catch (_) {}
   }
