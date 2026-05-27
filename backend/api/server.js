@@ -182,13 +182,13 @@ const PI_BASE_URL = process.env.PI_BASE_URL || "http://100.108.118.38:8000";
 const https = require("https");
 const piAgent = new https.Agent({ family: 4, keepAlive: true });
 
-// Get Pi tunnel URL — ngrok URL hardcoded, overridable via PI_BASE_URL env var
+// Get Pi tunnel URL — permanent static ngrok domain, overridable via PI_BASE_URL env var
 const getNgrokUrl = async () => {
   // PI_BASE_URL env var in Northflank takes priority (set this to update without redeploy)
   if (process.env.PI_BASE_URL && !process.env.PI_BASE_URL.includes('100.108') && !process.env.PI_BASE_URL.includes('tail2146')) {
     return process.env.PI_BASE_URL;
   }
-  return "https://afar-written-roamer.ngrok-free.dev";
+  return "https://splashed-giddily-populace.ngrok-free.dev";
 };
 
 // Helper: call the Pi print API for one file
