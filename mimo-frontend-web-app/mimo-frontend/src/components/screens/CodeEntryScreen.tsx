@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 
 interface CodeEntryScreenProps {
   onSuccess: () => void;
+  onBack: () => void;
   isActive: boolean;
   code: string;
   setCode: React.Dispatch<React.SetStateAction<string>>;
   hasError?: boolean;
 }
 
-export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({ onSuccess, isActive, code, setCode, hasError }) => {
+export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({ onSuccess, onBack, isActive, code, setCode, hasError }) => {
   const [isShaking, setIsShaking] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -71,7 +72,44 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({ onSuccess, isA
           @keyframes mimo-spin {
             to { transform: rotate(360deg); }
           }
+          .kiosk-back-btn {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.20);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease-in-out;
+            z-index: 100;
+          }
+          .kiosk-back-btn:active {
+            transform: scale(0.90);
+            background: rgba(255, 255, 255, 0.20);
+            border-color: rgba(255, 255, 255, 0.40);
+          }
+          .kiosk-back-btn .material-symbols-outlined {
+            font-size: 36px;
+          }
         `}</style>
+
+        <button 
+          onClick={onBack}
+          className="kiosk-back-btn"
+          aria-label="Go back to home"
+        >
+          <span className="material-symbols-outlined">arrow_back</span>
+        </button>
+
         <div className="input-display-area">
           <div className="entry-instruction">
             <h2>Enter Your Mimo <br /> Code Here</h2>

@@ -170,6 +170,7 @@ function App() {
         code={code}
         setCode={setCode}
         onSuccess={handleValidationSuccess}
+        onBack={handleReset}
         hasError={toastError && currentScreen === 'code-entry-screen'}
       />
 

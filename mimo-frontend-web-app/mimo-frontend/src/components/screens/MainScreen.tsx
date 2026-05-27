@@ -18,13 +18,15 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive }) => {
 
     const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
         if (isUnlocked) return;
-        let clientX = 0;
+        const isPortrait = window.innerWidth <= 1000;
+        let startVal = 0;
         if ('touches' in e) {
-            clientX = e.touches[0].clientX;
+            startVal = isPortrait ? e.touches[0].clientY : e.touches[0].clientX;
         } else {
-            clientX = (e as React.MouseEvent).clientX;
+            const mouseEvent = e as React.MouseEvent;
+            startVal = isPortrait ? mouseEvent.clientY : mouseEvent.clientX;
         }
-        dragStartX.current = clientX;
+        dragStartX.current = startVal;
         dragStartThumbX.current = dragX;
         setIsDragging(true);
     };
@@ -39,18 +41,23 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive }) => {
         const handleDragMove = (e: MouseEvent | TouchEvent) => {
             if (!isDragging || isUnlocked || !trackRef.current) return;
 
-            let clientX = 0;
+            const isPortrait = window.innerWidth <= 1000;
+            let currentVal = 0;
             if ('touches' in e) {
-                clientX = e.touches[0].clientX;
+                currentVal = isPortrait ? e.touches[0].clientY : e.touches[0].clientX;
             } else {
-                clientX = (e as MouseEvent).clientX;
+                currentVal = isPortrait ? (e as MouseEvent).clientY : (e as MouseEvent).clientX;
             }
 
             const trackRect = trackRef.current.getBoundingClientRect();
             const thumbWidth = thumbRef.current ? thumbRef.current.offsetWidth : 360;
-            const maxDragX = trackRect.width - thumbWidth - (TRACK_PADDING * 2);
+            
+            // On portrait-rotated displays, the track's length is visual height (trackRect.height)
+            const trackWidth = isPortrait ? trackRect.height : trackRect.width;
+            const maxDragX = trackWidth - thumbWidth - (TRACK_PADDING * 2);
 
-            const dx = clientX - dragStartX.current;
+            // On portrait-rotated displays, dragging left-to-right corresponds to viewport Y decreasing
+            const dx = isPortrait ? (dragStartX.current - currentVal) : (currentVal - dragStartX.current);
             let newX = dragStartThumbX.current + dx;
 
             if (newX < 0) newX = 0;
@@ -58,7 +65,8 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive }) => {
 
             setDragX(newX);
 
-            if (newX >= maxDragX * 0.95) {
+            // Require 90% swipe distance to unlock
+            if (newX >= maxDragX * 0.90) {
                 setIsUnlocked(true);
                 setIsDragging(false);
                 setDragX(maxDragX);
@@ -113,7 +121,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive }) => {
 
             <main className="immersive-container">
                 <section className="brand-panel">
-                    <div style={{ opacity: 0.8 }}>
+                    <div style={{ opacity: 0.8, transform: 'translateY(3px)' }}>
                         <p className="tag-line">— WELCOME TO —</p>
                     </div>
                     <div className="main-heading">
@@ -134,10 +142,10 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive }) => {
                                 strokeWidth="1.5"
                                 strokeLinejoin="bevel"
                                 strokeLinecap="butt"
-                                transform="translate(0, 5)"
+                                transform="translate(0, 13)"
                                 style={{
                                     fontFamily: "'Lovelo', sans-serif",
-                                    fontSize: '162px',
+                                    fontSize: '170px',
                                     fontWeight: 900,
                                     letterSpacing: '12px',
                                     paintOrder: 'stroke fill'
