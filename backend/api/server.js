@@ -189,23 +189,43 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
 
   const results = [];
   for (let i = 0; i < copies; i++) {
-    const res = await axios.post(
-      `${targetPiUrl}/print`,
-      { 
-        pdfUrl: fileUrl,          // matches the existing production script
-        file_url: fileUrl,        // kept for backward compatibility
+    // Use native fetch to avoid axios TLS/keep-alive quirks
+    const res = await fetch(`${targetPiUrl}/print`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pdfUrl: fileUrl,
+        file_url: fileUrl,
         printer_name: targetPrinter
-      },
-      { 
-        timeout: 30000, 
-        headers: { "Content-Type": "application/json" },
-        httpsAgent: piAgent 
-      }
-    );
-    results.push(res.data);
+      })
+    });
+    
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Pi HTTP error ${res.status}: ${errText}`);
+    }
+    
+    const data = await res.json();
+    results.push(data);
   }
   return results;
 };
+
+// ================= TEST PI CONNECTION =================
+app.get("/test-pi", async (req, res) => {
+  const targetPiUrl = process.env.PI_BASE_URL || "https://printpi.tail2146fa.ts.net";
+  try {
+    const response = await fetch(targetPiUrl);
+    res.json({ success: true, status: response.status, statusText: response.statusText });
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      error: err.message, 
+      stack: err.stack,
+      cause: err.cause ? err.cause.message : null
+    });
+  }
+});
 
 // ================= REGISTER =================
 app.post("/register", async (req, res) => {
