@@ -182,23 +182,13 @@ const PI_BASE_URL = process.env.PI_BASE_URL || "http://100.108.118.38:8000";
 const https = require("https");
 const piAgent = new https.Agent({ family: 4, keepAlive: true });
 
-// Fetch current ngrok URL from Pi's local ngrok API (updates automatically when ngrok restarts)
+// Get Pi tunnel URL — ngrok URL hardcoded, overridable via PI_BASE_URL env var
 const getNgrokUrl = async () => {
-  try {
-    // Ask the Pi's ngrok agent directly via the localtunnel bridge
-    // Fallback chain: ngrok API → env var → hardcoded
-    const res = await fetch("http://mimoprint.loca.lt/__ngrok_api__/tunnels", {
-      headers: { "bypass-tunnel-reminder": "true" },
-      signal: AbortSignal.timeout(3000)
-    }).catch(() => null);
-    if (res && res.ok) {
-      const data = await res.json();
-      const tunnel = data.tunnels?.find(t => t.proto === "https");
-      if (tunnel) return tunnel.public_url;
-    }
-  } catch (_) {}
-  // Direct hardcoded ngrok URL as reliable fallback
-  return process.env.PI_BASE_URL || "https://afar-written-roamer.ngrok-free.dev";
+  // PI_BASE_URL env var in Northflank takes priority (set this to update without redeploy)
+  if (process.env.PI_BASE_URL && !process.env.PI_BASE_URL.includes('100.108') && !process.env.PI_BASE_URL.includes('tail2146')) {
+    return process.env.PI_BASE_URL;
+  }
+  return "https://afar-written-roamer.ngrok-free.dev";
 };
 
 // Helper: call the Pi print API for one file
