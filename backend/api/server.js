@@ -184,16 +184,19 @@ const piAgent = new https.Agent({ family: 4, keepAlive: true });
 
 // Helper: call the Pi print API for one file
 const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
-  // FORCE Pinggy Tunnel via HTTP to completely bypass all TLS handshake issues
-  const targetPiUrl = "http://wpmoo-182-74-196-22.run.pinggy-free.link";
+  // Fixed permanent localtunnel URL - subdomain 'mimoprint' is always the same
+  const targetPiUrl = "https://mimoprint.loca.lt";
   const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
 
   const results = [];
   for (let i = 0; i < copies; i++) {
-    // Use native fetch to avoid axios TLS/keep-alive quirks
+    // Use native fetch with bypass header for localtunnel
     const res = await fetch(`${targetPiUrl}/print`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "bypass-tunnel-reminder": "true"
+      },
       body: JSON.stringify({
         pdfUrl: fileUrl,
         file_url: fileUrl,
@@ -214,16 +217,18 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
 
 // ================= TEST PI CONNECTION =================
 app.get("/test-pi", async (req, res) => {
-  const targetPiUrl = "http://wpmoo-182-74-196-22.run.pinggy-free.link";
+  const targetPiUrl = "https://mimoprint.loca.lt";
   try {
-    const response = await fetch(targetPiUrl);
-    res.json({ success: true, status: response.status, statusText: response.statusText });
+    const response = await fetch(targetPiUrl, {
+      headers: { "bypass-tunnel-reminder": "true" }
+    });
+    res.json({ success: true, status: response.status, statusText: response.statusText, url: targetPiUrl });
   } catch (err) {
     res.status(500).json({ 
       success: false, 
       error: err.message, 
-      stack: err.stack,
-      cause: err.cause ? err.cause.message : null
+      cause: err.cause ? err.cause.message : null,
+      url: targetPiUrl
     });
   }
 });
