@@ -88,7 +88,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
     // Dynamic Mock Loop
     if (!intervalRef.current && manualProgress === undefined) {
-      const speedPerPage = 2500; 
+      const speedPerPage = 4500; 
       const totalTime = pages * speedPerPage;
       const stepTime = totalTime / 100;
 
@@ -128,6 +128,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
+  // Calculate coordinates for the leading edge particle
+  const angle = -Math.PI / 2 + (progress / 100) * 2 * Math.PI;
+  const dotX = 190 + radius * Math.cos(angle);
+  const dotY = 190 + radius * Math.sin(angle);
+
   return (
     <div 
         className={`screen printing-wrap ${isActive ? 'visible' : ''}`} 
@@ -157,21 +162,46 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
             <div className="circular-progress-container" style={{ position: 'relative', width: '380px', height: '380px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                
+                <style>{`
+                  @keyframes mimo-spin {
+                    to { transform: rotate(360deg); }
+                  }
+                `}</style>
                 <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2 }}>
                     <defs>
                         <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stopColor="#4fc3f7" />
                             <stop offset="100%" stopColor="#0288d1" />
                         </linearGradient>
+                        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur stdDeviation="6" result="blur" />
+                            <feMerge>
+                                <feMergeNode in="blur" />
+                                <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                        </filter>
                     </defs>
                     <g style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+                        {/* Background track circle */}
                         <circle 
                           cx="190" cy="190" r={radius} 
                           fill="transparent" 
                           stroke="rgba(255,255,255,0.06)" 
                           strokeWidth="24" 
                         />
+                        {/* Rotating inner dashed decorative ring */}
+                        <circle 
+                          cx="190" cy="190" r={radius - 20} 
+                          fill="transparent" 
+                          stroke="rgba(79, 195, 247, 0.08)" 
+                          strokeWidth="2" 
+                          strokeDasharray="8 8"
+                          style={{
+                            transformOrigin: 'center',
+                            animation: 'mimo-spin 20s linear infinite'
+                          }}
+                        />
+                        {/* Active progress track circle */}
                         <circle 
                           cx="190" cy="190" r={radius} 
                           fill="transparent" 
@@ -180,12 +210,45 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                           strokeDasharray={progress === 100 ? 'none' : circumference} 
                           strokeDashoffset={progress === 100 ? 0 : strokeDashoffset} 
                           strokeLinecap={progress === 100 ? "square" : "round"}
+                          style={{
+                            transition: 'stroke-dashoffset 0.06s linear'
+                          }}
                         />
+                        {/* Glowing progress tip particle */}
+                        {progress > 0 && progress < 100 && (
+                          <circle 
+                            cx={dotX} 
+                            cy={dotY} 
+                            r="8" 
+                            fill="#4fc3f7" 
+                            filter="url(#glow)"
+                            style={{
+                              transition: 'cx 0.06s linear, cy 0.06s linear'
+                            }}
+                          />
+                        )}
                     </g>
                 </svg>
 
-                <div className="percentage-text">
-                    {progress}%
+                <div 
+                  className="percentage-text"
+                  style={{
+                    fontSize: '84px',
+                    fontWeight: 800,
+                    letterSpacing: '-2px',
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontFeatureSettings: '"tnum"',
+                    fontVariantNumeric: 'tabular-nums',
+                    color: '#fff',
+                    zIndex: 3,
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'center',
+                    textShadow: '0 0 20px rgba(79, 195, 247, 0.2)'
+                  }}
+                >
+                    {progress}
+                    <span style={{ fontSize: '32px', color: '#4fc3f7', marginLeft: '2px', fontWeight: 600 }}>%</span>
                 </div>
             </div>
         </div>
