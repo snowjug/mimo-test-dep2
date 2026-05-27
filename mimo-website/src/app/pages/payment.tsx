@@ -95,9 +95,7 @@ export function Payment() {
     try {
       // 1. If order is totally free (via ASDFG or coins), bypass Cashfree entirely
       if (totalAmount <= 0) {
-        const storedOptions = sessionStorage.getItem("printOptions");
-        const currentPrintOptions = storedOptions ? JSON.parse(storedOptions) : {};
-        const successResponse = await api.post("/payment-success", { printOptions: currentPrintOptions });
+        const successResponse = await api.post("/payment-success");
         const { printCode } = successResponse.data;
 
         sessionStorage.setItem("printCode", printCode);

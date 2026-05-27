@@ -74,8 +74,8 @@ function App() {
           const job = {
             userName: data.userName || "User",
             fileName: doc.file,
-            pages: 1,
-            copies: doc.copies,
+            pages: doc.pages || 1,
+            copies: doc.copies || 1,
             mode: "Black & White",
           };
 
@@ -189,9 +189,14 @@ function App() {
             : 'Printing in progress…\nPlease wait.'
         }
         pages={jobData?.pages || 1}
+        copies={jobData?.copies || 1}
+        printCode={code}
         onComplete={() => {
           setPrintStatus('completed');
           goToSummary();
+        }}
+        onError={() => {
+          setCurrentScreen('system-error-screen');
         }}
       />
 
