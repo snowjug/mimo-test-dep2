@@ -13,6 +13,7 @@ export function PrintCode() {
   const [printCode, setPrintCode] = useState("");
   const [files, setFiles] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(true);
+  const [printStatus, setPrintStatus] = useState<"paid" | "printing" | "completed" | "failed">("paid");
 
   useEffect(() => {
     const storedCode = sessionStorage.getItem("printCode");
@@ -34,6 +35,32 @@ export function PrintCode() {
     
     setIsProcessing(false);
   }, [navigate]);
+
+  useEffect(() => {
+    if (!printCode || printStatus === "completed" || printStatus === "failed") return;
+
+    const checkStatus = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || "https://p01--mimo-backend--4b94y9s4jyc5.code.run";
+        const res = await fetch(`${apiUrl}/kiosk/job-status?printCode=${printCode}`);
+        const data = await res.json();
+        
+        if (data.status && data.status !== printStatus) {
+          setPrintStatus(data.status);
+          if (data.status === "completed") {
+            toast.success("Your document has been printed!");
+          } else if (data.status === "failed") {
+            toast.error("Print failed. Please contact support.");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check status", err);
+      }
+    };
+
+    const interval = setInterval(checkStatus, 3000);
+    return () => clearInterval(interval);
+  }, [printCode, printStatus]);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(printCode);
@@ -95,8 +122,8 @@ export function PrintCode() {
                   <Printer className={`w-8 h-8 text-white/80 ${isProcessing ? 'animate-pulse' : ''}`} />
                 </div>
 
-                {/* Paper */}
-                {isProcessing ? (
+                {/* Paper Animation Logic */}
+                {isProcessing || printStatus === "printing" ? (
                   <div className="absolute bottom-16 w-16 h-20 bg-white border border-gray-200 shadow-sm rounded-t z-10 flex flex-col items-center justify-center animate-printing-motion overflow-hidden">
                     <div className="w-10 h-1 bg-gray-200 rounded-full mb-2"></div>
                     <div className="w-8 h-1 bg-gray-200 rounded-full mb-2"></div>
@@ -104,7 +131,7 @@ export function PrintCode() {
                     {/* Simulated print head moving */}
                     <div className="absolute top-1/2 left-0 w-full h-1 bg-blue-400/20 shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse" />
                   </div>
-                ) : (
+                ) : printStatus === "completed" ? (
                   <div className="absolute bottom-16 w-16 h-20 bg-white border border-gray-200 shadow-sm rounded-t animate-slide-up-paper z-10 flex flex-col items-center justify-center">
                     <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-1 animate-scale-check" style={{ animationDelay: '0.4s' }}>
                       <CheckCircle className="w-6 h-6 text-green-600" />
@@ -112,17 +139,27 @@ export function PrintCode() {
                     <div className="w-10 h-1 bg-gray-100 rounded-full mb-1"></div>
                     <div className="w-8 h-1 bg-gray-100 rounded-full"></div>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
             
             <CardTitle className="text-2xl sm:text-3xl font-bold mb-2 text-gray-900 transition-all">
-              {isProcessing ? "Processing Print Job..." : "Payment Successful!"}
+              {isProcessing 
+                ? "Processing Print Job..." 
+                : printStatus === "printing" 
+                  ? "Printing Document..." 
+                  : printStatus === "completed"
+                    ? "Printed Successfully!"
+                    : "Payment Successful!"}
             </CardTitle>
             <CardDescription className="text-sm sm:text-base transition-all">
               {isProcessing 
                 ? "Please wait while we securely prepare your documents..." 
-                : "Your print job has been confirmed. Use the code below at the printer."}
+                : printStatus === "printing"
+                  ? "Your document is currently printing at the kiosk. Please wait..."
+                  : printStatus === "completed"
+                    ? "Your document has been printed. Thank you for using MIMO."
+                    : "Your print job has been confirmed. Use the code below at the printer."}
             </CardDescription>
           </CardHeader>
 

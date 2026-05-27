@@ -1404,10 +1404,12 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     // Check across all docs for this code — all must be completed to call it done
     let allCompleted = true;
     let anyFailed = false;
+    let anyPrinting = false;
 
     snapshot.forEach((doc) => {
       const data = doc.data();
       if (data.status === "failed") anyFailed = true;
+      if (data.status === "printing") anyPrinting = true;
       if (!["completed", "printed"].includes(data.status) && data.isPrinted !== true) {
         allCompleted = false;
       }
@@ -1420,8 +1422,12 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     if (allCompleted) {
       return res.json({ status: "completed", isPrinted: true });
     }
+    
+    if (anyPrinting) {
+      return res.json({ status: "printing", isPrinted: false });
+    }
 
-    return res.json({ status: "printing", isPrinted: false });
+    return res.json({ status: "paid", isPrinted: false });
   } catch (err) {
     console.error("❌ KIOSK JOB STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch job status" });
