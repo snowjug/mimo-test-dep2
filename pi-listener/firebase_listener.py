@@ -6,6 +6,7 @@ import os
 import requests
 import urllib.parse
 from datetime import datetime, timedelta
+import threading
 
 # ================= CONFIGURATION =================
 PRINTER_NAME = os.environ.get("PRINTER_NAME", "Brother_HL_L5210DN_series")
@@ -158,6 +159,38 @@ def on_snapshot(col_snapshot, changes, read_time):
 
 # ================= START LISTENER =================
 print("\n📡 Pi Listener Started. Waiting for jobs (status: 'printing')...")
+
+def heartbeat_loop():
+    """ Sends printer status to Firestore every 30 seconds """
+    while True:
+        try:
+            status = "Online"
+            try:
+                # Query CUPS for printer status
+                result = subprocess.run(["lpstat", "-p", PRINTER_NAME], capture_output=True, text=True)
+                output = result.stdout.lower()
+                if "disabled" in output or "paused" in output:
+                    status = "Paused / Error"
+                elif "idle" in output:
+                    status = "Idle"
+                elif "printing" in output:
+                    status = "Printing"
+                else:
+                    status = "Unknown State"
+            except:
+                status = "lpstat failed"
+                
+            db.collection("system_status").document("pi").set({
+                "lastSeen": firestore.SERVER_TIMESTAMP,
+                "printerStatus": status
+            }, merge=True)
+        except Exception as e:
+            print(f"⚠️ Heartbeat failed: {e}")
+            
+        time.sleep(30)
+
+# Start heartbeat in a background thread
+threading.Thread(target=heartbeat_loop, daemon=True).start()
 
 # Watch the print_jobs collection where status == 'printing'
 query = db.collection('print_jobs').where('status', '==', 'printing')

@@ -15,6 +15,7 @@ import { UserProfile } from "./app/pages/user-profile";
 import { PrinterSettings } from "./app/pages/printer-settings";
 import { OnboardingName } from "./app/pages/onboarding-name";
 import { BlankPages } from "./app/pages/blank-pages";
+import AdminDashboard from "./app/pages/admin";
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -85,6 +86,7 @@ export default function App() {
           <Route path="/settings" element={<PrinterSettings />} />
           <Route path="/onboarding" element={<OnboardingName />} />
           <Route path="/blank-pages" element={<BlankPages />} />
+          <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
         <Toaster />
       </BrowserRouter>

@@ -1,4 +1,5 @@
 const { onRequest } = require("firebase-functions/v2/https");
+const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -91,7 +92,7 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
 app.post("/create-order", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const { selectedFiles, printOptions } = req.body;
+    const { selectedFiles, printOptions, couponCode } = req.body;
     let { orderId } = req.body;
     if (!orderId) {
       orderId = `order_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
@@ -105,6 +106,18 @@ app.post("/create-order", authMiddleware, async (req, res) => {
 
     if (jobsSnapshot.empty) {
       return res.status(400).send("No pending jobs to pay for");
+    }
+
+    let discountPercentage = 0;
+    if (couponCode) {
+      const couponDoc = await db.collection("coupons").doc(couponCode.toUpperCase()).get();
+      if (couponDoc.exists) {
+        const couponData = couponDoc.data();
+        const now = new Date();
+        if (couponData.isActive && (!couponData.expiryDate || couponData.expiryDate.toDate() > now)) {
+          discountPercentage = couponData.discountPercentage;
+        }
+      }
     }
 
     let totalAmount = 0;
@@ -149,7 +162,12 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     });
     await batchUpdate.commit();
 
-    const amount = Number(totalAmount.toFixed(2));
+    let amount = Number(totalAmount.toFixed(2));
+    if (discountPercentage > 0) {
+      amount = Number((amount - (amount * (discountPercentage / 100))).toFixed(2));
+      // Ensure Cashfree minimum transaction amount of 1 INR
+      if (amount < 1.00) amount = 1.00;
+    }
 
     const response = await axios.post(
       `${CASHFREE_BASE_URL}/orders`,
@@ -412,4 +430,185 @@ app.get("/generate-print-code", authMiddleware, async (req, res) => {
   }
 });
 
+// ================= ADMIN MIDDLEWARE =================
+const adminAuthMiddleware = (req, res, next) => {
+  const token = req.header("Authorization");
+  if (!token) return res.status(401).json({ error: "Access Denied" });
+  try {
+    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY);
+    if (!verified.isAdmin) return res.status(403).json({ error: "Forbidden: Admins only" });
+    req.admin = verified;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: "Invalid Token" });
+  }
+};
+
+// ================= ADMIN AUTH =================
+app.post("/admin/login", (req, res) => {
+  const { email, password } = req.body;
+  if (email === "visionprintt@gmail.com" && password === "Vishal@2006") {
+    const token = jwt.sign({ isAdmin: true, email }, SECRET_KEY, { expiresIn: "24h" });
+    return res.json({ token, message: "Admin Login Successful" });
+  }
+  return res.status(401).json({ error: "Invalid admin credentials" });
+});
+
+// ================= ADMIN METRICS =================
+app.get("/admin/metrics", adminAuthMiddleware, async (req, res) => {
+  try {
+    const ordersSnapshot = await db.collection("orders").where("status", "==", "PAID").get();
+    let totalRevenue = 0;
+    let totalPagesPrinted = 0;
+    
+    ordersSnapshot.forEach(doc => {
+      const data = doc.data();
+      totalRevenue += Number(data.amount || 0);
+      totalPagesPrinted += Number(data.totalPages || 0);
+    });
+
+    const piStatusDoc = await db.collection("system_status").doc("pi").get();
+    const piStatus = piStatusDoc.exists ? piStatusDoc.data() : { status: "Unknown", lastSeen: null };
+
+    res.json({
+      totalRevenue: totalRevenue.toFixed(2),
+      totalPagesPrinted,
+      totalOrders: ordersSnapshot.size,
+      piStatus
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch metrics" });
+  }
+});
+
+// ================= ADMIN COUPONS =================
+app.get("/admin/coupons", adminAuthMiddleware, async (req, res) => {
+  try {
+    const snapshot = await db.collection("coupons").get();
+    const coupons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(coupons);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch coupons" });
+  }
+});
+
+app.post("/admin/coupons", adminAuthMiddleware, async (req, res) => {
+  try {
+    const { code, discountPercentage, expiryDate } = req.body;
+    if (!code || !discountPercentage) return res.status(400).json({ error: "Missing required fields" });
+    
+    const couponRef = db.collection("coupons").doc(code.toUpperCase());
+    await couponRef.set({
+      code: code.toUpperCase(),
+      discountPercentage: Number(discountPercentage),
+      isActive: true,
+      expiryDate: expiryDate ? new Date(expiryDate) : null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    res.json({ message: "Coupon created successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create coupon" });
+  }
+});
+
+app.delete("/admin/coupons/:code", adminAuthMiddleware, async (req, res) => {
+  try {
+    await db.collection("coupons").doc(req.params.code).delete();
+    res.json({ message: "Coupon deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete coupon" });
+  }
+});
+
+// ================= VALIDATE COUPON (Public) =================
+app.get("/validate-coupon/:code", async (req, res) => {
+  try {
+    const code = req.params.code.toUpperCase();
+    const couponDoc = await db.collection("coupons").doc(code).get();
+    
+    if (!couponDoc.exists) {
+      return res.status(404).json({ error: "Invalid promo code" });
+    }
+
+    const couponData = couponDoc.data();
+    const now = new Date();
+    
+    if (!couponData.isActive) {
+      return res.status(400).json({ error: "Promo code is disabled" });
+    }
+    
+    if (couponData.expiryDate && couponData.expiryDate.toDate() < now) {
+      return res.status(400).json({ error: "Promo code has expired" });
+    }
+
+    res.json({ discountPercentage: couponData.discountPercentage });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to validate coupon" });
+  }
+});
+
 exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
+
+// ================= AUTO REFUND LISTENER =================
+exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
+  const beforeData = event.data.before.data();
+  const afterData = event.data.after.data();
+
+  // Trigger ONLY if status changes to "failed"
+  if (beforeData.status !== "failed" && afterData.status === "failed") {
+    console.log(`[REFUND] Print job ${event.params.jobId} failed. Initiating auto-refund...`);
+    const orderId = afterData.orderId;
+    if (!orderId) {
+      console.log(`[REFUND] No orderId found for job ${event.params.jobId}. Cannot refund.`);
+      return;
+    }
+
+    // 1. Fetch the Order to get the actual amount paid
+    const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+    if (orderSnapshot.empty) {
+      console.log(`[REFUND] Order ${orderId} not found.`);
+      return;
+    }
+    const orderDoc = orderSnapshot.docs[0];
+    const orderData = orderDoc.data();
+
+    // Prevent double refunds
+    if (orderData.refundStatus === "SUCCESS") {
+      console.log(`[REFUND] Order ${orderId} is already refunded.`);
+      return;
+    }
+
+    try {
+      // 2. Call Cashfree Refunds API
+      const refundId = `refund_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
+      const response = await axios.post(
+        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        {
+          refund_amount: orderData.amount,
+          refund_id: refundId,
+          refund_note: `Auto-refund for failed print job ${event.params.jobId}`
+        },
+        { headers: cashfreeHeaders, timeout: 10000 }
+      );
+
+      console.log(`[REFUND] Cashfree API response for ${orderId}:`, response.data);
+
+      // 3. Update Order in Firestore
+      await orderDoc.ref.update({
+        refundStatus: "SUCCESS",
+        refundId: refundId,
+        refundedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log(`[REFUND] Order ${orderId} successfully marked as refunded in DB.`);
+    } catch (err) {
+      console.error(`[REFUND ERROR] Failed to refund order ${orderId}:`, err.response?.data || err.message);
+      await orderDoc.ref.update({
+        refundStatus: "FAILED",
+        refundError: err.response?.data?.message || err.message
+      });
+    }
+  }
+});

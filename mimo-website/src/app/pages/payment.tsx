@@ -58,20 +58,29 @@ export function Payment() {
   const terminalId = useMemo(() => Math.random().toString(36).substr(2, 4).toUpperCase(), []);
   const txnId = useMemo(() => Math.random().toString(36).substr(2, 9).toUpperCase(), []);
 
-  const handleApplyPromo = () => {
-    if (promoCode.toUpperCase() === "MIMO20") {
-      const discount = totalCost * 0.2;
-      setPromoDiscount(discount);
-      setAppliedPromo("MIMO20");
-      toast.success("Promo code applied: 20% discount!");
-    } else if (promoCode.toUpperCase() === "ASDFG") {
+  const handleApplyPromo = async () => {
+    if (promoCode.trim() === "") {
+      toast.error("Please enter a promo code");
+      return;
+    }
+    
+    // Secret bypass for testing
+    if (promoCode.toUpperCase() === "ASDFG") {
       setPromoDiscount(totalCost); // 100% free
       setAppliedPromo("ASDFG");
       toast.success("Secret coupon applied! Free print unlocked.");
-    } else if (promoCode.trim() === "") {
-      toast.error("Please enter a promo code");
-    } else {
-      toast.error("Invalid promo code");
+      return;
+    }
+
+    try {
+      const response = await api.get(`/validate-coupon/${promoCode}`);
+      const discountPercentage = response.data.discountPercentage;
+      const discountAmount = totalCost * (discountPercentage / 100);
+      setPromoDiscount(discountAmount);
+      setAppliedPromo(promoCode.toUpperCase());
+      toast.success(`Promo code applied: ${discountPercentage}% discount!`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Invalid promo code");
     }
   };
 
@@ -112,7 +121,12 @@ export function Payment() {
       const storedOptions = sessionStorage.getItem("printOptions");
       const printOptions = storedOptions ? JSON.parse(storedOptions) : {};
       
-      const orderResponse = await api.post("/create-order", { printOptions });
+      const payload: any = { printOptions };
+      if (appliedPromo && appliedPromo !== "ASDFG") {
+        payload.couponCode = appliedPromo;
+      }
+
+      const orderResponse = await api.post("/create-order", payload);
       const { orderId, paymentSessionId } = orderResponse.data;
 
       // 3. Trigger Cashfree SDK
