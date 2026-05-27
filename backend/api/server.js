@@ -703,14 +703,17 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     const snapshot = await db
       .collection("print_jobs")
       .where("userId", "==", userId)
-      .where("status", "in", ["pending", "paid"])
+      .where("status", "in", ["pending", "paid", "pending_conversion", "processing"])
       .get();
 
     // Filter jobs that don't have a printCode yet
-    const jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
+    let jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
     
-    // If all jobs already have a print code, return the most recent one
-    if (jobsToUpdate.length === 0 && !snapshot.empty) {
+    // If NOT a blank sheet, and all jobs already have a print code, return the most recent one
+    const storedPrintOptions = bodyPrintOptions || {};
+    const isBlankSheet = storedPrintOptions.isBlankSheet === true;
+
+    if (!isBlankSheet && jobsToUpdate.length === 0 && !snapshot.empty) {
       const recentJob = snapshot.docs.find(doc => doc.data().printCode);
       if (recentJob) {
         console.log(`[PAYMENT-SUCCESS] Returning existing code for user ${userId}`);
@@ -718,6 +721,54 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       }
     }
 
+    // ============================================================
+    // BLANK SHEET / GRAPH PAPER: No file uploaded, create a virtual
+    // print_job so a print code can still be generated.
+    // ============================================================
+    if (jobsToUpdate.length === 0) {
+      if (isBlankSheet) {
+        const sheetType = storedPrintOptions.sheetType || "a4";
+        const totalPages = Number(storedPrintOptions.totalPages || 1);
+        const fileName = sheetType === "graph" ? "mimo_graph.pdf" : "blank_a4.pdf";
+        const pricePerPage = sheetType === "graph" ? 2.00 : 2.30;
+
+        console.log(`[PAYMENT-SUCCESS] Creating virtual print_job for blank sheet (${sheetType}), ${totalPages} pages, userId: ${userId}`);
+
+        const virtualJobRef = await db.collection("print_jobs").add({
+          userId,
+          fileName,
+          isBlankSheet: true,
+          sheetType,
+          documentUrl: null,
+          fileUrl: null,
+          mimetype: "application/pdf",
+          fileType: "pdf",
+          isImage: false,
+          pageCount: totalPages,
+          status: "pending",
+          printOptions: storedPrintOptions,
+          pricing: {
+            pricePerPage,
+            totalPages,
+            totalPagesToPrint: totalPages,
+            estimatedAmount: totalPages * pricePerPage,
+            finalAmount: storedPrintOptions.totalCost || totalPages * pricePerPage,
+            currency: "INR"
+          },
+          paymentStatus: { status: "completed", paymentMethod: "cashfree", paidAt: now },
+          printStatus: { status: "pending" },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Re-fetch the created doc so it can be updated in the batch below
+        const virtualJobDoc = await virtualJobRef.get();
+        jobsToUpdate = [virtualJobDoc];
+      } else {
+        console.error(`❌ No jobs found requiring a print code for userId: ${userId}`);
+        return res.status(400).json({ error: "No pending jobs found" });
+      }
+    }
     console.log(`[PAYMENT-SUCCESS] Found ${jobsToUpdate.length} jobs needing print codes for userId: ${userId}`);
 
     if (jobsToUpdate.length === 0) {
@@ -1550,12 +1601,23 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         const opts = data.printOptions || {};
         const copies = Number(opts.copies || 1);
         
-        const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
-        const file = bucket.file(filePath);
-        const [signedUrl] = await file.getSignedUrl({
-          action: 'read',
-          expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-        });
+        let signedUrl = null;
+        let isBlankSheet = data.isBlankSheet === true;
+        
+        if (!isBlankSheet) {
+          const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
+          const file = bucket.file(filePath);
+          const [generatedUrl] = await file.getSignedUrl({
+            action: 'read',
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+          });
+          signedUrl = generatedUrl;
+        } else {
+          // Point the Pi to the public templates hosted on the frontend
+          const frontendUrl = process.env.FRONTEND_URL || "https://mimo-test-dep2.vercel.app";
+          const templateName = data.sheetType === "graph" ? "mimo_graph.pdf" : "blank_a4.pdf";
+          signedUrl = `${frontendUrl}/${templateName}`;
+        }
 
         // --- OLD PI COMPATIBILITY (PULL ARCHITECTURE) ---
         if (process.env.PI_ARCHITECTURE === "pull") {
@@ -1701,8 +1763,13 @@ setInterval(async () => {
       fs.unlinkSync(tempInput);
     }
     
+    // Preserve payment status if the user paid while the document was converting
+    const latestDoc = await doc.ref.get();
+    const currentStatus = latestDoc.data().status;
+    const newStatus = (currentStatus === "paid" || currentStatus === "completed") ? currentStatus : "pending";
+    
     await doc.ref.update({
-      status: "pending",
+      status: newStatus,
       pageCount: pages,
       fileUrl: finalFileUrl
     });

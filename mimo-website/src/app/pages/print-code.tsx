@@ -24,8 +24,12 @@ export function PrintCode() {
     }
 
     setPrintCode(storedCode);
-    if (storedFiles) {
-      setFiles(JSON.parse(storedFiles));
+    if (storedFiles && storedFiles !== "undefined") {
+      try {
+        setFiles(JSON.parse(storedFiles));
+      } catch (err) {
+        console.error("Failed to parse stored files", err);
+      }
     }
     
     setIsProcessing(false);
