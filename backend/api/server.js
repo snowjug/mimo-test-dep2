@@ -1680,12 +1680,23 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         const opts = data.printOptions || {};
         const copies = Number(opts.copies || 1);
         
-        const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
-        const file = bucket.file(filePath);
-        const [signedUrl] = await file.getSignedUrl({
-          action: 'read',
-          expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-        });
+        let signedUrl = null;
+        let isBlankSheet = data.isBlankSheet === true;
+        
+        if (!isBlankSheet) {
+          const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
+          const file = bucket.file(filePath);
+          const [generatedUrl] = await file.getSignedUrl({
+            action: 'read',
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+          });
+          signedUrl = generatedUrl;
+        } else {
+          // Point the Pi to the public templates hosted on the frontend
+          const frontendUrl = process.env.FRONTEND_URL || "https://mimo-test-dep2.vercel.app";
+          const templateName = data.sheetType === "graph" ? "mimo_graph.pdf" : "blank_a4.pdf";
+          signedUrl = `${frontendUrl}/${templateName}`;
+        }
 
         // --- OLD PI COMPATIBILITY (PULL ARCHITECTURE) ---
         if (process.env.PI_ARCHITECTURE === "pull") {
