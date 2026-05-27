@@ -179,6 +179,9 @@ const uploadToStorage = async (file) => {
 // Pi Print Server
 const PI_BASE_URL = process.env.PI_BASE_URL || "http://100.108.118.38:8000";
 
+const https = require("https");
+const piAgent = new https.Agent({ family: 4, keepAlive: true });
+
 // Helper: call the Pi print API for one file
 const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
   const targetPiUrl = piUrl || process.env.PI_BASE_URL || "http://100.108.118.38:8000";
@@ -193,7 +196,11 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
         file_url: fileUrl,        // kept for backward compatibility
         printer_name: targetPrinter
       },
-      { timeout: 30000, headers: { "Content-Type": "application/json" } }
+      { 
+        timeout: 30000, 
+        headers: { "Content-Type": "application/json" },
+        httpsAgent: piAgent 
+      }
     );
     results.push(res.data);
   }
