@@ -35,6 +35,8 @@ Key backend responsibilities include:
 - **Brute Force Protection:** Rate limiters added to Kiosk API endpoints (20 req/min).
 - **Index Optimization:** Re-architected backend queries for Server-Sent Events (SSE) and history to filter in-memory, completely removing the need for strict composite indexes.
 - **Hardware Integration (Pi Architecture):** The Node backend dynamically supports both Firebase Listener "Pull" architectures (for the Old Pi) and FastAPI "Push" mechanisms (for the New Pi).
+- **Permanent Pi Tunnel (ngrok):** Replaced unreliable temporary tunnels and Tailscale conflicts with a permanent ngrok static domain configuration, auto-starting via systemd on the Pi for 100% uptime.
+- **E2E Stability:** Fixed frontend React crashes on payment failure and implemented strict error handling in the background PDF processor to prevent infinite retry loops on corrupted uploads.
 - **Production Payments:** Fully integrated Cashfree Production APIs for live order creation and automatic refunds on hardware failure.
 
 ## Folder Structure
@@ -43,6 +45,7 @@ Key backend responsibilities include:
 backend/
 mimo-website/
 mimo-frontend-web-app/mimo-frontend/
+docs/
 ```
 
 ## Local Setup
