@@ -188,7 +188,8 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
     const res = await axios.post(
       `${targetPiUrl}/print`,
       { 
-        file_url: fileUrl,
+        pdfUrl: fileUrl,          // matches the existing production script
+        file_url: fileUrl,        // kept for backward compatibility
         printer_name: targetPrinter
       },
       { timeout: 30000, headers: { "Content-Type": "application/json" } }
