@@ -710,8 +710,11 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     // Filter jobs that don't have a printCode yet
     let jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
     
-    // If all jobs already have a print code, return the most recent one
-    if (jobsToUpdate.length === 0 && !snapshot.empty) {
+    // If NOT a blank sheet, and all jobs already have a print code, return the most recent one
+    const storedPrintOptions = bodyPrintOptions || {};
+    const isBlankSheet = storedPrintOptions.isBlankSheet === true;
+
+    if (!isBlankSheet && jobsToUpdate.length === 0 && !snapshot.empty) {
       const recentJob = snapshot.docs.find(doc => doc.data().printCode);
       if (recentJob) {
         console.log(`[PAYMENT-SUCCESS] Returning existing code for user ${userId}`);
@@ -724,9 +727,6 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     // print_job so a print code can still be generated.
     // ============================================================
     if (jobsToUpdate.length === 0) {
-      const storedPrintOptions = bodyPrintOptions || {};
-      const isBlankSheet = storedPrintOptions.isBlankSheet === true;
-
       if (isBlankSheet) {
         const sheetType = storedPrintOptions.sheetType || "a4";
         const totalPages = Number(storedPrintOptions.totalPages || 1);
