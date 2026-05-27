@@ -425,9 +425,38 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     let amount = Number(totalAmount.toFixed(2));
     if (discountPercentage > 0) {
       amount = Number((amount - (amount * (discountPercentage / 100))).toFixed(2));
-      // Ensure Cashfree minimum transaction amount of 1 INR
-      if (amount < 1.00) amount = 1.00;
     }
+
+    // ─── 100% DISCOUNT BYPASS ─────────────────────────────────────────────────
+    // If amount is 0 (or coupon gives full discount), skip Cashfree entirely.
+    // Mark jobs as paid directly and return a print code immediately.
+    if (amount <= 0) {
+      const printCode = Math.floor(1000 + Math.random() * 9000).toString();
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      const freeBatch = db.batch();
+      jobsSnapshot.forEach((doc) => {
+        freeBatch.update(doc.ref, {
+          status: "paid",
+          printCode,
+          paymentTime: now,
+          isPrinted: false,
+          printOptions: printOptions || {},
+          colorMode,
+          copies,
+        });
+      });
+      await freeBatch.commit();
+      await db.collection("orders").add({
+        orderId, userId, amount: 0, totalPages, totalDocs: jobsSnapshot.size,
+        status: "PAID", orderStatus: "completed", jobIds,
+        createdAt: now, couponCode, discountPercentage
+      });
+      return res.json({ orderId, paymentSessionId: null, amount: 0, printCode, free: true });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Enforce Cashfree minimum of ₹1
+    if (amount < 1.00) amount = 1.00;
 
     const response = await axios.post(
       `${CASHFREE_BASE_URL}/orders`,
@@ -440,7 +469,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
           customer_phone: "9999999999",
         },
         order_meta: {
-          return_url: `https://mimo-test-dep2.vercel.app/payment-verify?order_id={order_id}`
+          return_url: `https://printmimo.tech/payment-verify?order_id={order_id}`
         },
       },
       { headers: cashfreeHeaders, timeout: 10000 }
@@ -448,11 +477,8 @@ app.post("/create-order", authMiddleware, async (req, res) => {
 
     const paymentTxnRef = db.collection("payment_transactions").doc();
     await paymentTxnRef.set({
-      transactionId: paymentTxnRef.id,
-      userId,
-      orderId,
-      merchantTransactionId: orderId,
-      paymentGateway: "cashfree",
+      transactionId: paymentTxnRef.id, userId, orderId,
+      merchantTransactionId: orderId, paymentGateway: "cashfree",
       cashfreeSessionId: response.data.payment_session_id,
       orderDetails: { description: `Print order ${orderId}`, amount, currency: "INR" },
       transactionStatus: { status: "pending", gatewayStatus: "initiated" },
@@ -460,26 +486,50 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     });
 
     await db.collection("orders").add({
-      orderId,
-      userId,
-      amount,
-      totalPages,
-      totalDocs: jobsSnapshot.size,
-      status: "CREATED",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      paymentTransactionId: paymentTxnRef.id,
-      jobIds,
-      orderStatus: "created"
+      orderId, userId, amount, totalPages, totalDocs: jobsSnapshot.size,
+      status: "CREATED", createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      paymentTransactionId: paymentTxnRef.id, jobIds, orderStatus: "created"
     });
 
-    res.json({
-      orderId,
-      paymentSessionId: response.data.payment_session_id,
-      amount,
-    });
+    res.json({ orderId, paymentSessionId: response.data.payment_session_id, amount });
   } catch (err) {
     console.error(err.response?.data || err.message);
     res.status(500).send("Order creation failed");
+  }
+});
+
+// ================= VERIFY PAYMENT (Called by frontend after Cashfree redirect) =================
+app.get("/verify-payment/:orderId", authMiddleware, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    // Check Cashfree order status
+    const r = await axios.get(
+      `${CASHFREE_BASE_URL}/orders/${orderId}`,
+      { headers: cashfreeHeaders, timeout: 10000 }
+    );
+    const cfStatus = r.data.order_status; // PAID, ACTIVE, EXPIRED, etc.
+    const order_status = (cfStatus === "PAID") ? "PAID" : cfStatus;
+    
+    // Also check our local orders collection as fallback
+    if (order_status !== "PAID") {
+      const localOrder = await db.collection("orders").where("orderId", "==", orderId).get();
+      if (!localOrder.empty && ["PAID", "SUCCESS"].includes(localOrder.docs[0].data().status)) {
+        return res.json({ order_status: "PAID" });
+      }
+    }
+    
+    res.json({ order_status });
+  } catch (err) {
+    console.error("verify-payment error:", err.response?.data || err.message);
+    // If Cashfree call fails, check local DB
+    try {
+      const localOrder = await db.collection("orders").where("orderId", "==", req.params.orderId).get();
+      if (!localOrder.empty) {
+        const s = localOrder.docs[0].data().status;
+        return res.json({ order_status: s === "PAID" || s === "SUCCESS" ? "PAID" : s });
+      }
+    } catch(e) {}
+    res.status(500).json({ error: "Failed to verify payment" });
   }
 });
 
@@ -803,6 +853,25 @@ app.get("/generate-print-code", authMiddleware, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch print code" });
   }
 });
+
+// ================= VALIDATE COUPON =================
+app.get("/validate-coupon/:code", authMiddleware, async (req, res) => {
+  try {
+    const code = req.params.code.toUpperCase();
+    const couponDoc = await db.collection("coupons").doc(code).get();
+    if (!couponDoc.exists) return res.status(404).json({ error: "Invalid coupon code" });
+    const data = couponDoc.data();
+    if (!data.isActive) return res.status(400).json({ error: "Coupon is no longer active" });
+    if (data.expiryDate && data.expiryDate.toDate() < new Date()) {
+      return res.status(400).json({ error: "Coupon has expired" });
+    }
+    res.json({ discountPercentage: data.discountPercentage, code });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to validate coupon" });
+  }
+});
+
 
 // ================= ADMIN MIDDLEWARE =================
 const adminAuthMiddleware = (req, res, next) => {
