@@ -184,8 +184,8 @@ const piAgent = new https.Agent({ family: 4, keepAlive: true });
 
 // Helper: call the Pi print API for one file
 const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
-  // FORCE Pinggy Tunnel to bypass Northflank/Tailscale IP conflicts
-  const targetPiUrl = "https://wpmoo-182-74-196-22.run.pinggy-free.link";
+  // FORCE Pinggy Tunnel via HTTP to completely bypass all TLS handshake issues
+  const targetPiUrl = "http://wpmoo-182-74-196-22.run.pinggy-free.link";
   const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
 
   const results = [];
@@ -214,7 +214,7 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
 
 // ================= TEST PI CONNECTION =================
 app.get("/test-pi", async (req, res) => {
-  const targetPiUrl = process.env.PI_BASE_URL || "https://printpi.tail2146fa.ts.net";
+  const targetPiUrl = "http://wpmoo-182-74-196-22.run.pinggy-free.link";
   try {
     const response = await fetch(targetPiUrl);
     res.json({ success: true, status: response.status, statusText: response.statusText });
