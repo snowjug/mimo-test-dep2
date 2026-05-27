@@ -47,18 +47,259 @@ const cashfreeHeaders = {
   "x-api-version": "2025-01-01",
 };
 
-// Middleware
-const authMiddleware = (req, res, next) => {
+// ================= AUTH MIDDLEWARE =================
+const authMiddleware = async (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
     const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY);
-    req.user = verified;
+    let userId = verified.userId || verified.id || verified.user?.id;
+    if (!userId) return res.status(403).json({ error: "Invalid token payload" });
+    // Resolve userId to actual Firestore doc ID
+    const directDoc = await db.collection("users").doc(userId).get();
+    if (!directDoc.exists) {
+      const snap = await db.collection("users").where("id", "==", userId).get();
+      if (!snap.empty) userId = snap.docs[0].id;
+    }
+    req.user = { userId, id: userId };
     next();
   } catch (err) {
     res.status(401).json({ error: "Invalid Token" });
   }
 };
+
+// ================= REGISTER =================
+app.post("/register", async (req, res) => {
+  try {
+    const { username, password, email, mobileNumber } = req.body;
+    const existing = await db.collection("users").where("email", "==", email).get();
+    if (!existing.empty) return res.status(400).json({ error: "User already exists" });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const userRef = await db.collection("users").add({
+      username, email, mobileNumber: mobileNumber || "", password: hashedPassword,
+      googleUser: false, createdAt: now, updatedAt: now, accountStatus: "active",
+      totalSpent: 0, totalPagesPrinted: 0, isVerified: true,
+      mimo_coins: { balance: 0, total_earned: 0, total_used: 0 },
+    });
+    await userRef.update({ id: userRef.id });
+    const token = jwt.sign({ userId: userRef.id }, SECRET_KEY, { expiresIn: "30d" });
+    res.json({ jwtToken: token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error registering user" });
+  }
+});
+
+// ================= LOGIN =================
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const snapshot = await db.collection("users").where("email", "==", email).get();
+    if (snapshot.empty) return res.status(400).json({ error: "User not found" });
+    const doc = snapshot.docs[0];
+    const user = doc.data();
+    if (user.googleUser) return res.status(400).json({ error: "Use Google login" });
+    const storedPassword = user.password || user.passwordHash;
+    if (!storedPassword) return res.status(500).json({ error: "Password missing" });
+    const valid = await bcrypt.compare(password, storedPassword);
+    if (!valid) return res.status(400).json({ error: "Wrong password" });
+    await doc.ref.update({ lastLoginAt: admin.firestore.FieldValue.serverTimestamp() });
+    const token = jwt.sign({ userId: doc.id }, SECRET_KEY, { expiresIn: "30d" });
+    res.json({ jwtToken: token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Login failed" });
+  }
+});
+
+// ================= GOOGLE LOGIN =================
+app.post("/google-login", async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: "Token missing" });
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID || "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com",
+    });
+    const payload = ticket.getPayload();
+    const email = payload.email;
+    const name = payload.name;
+    const snapshot = await db.collection("users").where("email", "==", email).get();
+    let userId;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    if (snapshot.empty) {
+      const userRef = await db.collection("users").add({
+        username: name, email, mobileNumber: "", password: null, googleUser: true,
+        createdAt: now, updatedAt: now, accountStatus: "active",
+        totalSpent: 0, totalPagesPrinted: 0, isVerified: true,
+        mimo_coins: { balance: 0, total_earned: 0, total_used: 0 },
+      });
+      userId = userRef.id;
+      await userRef.update({ id: userId });
+    } else {
+      userId = snapshot.docs[0].id;
+      await snapshot.docs[0].ref.update({ lastLoginAt: now });
+    }
+    const jwtToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "30d" });
+    res.json({ jwtToken, name, email, userId });
+  } catch (err) {
+    console.error(err);
+    res.status(401).json({ error: "Google login failed" });
+  }
+});
+
+// ================= ONBOARDING =================
+app.post("/onboarding", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { username } = req.body;
+    if (!username) return res.status(400).json({ error: "Name required" });
+    await db.collection("users").doc(userId).update({ username, onboardingCompleted: true });
+    res.json({ message: "Onboarding complete" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Onboarding failed" });
+  }
+});
+
+// ================= PROFILE =================
+app.get("/profile", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const doc = await db.collection("users").doc(userId).get();
+    if (!doc.exists) return res.status(404).json({ error: "User not found" });
+    const user = doc.data();
+    res.json({ id: userId, username: user.username, email: user.email, photoUrl: user.photoUrl,
+      mobileNumber: user.mobileNumber || "", googleUser: user.googleUser || false,
+      mimo_coins: user.mimo_coins || { balance: 0, total_earned: 0, total_used: 0 } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
+app.put("/profile", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { username, mobileNumber } = req.body;
+    await db.collection("users").doc(userId).update({
+      username, mobileNumber: mobileNumber || "",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ message: "Profile updated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error updating profile" });
+  }
+});
+
+// ================= MIMO USER =================
+app.get("/mimo/user", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const doc = await db.collection("users").doc(userId).get();
+    if (!doc.exists) return res.status(404).json({ error: "User not found" });
+    const user = doc.data();
+    res.json({ name: user.username, email: user.email, userId, photoUrl: user.photoUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+// ================= MIMO COINS =================
+app.get("/mimo/coins", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) return res.json({ balance: 0, totalEarned: 0, totalUsed: 0, history: [] });
+    const data = userDoc.data() || {};
+    res.json({
+      balance: data.mimo_coins?.balance || 0,
+      totalEarned: data.mimo_coins?.total_earned || 0,
+      totalUsed: data.mimo_coins?.total_used || 0,
+      history: []
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch coins" });
+  }
+});
+
+// ================= MIMO STATS =================
+app.get("/mimo/stats", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const jobsSnapshot = await db.collection("print_jobs").where("userId", "==", userId).get();
+    let totalDocs = 0, totalPages = 0;
+    jobsSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.status === "completed" || data.status === "paid") {
+        totalDocs++;
+        totalPages += (data.pageCount || 0) * (data.printOptions?.copies || 1);
+      }
+    });
+    const ordersSnapshot = await db.collection("orders").where("userId", "==", userId).get();
+    let totalSpent = 0;
+    ordersSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.status === "PAID" || data.status === "SUCCESS") totalSpent += Number(data.amount || 0);
+    });
+    res.json({ totalDocs, totalPages, totalSpent: Number(totalSpent.toFixed(2)) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error fetching stats" });
+  }
+});
+
+// ================= PRINT HISTORY =================
+app.get("/print-history", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const snapshot = await db.collection("print_jobs").where("userId", "==", userId).get();
+    const history = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const opts = data.printOptions || {};
+      const colorMode = opts.colorMode || "bw";
+      const copies = opts.copies || 1;
+      const cost = (data.pageCount || 0) * copies * (colorMode === "color" ? 9.2 : 2.3);
+      return {
+        id: doc.id, printCode: data.printCode || "-", status: data.status,
+        printerStatus: data.printerStatus || "Pending", file: data.fileName,
+        cost: `₹${cost.toFixed(2)}`, colorMode, copies,
+        date: data.createdAt?.toDate ? new Date(data.createdAt.toDate()).toLocaleString() : "N/A",
+      };
+    }).filter(j => ["paid","printing","completed","printed","failed"].includes(j.status))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    res.json(history);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch history" });
+  }
+});
+
+// ================= SETTINGS =================
+app.get("/settings", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+    res.json(userDoc.data());
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch settings" });
+  }
+});
+
+app.post("/settings", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    await db.collection("users").doc(userId).update({ settings: req.body, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    res.json({ message: "Settings saved" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to save settings" });
+  }
+});
 
 // ================= NEW FINAL UPLOAD (Serverless) =================
 app.post("/finalize-upload", authMiddleware, async (req, res) => {
