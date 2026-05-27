@@ -551,6 +551,8 @@ app.post("/kiosk/print", async (req, res) => {
     if (snapshot.empty) return res.status(404).json({ error: "Invalid print code" });
 
     const results = [];
+    let validJobQueued = false;
+
     for (const doc of snapshot.docs) {
       const data = doc.data();
 
@@ -559,14 +561,41 @@ app.post("/kiosk/print", async (req, res) => {
         continue;
       }
 
-      // Instead of an HTTP call, just change status. The Pi's WebSocket Listener will do the rest!
+      // Skip jobs with broken/undefined file URLs (old corrupted jobs from dead Northflank backend)
+      const fileUrl = data.fileUrl || "";
+      const isValidUrl = fileUrl && 
+        !fileUrl.includes("/undefined") && 
+        fileUrl.startsWith("https://") &&
+        (fileUrl.includes("firebasestorage") || fileUrl.includes("storage.googleapis.com"));
+
+      if (!isValidUrl) {
+        // Auto-mark broken jobs as failed so they never get re-triggered
+        await doc.ref.update({
+          status: "failed",
+          printerStatus: "Invalid file URL - job cancelled",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        results.push({ file: data.fileName, status: "skipped_invalid_url" });
+        continue;
+      }
+
+      // Queue valid job for Pi listener
       await doc.ref.update({
         status: "printing",
         printerStatus: "Sending to Pi...",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      validJobQueued = true;
       results.push({ file: data.fileName, status: "sent_to_pi_listener" });
+    }
+
+    if (!validJobQueued && results.every(r => r.status === "already_printed")) {
+      return res.json({ success: true, message: "Already printed", results });
+    }
+
+    if (!validJobQueued) {
+      return res.status(400).json({ error: "No valid files found for this print code. Please upload again." });
     }
 
     res.json({
