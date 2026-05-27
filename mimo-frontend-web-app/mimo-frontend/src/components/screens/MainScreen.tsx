@@ -134,9 +134,10 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive }) => {
                                 strokeWidth="1.5"
                                 strokeLinejoin="bevel"
                                 strokeLinecap="butt"
+                                transform="translate(0, 5)"
                                 style={{
                                     fontFamily: "'Lovelo', sans-serif",
-                                    fontSize: '158px',
+                                    fontSize: '162px',
                                     fontWeight: 900,
                                     letterSpacing: '12px',
                                     paintOrder: 'stroke fill'
