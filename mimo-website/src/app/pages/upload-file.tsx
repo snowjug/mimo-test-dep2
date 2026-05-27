@@ -9,6 +9,8 @@ import { Upload, FileText, X, Printer, CheckCircle, AlertCircle, ImageIcon, Hist
 import { toast } from "sonner";
 import api from "../api";
 import { PDFDocument } from "pdf-lib";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { storage } from "../lib/firebase";
 
 interface UploadedFile {
   name: string;
@@ -84,12 +86,10 @@ export function UploadFile() {
     setUploading(true);
 
     try {
-      // 1. Get Signed URLs from Backend & Parse PDFs locally
+      // 1. Parse PDFs locally for page counts
       const filesMeta = await Promise.all(fileArray.map(async (f) => {
-        let pageCount = 0;
-        if (f.type.startsWith("image/")) {
-          pageCount = 1;
-        } else if (f.type === "application/pdf") {
+        let pageCount = 1;
+        if (f.type === "application/pdf") {
           try {
             const arrayBuffer = await f.arrayBuffer();
             const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
@@ -97,102 +97,65 @@ export function UploadFile() {
           } catch (err) {
             console.error("Failed to parse PDF on client:", err);
           }
+        } else if (!f.type.startsWith("image/")) {
+            // Rough estimation for docx, pptx based on file size
+            pageCount = f.size > 2000000 ? Math.floor(f.size / 500000) : 1;
         }
         return { name: f.name, type: f.type, size: f.size, pageCount };
       }));
-      const { data: { urls } } = await api.post("/generate-upload-urls", { files: filesMeta });
 
-      // 2. Upload directly to Google Cloud Storage
+      // 2. Upload directly to Firebase Storage
       const uploadPromises = fileArray.map(async (file) => {
-        const urlData = urls.find((u: any) => u.name === file.name);
-        if (!urlData) throw new Error("Failed to get upload URL");
+        const uniqueFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+        const storageRef = ref(storage, `uploads/${userName.replace(/[^a-zA-Z0-9]/g, '_')}/${uniqueFileName}`);
+        const uploadTask = uploadBytesResumable(storageRef, file);
 
-        // Use standard axios or fetch for the PUT request (import axios if needed, but we can just use native fetch, wait, we want progress, so let's import axios at top if not imported. Wait, import axios from 'axios'; is it imported? Let's check. If not, we can use XMLHttpRequest or just api.put which is axios instance but we need to bypass base url. Let's use standard XMLHttpRequest for progress without adding dependencies to this file.)
-        // Actually, `api` is an axios instance. We can use it, but we need to pass the full URL and bypass headers.
-        // It's safer to use a fresh XMLHttpRequest for raw file PUTs with progress.
         return new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", urlData.signedUrl, true);
-          xhr.setRequestHeader("Content-Type", file.type);
-          
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              const percentCompleted = Math.round((e.loaded * 100) / e.total);
-              const displayProgress = percentCompleted === 100 ? 99 : percentCompleted;
+          uploadTask.on(
+            "state_changed",
+            (snapshot) => {
+              const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              const displayProgress = progress === 100 ? 99 : progress;
               setFiles((prev) =>
                 prev.map((f) =>
                   f.name === file.name ? { ...f, progress: displayProgress } : f
                 )
               );
+            },
+            (error) => {
+              reject(error);
+            },
+            async () => {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              const meta = filesMeta.find(m => m.name === file.name);
+              resolve({ name: file.name, url: downloadURL, type: file.type, size: file.size, pageCount: meta?.pageCount || 1 });
             }
-          };
-
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(urlData);
-            } else {
-              reject(new Error(`Upload failed with status ${xhr.status}`));
-            }
-          };
-          
-          xhr.onerror = () => reject(new Error("Upload network error"));
-          xhr.send(file);
+          );
         });
       });
 
-      await Promise.all(uploadPromises);
+      const uploadedFiles = await Promise.all(uploadPromises);
 
-      // 3. Tell backend to finalize and start processing
-      await api.post("/finalize-upload", { files: urls });
+      // 3. Tell backend to finalize and create database records
+      // In Serverless architecture, this doesn't trigger conversion anymore. It just creates the job.
+      const response = await api.post("/finalize-upload", { files: uploadedFiles });
+      
+      // Update UI
+      setFiles((prev) =>
+        prev.map((f) =>
+          newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "completed", progress: 100 } : f
+        )
+      );
+      toast.success("Files ready for printing!");
 
-      // Start real-time SSE stream for processing status
-      const token = localStorage.getItem("jwtToken");
-      const rawApiUrl = import.meta.env.VITE_API_URL || "https://p01--mimo-backend--4b94y9s4jyc5.code.run";
-      const API_URL = rawApiUrl.replace(/\/$/, ""); // Strip trailing slash if present
-      const eventSource = new EventSource(`${API_URL}/mimo/conversion-stream?token=${token}`);
-
-      const handleUploadError = () => {
-        setFiles((prev) =>
-          prev.map((f) =>
-            newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "failed", progress: 0 } : f
-          )
-        );
-        toast.error("File processing failed");
-        setUploading(false);
-      };
-
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.status === "completed") {
-            eventSource.close();
-            setFiles((prev) =>
-              prev.map((f) =>
-                newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "completed", progress: 100 } : f
-              )
-            );
-            toast.success("Files processed successfully!");
-
-            setBackendTotalPages(data.totalPages);
-            sessionStorage.setItem("uploadAmount", data.amount);
-            sessionStorage.setItem("uploadTotalPages", data.totalPages);
-            setUploading(false);
-          } else if (data.error) {
-            eventSource.close();
-            throw new Error(data.error);
-          }
-        } catch (err) {
-          eventSource.close();
-          console.error("SSE parse error", err);
-          handleUploadError();
-        }
-      };
-
-      eventSource.onerror = (err) => {
-        eventSource.close();
-        console.error("SSE connection error", err);
-        handleUploadError();
-      };
+      // Calculate total pages for pricing
+      const totalPages = uploadedFiles.reduce((acc: number, curr: any) => acc + curr.pageCount, 0);
+      setBackendTotalPages(totalPages);
+      
+      // Assuming a base rate of 2 per page for estimation, backend handles real calculation
+      sessionStorage.setItem("uploadAmount", (totalPages * 2).toString());
+      sessionStorage.setItem("uploadTotalPages", totalPages.toString());
+      setUploading(false);
 
     } catch (err) {
       console.error(err);

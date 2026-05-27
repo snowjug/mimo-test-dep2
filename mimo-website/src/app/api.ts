@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://p01--mimo-backend--4b94y9s4jyc5.code.run";
+const API_URL = import.meta.env.VITE_API_URL || "https://us-central1-mimo-v2-11868.cloudfunctions.net/api";
 
 const api = axios.create({
   baseURL: API_URL,
