@@ -62,8 +62,8 @@ body {
     flex-shrink: 0;
 }
 
-/* Physically rotate and scale the UI to landscape if the device screen orientation is portrait */
-@media (orientation: portrait) {
+/* Physically rotate and scale the UI to landscape if the device screen viewport is portrait (width <= 1000px) */
+@media (max-width: 1000px) {
     #root {
         width: 100vh;
         height: 100vw;
@@ -71,6 +71,7 @@ body {
         transform-origin: center;
     }
 }
+
 
 
 
