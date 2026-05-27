@@ -48,16 +48,60 @@ def convert_to_pdf(input_path):
         return None
 
 def print_file(file_path, copies=1):
-    """ Sends file to CUPS printer """
+    """ Sends file to CUPS printer and verifies it printed successfully """
     try:
+        # Validate file exists and has real content
+        file_size = os.path.getsize(file_path)
+        if file_size < 100:
+            print(f"❌ File too small ({file_size} bytes) - likely invalid/empty")
+            return False
+
+        # For PDFs, do a basic header check
+        if file_path.endswith('.pdf'):
+            with open(file_path, 'rb') as f:
+                header = f.read(8)
+            if not header.startswith(b'%PDF'):
+                print(f"❌ File does not appear to be a valid PDF (header: {header})")
+                return False
+            print(f"✅ Valid PDF confirmed ({file_size} bytes)")
+
         print(f"🖨️  Sending to CUPS: {file_path} ({copies} copies)")
         cmd = ["lp", "-d", PRINTER_NAME, "-n", str(copies), file_path]
-        subprocess.run(cmd, check=True)
-        print("✅ Print job submitted successfully!")
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        
+        # Extract job ID from lp output (e.g., "request id is Brother_HL_L5210DN_series-3372 (1 file(s))")
+        lp_output = result.stdout.strip()
+        print(f"CUPS: {lp_output}")
+        
+        # Wait a moment and check if the job completed without errors
+        time.sleep(2)
+        
+        # Extract job number from output
+        import re
+        match = re.search(r'is (\S+-\d+)', lp_output)
+        if match:
+            job_id = match.group(1)
+            status_result = subprocess.run(
+                ["lpstat", "-l", job_id],
+                capture_output=True, text=True
+            )
+            status_output = status_result.stdout
+            print(f"Job status: {status_output.strip()[:200]}")
+            
+            if "job-completed-with-errors" in status_output or "loadFilename failed" in status_output:
+                print(f"❌ CUPS rendered the job with errors - PDF may be malformed")
+                return False
+
+        print("✅ Print job submitted and verified successfully!")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Print failed: {e}")
+        stderr = e.stderr.strip() if e.stderr else str(e)
+        print(f"❌ Print failed: {stderr}")
         return False
+    except Exception as e:
+        print(f"❌ Unexpected print error: {e}")
+        return False
+
 
 def download_file(file_url, file_name):
     """ Downloads file from Firebase Storage to local temp directory """
