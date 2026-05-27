@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // Allow read/write for all users (or restrict to logged-in users if preferred)
+      // Since Mimo requires users to upload, we can allow reads and writes for now.
+      allow read, write: if true;
+    }
+  }
+}
