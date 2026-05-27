@@ -72,7 +72,7 @@ export function PrintCode() {
     sessionStorage.removeItem("printCode");
     sessionStorage.removeItem("printFiles");
     sessionStorage.removeItem("totalPages");
-    navigate("/");
+    navigate("/upload");
   };
 
   return (
