@@ -184,8 +184,8 @@ const piAgent = new https.Agent({ family: 4, keepAlive: true });
 
 // Helper: call the Pi print API for one file
 const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
-  // FORCE Cloudflare Tunnel to bypass Northflank/Tailscale IP conflicts
-  const targetPiUrl = "https://patricia-demanding-predict-warm.trycloudflare.com";
+  // FORCE Pinggy Tunnel to bypass Northflank/Tailscale IP conflicts
+  const targetPiUrl = "https://wpmoo-182-74-196-22.run.pinggy-free.link";
   const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
 
   const results = [];
