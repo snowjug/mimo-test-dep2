@@ -1,22 +1,21 @@
-[debug] [2026-05-27T17:11:08.687Z] ----------------------------------------------------------------------
-[debug] [2026-05-27T17:11:08.689Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions --project mimo-v2-11868
-[debug] [2026-05-27T17:11:08.690Z] CLI Version:   15.15.0
-[debug] [2026-05-27T17:11:08.690Z] Platform:      win32
-[debug] [2026-05-27T17:11:08.690Z] Node Version:  v24.14.1
-[debug] [2026-05-27T17:11:08.690Z] Time:          Wed May 27 2026 22:41:08 GMT+0530 (India Standard Time)
-[debug] [2026-05-27T17:11:08.690Z] ----------------------------------------------------------------------
+[debug] [2026-05-27T17:17:13.666Z] ----------------------------------------------------------------------
+[debug] [2026-05-27T17:17:13.669Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions --project mimo-v2-11868
+[debug] [2026-05-27T17:17:13.669Z] CLI Version:   15.15.0
+[debug] [2026-05-27T17:17:13.670Z] Platform:      win32
+[debug] [2026-05-27T17:17:13.670Z] Node Version:  v24.14.1
+[debug] [2026-05-27T17:17:13.670Z] Time:          Wed May 27 2026 22:47:13 GMT+0530 (India Standard Time)
+[debug] [2026-05-27T17:17:13.670Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2026-05-27T17:11:10.641Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2026-05-27T17:11:10.641Z] > authorizing via signed-in user (visionprintt@gmail.com)
-[debug] [2026-05-27T17:11:10.641Z] [iam] checking project mimo-v2-11868 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
-[debug] [2026-05-27T17:11:10.642Z] Checked if tokens are valid: true, expires at: 1779902905880
-[debug] [2026-05-27T17:11:10.642Z] Checked if tokens are valid: true, expires at: 1779902905880
-[debug] [2026-05-27T17:11:10.643Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/mimo-v2-11868:testIamPermissions [none]
-[debug] [2026-05-27T17:11:10.643Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/mimo-v2-11868:testIamPermissions  x-goog-user-project=mimo-v2-11868
-[debug] [2026-05-27T17:11:10.643Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/mimo-v2-11868:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
-[debug] [2026-05-27T17:11:11.942Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/mimo-v2-11868:testIamPermissions 200
-[debug] [2026-05-27T17:11:11.942Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/mimo-v2-11868:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
-[debug] [2026-05-27T17:11:11.942Z] Checked if tokens are valid: true, expires at: 1779902905880
-[debug] [2026-05-27T17:11:11.942Z] Checked if tokens are valid: true, expires at: 1779902905880
-[debug] [2026-05-27T17:11:11.942Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/mimo-v2-11868/serviceAccounts/mimo-v2-11868@appspot.gserviceaccount.com:testIamPermissions [none]
-[debug] [2026-05-27T17:11:11.942Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/mimo-v2-11868/serviceAccounts/mimo-v2-11868@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-05-27T17:17:14.952Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-05-27T17:17:14.953Z] > authorizing via signed-in user (visionprintt@gmail.com)
+[debug] [2026-05-27T17:17:14.953Z] [iam] checking project mimo-v2-11868 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2026-05-27T17:17:14.953Z] Checked if tokens are valid: false, expires at: 1779902905880
+[debug] [2026-05-27T17:17:14.954Z] Checked if tokens are valid: false, expires at: 1779902905880
+[debug] [2026-05-27T17:17:14.954Z] > refreshing access token with scopes: []
+[debug] [2026-05-27T17:17:14.955Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-05-27T17:17:14.955Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-05-27T17:17:15.149Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-05-27T17:17:15.149Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-05-27T17:17:15.160Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/mimo-v2-11868:testIamPermissions [none]
+[debug] [2026-05-27T17:17:15.160Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/mimo-v2-11868:testIamPermissions  x-goog-user-project=mimo-v2-11868
+[debug] [2026-05-27T17:17:15.160Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/mimo-v2-11868:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
