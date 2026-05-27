@@ -334,8 +334,10 @@ body {
     justify-content: center;
     padding: 0 40px 220px; /* bottom padding to keep brand panel from overlapping the absolute slider */
     position: relative;
+    top: 10px; /* Shift contents 10px downwards */
     z-index: 10;
 }
+
 
 .brand-panel {
     display: flex;
