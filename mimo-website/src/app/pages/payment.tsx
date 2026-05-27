@@ -130,7 +130,10 @@ export function Payment() {
       
     } catch (err: any) {
       console.error("Cashfree Error:", err);
-      toast.error(err.response?.data || err.message || "Payment initiation failed");
+      const errorMsg = typeof err.response?.data === 'string' 
+        ? err.response.data 
+        : err.response?.data?.error || err.message || "Payment initiation failed";
+      toast.error(errorMsg);
     } finally {
       setIsProcessing(false);
     }
