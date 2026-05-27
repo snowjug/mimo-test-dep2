@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import api from "../api";
 import { PDFDocument } from "pdf-lib";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { storage } from "../lib/firebase";
+import { storage } from "../../lib/firebase";
 
 interface UploadedFile {
   name: string;
