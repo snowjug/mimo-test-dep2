@@ -35,7 +35,7 @@ def convert_to_pdf(input_path):
         subprocess.run([
             "libreoffice", "--headless", "--convert-to", "pdf",
             "--outdir", TEMP_DIR, input_path
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
         
         pdf_path = os.path.splitext(input_path)[0] + ".pdf"
         if os.path.exists(pdf_path):
@@ -163,7 +163,7 @@ def process_job(doc_snapshot):
 
     # 2. Convert if needed
     ext = os.path.splitext(local_path)[1].lower()
-    if ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"]:
+    if ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
         pdf_path = convert_to_pdf(local_path)
         if pdf_path:
             final_path = pdf_path
