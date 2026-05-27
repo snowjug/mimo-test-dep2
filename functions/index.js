@@ -393,7 +393,6 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
     }
 
     const printCode = Math.floor(1000 + Math.random() * 9000).toString();
-    const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000);
 
     const batch = db.batch();
     jobsToUpdate.forEach((doc) => {
@@ -402,7 +401,6 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
         paymentTime: admin.firestore.FieldValue.serverTimestamp(),
         printCode,
         codeCreatedAt: now,
-        codeExpiresAt: expiresAt,
         isPrinted: false,
       });
     });
@@ -426,7 +424,7 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
               </div>
               <p style="color: #666; font-size: 14px;">Go to the Mimo iPad Kiosk and scan this code to retrieve your documents.</p>
               <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
-              <p style="color: #94a3b8; font-size: 12px;">This code will expire in 12 hours.</p>
+              <p style="color: #94a3b8; font-size: 12px;">This code is permanently valid until it is successfully printed.</p>
             </div>
           `
         };
@@ -460,8 +458,7 @@ app.get("/generate-print-code", authMiddleware, async (req, res) => {
 
     const data = snapshot.docs[0].data();
     res.json({
-      printCode: data.printCode,
-      expiresAt: data.codeExpiresAt,
+      printCode: data.printCode
     });
   } catch (err) {
     console.error(err);
@@ -661,6 +658,55 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
         refundStatus: "FAILED",
         refundError: err.response?.data?.message || err.message
       });
+    }
+  }
+});
+
+// ================= STORAGE AUTO-CLEANUP =================
+exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
+  const beforeData = event.data.before.data();
+  const afterData = event.data.after.data();
+
+  // Trigger ONLY if status changes to "completed"
+  if (beforeData.status !== "completed" && afterData.status === "completed") {
+    console.log(`[STORAGE] Print job ${event.params.jobId} completed. Cleaning up file...`);
+    
+    if (!afterData.fileUrl) {
+      console.log(`[STORAGE] No fileUrl found for job ${event.params.jobId}.`);
+      return;
+    }
+
+    try {
+      // fileUrl format: "gs://mimo-v2-11868.firebasestorage.app/uploads/username/filename.pdf"
+      // Or: "https://firebasestorage.googleapis.com/v0/b/..."
+      
+      const fileUrl = afterData.fileUrl;
+      const bucket = admin.storage().bucket();
+      
+      let filePath = "";
+      if (fileUrl.startsWith("gs://")) {
+        const bucketName = bucket.name;
+        filePath = fileUrl.replace(`gs://${bucketName}/`, "");
+      } else if (fileUrl.includes("firebasestorage.googleapis.com")) {
+        // Extract from HTTP URL
+        const urlObj = new URL(fileUrl);
+        const pathParts = urlObj.pathname.split("/o/");
+        if (pathParts.length > 1) {
+          filePath = decodeURIComponent(pathParts[1].split("?")[0]);
+        }
+      }
+
+      if (!filePath) {
+        console.error(`[STORAGE ERROR] Could not parse path from: ${fileUrl}`);
+        return;
+      }
+
+      const fileRef = bucket.file(filePath);
+      await fileRef.delete();
+      console.log(`[STORAGE] Successfully deleted ${filePath}`);
+
+    } catch (err) {
+      console.error(`[STORAGE ERROR] Failed to delete file for job ${event.params.jobId}:`, err);
     }
   }
 });
