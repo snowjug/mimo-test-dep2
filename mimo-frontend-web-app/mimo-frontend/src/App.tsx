@@ -83,9 +83,9 @@ function App() {
           setPrintStatus("printing");
           setCurrentScreen("printing-screen");
 
-          // 🖨️ TRIGGER PRINT VIA PI (BACKEND INTEGRATION)
+          // 🖨️ TRIGGER PRINT VIA PI (FIREBASE FUNCTIONS - PULL MODEL)
           try {
-            const printRes = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/kiosk/print", {
+            const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",

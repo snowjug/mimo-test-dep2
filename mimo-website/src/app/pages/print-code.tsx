@@ -41,7 +41,7 @@ export function PrintCode() {
 
     const checkStatus = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || "https://p01--mimo-backend--4b94y9s4jyc5.code.run";
+        const apiUrl = import.meta.env.VITE_API_URL || "https://api-upqxuj7evq-uc.a.run.app";
         const res = await fetch(`${apiUrl}/kiosk/job-status?printCode=${printCode}`);
         const data = await res.json();
         
