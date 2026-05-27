@@ -23,6 +23,7 @@
     "firebase-functions": "^7.2.5",
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^8.0.9",
     "uuid": "^14.0.0"
   }
 }

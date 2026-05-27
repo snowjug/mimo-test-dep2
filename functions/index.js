@@ -8,6 +8,16 @@ const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
 const { OAuth2Client } = require("google-auth-library");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
+
+// Nodemailer Transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "visionprintt@gmail.com",
+    pass: process.env.GMAIL_APP_PASSWORD || "placeholder_pass" // Expected from Firebase config
+  }
+});
 
 // Initialize Firebase Admin (must be done before using it)
 const admin = require("firebase-admin");
@@ -398,6 +408,35 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
     });
     await batch.commit();
 
+    // Trigger Email Receipt via Nodemailer
+    try {
+      const userRecord = await admin.auth().getUser(userId);
+      if (userRecord.email && process.env.GMAIL_APP_PASSWORD) {
+        const mailOptions = {
+          from: '"Mimo Printing" <visionprintt@gmail.com>',
+          to: userRecord.email,
+          subject: "Your Mimo Print Code is Ready!",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px; text-align: center;">
+              <h2 style="color: #093765;">Mimo Print Receipt</h2>
+              <p style="color: #666; font-size: 16px;">Thank you for using Mimo! Your document is ready to print.</p>
+              <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; color: #64748b; font-size: 14px; text-transform: uppercase; font-weight: bold;">Print Code</p>
+                <p style="margin: 10px 0 0; font-size: 48px; font-weight: 900; color: #0f172a; letter-spacing: 5px;">${printCode}</p>
+              </div>
+              <p style="color: #666; font-size: 14px;">Go to the Mimo iPad Kiosk and scan this code to retrieve your documents.</p>
+              <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
+              <p style="color: #94a3b8; font-size: 12px;">This code will expire in 12 hours.</p>
+            </div>
+          `
+        };
+        await transporter.sendMail(mailOptions);
+        console.log(`[EMAIL] Receipt sent to ${userRecord.email}`);
+      }
+    } catch (emailErr) {
+      console.error("[EMAIL ERROR] Failed to send receipt:", emailErr);
+    }
+
     res.json({ message: "Payment success", printCode });
   } catch (err) {
     console.error(err);
@@ -461,10 +500,22 @@ app.get("/admin/metrics", adminAuthMiddleware, async (req, res) => {
     let totalRevenue = 0;
     let totalPagesPrinted = 0;
     
+    // Initialize array for 24 hours
+    const hourlyData = Array.from({ length: 24 }, (_, i) => ({
+      hour: `${i.toString().padStart(2, '0')}:00`,
+      prints: 0
+    }));
+    
     ordersSnapshot.forEach(doc => {
       const data = doc.data();
       totalRevenue += Number(data.amount || 0);
       totalPagesPrinted += Number(data.totalPages || 0);
+      
+      if (data.createdAt) {
+        const date = data.createdAt.toDate();
+        const hour = date.getHours();
+        hourlyData[hour].prints += 1;
+      }
     });
 
     const piStatusDoc = await db.collection("system_status").doc("pi").get();
@@ -474,7 +525,8 @@ app.get("/admin/metrics", adminAuthMiddleware, async (req, res) => {
       totalRevenue: totalRevenue.toFixed(2),
       totalPagesPrinted,
       totalOrders: ordersSnapshot.size,
-      piStatus
+      piStatus,
+      hourlyData
     });
   } catch (err) {
     console.error(err);

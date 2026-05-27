@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 // Using the same API base url configured globally
 const API_BASE = "https://us-central1-mimo-v2-11868.cloudfunctions.net/api";
@@ -155,6 +156,27 @@ export default function AdminDashboard() {
             </p>
           </div>
         </div>
+
+        {/* PEAK HOUR ANALYTICS */}
+        {metrics?.hourlyData && (
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-[#2D332F]/10 mb-8">
+            <h2 className="text-2xl font-bold text-[#2D332F] mb-6">Peak Hour Analytics</h2>
+            <p className="text-gray-500 mb-6">Total prints distributed by hour of the day.</p>
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={metrics.hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="hour" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip 
+                    cursor={{ fill: '#f1f5f9' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="prints" fill="#093765" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* COUPONS SECTION */}
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-[#2D332F]/10">
