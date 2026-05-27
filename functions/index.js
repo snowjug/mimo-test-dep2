@@ -622,19 +622,35 @@ app.get("/kiosk/job-status", async (req, res) => {
     if (snapshot.empty) return res.status(404).json({ error: "No jobs found" });
 
     let allCompleted = true;
-    let anyFailed = false;
+    let anyRealFailed = false;  // Only real Pi print failures, not URL-validation cancellations
     let anyPrinting = false;
+    let hasValidJob = false;
 
     snapshot.forEach((doc) => {
       const data = doc.data();
-      if (data.status === "failed") anyFailed = true;
+      const printerStatus = data.printerStatus || "";
+      
+      // Auto-cancelled jobs (bad URL) are NOT real failures - ignore them for status
+      const isAutoCancelled = data.status === "failed" && (
+        printerStatus.includes("Invalid file URL") ||
+        printerStatus.includes("invalid file path") ||
+        printerStatus.includes("Cancelled")
+      );
+      
+      if (isAutoCancelled) return; // skip — these are not real jobs
+      
+      hasValidJob = true;
+      if (data.status === "failed") anyRealFailed = true;
       if (data.status === "printing") anyPrinting = true;
       if (!["completed", "printed"].includes(data.status) && data.isPrinted !== true) {
         allCompleted = false;
       }
     });
 
-    if (anyFailed) return res.json({ status: "failed", isPrinted: false });
+    // If ONLY auto-cancelled jobs exist, treat as invalid code
+    if (!hasValidJob) return res.status(404).json({ error: "No valid jobs found for this code" });
+
+    if (anyRealFailed) return res.json({ status: "failed", isPrinted: false });
     if (allCompleted) return res.json({ status: "completed", isPrinted: true });
     if (anyPrinting) return res.json({ status: "printing", isPrinted: false });
 
