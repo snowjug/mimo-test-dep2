@@ -66,6 +66,14 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
     const { files } = req.body;
     if (!files || files.length === 0) return res.status(400).json({ error: "No files provided" });
 
+    // Validate all files have real URLs before touching the database
+    for (const f of files) {
+      if (!f.url || f.url === "undefined" || !f.url.startsWith("http")) {
+        console.error("Invalid fileUrl received:", f.url, "for file:", f.name);
+        return res.status(400).json({ error: `Missing or invalid file URL for ${f.name}. Please re-upload.` });
+      }
+    }
+
     let totalPages = 0;
     const batch = db.batch();
     
@@ -97,6 +105,7 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // ================= CREATE ORDER =================
 app.post("/create-order", authMiddleware, async (req, res) => {

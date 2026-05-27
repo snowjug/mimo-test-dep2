@@ -23,6 +23,7 @@ interface UploadedFile {
 export function UploadFile() {
   const navigate = useNavigate();
   const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [uploadedFilesData, setUploadedFilesData] = useState<any[]>([]); // holds full metadata with URLs
   const [isDragging, setIsDragging] = useState(false);
   const [userName, setUserName] = useState("Admin User");
   const [userStats, setUserStats] = useState({ totalDocs: 0, totalPages: 0, totalSpent: 0 });
@@ -134,7 +135,10 @@ export function UploadFile() {
         });
       });
 
-      const uploadedFiles = await Promise.all(uploadPromises);
+      const uploadedFiles = await Promise.all(uploadPromises) as any[];
+
+      // Store the full file metadata (with URLs) for later use in handlePrint
+      setUploadedFilesData(prev => [...prev, ...uploadedFiles]);
 
       // 3. Tell backend to finalize and create database records
       // In Serverless architecture, this doesn't trigger conversion anymore. It just creates the job.
@@ -190,7 +194,11 @@ export function UploadFile() {
   const displayTotalPages = backendTotalPages || (files.filter((f) => f.status === "completed").length * 5);
 
   const handlePrint = () => {
-    sessionStorage.setItem("printFiles", JSON.stringify(files.filter((f) => f.status === "completed")));
+    // Use uploadedFilesData which contains the full metadata WITH Firebase download URLs
+    const completedFiles = uploadedFilesData.filter(f =>
+      files.some(uf => uf.name === f.name && uf.status === "completed")
+    );
+    sessionStorage.setItem("printFiles", JSON.stringify(completedFiles));
     navigate("/print-options");
   };
 
