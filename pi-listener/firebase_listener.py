@@ -163,7 +163,7 @@ def process_job(doc_snapshot):
 
     # 2. Convert if needed
     ext = os.path.splitext(local_path)[1].lower()
-    if ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
+    if ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"]:
         pdf_path = convert_to_pdf(local_path)
         if pdf_path:
             final_path = pdf_path
