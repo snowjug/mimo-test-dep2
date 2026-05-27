@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://us-central1-mimo-v2-11868.cloudfunctions.net/api";
+// Always use Firebase Functions - the VITE_API_URL env var was pointing to old dead Northflank backend
+const API_URL = "https://api-upqxuj7evq-uc.a.run.app";
 
 const api = axios.create({
   baseURL: API_URL,
