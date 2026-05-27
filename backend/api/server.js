@@ -699,6 +699,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const now = new Date();
+    const { printOptions: bodyPrintOptions } = req.body || {};
 
     const snapshot = await db
       .collection("print_jobs")
@@ -707,7 +708,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       .get();
 
     // Filter jobs that don't have a printCode yet
-    const jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
+    let jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
     
     // If all jobs already have a print code, return the most recent one
     if (jobsToUpdate.length === 0 && !snapshot.empty) {
@@ -718,12 +719,59 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       }
     }
 
-    console.log(`[PAYMENT-SUCCESS] Found ${jobsToUpdate.length} jobs needing print codes for userId: ${userId}`);
-
+    // ============================================================
+    // BLANK SHEET / GRAPH PAPER: No file uploaded, create a virtual
+    // print_job so a print code can still be generated.
+    // ============================================================
     if (jobsToUpdate.length === 0) {
-      console.error(`❌ No jobs found requiring a print code for userId: ${userId}`);
-      return res.status(400).json({ error: "No pending jobs found" });
+      const storedPrintOptions = bodyPrintOptions || {};
+      const isBlankSheet = storedPrintOptions.isBlankSheet === true;
+
+      if (isBlankSheet) {
+        const sheetType = storedPrintOptions.sheetType || "a4";
+        const totalPages = Number(storedPrintOptions.totalPages || 1);
+        const fileName = sheetType === "graph" ? "mimo_graph.pdf" : "blank_a4.pdf";
+        const pricePerPage = sheetType === "graph" ? 2.00 : 2.30;
+
+        console.log(`[PAYMENT-SUCCESS] Creating virtual print_job for blank sheet (${sheetType}), ${totalPages} pages, userId: ${userId}`);
+
+        const virtualJobRef = await db.collection("print_jobs").add({
+          userId,
+          fileName,
+          isBlankSheet: true,
+          sheetType,
+          documentUrl: null,
+          fileUrl: null,
+          mimetype: "application/pdf",
+          fileType: "pdf",
+          isImage: false,
+          pageCount: totalPages,
+          status: "pending",
+          printOptions: storedPrintOptions,
+          pricing: {
+            pricePerPage,
+            totalPages,
+            totalPagesToPrint: totalPages,
+            estimatedAmount: totalPages * pricePerPage,
+            finalAmount: storedPrintOptions.totalCost || totalPages * pricePerPage,
+            currency: "INR"
+          },
+          paymentStatus: { status: "completed", paymentMethod: "cashfree", paidAt: now },
+          printStatus: { status: "pending" },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Re-fetch the created doc so it can be updated in the batch below
+        const virtualJobDoc = await virtualJobRef.get();
+        jobsToUpdate = [virtualJobDoc];
+      } else {
+        console.error(`❌ No jobs found requiring a print code for userId: ${userId}`);
+        return res.status(400).json({ error: "No pending jobs found" });
+      }
     }
+
+    console.log(`[PAYMENT-SUCCESS] Found ${jobsToUpdate.length} jobs needing print codes for userId: ${userId}`);
 
     // ✅ GENERATE ONLY ONCE HERE
     const printCode = Math.floor(1000 + Math.random() * 9000).toString();
@@ -977,8 +1025,10 @@ app.post("/create-order", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     console.log(`[CREATE-ORDER] userId from token: ${userId}`);
+
+    const { printOptions } = req.body;
     
-    const jobsSnapshot = await db
+    let jobsSnapshot = await db
       .collection("print_jobs")
       .where("userId", "==", userId)
       .where("status", "==", "pending")
@@ -986,7 +1036,68 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     
     console.log(`[CREATE-ORDER] Found ${jobsSnapshot.size} pending jobs for userId: ${userId}`);
 
-    const { printOptions } = req.body;
+    // ============================================================
+    // BLANK SHEET / GRAPH PAPER: No file uploaded → create a
+    // virtual print_job so the order can be priced and processed.
+    // ============================================================
+    if (jobsSnapshot.empty && printOptions?.isBlankSheet === true) {
+      const sheetType = printOptions?.sheetType || "a4";
+      const totalPages = Number(printOptions?.totalPages || 1);
+      const fileName = sheetType === "graph" ? "mimo_graph.pdf" : "blank_a4.pdf";
+      const pricePerPage = sheetType === "graph" ? 2.00 : 2.30;
+
+      console.log(`[CREATE-ORDER] Creating virtual print_job for blank sheet (${sheetType}), ${totalPages} pages, userId: ${userId}`);
+
+      // Clean up any stale blank sheet jobs first
+      const oldBlankJobs = await db.collection("print_jobs")
+        .where("userId", "==", userId)
+        .where("isBlankSheet", "==", true)
+        .get();
+      const cleanupBatch = db.batch();
+      oldBlankJobs.forEach(doc => {
+        if (["pending", "pending_conversion"].includes(doc.data().status)) {
+          cleanupBatch.delete(doc.ref);
+        }
+      });
+      if (!oldBlankJobs.empty) await cleanupBatch.commit();
+
+      await db.collection("print_jobs").add({
+        userId,
+        fileName,
+        isBlankSheet: true,
+        sheetType,
+        documentUrl: null,
+        fileUrl: null,
+        mimetype: "application/pdf",
+        fileType: "pdf",
+        isImage: false,
+        pageCount: totalPages,
+        status: "pending",
+        printOptions: printOptions || {},
+        pricing: {
+          pricePerPage,
+          totalPages,
+          totalPagesToPrint: totalPages,
+          estimatedAmount: totalPages * pricePerPage,
+          finalAmount: printOptions?.totalCost || totalPages * pricePerPage,
+          currency: "INR"
+        },
+        paymentStatus: { status: "pending", paymentMethod: "cashfree", transactionId: null, paidAt: null },
+        printStatus: { status: "pending" },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Re-fetch the newly created job
+      jobsSnapshot = await db
+        .collection("print_jobs")
+        .where("userId", "==", userId)
+        .where("status", "==", "pending")
+        .get();
+
+      console.log(`[CREATE-ORDER] Virtual job created. Re-fetched ${jobsSnapshot.size} pending jobs.`);
+    }
+
     if (jobsSnapshot.empty) return res.status(400).send("No pending jobs");
 
     const orderId = "order_" + Date.now();
@@ -1286,6 +1397,54 @@ app.get("/generate-print-code", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch print code" });
   }
 });
+
+// ================= KIOSK: POLL JOB STATUS =================
+// Called by kiosk frontend periodically to check if the Pi has finished printing.
+// Returns: { status: "printing" | "completed" | "failed", isPrinted: bool }
+app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
+  try {
+    const { printCode } = req.query;
+    if (!printCode) {
+      return res.status(400).json({ error: "printCode query param required" });
+    }
+
+    const snapshot = await db
+      .collection("print_jobs")
+      .where("printCode", "==", printCode)
+      .limit(5)
+      .get();
+
+    if (snapshot.empty) {
+      return res.status(404).json({ error: "No jobs found for this code" });
+    }
+
+    // Check across all docs for this code — all must be completed to call it done
+    let allCompleted = true;
+    let anyFailed = false;
+
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.status === "failed") anyFailed = true;
+      if (!["completed", "printed"].includes(data.status) && data.isPrinted !== true) {
+        allCompleted = false;
+      }
+    });
+
+    if (anyFailed) {
+      return res.json({ status: "failed", isPrinted: false });
+    }
+
+    if (allCompleted) {
+      return res.json({ status: "completed", isPrinted: true });
+    }
+
+    return res.json({ status: "printing", isPrinted: false });
+  } catch (err) {
+    console.error("❌ KIOSK JOB STATUS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch job status" });
+  }
+});
+
 // ================= PRINT BY CODE =================
 app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
   try {
@@ -1342,6 +1501,25 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       // ❌ Already printed
       if (data.isPrinted) continue;
 
+      // ✅ BLANK / GRAPH SHEET: No file stored — kiosk prints its built-in template
+      if (data.isBlankSheet) {
+        validDocs.push({
+          id: doc.id,
+          file: data.fileName,
+          copies: data.copies || data.printOptions?.copies || 1,
+          pages: data.pageCount || 1,
+          url: null,
+          isBlankSheet: true,
+          sheetType: data.sheetType || "a4",
+        });
+
+        await doc.ref.update({
+          printerStatus: "printing",
+          status: "printing",
+        });
+        continue;
+      }
+
       const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
       const file = bucket.file(filePath);
       const [signedUrl] = await file.getSignedUrl({
@@ -1353,6 +1531,7 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
         id: doc.id,
         file: data.fileName,
         copies: data.copies || 1,
+        pages: data.pageCount || 1,
         url: signedUrl,
       });
 

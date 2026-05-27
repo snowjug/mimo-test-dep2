@@ -26,7 +26,9 @@ export function PaymentVerify() {
           setStatus("success");
           
           // Trigger the job finalization (generate code, etc)
-          const successResponse = await api.post("/payment-success");
+          const storedOptions = sessionStorage.getItem("printOptions");
+          const currentPrintOptions = storedOptions ? JSON.parse(storedOptions) : {};
+          const successResponse = await api.post("/payment-success", { printOptions: currentPrintOptions });
           const { printCode } = successResponse.data;
 
           sessionStorage.setItem("printCode", printCode);
