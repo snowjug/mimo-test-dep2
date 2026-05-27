@@ -68,15 +68,30 @@ def download_file(file_url, file_name):
         
         print(f"⬇️  Downloading from Firebase Storage...")
         
-        # Extract the storage path from the URL
-        if "firebasestorage.googleapis.com" in file_url:
+        blob_path = None
+
+        # Strategy 1: gs:// URL
+        if file_url.startswith("gs://"):
+            blob_path = file_url.split(bucket.name + "/")[1]
+
+        # Strategy 2: Standard Firebase Storage URL (contains /o/)
+        elif "firebasestorage.googleapis.com" in file_url and "/o/" in file_url:
             path = file_url.split("/o/")[1].split("?")[0]
             blob_path = urllib.parse.unquote(path)
+
+        if blob_path:
+            # Use Firebase Admin SDK to download directly
+            blob = bucket.blob(blob_path)
+            blob.download_to_filename(local_path)
         else:
-            blob_path = file_url.split(bucket.name + "/")[1]
-            
-        blob = bucket.blob(blob_path)
-        blob.download_to_filename(local_path)
+            # Strategy 3: Fallback - direct HTTP download (handles signed URLs, etc.)
+            print(f"⬇️  Using direct HTTP download for URL type...")
+            import requests as req_lib
+            response = req_lib.get(file_url, stream=True, timeout=30)
+            response.raise_for_status()
+            with open(local_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
         
         print(f"✅ Downloaded to: {local_path}")
         return local_path
