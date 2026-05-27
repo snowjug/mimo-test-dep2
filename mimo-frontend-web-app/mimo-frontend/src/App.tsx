@@ -53,7 +53,7 @@ function App() {
       validationTimerRef.current = window.setTimeout(async () => {
         try {
           // 🔐 VERIFY CODE
-          const res = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/get-documents-by-code", {
+          const res = await fetch("https://api-upqxuj7evq-uc.a.run.app/get-documents-by-code", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -68,13 +68,13 @@ function App() {
           }
 
           // 📄 GET DOCUMENT
-          const doc = data.documents[0];
+          const doc = data.documents && data.documents[0] ? data.documents[0] : { file: data.fileName || "Document", pages: data.pageCount || 1, copies: 1 };
 
           // 📊 SET JOB DATA
           const job = {
-            userName: data.userName || "User",
-            fileName: doc.file,
-            pages: doc.pages || 1,
+            userName: data.userName || data.name || "User",
+            fileName: doc.file || doc.fileName || "Document",
+            pages: doc.pages || doc.pageCount || 1,
             copies: doc.copies || 1,
             mode: "Black & White",
           };
@@ -83,7 +83,7 @@ function App() {
           setPrintStatus("printing");
           setCurrentScreen("printing-screen");
 
-          // 🖨️ TRIGGER PRINT VIA PI (FIREBASE FUNCTIONS - PULL MODEL)
+          // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS (Pi listener picks it up via Firestore)
           try {
             const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
               method: "POST",
@@ -99,14 +99,12 @@ function App() {
             const printData = await printRes.json();
             
             if (!printRes.ok) {
-              console.error("Print Failed", printData.error);
-              showToast(printData.error || "Failed to trigger printer", true);
-              setCurrentScreen("system-error-screen");
+              // Log but don't show error - Pi listener handles printing independently
+              console.warn("kiosk/print API warning:", printData.error);
             }
           } catch (printErr: any) {
-            console.error("Printer trigger error:", printErr);
-            showToast(printErr.message || "Failed to communicate with printer", true);
-            setCurrentScreen("system-error-screen");
+            // Network error calling kiosk/print - Pi listener will still handle it
+            console.warn("kiosk/print network warning:", printErr.message);
           }
 
           resolve();

@@ -616,6 +616,49 @@ app.get("/kiosk/job-status", async (req, res) => {
   }
 });
 
+// ================= KIOSK: GET DOCUMENTS BY CODE =================
+app.post("/get-documents-by-code", async (req, res) => {
+  try {
+    const { printCode } = req.body;
+    if (!printCode) return res.status(400).json({ error: "printCode required" });
+
+    const snapshot = await db.collection("print_jobs")
+      .where("printCode", "==", printCode)
+      .where("status", "in", ["paid", "printing", "completed"])
+      .get();
+
+    if (snapshot.empty) return res.status(404).json({ error: "Invalid or expired print code" });
+
+    // Get user info from first job
+    const firstJob = snapshot.docs[0].data();
+    const userId = firstJob.userId;
+
+    let userName = "User";
+    try {
+      const userDoc = await db.collection("users").doc(userId).get();
+      if (userDoc.exists) userName = userDoc.data().username || "User";
+    } catch (e) { /* ignore */ }
+
+    const documents = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        file: data.fileName || "Document",
+        fileName: data.fileName || "Document",
+        pages: data.pageCount || 1,
+        copies: data.printOptions?.copies || 1,
+        colorMode: data.printOptions?.colorMode || "bw",
+        jobId: doc.id,
+      };
+    });
+
+    res.json({ userName, name: userName, documents, printCode });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch documents" });
+  }
+});
+
+
 // ================= PAYMENT SUCCESS (Generates Print Code) =================
 app.post("/payment-success", authMiddleware, async (req, res) => {
   try {

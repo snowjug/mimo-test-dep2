@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 
-const BACKEND_URL = "https://p01--mimo-backend--4b94y9s4jyc5.code.run";
+const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
 
 interface PrintingScreenProps {
   isActive: boolean;
