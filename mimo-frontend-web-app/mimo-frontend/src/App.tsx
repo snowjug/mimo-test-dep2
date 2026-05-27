@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { MainScreen } from './components/screens/MainScreen';
 import { CodeEntryScreen } from './components/screens/CodeEntryScreen';
 import { PrintingScreen } from './components/screens/PrintingScreen';
@@ -13,9 +13,6 @@ export type ScreenState =
   | 'summary-screen'
   | 'system-error-screen'
   | 'maintenance-screen';
-
-const BACKEND_URL = "https://p01--mimo-backend--4b94y9s4jyc5.code.run";
-const HEALTH_CHECK_INTERVAL_MS = 30_000; // 30 seconds
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('main-interface');
@@ -34,49 +31,6 @@ function App() {
 
   const toastTimerRef = useRef<number | null>(null);
   const validationTimerRef = useRef<number | null>(null);
-  const healthCheckRef = useRef<number | null>(null);
-  // Track whether we are currently on the maintenance screen due to a failed health check
-  const isOnMaintenanceDueToHealthRef = useRef(false);
-
-  // ================= HEALTH CHECK =================
-  const runHealthCheck = useCallback(async () => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(8000), // 8-second timeout
-      });
-
-      if (res.ok) {
-        // ✅ Backend is healthy — recover if we were showing maintenance
-        if (isOnMaintenanceDueToHealthRef.current) {
-          isOnMaintenanceDueToHealthRef.current = false;
-          setCurrentScreen('main-interface');
-        }
-      } else {
-        throw new Error(`HTTP ${res.status}`);
-      }
-    } catch {
-      // ❌ Backend is unreachable — show maintenance screen
-      // Only switch if we're on a non-critical screen (main or code entry)
-      setCurrentScreen(prev => {
-        if (prev === 'main-interface' || prev === 'code-entry-screen') {
-          isOnMaintenanceDueToHealthRef.current = true;
-          return 'maintenance-screen';
-        }
-        return prev;
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    // Run immediately on mount, then on interval
-    runHealthCheck();
-    healthCheckRef.current = window.setInterval(runHealthCheck, HEALTH_CHECK_INTERVAL_MS);
-
-    return () => {
-      if (healthCheckRef.current) clearInterval(healthCheckRef.current);
-    };
-  }, [runHealthCheck]);
 
   // ================= TOAST =================
   const showToast = useCallback((msg: string, isError: boolean = false) => {
@@ -99,7 +53,7 @@ function App() {
       validationTimerRef.current = window.setTimeout(async () => {
         try {
           // 🔐 VERIFY CODE
-          const res = await fetch(`${BACKEND_URL}/get-documents-by-code`, {
+          const res = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/get-documents-by-code", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -131,7 +85,7 @@ function App() {
 
           // 🖨️ TRIGGER PRINT VIA PI (BACKEND INTEGRATION)
           try {
-            const printRes = await fetch(`${BACKEND_URL}/kiosk/print`, {
+            const printRes = await fetch("https://p01--mimo-backend--4b94y9s4jyc5.code.run/kiosk/print", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",

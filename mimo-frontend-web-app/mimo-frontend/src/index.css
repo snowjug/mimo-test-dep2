@@ -45,16 +45,34 @@ body {
     user-select: none;
     -webkit-user-select: none;
     touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Base App Wrapper — locked to tablet screen resolution: 1333×794px */
 #root {
     width: 1333px;
     height: 794px;
-    position: relative;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     overflow: hidden;
     flex-shrink: 0;
 }
+
+/* Physically rotate and scale the UI to landscape if the device screen orientation is portrait */
+@media (orientation: portrait) {
+    #root {
+        width: 100vh;
+        height: 100vw;
+        transform: translate(-50%, -50%) rotate(-90deg);
+        transform-origin: center;
+    }
+}
+
+
 
 /* ---- SCREEN SYSTEM ---- */
 .screen {
