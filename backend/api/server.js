@@ -704,7 +704,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     const snapshot = await db
       .collection("print_jobs")
       .where("userId", "==", userId)
-      .where("status", "in", ["pending", "paid"])
+      .where("status", "in", ["pending", "paid", "pending_conversion", "processing"])
       .get();
 
     // Filter jobs that don't have a printCode yet
@@ -1831,8 +1831,13 @@ setInterval(async () => {
       fs.unlinkSync(tempInput);
     }
     
+    // Preserve payment status if the user paid while the document was converting
+    const latestDoc = await doc.ref.get();
+    const currentStatus = latestDoc.data().status;
+    const newStatus = (currentStatus === "paid" || currentStatus === "completed") ? currentStatus : "pending";
+    
     await doc.ref.update({
-      status: "pending",
+      status: newStatus,
       pageCount: pages,
       fileUrl: finalFileUrl
     });
