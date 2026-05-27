@@ -184,7 +184,8 @@ const piAgent = new https.Agent({ family: 4, keepAlive: true });
 
 // Helper: call the Pi print API for one file
 const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
-  const targetPiUrl = piUrl || process.env.PI_BASE_URL || "http://100.108.118.38:8000";
+  // FORCE Cloudflare Tunnel to bypass Northflank/Tailscale IP conflicts
+  const targetPiUrl = "https://patricia-demanding-predict-warm.trycloudflare.com";
   const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
 
   const results = [];
