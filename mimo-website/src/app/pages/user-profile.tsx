@@ -79,9 +79,7 @@ export function UserProfile() {
     formData.append("photo", file);
 
     try {
-      const res = await api.post("/upload-profile-photo", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      const res = await api.post("/upload-profile-photo", formData);
       setPhotoUrl(res.data.photoUrl);
       toast.success("Profile photo updated!");
     } catch (err) {

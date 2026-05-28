@@ -1097,7 +1097,10 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     const jobIds = [];
 
     const userDoc = await db.collection("users").doc(userId).get();
-    const userEmail = userDoc.exists ? userDoc.data().email : "unknown";
+    const userData = userDoc.exists ? userDoc.data() : {};
+    const userEmail = userData.email || "user@example.com";
+    const userName = userData.username || "Mimo User";
+    const userPhone = userData.mobileNumber || "9999999999";
 
     let totalPages = 0;
     let totalAmount = 0;
@@ -1153,8 +1156,9 @@ app.post("/create-order", authenticateToken, async (req, res) => {
         order_currency: "INR",
         customer_details: {
           customer_id: userId,
-          customer_email: "user@email.com",
-          customer_phone: "9999999999",
+          customer_email: userEmail,
+          customer_phone: userPhone,
+          customer_name: userName,
         },
         order_meta: {
           return_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/payment-verify?order_id={order_id}`
@@ -1365,9 +1369,20 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
           paymentTime: paymentData.payment_time || now
         });
       }
-    }
 
-    res.sendStatus(200);
+      // ✅ Update Global Admin Metrics ONLY on Real Payments
+      const dateString = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const metricsRef = db.collection("system").doc("metrics");
+      await metricsRef.set({
+        totalRevenue: admin.firestore.FieldValue.increment(paidAmount),
+        totalOrders: admin.firestore.FieldValue.increment(1),
+        totalPagesPrinted: admin.firestore.FieldValue.increment(newTotalPages),
+        [`dailyRevenue.${dateString}`]: admin.firestore.FieldValue.increment(paidAmount),
+        lastUpdatedAt: now
+      }, { merge: true });
+
+      res.status(200).send("Webhook received");
+    }
   } catch (err) {
     console.error(err);
     res.sendStatus(500);
@@ -1916,6 +1931,124 @@ app.get("/cron/cleanup-files", async (req, res) => {
 });
 
 
+
+// ================= ADMIN DASHBOARD API =================
+
+// Middleware to protect admin routes
+const authenticateAdmin = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  if (!token) return res.sendStatus(401);
+  jwt.verify(token, process.env.JWT_SECRET || "fallback_secret_for_admin_only", (err, decoded) => {
+    if (err || !decoded.admin) return res.sendStatus(403);
+    next();
+  });
+};
+
+app.post("/admin/login", async (req, res) => {
+  const { email, password } = req.body;
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@printmimo.tech";
+  const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+  if (email === adminEmail && password === adminPassword) {
+    const token = jwt.sign({ admin: true }, process.env.JWT_SECRET || "fallback_secret_for_admin_only", { expiresIn: "12h" });
+    res.json({ token });
+  } else {
+    res.status(401).json({ error: "Invalid credentials" });
+  }
+});
+
+app.get("/admin/metrics", authenticateAdmin, async (req, res) => {
+  try {
+    const metricsDoc = await db.collection("system").doc("metrics").get();
+    const data = metricsDoc.exists ? metricsDoc.data() : { totalRevenue: 0, totalOrders: 0, totalPagesPrinted: 0, dailyRevenue: {} };
+    
+    // Check Pi Status
+    let piStatus = { printerStatus: "Unknown", lastSeen: null };
+    const pSnapshot = await db.collection("mimo_pi").doc("status").get();
+    if (pSnapshot.exists) {
+      piStatus = pSnapshot.data();
+    }
+    
+    res.json({ ...data, piStatus });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/reset-metrics", authenticateAdmin, async (req, res) => {
+  try {
+    await db.collection("system").doc("metrics").set({
+      totalRevenue: 0,
+      totalOrders: 0,
+      totalPagesPrinted: 0,
+      dailyRevenue: {},
+      lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ success: true, message: "Metrics reset successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/coupons", authenticateAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection("coupons").get();
+    const coupons = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(coupons);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/coupons", authenticateAdmin, async (req, res) => {
+  try {
+    const { code, discountPercentage, expiryDate } = req.body;
+    await db.collection("coupons").doc(code.toUpperCase()).set({
+      discountPercentage: Number(discountPercentage),
+      expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
+      isActive: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/coupons/bulk", authenticateAdmin, async (req, res) => {
+  try {
+    const { prefix, count, discountPercentage, expiryDate } = req.body;
+    const batch = db.batch();
+    const generatedCodes = [];
+    
+    for(let i = 0; i < Number(count); i++) {
+      const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const code = `${prefix.toUpperCase()}-${randomStr}`;
+      generatedCodes.push(code);
+      const ref = db.collection("coupons").doc(code);
+      batch.set(ref, {
+        discountPercentage: Number(discountPercentage),
+        expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
+        isActive: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        isBulk: true
+      });
+    }
+    await batch.commit();
+    res.json({ success: true, count: generatedCodes.length, codes: generatedCodes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/admin/coupons/:code", authenticateAdmin, async (req, res) => {
+  try {
+    await db.collection("coupons").doc(req.params.code).delete();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 const Sentry = require("@sentry/node");
 Sentry.setupExpressErrorHandler(app);

@@ -146,13 +146,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         return;
       }
 
-      const next = currentProgress + 1;
+      // If the backend finished incredibly fast (e.g., under 4 seconds) and we're still at 15%,
+      // jump ahead to 80% instantly, then rapidly tick up to 100%.
+      const next = currentProgress < 80 ? 80 : currentProgress + 1;
+      
       progressRef.current = next;
       setProgress(next);
       stepIndex++;
 
-      // Ease-in: first few steps ~600ms, tapering to ~350ms near 100
-      const delay = Math.max(350, 600 - stepIndex * 18);
+      // Super fast finish (30ms per step) because the Pi already reported success!
+      const delay = 30;
       tickTimerRef.current = window.setTimeout(finish, delay);
 
       // Update status message as we near the end
