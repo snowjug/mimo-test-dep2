@@ -61,6 +61,8 @@ export function DashboardLayout() {
 
   const handleLogout = () => {
     localStorage.removeItem("isAuthenticated");
+    localStorage.removeItem("jwtToken");
+    localStorage.removeItem("mimo_user_name");
     navigate("/login");
   };
 
