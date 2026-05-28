@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { MimoHeader } from "../components/mimo-header";
-import { ArrowLeft, Minus, Plus, FileText, Grid3X3 } from "lucide-react";
+import { ArrowLeft, Minus, Plus, FileText, Grid3X3, Loader2 } from "lucide-react";
+import api from "../api";
 
 export function BlankPages() {
   const navigate = useNavigate();
@@ -27,38 +28,41 @@ export function BlankPages() {
 
   const fileName = isGraph ? "mimo_graph.pdf" : "blank_a4.pdf";
 
-  const handleContinue = () => {
-    // Store as printFiles (as a virtual file entry for consistency)
-    sessionStorage.setItem(
-      "printFiles",
-      JSON.stringify([
-        {
-          name: fileName,
-          size: 1024 * 50, // 50KB mock size
-          status: "completed",
-          progress: 100,
-        },
-      ])
-    );
+  const [isProcessing, setIsProcessing] = useState(false);
 
-    // Store print options for payment page
-    sessionStorage.setItem(
-      "printOptions",
-      JSON.stringify({
-        copies: 1,
-        colorMode: "bw",
-        doubleSided: "single",
-        pageSelection: "all",
-        pageRange: "",
-        orientation: "portrait",
-        totalPages: pageCount,
-        totalCost,
-        isBlankSheet: true,
-        sheetType: type,
-      })
-    );
+  const handleContinue = async () => {
+    setIsProcessing(true);
+    try {
+      const token = localStorage.getItem("jwtToken");
+      await api.post("/create-blank-job", 
+        { type, pageCount },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    navigate("/payment");
+      // Store print options for payment page
+      sessionStorage.setItem(
+        "printOptions",
+        JSON.stringify({
+          copies: 1,
+          colorMode: "bw",
+          doubleSided: "single",
+          pageSelection: "all",
+          pageRange: "",
+          orientation: "portrait",
+          totalPages: pageCount,
+          totalCost,
+          isBlankSheet: true,
+          sheetType: type,
+        })
+      );
+
+      navigate("/payment");
+    } catch (err) {
+      console.error("Failed to create blank job:", err);
+      alert("Failed to proceed to checkout. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -204,10 +208,11 @@ export function BlankPages() {
 
           <div className="pt-4 pb-8">
             <Button
-              className="w-full h-14 text-base bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-xl shadow-blue-900/20 transition-all duration-300 font-bold uppercase tracking-wider rounded-2xl"
+              className="w-full h-14 text-base bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-xl shadow-blue-900/20 transition-all duration-300 font-bold uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2"
               onClick={handleContinue}
+              disabled={isProcessing}
             >
-              Continue to Checkout
+              {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : "Continue to Checkout"}
             </Button>
           </div>
         </div>

@@ -12,6 +12,7 @@ import api from "../api";
 export function OnboardingName() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,16 +21,28 @@ export function OnboardingName() {
       toast.error("Please enter your name");
       return;
     }
+    if (mobileNumber.length !== 10) {
+      toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
 
     setLoading(true);
-    // Simulation delay for premium feel
-    setTimeout(() => {
+    
+    try {
+      const token = localStorage.getItem("jwtToken");
+      await api.post("/onboarding", { username: name.trim(), mobileNumber }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
       localStorage.setItem("mimo_user_name", name.trim());
       localStorage.setItem("isAuthenticated", "true");
       toast.success(`Welcome to MIMO, ${name.trim()}!`);
       navigate("/upload");
+    } catch (err) {
+      toast.error("Failed to complete onboarding");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -101,7 +114,7 @@ export function OnboardingName() {
             </CardHeader>
             <CardContent className="p-6 sm:p-8 pt-0 sm:pt-4">
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                <div className="space-y-2">
+                <div className="space-y-4">
                   <div className="relative group">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors duration-300" />
                     <Input
@@ -113,6 +126,22 @@ export function OnboardingName() {
                       className="pl-12 h-12 sm:h-14 border-slate-200 bg-slate-50/50 focus:bg-white transition-all duration-300 text-base sm:text-lg rounded-xl sm:rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 shadow-sm"
                       disabled={loading}
                       autoFocus
+                    />
+                  </div>
+
+                  <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-slate-400 group-focus-within:text-blue-500 transition-colors duration-300 font-bold text-sm">
+                      +91
+                    </div>
+                    <Input
+                      id="mobile"
+                      type="tel"
+                      placeholder="Enter your 10-digit mobile number"
+                      maxLength={10}
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                      className="pl-12 h-12 sm:h-14 border-slate-200 bg-slate-50/50 focus:bg-white transition-all duration-300 text-base sm:text-lg rounded-xl sm:rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 shadow-sm"
+                      disabled={loading}
                     />
                   </div>
                 </div>

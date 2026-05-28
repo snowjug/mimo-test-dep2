@@ -479,11 +479,15 @@ app.post("/google-login", async (req, res) => {
 app.post("/onboarding", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { username } = req.body;
+    const { username, mobileNumber } = req.body;
     if (!username) return res.status(400).send("Name required");
     const userDoc = await db.collection("users").doc(userId).get();
     if (!userDoc.exists) return res.status(404).send("User not found");
-    await userDoc.ref.update({ username, onboardingCompleted: true });
+    
+    const updates = { username, onboardingCompleted: true };
+    if (mobileNumber) updates.mobileNumber = mobileNumber;
+    
+    await userDoc.ref.update(updates);
     res.send("Onboarding complete");
   } catch (err) {
     console.error(err);
@@ -1043,6 +1047,55 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
     }
 
     res.json({ message: "Files finalized and queued for processing" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { type, pageCount } = req.body; // "a4" or "graph"
+    
+    // 1. Clear abandoned jobs to prevent overcharging
+    const existingJobs = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("status", "==", "pending")
+      .get();
+      
+    if (!existingJobs.empty) {
+      const deleteBatch = db.batch();
+      existingJobs.forEach(doc => deleteBatch.delete(doc.ref));
+      await deleteBatch.commit();
+    }
+
+    // 2. Create the blank job
+    const isGraph = type === "graph";
+    const fileName = isGraph ? "mimo_graph.pdf" : "blank_a4.pdf";
+    const dummyUrl = "https://example.com/blank.pdf"; // Mock URL for blank pages
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    await db.collection("print_jobs").add({
+      userId,
+      fileName,
+      documentUrl: dummyUrl,
+      fileUrl: dummyUrl,
+      mimetype: "application/pdf",
+      fileSize: 10240,
+      fileType: "pdf",
+      isImage: false,
+      createdAt: now,
+      updatedAt: now,
+      status: "pending",
+      pageCount: Number(pageCount) || 1,
+      files: [{ name: fileName, size: 10240, type: "application/pdf", url: dummyUrl }],
+      printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
+      pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
+      paymentStatus: { status: "pending" },
+      printStatus: { status: "pending" }
+    });
+
+    res.json({ message: "Blank job queued successfully" });
   } catch (err) {
     next(err);
   }
