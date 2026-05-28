@@ -127,7 +127,7 @@ app.post("/google-login", async (req, res) => {
     const email = payload.email;
     const name = payload.name;
     const snapshot = await db.collection("users").where("email", "==", email).get();
-    let userId;
+    let mobileNumber = "";
     const now = admin.firestore.FieldValue.serverTimestamp();
     if (snapshot.empty) {
       const userRef = await db.collection("users").add({
@@ -140,10 +140,11 @@ app.post("/google-login", async (req, res) => {
       await userRef.update({ id: userId });
     } else {
       userId = snapshot.docs[0].id;
+      mobileNumber = snapshot.docs[0].data().mobileNumber || "";
       await snapshot.docs[0].ref.update({ lastLoginAt: now });
     }
     const jwtToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "30d" });
-    res.json({ jwtToken, name, email, userId });
+    res.json({ jwtToken, name, email, userId, mobileNumber });
   } catch (err) {
     console.error(err);
     res.status(401).json({ error: "Google login failed" });
@@ -154,9 +155,9 @@ app.post("/google-login", async (req, res) => {
 app.post("/onboarding", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { username } = req.body;
+    const { username, mobileNumber } = req.body;
     if (!username) return res.status(400).json({ error: "Name required" });
-    await db.collection("users").doc(userId).update({ username, onboardingCompleted: true });
+    await db.collection("users").doc(userId).update({ username, mobileNumber: mobileNumber || "", onboardingCompleted: true });
     res.json({ message: "Onboarding complete" });
   } catch (err) {
     console.error(err);
@@ -345,6 +346,55 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Error finalizing upload:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ================= REMOVE ABANDONED FILE =================
+app.delete("/remove-file", authMiddleware, async (req, res) => {
+  try {
+    const { fileUrl } = req.body;
+    const userId = req.user.id || req.user.userId;
+
+    if (!fileUrl) return res.status(400).json({ error: "Missing fileUrl" });
+
+    // Find the pending print job in Firestore
+    const jobsSnapshot = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("fileUrl", "==", fileUrl)
+      .where("status", "==", "pending")
+      .get();
+
+    if (jobsSnapshot.empty) {
+      return res.status(404).json({ error: "File not found or already processed" });
+    }
+
+    // Delete Firestore document
+    const batch = db.batch();
+    jobsSnapshot.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+
+    // Delete from Firebase Storage
+    const bucket = admin.storage().bucket();
+    let filePath = "";
+    if (fileUrl.startsWith("gs://")) {
+      const bucketName = bucket.name;
+      filePath = fileUrl.replace(`gs://${bucketName}/`, "");
+    } else if (fileUrl.includes("firebasestorage.googleapis.com")) {
+      const urlObj = new URL(fileUrl);
+      const pathParts = urlObj.pathname.split("/o/");
+      if (pathParts.length > 1) {
+        filePath = decodeURIComponent(pathParts[1].split("?")[0]);
+      }
+    }
+
+    if (filePath) {
+      await bucket.file(filePath).delete().catch(e => console.error("Storage delete error:", e));
+    }
+
+    res.json({ message: "File successfully deleted from cloud" });
+  } catch (err) {
+    console.error("Error removing file:", err);
+    res.status(500).json({ error: "Failed to remove file" });
   }
 });
 
