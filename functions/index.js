@@ -556,6 +556,35 @@ app.post("/create-order", authMiddleware, async (req, res) => {
         createdAt: now, couponCode, discountPercentage,
         coinsUsed: coinsToUse || 0
       });
+
+      // Trigger Email Receipt via Nodemailer for free orders
+      try {
+        const userDoc = await db.collection("users").doc(userId).get();
+        const userEmail = userDoc.exists ? userDoc.data().email : null;
+        if (userEmail && process.env.GMAIL_APP_PASSWORD) {
+          const mailOptions = {
+            from: '"Mimo Printing" <visionprintt@gmail.com>',
+            to: userEmail,
+            subject: "Your Mimo Print Code is Ready!",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px; text-align: center;">
+                <h2 style="color: #093765;">Mimo Print Receipt</h2>
+                <p style="color: #666; font-size: 16px;">Thank you for using Mimo! Your free order is ready to print.</p>
+                <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin: 0; color: #64748b; font-size: 14px; text-transform: uppercase; font-weight: bold;">Print Code</p>
+                  <p style="margin: 10px 0 0; font-size: 48px; font-weight: 900; color: #0f172a; letter-spacing: 5px;">${printCode}</p>
+                </div>
+                <p style="color: #666; font-size: 14px;">Go to the Mimo Kiosk and enter this code to retrieve your documents.</p>
+              </div>
+            `
+          };
+          await transporter.sendMail(mailOptions);
+          console.log(`[EMAIL] Free order receipt sent to ${userEmail}`);
+        }
+      } catch (emailErr) {
+        console.error("[EMAIL ERROR] Failed to send free order receipt:", emailErr);
+      }
+
       return res.json({ orderId, paymentSessionId: null, amount: 0, printCode, free: true });
     }
     // ─────────────────────────────────────────────────────────────────────────
