@@ -188,8 +188,20 @@ export function UploadFile() {
     handleFileSelect(e.dataTransfer.files);
   };
 
-  const removeFile = (index: number) => {
+  const removeFile = async (index: number) => {
+    const fileToRemove = files[index];
+    const meta = uploadedFilesData.find((f) => f.name === fileToRemove.name);
+
+    if (fileToRemove.status === "completed" && meta && meta.url) {
+      try {
+        await api.delete("/remove-file", { data: { fileUrl: meta.url } });
+      } catch (err) {
+        console.error("Failed to delete from cloud:", err);
+      }
+    }
+
     setFiles((prev) => prev.filter((_, i) => i !== index));
+    setUploadedFilesData((prev) => prev.filter((f) => f.name !== fileToRemove.name));
   };
 
   const formatFileSize = (bytes: number) => {
