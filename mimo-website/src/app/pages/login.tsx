@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
@@ -14,6 +14,41 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+
+  // Auto-login if token already exists
+  
+  useEffect(() => {
+    const token = localStorage.getItem("jwtToken");
+    if (token) {
+      // Verify token is still valid by fetching profile
+      api.get("/profile", { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => {
+          if (res.data.username) {
+            localStorage.setItem("mimo_user_name", res.data.username);
+            navigate("/upload");
+          } else {
+            navigate("/onboarding");
+          }
+        })
+        .catch(() => {
+          // Token invalid or expired, clear it
+          localStorage.removeItem("jwtToken");
+          setIsCheckingSession(false);
+        });
+    } else {
+      setIsCheckingSession(false);
+    }
+  }, [navigate]);
+
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F4F7FB]">
+        <Loader2 className="w-10 h-10 animate-spin text-[#093765] mb-4" />
+        <p className="text-[#093765] font-medium animate-pulse">Resuming your session...</p>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
