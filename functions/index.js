@@ -319,6 +319,14 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
     }
 
     let totalPages = 0;
+    const userId = req.user.id || req.user.userId;
+
+    // Clear old pending jobs to prevent ghost cart pricing discrepancies
+    const staleJobs = await db.collection("print_jobs").where("userId", "==", userId).where("status", "==", "pending").get();
+    const deleteBatch = db.batch();
+    staleJobs.forEach(doc => deleteBatch.delete(doc.ref));
+    await deleteBatch.commit();
+
     const batch = db.batch();
     
     // Process files directly - no conversion loop, Pi handles it!
