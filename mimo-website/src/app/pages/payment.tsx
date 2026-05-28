@@ -63,14 +63,6 @@ export function Payment() {
       toast.error("Please enter a promo code");
       return;
     }
-    
-    // Secret bypass for testing
-    if (promoCode.toUpperCase() === "ASDFG") {
-      setPromoDiscount(totalCost); // 100% free
-      setAppliedPromo("ASDFG");
-      toast.success("Secret coupon applied! Free print unlocked.");
-      return;
-    }
 
     try {
       const response = await api.get(`/validate-coupon/${promoCode}`);

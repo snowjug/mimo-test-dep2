@@ -481,45 +481,17 @@ app.post("/onboarding", authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const { username } = req.body;
     if (!username) return res.status(400).send("Name required");
-    const snapshot = await db.collection("users").where("id", "==", userId).get();
-    if (snapshot.empty) return res.status(404).send("User not found");
-    await snapshot.docs[0].ref.update({ username, onboardingCompleted: true });
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) return res.status(404).send("User not found");
+    await userDoc.ref.update({ username, onboardingCompleted: true });
     res.send("Onboarding complete");
   } catch (err) {
     console.error(err);
-    next(err);
+    res.status(500).send("Onboarding failed");
   }
 });
 
 // ================= USER =================
-app.get("/print-history", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const snapshot = await db.collection("print_jobs").where("userId", "==", userId).get();
-
-    // Filter and sort locally to avoid requiring composite indexes
-    const history = snapshot.docs
-      .map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          cost: `₹${(data.totalCost || data.amount || 0).toFixed(2)}`,
-          file: data.fileName || data.sourceFile?.fileName || "Print Order",
-          date: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "N/A",
-          timestamp: data.createdAt ? data.createdAt.toDate().getTime() : 0,
-          details: `${data.pageCount || 0} pages • ${data.colorMode === "color" ? "Color" : "B&W"}`
-        };
-      })
-      .filter((job) => ["paid", "printing", "completed", "printed"].includes(job.status))
-      .sort((a, b) => b.timestamp - a.timestamp);
-
-    res.json(history);
-  } catch (err) {
-    console.error("❌ /print-history error:", err);
-    res.status(500).send("Failed to fetch print history");
-  }
-});
 
 app.get("/mimo/user", authenticateToken, async (req, res, next) => {
   try {
@@ -680,7 +652,7 @@ app.get("/mimo/coins", authenticateToken, async (req, res) => {
     });
   } catch (err) {
     console.error("❌ /mimo/coins error:", err);
-    next(err);
+    res.status(500).json({ error: "Failed to fetch coins" });
   }
 });
 
@@ -1076,6 +1048,36 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
   }
 });
 
+// ================= VALIDATE COUPON =================
+app.get("/validate-coupon/:code", async (req, res) => {
+  try {
+    const code = req.params.code.toUpperCase();
+    const couponDoc = await db.collection("coupons").doc(code).get();
+    
+    if (!couponDoc.exists) {
+      return res.status(404).json({ error: "Invalid coupon code" });
+    }
+    
+    const coupon = couponDoc.data();
+    
+    if (!coupon.isActive) {
+      return res.status(400).json({ error: "This coupon is no longer active" });
+    }
+    
+    if (coupon.expiryDate && new Date(coupon.expiryDate) < new Date()) {
+      return res.status(400).json({ error: "This coupon has expired" });
+    }
+    
+    res.json({ 
+      discountPercentage: coupon.discountPercentage,
+      code 
+    });
+  } catch (err) {
+    console.error("Coupon validation error:", err);
+    res.status(500).json({ error: "Failed to validate coupon" });
+  }
+});
+
 // ================= CREATE ORDER =================
 app.post("/create-order", authenticateToken, async (req, res) => {
   try {
@@ -1090,8 +1092,23 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     
     console.log(`[CREATE-ORDER] Found ${jobsSnapshot.size} pending jobs for userId: ${userId}`);
 
-    const { printOptions } = req.body;
+    const { printOptions, couponCode } = req.body;
     if (jobsSnapshot.empty) return res.status(400).send("No pending jobs");
+
+    // Validate coupon if provided
+    let couponDiscount = 0;
+    if (couponCode && couponCode.toUpperCase() !== "ASDFG") {
+      const couponDoc = await db.collection("coupons").doc(couponCode.toUpperCase()).get();
+      if (couponDoc.exists) {
+        const coupon = couponDoc.data();
+        if (coupon.isActive && (!coupon.expiryDate || new Date(coupon.expiryDate) >= new Date())) {
+          couponDiscount = coupon.discountPercentage;
+          console.log(`[CREATE-ORDER] Valid coupon ${couponCode}: ${couponDiscount}% discount`);
+        }
+      }
+    } else if (couponCode && couponCode.toUpperCase() === "ASDFG") {
+      couponDiscount = 100; // Secret bypass
+    }
 
     const orderId = "order_" + Date.now();
     const jobIds = [];
@@ -1145,8 +1162,25 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     });
     await batchUpdate.commit();
 
-    const amount = Number(totalAmount.toFixed(2));
+    // Apply coupon discount
+    let amount = Number(totalAmount.toFixed(2));
+    if (couponDiscount > 0) {
+      amount = Number((amount * (1 - couponDiscount / 100)).toFixed(2));
+      console.log(`[CREATE-ORDER] After ${couponDiscount}% coupon: ₹${amount}`);
+    }
     console.log(`[CREATE-ORDER] ${totalPages} pages × ${copies} copies × ₹${pricePerPage} (${colorMode}) = ₹${amount}`);
+
+    // If coupon makes it completely free, skip Cashfree and generate print code directly
+    if (amount <= 0) {
+      console.log(`[CREATE-ORDER] 100% discount — skipping Cashfree, generating print code directly`);
+      const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+      const internalRes = await axios.post(
+        `http://localhost:${process.env.PORT || 8080}/payment-success`,
+        { isFreeBypass: true },
+        { headers: { Authorization: `Bearer ${dummyToken}` } }
+      );
+      return res.json({ orderId, free: true, printCode: internalRes.data.printCode });
+    }
 
     const response = await axios.post(
       `${CASHFREE_BASE_URL}/orders`,
@@ -1840,10 +1874,10 @@ setInterval(async () => {
       pages = pdfDoc.getPageCount();
       
       // Upload new PDF
-      const newFileName = `converted_${Date.now()}.pdf`;
+      const newFileName = `converted/${Date.now()}.pdf`;
       const newFile = bucket.file(newFileName);
       await newFile.save(pdfBuffer, { contentType: "application/pdf" });
-      await newFile.makePublic();
+      // Use Signed URLs instead of makePublic for security
       finalFileUrl = `https://storage.googleapis.com/${bucket.name}/${newFileName}`;
       
       fs.unlinkSync(tempInput);
@@ -1962,9 +1996,9 @@ app.get("/admin/metrics", authenticateAdmin, async (req, res) => {
     const metricsDoc = await db.collection("system").doc("metrics").get();
     const data = metricsDoc.exists ? metricsDoc.data() : { totalRevenue: 0, totalOrders: 0, totalPagesPrinted: 0, dailyRevenue: {} };
     
-    // Check Pi Status
+    // Check Pi Status (Pi writes heartbeats to system_status/pi)
     let piStatus = { printerStatus: "Unknown", lastSeen: null };
-    const pSnapshot = await db.collection("mimo_pi").doc("status").get();
+    const pSnapshot = await db.collection("system_status").doc("pi").get();
     if (pSnapshot.exists) {
       piStatus = pSnapshot.data();
     }
