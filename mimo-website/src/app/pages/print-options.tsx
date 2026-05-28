@@ -148,12 +148,12 @@ export function PrintOptions() {
               </div>
             </Card>
 
-            {/* Color Mode - Coming Soon */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 relative overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 blur-[3px] opacity-60 pointer-events-none select-none transition-all duration-300">
+            {/* Color Mode - Coming Soon for Color only */}
+            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Color Mode</p>
-                  <p className="text-[10px] text-slate-500 font-medium">₹{colorMode === "bw" ? pricePerPageBW : pricePerPageColor}/page • {colorMode === "bw" ? "B&W" : "Color"}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">₹{pricePerPageBW}/page • B&W Only</p>
                 </div>
                 <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
                   <button
@@ -173,20 +173,25 @@ export function PrintOptions() {
                     </div>
                     <span>B&W</span>
                   </button>
-                  <button
-                    onClick={() => setColorMode("color")}
-                    type="button"
-                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
-                      colorMode === "color"
-                        ? "text-[#093765] font-black"
-                        : "text-slate-500 hover:text-slate-700 font-bold"
-                    }`}
-                  >
-                    <div className={`w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-[#093765] via-blue-500 to-cyan-400 border border-slate-200/50 shrink-0 transition-all duration-300 group-hover:scale-110 ${
-                      colorMode === "color" ? "scale-110 rotate-180 shadow-sm" : "scale-100 rotate-0"
-                    }`} />
-                    <span>Color</span>
-                  </button>
+                  
+                  {/* Blurred Color Button */}
+                  <div className="relative flex-1 h-full">
+                    <button
+                      type="button"
+                      disabled
+                      className="control-btn group w-full h-full relative z-10 text-center py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-2 text-slate-400 blur-[1px] opacity-70 pointer-events-none"
+                    >
+                      <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-slate-400 via-slate-300 to-slate-200 border border-slate-200/50 shrink-0" />
+                      <span>Color</span>
+                    </button>
+                    {/* Coming Soon Overlay specifically for Color */}
+                    <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                      <Badge className="bg-[#093765]/90 text-white shadow-sm px-2 py-0.5 text-[8px] rounded-full font-bold uppercase tracking-wider scale-90">
+                        Coming Soon
+                      </Badge>
+                    </div>
+                  </div>
+
                   {/* Sliding Background Pill */}
                   <div
                     className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
@@ -194,13 +199,6 @@ export function PrintOptions() {
                     }`}
                   />
                 </div>
-              </div>
-
-              {/* Coming Soon Overlay */}
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/20 backdrop-blur-[1px]">
-                <Badge className="bg-[#093765] hover:bg-[#093765] text-white shadow-lg px-4 py-1.5 text-sm rounded-full tracking-wide font-bold">
-                  ✨ Coming Soon
-                </Badge>
               </div>
             </Card>
 
