@@ -148,9 +148,9 @@ export function PrintOptions() {
               </div>
             </Card>
 
-            {/* Color Mode - Responsive & Interactive Segmented Control */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            {/* Color Mode - Coming Soon */}
+            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 blur-[3px] opacity-60 pointer-events-none select-none transition-all duration-300">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Color Mode</p>
                   <p className="text-[10px] text-slate-500 font-medium">₹{colorMode === "bw" ? pricePerPageBW : pricePerPageColor}/page • {colorMode === "bw" ? "B&W" : "Color"}</p>
@@ -159,7 +159,7 @@ export function PrintOptions() {
                   <button
                     onClick={() => setColorMode("bw")}
                     type="button"
-                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
                       colorMode === "bw"
                         ? "text-[#093765]"
                         : "text-slate-500 hover:text-slate-700"
@@ -176,7 +176,7 @@ export function PrintOptions() {
                   <button
                     onClick={() => setColorMode("color")}
                     type="button"
-                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
                       colorMode === "color"
                         ? "text-[#093765] font-black"
                         : "text-slate-500 hover:text-slate-700 font-bold"
@@ -194,6 +194,13 @@ export function PrintOptions() {
                     }`}
                   />
                 </div>
+              </div>
+
+              {/* Coming Soon Overlay */}
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/20 backdrop-blur-[1px]">
+                <Badge className="bg-[#093765] hover:bg-[#093765] text-white shadow-lg px-4 py-1.5 text-sm rounded-full tracking-wide font-bold">
+                  ✨ Coming Soon
+                </Badge>
               </div>
             </Card>
 
