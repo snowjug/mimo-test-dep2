@@ -10,14 +10,11 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [metrics, setMetrics] = useState<any>(null);
   const [coupons, setCoupons] = useState<any[]>([]);
-  const [recentPrints, setRecentPrints] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("coupons");
   
   const [newCoupon, setNewCoupon] = useState({ code: "", discount: "", expiry: "" });
   const [bulkCoupon, setBulkCoupon] = useState({ prefix: "", count: "10", discount: "50", expiry: "" });
-  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -30,14 +27,10 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [metricsRes, couponsRes, printsRes] = await Promise.all([
-        api.get(`/admin/metrics`, { headers }),
-        api.get(`/admin/coupons`, { headers }),
-        api.get(`/admin/recent-prints`, { headers }).catch(() => ({ data: [] })) // Graceful degradation
+      const [couponsRes] = await Promise.all([
+        api.get(`/admin/coupons`, { headers })
       ]);
-      setMetrics(metricsRes.data);
       setCoupons(couponsRes.data);
-      setRecentPrints(printsRes.data);
     } catch (err: any) {
       if (err.response?.status === 401 || err.response?.status === 403) {
         logout();
@@ -64,24 +57,9 @@ export default function AdminDashboard() {
   const logout = () => {
     localStorage.removeItem("adminToken");
     setToken("");
-    setMetrics(null);
     setCoupons([]);
-    setRecentPrints([]);
   };
 
-  const handleResetMetrics = async () => {
-    if (!confirm("🚨 WARNING: Are you sure you want to RESET ALL METRICS? This cannot be undone!")) return;
-    setIsResetting(true);
-    try {
-      await api.post(`/admin/reset-metrics`, {}, { headers: { Authorization: `Bearer ${token}` } });
-      await fetchData();
-      alert("✅ Metrics successfully reset.");
-    } catch (err) {
-      alert("Failed to reset metrics.");
-    } finally {
-      setIsResetting(false);
-    }
-  };
 
   const createCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,14 +95,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const revenueData = React.useMemo(() => {
-    if (!metrics?.dailyRevenue) return [];
-    return Object.entries(metrics.dailyRevenue).map(([date, revenue]) => ({ date, revenue })).sort((a, b) => a.date.localeCompare(b.date));
-  }, [metrics]);
-
-  const isPiOffline = () => {
-    return metrics?.piStatus?.isOffline ?? true;
-  };
 
   if (!token) {
     return (
@@ -171,10 +141,7 @@ export default function AdminDashboard() {
         </div>
         
         <nav className="flex-1 px-4 space-y-1">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
-            <Home className="w-5 h-5" /> Dashboard
-          </button>
-          <button onClick={() => setActiveTab('coupons')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'coupons' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
+          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-blue-50 text-blue-700">
             <Ticket className="w-5 h-5" /> Coupons
           </button>
         </nav>
@@ -192,165 +159,16 @@ export default function AdminDashboard() {
         {/* Top Header */}
         <header className="flex justify-between items-center mb-10">
           <div>
-            <h2 className="text-3xl font-bold text-slate-900">Dashboard Overview</h2>
-            <p className="text-slate-500 mt-1">Check your metrics and manage the Mimo fleet.</p>
+            <h2 className="text-3xl font-bold text-slate-900">Coupons Management</h2>
+            <p className="text-slate-500 mt-1">Manage discount codes and promotions.</p>
           </div>
           
           <div className="flex items-center gap-6">
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input type="text" placeholder="Search anything..." className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 w-64" />
-            </div>
-            <button onClick={handleResetMetrics} disabled={isResetting} className="flex items-center gap-2 text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-full transition-colors shadow-md">
-              {isResetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
-              Reset Analytics
-            </button>
             <div className="w-10 h-10 bg-slate-200 rounded-full border-2 border-white shadow-sm overflow-hidden flex items-center justify-center">
               <User className="w-5 h-5 text-slate-500" />
             </div>
           </div>
         </header>
-
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            
-            {/* KPI Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {/* Total Revenue */}
-              <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col justify-between">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
-                    <span className="font-bold text-xl">₹</span>
-                  </div>
-                  <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">+12.5%</span>
-                </div>
-                <div>
-                  <p className="text-slate-500 text-sm font-medium mb-1">Total Revenue</p>
-                  <h3 className="text-3xl font-bold text-slate-900">₹{metrics?.totalRevenue || "0.00"}</h3>
-                </div>
-              </div>
-
-              {/* Total Orders */}
-              <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col justify-between">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
-                    <Zap className="w-6 h-6" />
-                  </div>
-                  <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">+34</span>
-                </div>
-                <div>
-                  <p className="text-slate-500 text-sm font-medium mb-1">Total Orders</p>
-                  <h3 className="text-3xl font-bold text-slate-900">{metrics?.totalOrders || "0"}</h3>
-                </div>
-              </div>
-
-              {/* Pages Printed */}
-              <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col justify-between">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600">
-                    <Activity className="w-6 h-6" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-slate-500 text-sm font-medium mb-1">Pages Printed</p>
-                  <h3 className="text-3xl font-bold text-slate-900">{metrics?.totalPagesPrinted || "0"}</h3>
-                </div>
-              </div>
-
-              {/* Pi Fleet Status */}
-              <div className={`p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border flex flex-col justify-between ${isPiOffline() ? 'bg-red-50/50 border-red-100' : 'bg-emerald-50/30 border-emerald-100'}`}>
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isPiOffline() ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                    <Printer className="w-6 h-6" />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className={`w-2.5 h-2.5 rounded-full ${isPiOffline() ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-                    <span className={`text-xs font-bold uppercase tracking-wider ${isPiOffline() ? 'text-red-700' : 'text-emerald-700'}`}>
-                      {isPiOffline() ? 'Offline' : 'Online'}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <p className={`text-sm font-medium mb-1 ${isPiOffline() ? 'text-red-600/70' : 'text-emerald-700/70'}`}>Pi Fleet Status</p>
-                  <h3 className={`text-xl font-bold truncate ${isPiOffline() ? 'text-red-700' : 'text-emerald-800'}`}>
-                    {metrics?.piStatus?.printerStatus || "Unknown"}
-                  </h3>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
-              {/* Left Column: Revenue Chart */}
-              <div className="lg:col-span-2 space-y-8">
-                <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-bold text-slate-900">Revenue Analytics</h2>
-                    <select className="bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg px-3 py-1.5 outline-none focus:border-blue-500">
-                      <option>This Month</option>
-                      <option>Last Month</option>
-                    </select>
-                  </div>
-                  <div className="h-72 w-full mt-4">
-                    {revenueData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
-                          <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} dx={-10} />
-                          <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px' }} />
-                          <Bar dataKey="revenue" fill="#3b82f6" radius={[6, 6, 6, 6]} maxBarSize={40} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                        <BarChart2 className="w-12 h-12 mb-3 text-slate-200" />
-                        <p className="text-sm font-medium">No revenue data yet.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Recent Activity Feed */}
-              <div className="lg:col-span-1">
-                <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 h-full max-h-[500px] flex flex-col">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-bold text-slate-900">Activity Log</h2>
-                    <span className="text-sm font-medium text-blue-600 cursor-pointer hover:underline">View All</span>
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                    {recentPrints.length > 0 ? recentPrints.map((job, idx) => (
-                      <div key={idx} className="flex items-start gap-4 p-3 rounded-2xl hover:bg-slate-50 transition-colors">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
-                          <Printer className="w-5 h-5 text-slate-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-900 truncate">{job.userEmail}</p>
-                          <p className="text-xs text-slate-500 truncate mt-0.5">Printed: {job.file}</p>
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${job.status === 'completed' || job.status === 'printed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {job.status.toUpperCase()}
-                            </span>
-                            <span className="text-xs font-semibold text-slate-700">{job.cost}</span>
-                          </div>
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{job.date.split(',')[1]?.trim() || job.date}</span>
-                      </div>
-                    )) : (
-                      <div className="flex flex-col items-center justify-center h-48 text-slate-400">
-                        <p className="text-sm">No recent activity.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
 
         {activeTab === 'coupons' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
