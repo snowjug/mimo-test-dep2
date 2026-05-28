@@ -129,6 +129,7 @@ app.post("/google-login", async (req, res) => {
     const snapshot = await db.collection("users").where("email", "==", email).get();
     let mobileNumber = "";
     const now = admin.firestore.FieldValue.serverTimestamp();
+    let userId;
     if (snapshot.empty) {
       const userRef = await db.collection("users").add({
         username: name, email, mobileNumber: "", password: null, googleUser: true,
@@ -617,9 +618,12 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       });
       await orderBatch.commit();
 
+      // Generate a print code for webhook-confirmed payments
+      const webhookPrintCode = Math.floor(1000 + Math.random() * 9000).toString();
       const jobs = await db.collection("print_jobs")
         .where("userId", "==", userId)
         .where("status", "==", "pending")
+        .where("orderId", "==", orderId)
         .get();
         
       const jobsBatch = db.batch();
@@ -627,7 +631,9 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       jobs.forEach((doc) => {
         jobsBatch.update(doc.ref, { 
           status: "paid",
-          paymentTime: now
+          paymentTime: now,
+          printCode: doc.data().printCode || webhookPrintCode,
+          isPrinted: false,
         });
       });
       await jobsBatch.commit();
@@ -903,11 +909,13 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
 
     // Trigger Email Receipt via Nodemailer
     try {
-      const userRecord = await admin.auth().getUser(userId);
-      if (userRecord.email && process.env.GMAIL_APP_PASSWORD) {
+      // Use Firestore (not Firebase Auth) to get user email - avoids admin.auth() errors
+      const userDoc = await db.collection("users").doc(userId).get();
+      const userEmail = userDoc.exists ? userDoc.data().email : null;
+      if (userEmail && process.env.GMAIL_APP_PASSWORD) {
         const mailOptions = {
           from: '"Mimo Printing" <visionprintt@gmail.com>',
-          to: userRecord.email,
+          to: userEmail,
           subject: "Your Mimo Print Code is Ready!",
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px; text-align: center;">
@@ -924,7 +932,7 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
           `
         };
         await transporter.sendMail(mailOptions);
-        console.log(`[EMAIL] Receipt sent to ${userRecord.email}`);
+        console.log(`[EMAIL] Receipt sent to ${userEmail}`);
       }
     } catch (emailErr) {
       console.error("[EMAIL ERROR] Failed to send receipt:", emailErr);
@@ -1021,11 +1029,8 @@ app.get("/admin/metrics", adminAuthMiddleware, async (req, res) => {
     let totalRevenue = 0;
     let totalPagesPrinted = 0;
     
-    // Initialize array for 24 hours
-    const hourlyData = Array.from({ length: 24 }, (_, i) => ({
-      hour: `${i.toString().padStart(2, '0')}:00`,
-      prints: 0
-    }));
+    // Build daily revenue map for chart
+    const dailyRevenue = {};
     
     ordersSnapshot.forEach(doc => {
       const data = doc.data();
@@ -1034,26 +1039,70 @@ app.get("/admin/metrics", adminAuthMiddleware, async (req, res) => {
       
       if (data.createdAt) {
         const date = data.createdAt.toDate();
-        const hour = date.getHours();
-        hourlyData[hour].prints += 1;
+        const day = date.toISOString().split('T')[0];
+        dailyRevenue[day] = (dailyRevenue[day] || 0) + Number(data.amount || 0);
       }
     });
 
     const piStatusDoc = await db.collection("system_status").doc("pi").get();
-    const piStatus = piStatusDoc.exists ? piStatusDoc.data() : { status: "Unknown", lastSeen: null };
+    let piStatus = { status: "Unknown", isOffline: true };
+    if (piStatusDoc.exists) {
+      const piData = piStatusDoc.data();
+      const lastSeen = piData.lastSeen ? piData.lastSeen.toDate() : null;
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+      piStatus = {
+        ...piData,
+        printerStatus: piData.status || "Unknown",
+        isOffline: !lastSeen || lastSeen < twoMinutesAgo,
+      };
+    }
 
     res.json({
       totalRevenue: totalRevenue.toFixed(2),
       totalPagesPrinted,
       totalOrders: ordersSnapshot.size,
       piStatus,
-      hourlyData
+      dailyRevenue
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch metrics" });
   }
 });
+
+// ================= ADMIN RESET METRICS =================
+app.post("/admin/reset-metrics", adminAuthMiddleware, async (req, res) => {
+  try {
+    const deleteCollection = async (collectionName) => {
+      const snapshot = await db.collection(collectionName).limit(400).get();
+      if (snapshot.empty) return 0;
+      const batch = db.batch();
+      snapshot.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      return snapshot.size;
+    };
+
+    // Delete all orders and print_jobs in batches
+    let deleted = 0;
+    let round = 0;
+    while (round < 20) { // max 20 rounds = 8000 documents
+      const [a, b] = await Promise.all([
+        deleteCollection("orders"),
+        deleteCollection("print_jobs"),
+      ]);
+      deleted += a + b;
+      if (a === 0 && b === 0) break;
+      round++;
+    }
+
+    console.log(`[RESET] Admin wiped ${deleted} documents from orders + print_jobs.`);
+    res.json({ success: true, deleted });
+  } catch (err) {
+    console.error("[RESET] Failed:", err);
+    res.status(500).json({ error: "Failed to reset metrics" });
+  }
+});
+
 
 // ================= ADMIN COUPONS =================
 app.get("/admin/coupons", adminAuthMiddleware, async (req, res) => {

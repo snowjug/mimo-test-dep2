@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Building, ShieldAlert, LogOut, Loader2, Printer, CheckCircle, RefreshCcw, Tag, Home, BarChart2, Ticket, Settings, Bell, Search, User, Zap, Activity } from "lucide-react";
-import api from "../api";
+import api from "../../api";
 
 export default function AdminDashboard() {
   const [token, setToken] = useState(localStorage.getItem("adminToken") || "");

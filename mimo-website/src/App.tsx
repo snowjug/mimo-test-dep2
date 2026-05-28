@@ -15,7 +15,7 @@ import { UserProfile } from "./app/pages/user-profile";
 import { PrinterSettings } from "./app/pages/printer-settings";
 import { OnboardingName } from "./app/pages/onboarding-name";
 import { BlankPages } from "./app/pages/blank-pages";
-import AdminDashboard from "./app/pages/admin";
+import AdminDashboard from "./app/pages/mimo-admin-dashboard";
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(false);
