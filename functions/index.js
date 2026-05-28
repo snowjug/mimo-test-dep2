@@ -552,7 +552,6 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       if (receivedSignature !== expectedSignature) {
         return res.status(403).send("Invalid signature");
       }
-    }
 
     const event = JSON.parse(rawBody);
 
@@ -588,6 +587,60 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
   } catch (err) {
     console.error(err);
     res.sendStatus(500);
+  }
+});
+
+// ================= CREATE BLANK JOB =================
+app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { type, pageCount } = req.body; // "a4" or "graph"
+    
+    // 1. Clear abandoned jobs to prevent overcharging
+    const existingJobs = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("status", "==", "pending")
+      .get();
+      
+    if (!existingJobs.empty) {
+      const deleteBatch = db.batch();
+      existingJobs.forEach(doc => deleteBatch.delete(doc.ref));
+      await deleteBatch.commit();
+    }
+
+    // 2. Create the blank job
+    const isGraph = type === "graph";
+    const fileName = isGraph ? "mimo_graph.pdf" : "blank_a4.pdf";
+    const actualUrl = isGraph 
+      ? "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fmimo_graph.pdf" 
+      : "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fblank_a4.pdf";
+    
+    const fileSize = isGraph ? 1806 : 583;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    await db.collection("print_jobs").add({
+      userId,
+      fileName,
+      documentUrl: actualUrl,
+      fileUrl: actualUrl,
+      mimetype: "application/pdf",
+      fileSize: fileSize,
+      fileType: "pdf",
+      isImage: false,
+      createdAt: now,
+      updatedAt: now,
+      status: "pending",
+      pageCount: Number(pageCount) || 1,
+      files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
+      printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
+      pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
+      paymentStatus: { status: "pending" },
+      printStatus: { status: "pending" }
+    });
+
+    res.json({ message: "Blank job queued successfully" });
+  } catch (err) {
+    next(err);
   }
 });
 
