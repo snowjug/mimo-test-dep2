@@ -140,8 +140,8 @@ export default function AdminDashboard() {
           
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Email</label>
-              <input type="email" placeholder="admin@printmimo.tech" className="w-full p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Username / Email</label>
+              <input type="text" placeholder="admin" className="w-full p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Password</label>
