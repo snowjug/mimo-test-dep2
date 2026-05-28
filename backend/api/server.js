@@ -1991,6 +1991,32 @@ app.post("/admin/login", async (req, res) => {
   }
 });
 
+app.get("/admin/recent-prints", authenticateAdmin, async (req, res) => {
+  try {
+    const snapshot = await db.collection("print_jobs")
+      .orderBy("createdAt", "desc")
+      .limit(10)
+      .get();
+      
+    const history = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        userEmail: data.userEmail || "Unknown",
+        cost: `₹${(data.totalCost || data.amount || 0).toFixed(2)}`,
+        file: data.fileName || data.sourceFile?.fileName || "Print Order",
+        date: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : "N/A",
+        status: data.status,
+        pages: data.pageCount || 0
+      };
+    });
+    res.json(history);
+  } catch (err) {
+    console.error("❌ /admin/recent-prints error:", err);
+    res.status(500).send("Failed to fetch recent prints");
+  }
+});
+
 app.get("/admin/metrics", authenticateAdmin, async (req, res) => {
   try {
     const metricsDoc = await db.collection("system").doc("metrics").get();
