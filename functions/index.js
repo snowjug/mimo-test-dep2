@@ -44,7 +44,7 @@ const cashfreeHeaders = {
   "Content-Type": "application/json",
   "x-client-id": process.env.CASHFREE_APP_ID || "test_app_id",
   "x-client-secret": process.env.CASHFREE_SECRET_KEY || "test_secret_key",
-  "x-api-version": "2025-01-01",
+  "x-api-version": "2023-08-01",
 };
 
 // ================= AUTH MIDDLEWARE =================
