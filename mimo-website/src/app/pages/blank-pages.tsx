@@ -56,6 +56,17 @@ export function BlankPages() {
         })
       );
 
+      sessionStorage.setItem(
+        "printFiles",
+        JSON.stringify([
+          {
+            name: fileName,
+            size: isGraph ? 1806 : 583,
+            type: "application/pdf"
+          }
+        ])
+      );
+
       navigate("/payment");
     } catch (err) {
       console.error("Failed to create blank job:", err);
