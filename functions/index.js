@@ -997,13 +997,20 @@ const adminAuthMiddleware = (req, res, next) => {
 // ================= ADMIN AUTH =================
 app.post("/admin/login", (req, res) => {
   const { email, password } = req.body;
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPassword = process.env.ADMIN_PASSWORD;
+  
+  // Defensively strip quotes and whitespace from both env vars and user input
+  const envEmail = (process.env.ADMIN_EMAIL || "").replace(/^"|"$/g, '').trim();
+  const envPassword = (process.env.ADMIN_PASSWORD || "").replace(/^"|"$/g, '').trim();
+  
+  const reqEmail = (email || "").trim();
+  const reqPassword = (password || "").trim();
 
-  if (adminEmail && adminPassword && email === adminEmail && password === adminPassword) {
-    const token = jwt.sign({ isAdmin: true, email }, SECRET_KEY, { expiresIn: "24h" });
+  if (envEmail && envPassword && reqEmail === envEmail && reqPassword === envPassword) {
+    const token = jwt.sign({ isAdmin: true, email: reqEmail }, SECRET_KEY, { expiresIn: "24h" });
     return res.json({ token, message: "Admin Login Successful" });
   }
+  
+  console.log(`[AUTH FAILED] Attempted: '${reqEmail}' / '${reqPassword}' against Env: '${envEmail}' / '${envPassword}'`);
   return res.status(401).json({ error: "Invalid admin credentials" });
 });
 
