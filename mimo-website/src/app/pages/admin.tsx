@@ -224,7 +224,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-slate-500 text-sm font-medium mb-1">Total Revenue</p>
-                  <h3 className="text-3xl font-bold text-slate-900">₹{metrics?.totalRevenue?.toFixed(2) || "0.00"}</h3>
+                  <h3 className="text-3xl font-bold text-slate-900">₹{metrics?.totalRevenue || "0.00"}</h3>
                 </div>
               </div>
 
