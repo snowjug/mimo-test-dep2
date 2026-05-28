@@ -120,7 +120,7 @@ export function Payment() {
       }
 
       // 3. Trigger Cashfree SDK for paid orders
-      const cashfreeMode = import.meta.env.VITE_CASHFREE_MODE || "sandbox";
+      const cashfreeMode = import.meta.env.VITE_CASHFREE_MODE || "production";
       const cashfree = (window as any).Cashfree({
         mode: cashfreeMode,
       });
