@@ -741,7 +741,17 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const now = new Date();
-    const { printOptions: bodyPrintOptions } = req.body || {};
+    const { printOptions: bodyPrintOptions, isFreeBypass, internalSecret } = req.body || {};
+
+    // ─── SECURITY MEASURE ──────────────────────────────────────────
+    // The frontend should ONLY call this endpoint directly if amount <= 0.
+    // If it's a paid order, this endpoint must ONLY be called internally
+    // by the /cashfree-webhook endpoint.
+    if (!isFreeBypass && internalSecret !== process.env.INTERNAL_WEBHOOK_SECRET) {
+      console.warn(`[SECURITY] Unauthorized direct call to /payment-success by user ${userId}`);
+      return res.status(403).json({ error: "Unauthorized. Payment must be verified via webhook." });
+    }
+    // ───────────────────────────────────────────────────────────────
 
     const snapshot = await db
       .collection("print_jobs")
@@ -1320,6 +1330,18 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         });
       });
       await jobsBatch.commit();
+      
+      // ✅ Call /payment-success internally to generate the print code
+      try {
+        const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+        await axios.post(
+          `http://localhost:${process.env.PORT || 8080}/payment-success`,
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { headers: { Authorization: `Bearer ${dummyToken}` } }
+        );
+      } catch (internalErr) {
+        console.error("[WEBHOOK] Failed to call internal /payment-success:", internalErr.message);
+      }
       
       // Update User Statistics (V2 Schema)
       const userRef = db.collection("users").doc(userId);

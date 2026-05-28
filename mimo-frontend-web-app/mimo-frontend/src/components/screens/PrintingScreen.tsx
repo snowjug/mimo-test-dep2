@@ -315,6 +315,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     return () => {
       clearInterval(titleInterval);
       clearInterval(subInterval);
+      clearAllTimers();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);

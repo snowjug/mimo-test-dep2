@@ -67,7 +67,7 @@ def print_file(file_path, copies=1):
 
         print(f"🖨️  Sending to CUPS: {file_path} ({copies} copies)")
         cmd = ["lp", "-d", PRINTER_NAME, "-n", str(copies), file_path]
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
         
         # Extract job ID from lp output (e.g., "request id is Brother_HL_L5210DN_series-3372 (1 file(s))")
         lp_output = result.stdout.strip()
@@ -83,7 +83,7 @@ def print_file(file_path, copies=1):
             job_id = match.group(1)
             status_result = subprocess.run(
                 ["lpstat", "-l", job_id],
-                capture_output=True, text=True
+                capture_output=True, text=True, timeout=10
             )
             status_output = status_result.stdout
             print(f"Job status: {status_output.strip()[:200]}")
@@ -123,6 +123,14 @@ def download_file(file_url, file_name):
             path = file_url.split("/o/")[1].split("?")[0]
             blob_path = urllib.parse.unquote(path)
 
+        # Strategy 2.5: Google Cloud Storage REST URL
+        elif "storage.googleapis.com/" in file_url:
+            # Example: https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/uploads/file.pdf
+            # Split by bucket name to get the path
+            if f"/{bucket.name}/" in file_url:
+                path = file_url.split(f"/{bucket.name}/")[1].split("?")[0]
+                blob_path = urllib.parse.unquote(path)
+
         if blob_path:
             # Use Firebase Admin SDK to download directly
             blob = bucket.blob(blob_path)
@@ -153,46 +161,56 @@ def process_job(doc_snapshot):
     file_name = doc.get("fileName", "document.pdf")
     copies = doc.get("copies", 1)
     
-    # 1. Download
-    local_path = download_file(file_url, file_name)
-    if not local_path:
-        doc_ref.update({"status": "failed", "printerStatus": "Failed to download on Pi"})
-        return
+    local_path = None
+    final_path = None
 
-    final_path = local_path
-
-    # 2. Convert if needed
-    ext = os.path.splitext(local_path)[1].lower()
-    if ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
-        pdf_path = convert_to_pdf(local_path)
-        if pdf_path:
-            final_path = pdf_path
-        else:
-            doc_ref.update({"status": "failed", "printerStatus": "LibreOffice conversion failed on Pi"})
+    try:
+        # 1. Download
+        local_path = download_file(file_url, file_name)
+        if not local_path:
+            doc_ref.update({"status": "failed", "printerStatus": "Failed to download on Pi"})
             return
 
-    # 3. Print
-    success = print_file(final_path, copies)
-    
-    # 4. Update Status
-    if success:
-        doc_ref.update({
-            "status": "completed", 
-            "isPrinted": True, 
-            "printerStatus": "Printed",
-            "printedAt": firestore.SERVER_TIMESTAMP
-        })
-        print(f"🎉 Job {doc_id} marked as completed in database.")
-    else:
-        doc_ref.update({"status": "failed", "printerStatus": "CUPS error on Pi"})
+        final_path = local_path
 
-    # Cleanup
-    try:
-        os.remove(local_path)
-        if final_path != local_path:
-            os.remove(final_path)
-    except:
-        pass
+        # 2. Convert if needed
+        ext = os.path.splitext(local_path)[1].lower()
+        if ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
+            pdf_path = convert_to_pdf(local_path)
+            if pdf_path:
+                final_path = pdf_path
+            else:
+                doc_ref.update({"status": "failed", "printerStatus": "LibreOffice conversion failed on Pi"})
+                return
+
+        # 3. Print
+        success = print_file(final_path, copies)
+        
+        # 4. Update Status
+        if success:
+            doc_ref.update({
+                "status": "completed", 
+                "isPrinted": True, 
+                "printerStatus": "Printed",
+                "printedAt": firestore.SERVER_TIMESTAMP
+            })
+            print(f"🎉 Job {doc_id} marked as completed in database.")
+        else:
+            doc_ref.update({"status": "failed", "printerStatus": "CUPS error on Pi"})
+            
+    except Exception as e:
+        print(f"❌ Unexpected error processing job: {e}")
+        doc_ref.update({"status": "failed", "printerStatus": f"Pi processing error: {str(e)[:50]}"})
+
+    finally:
+        # 5. Cleanup
+        try:
+            if local_path and os.path.exists(local_path):
+                os.remove(local_path)
+            if final_path and final_path != local_path and os.path.exists(final_path):
+                os.remove(final_path)
+        except Exception as e:
+            print(f"⚠️ Failed to cleanup temporary files: {e}")
 
 def on_snapshot(col_snapshot, changes, read_time):
     """ Callback triggered whenever Firestore changes """

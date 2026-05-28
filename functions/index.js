@@ -57,8 +57,9 @@ const authMiddleware = async (req, res, next) => {
     if (!userId) return res.status(403).json({ error: "Invalid token payload" });
     // Resolve userId to actual Firestore doc ID
     const directDoc = await db.collection("users").doc(userId).get();
+    const snap = await db.collection("users").where("id", "==", userId).get();
+    if (!directDoc.exists && snap.empty) return res.status(401).json({ error: "User not found" });
     if (!directDoc.exists) {
-      const snap = await db.collection("users").where("id", "==", userId).get();
       if (!snap.empty) userId = snap.docs[0].id;
     }
     req.user = { userId, id: userId };
@@ -540,8 +541,11 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
     const receivedSignature = req.headers["x-webhook-signature"];
     const timestamp = req.headers["x-webhook-timestamp"];
 
-    if (receivedSignature && timestamp) {
-      const expectedSignature = crypto
+    if (!receivedSignature || !timestamp) {
+      return res.status(403).send("Missing signature or timestamp");
+    }
+
+    const expectedSignature = crypto
         .createHmac("sha256", cashfreeHeaders["x-client-secret"])
         .update(timestamp + rawBody)
         .digest("base64");
@@ -890,7 +894,10 @@ const adminAuthMiddleware = (req, res, next) => {
 // ================= ADMIN AUTH =================
 app.post("/admin/login", (req, res) => {
   const { email, password } = req.body;
-  if (email === "visionprintt@gmail.com" && password === "Vishal@2006") {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (adminEmail && adminPassword && email === adminEmail && password === adminPassword) {
     const token = jwt.sign({ isAdmin: true, email }, SECRET_KEY, { expiresIn: "24h" });
     return res.json({ token, message: "Admin Login Successful" });
   }
@@ -1033,6 +1040,17 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
     // Prevent double refunds
     if (orderData.refundStatus === "SUCCESS") {
       console.log(`[REFUND] Order ${orderId} is already refunded.`);
+      return;
+    }
+
+    // Skip refund if the amount is zero (100% discount or free order)
+    if (!orderData.amount || orderData.amount <= 0) {
+      console.log(`[REFUND] Order ${orderId} has a zero amount. Skipping Cashfree refund API call.`);
+      await orderDoc.ref.update({
+        refundStatus: "SUCCESS",
+        refundNote: "Zero amount order, no gateway refund required",
+        refundedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
       return;
     }
 

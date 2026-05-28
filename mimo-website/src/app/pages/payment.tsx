@@ -102,34 +102,28 @@ export function Payment() {
     setIsProcessing(true);
 
     try {
-      // 1. If order is totally free (via ASDFG or coins), bypass Cashfree entirely
-      if (totalAmount <= 0) {
-        const storedOptions = sessionStorage.getItem("printOptions");
-        const printOptions = storedOptions ? JSON.parse(storedOptions) : {};
-        
-        const successResponse = await api.post("/payment-success", { printOptions });
-        const { printCode } = successResponse.data;
-
-        sessionStorage.setItem("printCode", printCode);
-        toast.success("Order confirmed!");
-        
-        navigate("/print-code");
-        return;
-      }
-
-      // 2. Otherwise, create order in backend
       const storedOptions = sessionStorage.getItem("printOptions");
       const printOptions = storedOptions ? JSON.parse(storedOptions) : {};
       
       const payload: any = { printOptions };
-      if (appliedPromo && appliedPromo !== "ASDFG") {
+      if (appliedPromo) {
         payload.couponCode = appliedPromo;
       }
 
+      // 1. ALWAYS create order in backend first, regardless of amount.
+      // The backend securely verifies the coupon and 100% discount status.
       const orderResponse = await api.post("/create-order", payload);
-      const { orderId, paymentSessionId } = orderResponse.data;
+      const { orderId, paymentSessionId, free, printCode } = orderResponse.data;
 
-      // 3. Trigger Cashfree SDK
+      // 2. If backend determines it's totally free, skip Cashfree
+      if (free && printCode) {
+        sessionStorage.setItem("printCode", printCode);
+        toast.success("Free Order Confirmed!");
+        navigate("/print-code");
+        return;
+      }
+
+      // 3. Trigger Cashfree SDK for paid orders
       const cashfreeMode = import.meta.env.VITE_CASHFREE_MODE || "production";
       const cashfree = (window as any).Cashfree({
         mode: cashfreeMode, // Uses "production" by default so real payments work!
