@@ -1079,23 +1079,28 @@ app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
     // 2. Create the blank job
     const isGraph = type === "graph";
     const fileName = isGraph ? "mimo_graph.pdf" : "blank_a4.pdf";
-    const dummyUrl = "https://example.com/blank.pdf"; // Mock URL for blank pages
+    const actualUrl = isGraph 
+      ? "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fmimo_graph.pdf" 
+      : "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fblank_a4.pdf";
+    
+    // Determine exact size based on uploaded files
+    const fileSize = isGraph ? 1806 : 583;
     const now = admin.firestore.FieldValue.serverTimestamp();
 
     await db.collection("print_jobs").add({
       userId,
       fileName,
-      documentUrl: dummyUrl,
-      fileUrl: dummyUrl,
+      documentUrl: actualUrl,
+      fileUrl: actualUrl,
       mimetype: "application/pdf",
-      fileSize: 10240,
+      fileSize: fileSize,
       fileType: "pdf",
       isImage: false,
       createdAt: now,
       updatedAt: now,
       status: "pending",
       pageCount: Number(pageCount) || 1,
-      files: [{ name: fileName, size: 10240, type: "application/pdf", url: dummyUrl }],
+      files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
       printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
       pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
       paymentStatus: { status: "pending" },
