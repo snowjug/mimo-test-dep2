@@ -18,6 +18,7 @@ interface UploadedFile {
   type?: string;
   status: "uploading" | "completed" | "failed";
   progress: number;
+  pageCount?: number;
 }
 
 export function UploadFile() {
@@ -80,6 +81,7 @@ export function UploadFile() {
         type: file.type,
         status: "uploading",
         progress: 0,
+        pageCount: 0,
       };
     });
 
@@ -146,9 +148,14 @@ export function UploadFile() {
       
       // Update UI
       setFiles((prev) =>
-        prev.map((f) =>
-          newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "completed", progress: 100 } : f
-        )
+        prev.map((f) => {
+          const isTarget = newFiles.some((nf) => nf.name === f.name);
+          if (isTarget) {
+            const meta = uploadedFiles.find(uf => uf.name === f.name);
+            return { ...f, status: "completed", progress: 100, pageCount: meta?.pageCount || 1 };
+          }
+          return f;
+        })
       );
       toast.success("Files ready for printing!");
 
@@ -431,7 +438,7 @@ export function UploadFile() {
                         <p className="text-sm font-medium truncate">{file.name}</p>
                         {file.status === "completed" && (
                           <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 whitespace-nowrap text-[10px] sm:text-xs">
-                            ~{file.type?.startsWith('image/') ? 1 : (file.size > 2000000 ? Math.floor(file.size / 500000) : 1)} pgs
+                            {file.pageCount ? `${file.pageCount} pgs` : `~${file.type?.startsWith('image/') ? 1 : (file.size > 2000000 ? Math.floor(file.size / 500000) : 1)} pgs`}
                           </Badge>
                         )}
                         {file.status === "failed" && (
