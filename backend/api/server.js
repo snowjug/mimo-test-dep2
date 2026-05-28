@@ -743,7 +743,14 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     const isBlankSheet = storedPrintOptions.isBlankSheet === true;
 
     if (!isBlankSheet && jobsToUpdate.length === 0 && !snapshot.empty) {
-      const recentJob = snapshot.docs.find(doc => doc.data().printCode);
+      // Sort in memory to get the most recent job first
+      const sortedDocs = snapshot.docs.sort((a, b) => {
+        const aTime = a.data().createdAt?.toMillis ? a.data().createdAt.toMillis() : 0;
+        const bTime = b.data().createdAt?.toMillis ? b.data().createdAt.toMillis() : 0;
+        return bTime - aTime;
+      });
+      
+      const recentJob = sortedDocs.find(doc => doc.data().printCode);
       if (recentJob) {
         console.log(`[PAYMENT-SUCCESS] Returning existing code for user ${userId}`);
         return res.json({ printCode: recentJob.data().printCode });
