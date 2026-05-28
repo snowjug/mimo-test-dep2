@@ -151,7 +151,7 @@ export function Payment() {
         <MimoHeader />
 
         <div className="flex items-center gap-4 pb-2">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-white hover:shadow-sm" onClick={() => navigate("/print-options")}>
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-white hover:shadow-sm" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -11,7 +11,8 @@ import api from "../api";
 
 export function OnboardingName() {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
+  const location = useLocation();
+  const [name, setName] = useState(location.state?.name || "");
   const [mobileNumber, setMobileNumber] = useState("");
   const [loading, setLoading] = useState(false);
 

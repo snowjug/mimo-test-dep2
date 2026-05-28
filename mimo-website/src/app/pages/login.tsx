@@ -177,13 +177,13 @@ export function Login() {
                     });
                     localStorage.setItem("jwtToken", res.data.jwtToken);
                     
-                    if (res.data.name) {
+                    if (res.data.name && res.data.mobileNumber) {
                       localStorage.setItem("mimo_user_name", res.data.name);
                       toast.success("Signed in with Google!");
                       navigate("/upload");
                     } else {
-                      toast.success("Signed in with Google!");
-                      navigate("/onboarding");
+                      toast.success("Almost there! Please provide your phone number.");
+                      navigate("/onboarding", { state: { name: res.data.name } });
                     }
                   } catch (err: any) {
                     console.error(err);
