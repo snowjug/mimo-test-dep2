@@ -230,6 +230,7 @@ export function UserProfile() {
                   <Button variant="outline" onClick={() => {
                     localStorage.removeItem("mimo_user_name");
                     localStorage.removeItem("jwtToken");
+                    sessionStorage.removeItem("jwtToken");
                     localStorage.removeItem("isAuthenticated");
                     navigate("/login");
                   }} className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-all shadow-sm">

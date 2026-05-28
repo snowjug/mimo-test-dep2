@@ -15,11 +15,12 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [rememberMe, setRememberMe] = useState(true);
 
   // Auto-login if token already exists
   
   useEffect(() => {
-    const token = localStorage.getItem("jwtToken");
+    const token = sessionStorage.getItem("jwtToken") || localStorage.getItem("jwtToken");
     if (token) {
       // Verify token is still valid by fetching profile
       api.get("/profile", { headers: { Authorization: `Bearer ${token}` } })
@@ -34,6 +35,7 @@ export function Login() {
         .catch(() => {
           // Token invalid or expired, clear it
           localStorage.removeItem("jwtToken");
+          sessionStorage.removeItem("jwtToken");
           setIsCheckingSession(false);
         });
     } else {
@@ -58,7 +60,11 @@ export function Login() {
       const response = await api.post("/login", { email, password });
       const { jwtToken } = response.data;
 
-      localStorage.setItem("jwtToken", jwtToken);
+      if (rememberMe) {
+        localStorage.setItem("jwtToken", jwtToken);
+      } else {
+        sessionStorage.setItem("jwtToken", jwtToken);
+      }
       
       // Check if user already has a name
       const profileRes = await api.get("/profile", {
@@ -140,7 +146,7 @@ export function Login() {
               </div>
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 cursor-pointer group">
-                  <input type="checkbox" className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-all" />
+                  <input type="checkbox" className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-all" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
                   <span className="text-gray-600 group-hover:text-gray-900 transition-colors">Remember me</span>
                 </label>
                 <a href="#" className="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline transition-all">
@@ -175,7 +181,11 @@ export function Login() {
                     const res = await api.post("/google-login", {
                       token: credentialResponse.credential,
                     });
-                    localStorage.setItem("jwtToken", res.data.jwtToken);
+                    if (rememberMe) {
+                      localStorage.setItem("jwtToken", res.data.jwtToken);
+                    } else {
+                      sessionStorage.setItem("jwtToken", res.data.jwtToken);
+                    }
                     
                     if (res.data.name && res.data.mobileNumber) {
                       localStorage.setItem("mimo_user_name", res.data.name);
