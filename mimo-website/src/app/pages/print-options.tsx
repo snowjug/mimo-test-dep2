@@ -25,7 +25,6 @@ export function PrintOptions() {
   const [orientation, setOrientation] = useState("portrait");
   const [photoLayout, setPhotoLayout] = useState("1");
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
-  const [uploadedImages, setUploadedImages] = useState<{ name: string; mimetype: string; dataUrl: string }[]>([]);
 
   // Standard grid layouts
   const gridLayouts = [
@@ -49,21 +48,26 @@ export function PrintOptions() {
     if (uploadTotalPages) setTotalPages(Number(uploadTotalPages));
     if (uploadAmount) setBaseTotalCost(Number(uploadAmount));
 
-    const imagesRaw = sessionStorage.getItem("uploadedImages");
-    if (imagesRaw) setUploadedImages(JSON.parse(imagesRaw));
-    
     // Scroll to top when page loads
     window.scrollTo(0, 0);
   }, [navigate]);
 
   // Only true if there are actual images (not PDFs)
-  const actualImages = uploadedImages.filter(img => img.mimetype.startsWith('image/'));
+  const actualImages = files.filter(f => f.type && f.type.startsWith('image/')).map(f => ({
+    name: f.name,
+    mimetype: f.type,
+    dataUrl: (f as any).url
+  }));
   const hasImages = actualImages.length > 0;
 
   const [totalPages, setTotalPages] = useState(0);
   const [baseTotalCost, setBaseTotalCost] = useState(0);
 
-  const actualPages = doubleSided === "double" ? Math.ceil(totalPages / 2) : totalPages;
+  let sheetsNeeded = totalPages;
+  if (hasImages && photoLayout !== "1") {
+    sheetsNeeded = Math.ceil(totalPages / Number(photoLayout));
+  }
+  const actualPages = doubleSided === "double" ? Math.ceil(sheetsNeeded / 2) : sheetsNeeded;
 
   // Pricing
   const pricePerPageBW = 2.30;
@@ -593,9 +597,9 @@ export function PrintOptions() {
                 <div className="bg-gray-100 rounded-lg p-2 flex-1 flex items-center justify-center overflow-hidden">
                   {(() => {
                     const previewFile = files[selectedPreview];
-                    const previewDataUrl = uploadedImages.find(img => img.name === previewFile?.name)?.dataUrl;
-                    const isPdf = previewFile?.name.toLowerCase().endsWith(".pdf");
-                    const isImage = uploadedImages.some(img => img.name === previewFile?.name && img.mimetype.startsWith("image/"));
+                    const previewDataUrl = (previewFile as any)?.url;
+                    const isPdf = previewFile?.name.toLowerCase().endsWith(".pdf") || previewFile?.type === "application/pdf";
+                    const isImage = previewFile?.type?.startsWith("image/");
                     
                     if (previewDataUrl) {
                       const filterStyle = colorMode === "bw" ? "grayscale(100%) contrast(1.1)" : "none";
