@@ -11,8 +11,9 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem("jwtToken") || localStorage.getItem("jwtToken");
-    // Only inject user token if no custom auth header (like Admin token) was provided
-    if (token && !config.headers.Authorization) {
+    
+    // Explicitly prevent the standard user token from being injected into admin routes
+    if (token && !config.url?.startsWith('/admin')) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
