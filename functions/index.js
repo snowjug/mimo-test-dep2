@@ -452,10 +452,40 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     const batchUpdate = db.batch();
     jobsSnapshot.forEach((doc) => {
       jobIds.push(doc.id);
-      const pages = doc.data().pageCount || 1;
-      const jobCost = pages * copies * pricePerPage;
+      let numPages = doc.data().pageCount || 1;
+
+      // Handle custom page ranges
+      if (printOptions?.pagesToPrint === "custom" && printOptions?.customPageRange) {
+        const ranges = String(printOptions.customPageRange).split(",");
+        let customCount = 0;
+        for (const r of ranges) {
+          const parts = r.split("-").map(p => parseInt(p.trim()));
+          if (parts.length === 1 && !isNaN(parts[0])) {
+            customCount += 1;
+          } else if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            customCount += (parts[1] - parts[0] + 1);
+          }
+        }
+        if (customCount > 0) numPages = customCount;
+      }
+
+      // Handle N-up photo layouts
+      let divisor = 1;
+      if (printOptions?.photoLayout === "2") divisor = 2;
+      if (printOptions?.photoLayout === "4") divisor = 4;
+      if (printOptions?.photoLayout === "6") divisor = 6;
+      if (printOptions?.photoLayout === "9") divisor = 9;
       
-      totalPages += pages;
+      let actualPages = Math.ceil(numPages / divisor);
+
+      // Handle double-sided
+      if (printOptions?.doubleSided === "double") {
+        actualPages = Math.ceil(actualPages / 2);
+      }
+
+      const jobCost = actualPages * copies * pricePerPage;
+      
+      totalPages += actualPages; // Total physical sheets used
       totalAmount += jobCost;
 
       batchUpdate.update(doc.ref, { 
