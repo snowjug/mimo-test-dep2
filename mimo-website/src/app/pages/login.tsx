@@ -22,22 +22,7 @@ export function Login() {
   useEffect(() => {
     const token = sessionStorage.getItem("jwtToken") || localStorage.getItem("jwtToken");
     if (token) {
-      // Verify token is still valid by fetching profile
-      api.get("/profile", { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) => {
-          if (res.data.username) {
-            localStorage.setItem("mimo_user_name", res.data.username);
-            navigate("/upload");
-          } else {
-            navigate("/onboarding");
-          }
-        })
-        .catch(() => {
-          // Token invalid or expired, clear it
-          localStorage.removeItem("jwtToken");
-          sessionStorage.removeItem("jwtToken");
-          setIsCheckingSession(false);
-        });
+      navigate("/upload");
     } else {
       setIsCheckingSession(false);
     }

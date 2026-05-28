@@ -18,15 +18,7 @@ import { BlankPages } from "./app/pages/blank-pages";
 import AdminDashboard from "./app/pages/admin";
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
-
-  useEffect(() => {
-    // Show splash screen for 1.8 seconds on initial load
-    const timer = setTimeout(() => {
-      setShowSplash(false);
-    }, 1800);
-    return () => clearTimeout(timer);
-  }, []);
+  const [showSplash, setShowSplash] = useState(false);
 
   return (
     <>
