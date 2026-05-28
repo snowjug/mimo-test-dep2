@@ -65,6 +65,8 @@ export default function AdminDashboard() {
     localStorage.removeItem("adminToken");
     setToken("");
     setMetrics(null);
+    setCoupons([]);
+    setRecentPrints([]);
   };
 
   const handleResetMetrics = async () => {

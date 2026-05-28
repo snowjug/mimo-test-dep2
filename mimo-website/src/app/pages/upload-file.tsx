@@ -229,7 +229,7 @@ export function UploadFile() {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
-  const displayTotalPages = backendTotalPages || (files.filter((f) => f.status === "completed").length * 5);
+  const displayTotalPages = backendTotalPages || files.filter((f) => f.status === "completed").reduce((acc, f) => acc + (f.pageCount || 1), 0);
 
   const handlePrint = () => {
     // Use uploadedFilesData which contains the full metadata WITH Firebase download URLs
@@ -518,7 +518,15 @@ export function UploadFile() {
                 >
                   Continue ({files.filter((f) => f.status === "completed").length} file{files.filter((f) => f.status === "completed").length !== 1 ? "s" : ""})
                 </Button>
-                <Button variant="outline" className="h-12 px-6 rounded-xl hover:bg-gray-100" onClick={() => setFiles([])}>
+                <Button variant="outline" className="h-12 px-6 rounded-xl hover:bg-gray-100" onClick={() => {
+                  setFiles([]);
+                  setUploadedFilesData([]);
+                  setBackendTotalPages(0);
+                  sessionStorage.removeItem("uploadedImages");
+                  sessionStorage.removeItem("printFiles");
+                  sessionStorage.removeItem("uploadAmount");
+                  sessionStorage.removeItem("uploadTotalPages");
+                }}>
                   Clear All
                 </Button>
               </div>
