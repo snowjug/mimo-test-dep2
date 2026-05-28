@@ -175,18 +175,18 @@ export function PrintOptions() {
                   </button>
                   
                   {/* Blurred Color Button */}
-                  <div className="relative flex-1 h-full">
+                  <div className="relative flex-1 h-full group">
                     <button
                       type="button"
                       disabled
-                      className="control-btn group w-full h-full relative z-10 text-center py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-2 text-slate-400 blur-[1px] opacity-70 pointer-events-none"
+                      className="control-btn w-full h-full relative z-10 text-center py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-2 text-slate-400 blur-[1px] opacity-60 pointer-events-none"
                     >
                       <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-slate-400 via-slate-300 to-slate-200 border border-slate-200/50 shrink-0" />
                       <span>Color</span>
                     </button>
-                    {/* Coming Soon Overlay specifically for Color */}
-                    <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                      <Badge className="bg-[#093765]/90 text-white shadow-sm px-2 py-0.5 text-[8px] rounded-full font-bold uppercase tracking-wider scale-90">
+                    {/* Coming Soon Overlay Floating Above */}
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                      <Badge className="bg-[#093765] text-white shadow-md px-1.5 py-0 text-[7px] leading-[10px] rounded-sm font-bold uppercase tracking-wider whitespace-nowrap border border-blue-400/30">
                         Coming Soon
                       </Badge>
                     </div>
