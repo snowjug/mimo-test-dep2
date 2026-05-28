@@ -101,6 +101,10 @@ export function Payment() {
       if (appliedPromo) {
         payload.couponCode = appliedPromo;
       }
+      // Send coins so backend deducts them from the Cashfree order amount too
+      if (applyCoins && coinsToUse > 0) {
+        payload.coinsToUse = coinsToUse;
+      }
 
       // 1. ALWAYS create order in backend first, regardless of amount.
       // The backend securely verifies the coupon and 100% discount status.

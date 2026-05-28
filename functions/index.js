@@ -404,7 +404,8 @@ app.delete("/remove-file", authMiddleware, async (req, res) => {
 app.post("/create-order", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const { selectedFiles, printOptions, couponCode } = req.body;
+    const { selectedFiles, printOptions, couponCode, coinsToUse } = req.body;
+    const coinsDiscount = coinsToUse ? Number(coinsToUse) * 0.5 : 0; // 1 coin = ₹0.50
     let { orderId } = req.body;
     if (!orderId) {
       orderId = `order_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
@@ -478,11 +479,15 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     if (discountPercentage > 0) {
       amount = Number((amount - (amount * (discountPercentage / 100))).toFixed(2));
     }
+    // Apply Mimo Coins discount (securely re-calculated on backend)
+    if (coinsDiscount > 0) {
+      amount = Number(Math.max(0, amount - coinsDiscount).toFixed(2));
+    }
 
-    // ─── 100% DISCOUNT BYPASS ─────────────────────────────────────────────────
-    // If amount is 0 (or coupon gives full discount), skip Cashfree entirely.
-    // Mark jobs as paid directly and return a print code immediately.
-    if (amount <= 0) {
+    // ─── FREE ORDER BYPASS ──────────────────────────────────────────────────────
+    // Treat amount <= 0 OR amount < ₹1 (Cashfree minimum) as fully free.
+    // Previously the ₹1 minimum silently overrode discount, causing UI/Cashfree mismatch.
+    if (amount <= 0 || amount < 1.00) {
       const printCode = Math.floor(1000 + Math.random() * 9000).toString();
       const now = admin.firestore.FieldValue.serverTimestamp();
       const freeBatch = db.batch();
@@ -498,17 +503,24 @@ app.post("/create-order", authMiddleware, async (req, res) => {
         });
       });
       await freeBatch.commit();
+
+      // Deduct coins from user balance if coins were used
+      if (coinsToUse && coinsToUse > 0) {
+        await db.collection("users").doc(userId).update({
+          "mimo_coins.balance": admin.firestore.FieldValue.increment(-coinsToUse),
+          "mimo_coins.total_used": admin.firestore.FieldValue.increment(coinsToUse),
+        });
+      }
+
       await db.collection("orders").add({
         orderId, userId, amount: 0, totalPages, totalDocs: jobsSnapshot.size,
         status: "PAID", orderStatus: "completed", jobIds,
-        createdAt: now, couponCode, discountPercentage
+        createdAt: now, couponCode, discountPercentage,
+        coinsUsed: coinsToUse || 0
       });
       return res.json({ orderId, paymentSessionId: null, amount: 0, printCode, free: true });
     }
     // ─────────────────────────────────────────────────────────────────────────
-
-    // Enforce Cashfree minimum of ₹1
-    if (amount < 1.00) amount = 1.00;
 
     const response = await axios.post(
       `${CASHFREE_BASE_URL}/orders`,
