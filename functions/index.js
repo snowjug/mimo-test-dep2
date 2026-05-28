@@ -871,13 +871,19 @@ app.post("/get-documents-by-code", async (req, res) => {
 app.post("/payment-success", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
+    const { orderId } = req.body; // Scoped to the specific order being confirmed
     const now = new Date();
 
-    const snapshot = await db
-      .collection("print_jobs")
+    let queryRef = db.collection("print_jobs")
       .where("userId", "==", userId)
-      .where("status", "in", ["pending", "paid"])
-      .get();
+      .where("status", "in", ["pending", "paid"]);
+    
+    // If orderId provided, narrow query to only jobs from this order
+    if (orderId) {
+      queryRef = queryRef.where("orderId", "==", orderId);
+    }
+
+    const snapshot = await queryRef.get();
 
     if (snapshot.empty) {
       return res.status(400).json({ error: "No pending jobs found" });
@@ -969,23 +975,7 @@ app.get("/generate-print-code", authMiddleware, async (req, res) => {
   }
 });
 
-// ================= VALIDATE COUPON =================
-app.get("/validate-coupon/:code", authMiddleware, async (req, res) => {
-  try {
-    const code = req.params.code.toUpperCase();
-    const couponDoc = await db.collection("coupons").doc(code).get();
-    if (!couponDoc.exists) return res.status(404).json({ error: "Invalid coupon code" });
-    const data = couponDoc.data();
-    if (!data.isActive) return res.status(400).json({ error: "Coupon is no longer active" });
-    if (data.expiryDate && data.expiryDate.toDate() < new Date()) {
-      return res.status(400).json({ error: "Coupon has expired" });
-    }
-    res.json({ discountPercentage: data.discountPercentage, code });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to validate coupon" });
-  }
-});
+// Note: /validate-coupon/:code is defined below as a public route (no auth required)
 
 
 // ================= ADMIN MIDDLEWARE =================

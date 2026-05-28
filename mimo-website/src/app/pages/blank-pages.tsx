@@ -33,10 +33,8 @@ export function BlankPages() {
   const handleContinue = async () => {
     setIsProcessing(true);
     try {
-      const token = localStorage.getItem("jwtToken");
       await api.post("/create-blank-job", 
-        { type, pageCount },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { type, pageCount }
       );
 
       // Store print options for payment page

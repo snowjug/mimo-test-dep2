@@ -68,9 +68,13 @@ export function PrintCode() {
   };
 
   const handleDone = () => {
-    // Clear session storage
+    // Clear ALL session storage to ensure a completely fresh start for next job
     sessionStorage.removeItem("printCode");
     sessionStorage.removeItem("printFiles");
+    sessionStorage.removeItem("printOptions");
+    sessionStorage.removeItem("uploadedImages");
+    sessionStorage.removeItem("uploadAmount");
+    sessionStorage.removeItem("uploadTotalPages");
     sessionStorage.removeItem("totalPages");
     navigate("/upload");
   };

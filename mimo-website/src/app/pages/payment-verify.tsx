@@ -26,7 +26,8 @@ export function PaymentVerify() {
           setStatus("success");
           
           // Trigger the job finalization (generate code, etc)
-          const successResponse = await api.post("/payment-success");
+          // Pass orderId so backend scopes to the correct order, not any pending job
+          const successResponse = await api.post("/payment-success", { orderId });
           const { printCode } = successResponse.data;
 
           sessionStorage.setItem("printCode", printCode);

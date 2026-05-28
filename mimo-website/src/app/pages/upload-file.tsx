@@ -524,6 +524,7 @@ export function UploadFile() {
                   setBackendTotalPages(0);
                   sessionStorage.removeItem("uploadedImages");
                   sessionStorage.removeItem("printFiles");
+                  sessionStorage.removeItem("printOptions");
                   sessionStorage.removeItem("uploadAmount");
                   sessionStorage.removeItem("uploadTotalPages");
                 }}>

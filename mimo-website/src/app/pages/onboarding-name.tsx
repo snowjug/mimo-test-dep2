@@ -30,10 +30,7 @@ export function OnboardingName() {
     setLoading(true);
     
     try {
-      const token = localStorage.getItem("jwtToken");
-      await api.post("/onboarding", { username: name.trim(), mobileNumber }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post("/onboarding", { username: name.trim(), mobileNumber });
       
       localStorage.setItem("mimo_user_name", name.trim());
       localStorage.setItem("isAuthenticated", "true");
