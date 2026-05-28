@@ -57,7 +57,8 @@ export function PrintOptions() {
   }, [navigate]);
 
   // Only true if there are actual images (not PDFs)
-  const hasImages = uploadedImages.some(img => img.mimetype.startsWith('image/'));
+  const actualImages = uploadedImages.filter(img => img.mimetype.startsWith('image/'));
+  const hasImages = actualImages.length > 0;
 
   const [totalPages, setTotalPages] = useState(0);
   const [baseTotalCost, setBaseTotalCost] = useState(0);
@@ -408,7 +409,7 @@ export function PrintOptions() {
                               hasImages ? (
                                 <div key={i} className="overflow-hidden rounded-[1px]">
                                   <img
-                                    src={uploadedImages[i % uploadedImages.length]?.dataUrl}
+                                    src={actualImages[i % actualImages.length]?.dataUrl}
                                     alt=""
                                     className="w-full h-full object-cover"
                                   />
@@ -459,7 +460,7 @@ export function PrintOptions() {
                         }).map((_, i) => (
                           <div key={i} className="overflow-hidden rounded-md bg-slate-100">
                             <img
-                              src={uploadedImages[i % uploadedImages.length]?.dataUrl}
+                              src={actualImages[i % actualImages.length]?.dataUrl}
                               alt="preview"
                               className="w-full h-full object-cover"
                             />

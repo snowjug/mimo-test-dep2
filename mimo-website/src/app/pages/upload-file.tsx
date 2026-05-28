@@ -68,8 +68,15 @@ export function UploadFile() {
         imageDataUrls.push({ name: file.name, mimetype: file.type, dataUrl });
       }
     }
-    if (imageDataUrls.length > 0) {
-      sessionStorage.setItem("uploadedImages", JSON.stringify(imageDataUrls));
+    const existingRaw = sessionStorage.getItem("uploadedImages");
+    let existingImages = [];
+    if (existingRaw) {
+      existingImages = JSON.parse(existingRaw);
+    }
+    const combinedImages = [...existingImages, ...imageDataUrls];
+
+    if (combinedImages.length > 0) {
+      sessionStorage.setItem("uploadedImages", JSON.stringify(combinedImages));
     } else {
       sessionStorage.removeItem("uploadedImages");
     }
@@ -202,6 +209,18 @@ export function UploadFile() {
 
     setFiles((prev) => prev.filter((_, i) => i !== index));
     setUploadedFilesData((prev) => prev.filter((f) => f.name !== fileToRemove.name));
+
+    // Remove from sessionStorage
+    const existingRaw = sessionStorage.getItem("uploadedImages");
+    if (existingRaw) {
+      const existingImages = JSON.parse(existingRaw);
+      const updatedImages = existingImages.filter((img: any) => img.name !== fileToRemove.name);
+      if (updatedImages.length > 0) {
+        sessionStorage.setItem("uploadedImages", JSON.stringify(updatedImages));
+      } else {
+        sessionStorage.removeItem("uploadedImages");
+      }
+    }
   };
 
   const formatFileSize = (bytes: number) => {
