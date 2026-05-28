@@ -2083,10 +2083,18 @@ app.get("/admin/metrics", authenticateAdmin, async (req, res) => {
     const data = metricsDoc.exists ? metricsDoc.data() : { totalRevenue: 0, totalOrders: 0, totalPagesPrinted: 0, dailyRevenue: {} };
     
     // Check Pi Status (Pi writes heartbeats to system_status/pi)
-    let piStatus = { printerStatus: "Unknown", lastSeen: null };
+    let piStatus = { printerStatus: "Unknown", lastSeen: null, isOffline: true };
     const pSnapshot = await db.collection("system_status").doc("pi").get();
     if (pSnapshot.exists) {
-      piStatus = pSnapshot.data();
+      const data = pSnapshot.data();
+      piStatus.printerStatus = data.printerStatus;
+      piStatus.lastSeen = data.lastSeen;
+      
+      // Calculate offline status on the server to prevent client clock skew bugs
+      if (data.lastSeen) {
+        const lastSeenMs = data.lastSeen.toMillis();
+        piStatus.isOffline = (Date.now() - lastSeenMs) > 120000; // 2 minutes
+      }
     }
     
     res.json({ ...data, piStatus });

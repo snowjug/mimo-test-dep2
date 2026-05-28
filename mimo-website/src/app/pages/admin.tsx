@@ -121,9 +121,7 @@ export default function AdminDashboard() {
   }, [metrics]);
 
   const isPiOffline = () => {
-    if (!metrics?.piStatus?.lastSeen) return true;
-    const lastSeen = new Date(metrics.piStatus.lastSeen._seconds ? metrics.piStatus.lastSeen._seconds * 1000 : metrics.piStatus.lastSeen).getTime();
-    return Date.now() - lastSeen > 120000;
+    return metrics?.piStatus?.isOffline ?? true;
   };
 
   if (!token) {
