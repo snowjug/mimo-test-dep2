@@ -281,6 +281,36 @@ def heartbeat_loop():
 # Start heartbeat in a background thread
 threading.Thread(target=heartbeat_loop, daemon=True).start()
 
+def watchdog_loop():
+    """ Monitors CUPS for stuck jobs or disabled printers and auto-heals them """
+    stuck_cycles = 0
+    while True:
+        try:
+            # 1. Always ensure printer is enabled (CUPS auto-disables on communication errors)
+            subprocess.run(["sudo", "cupsenable", PRINTER_NAME], capture_output=True)
+            
+            # 2. Check for stuck jobs
+            result = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True)
+            if PRINTER_NAME in result.stdout:
+                stuck_cycles += 1
+                print(f"⚠️ Watchdog: Stuck job detected (Cycle {stuck_cycles})")
+                
+                # If stuck for 2 cycles (~120s), kick the USB daemon to wake up deep sleep
+                if stuck_cycles >= 2:
+                    print("🔧 Watchdog: Kicking ipp-usb to wake up sleeping printer...")
+                    subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
+                    subprocess.run(["sudo", "cupsenable", PRINTER_NAME], capture_output=True)
+                    stuck_cycles = 0 # reset after kicking
+            else:
+                stuck_cycles = 0
+        except Exception as e:
+            print(f"⚠️ Watchdog failed: {e}")
+            
+        time.sleep(60)
+
+# Start auto-heal watchdog
+threading.Thread(target=watchdog_loop, daemon=True).start()
+
 def keep_warm_loop():
     """ Pings the Firebase API every 10 minutes to prevent cold starts """
     while True:
