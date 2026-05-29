@@ -125,30 +125,46 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive }) => {
                         <p className="tag-line">— WELCOME TO —</p>
                     </div>
                     <div className="main-heading">
-                        <svg width="680" height="175" viewBox="0 0 680 175" style={{ overflow: 'visible', filter: 'drop-shadow(0 10px 25px rgba(0,0,0,0.45))' }}>
+                        <svg width="680" height="175" viewBox="0 0 680 175" style={{ overflow: 'visible', filter: 'drop-shadow(0 12px 25px rgba(0,0,0,0.5))' }}>
                             <defs>
-                                <style>{`@import url('https://fonts.cdnfonts.com/css/lovelo');`}</style>
-                                <linearGradient id="mimoGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-                                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0.7" />
+                                <linearGradient id="mimoPremiumGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#ffffff" />
+                                    <stop offset="100%" stopColor="#dbeafe" />
                                 </linearGradient>
                             </defs>
+                            
+                            {/* Layer 1: Solid 3D Drop Shadow / Extrusion */}
                             <text
                                 x="50%" y="52%"
                                 dominantBaseline="middle"
                                 textAnchor="middle"
-                                fill="url(#mimoGrad)"
-                                stroke="rgba(255,255,255,0.3)"
-                                strokeWidth="1.5"
-                                strokeLinejoin="bevel"
-                                strokeLinecap="butt"
-                                transform="translate(0, 13)"
+                                fill="#0a396b"
+                                transform="translate(6, 19)"
                                 style={{
-                                    fontFamily: "'Lovelo', sans-serif",
+                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
                                     fontSize: '170px',
                                     fontWeight: 900,
-                                    letterSpacing: '12px',
-                                    paintOrder: 'stroke fill'
+                                    letterSpacing: '4px'
+                                }}
+                            >
+                                MIMO
+                            </text>
+
+                            {/* Layer 2: Main Text with Gradient Fill & Subtle Stroke */}
+                            <text
+                                x="50%" y="52%"
+                                dominantBaseline="middle"
+                                textAnchor="middle"
+                                fill="url(#mimoPremiumGrad)"
+                                stroke="rgba(255,255,255,0.4)"
+                                strokeWidth="1.5"
+                                paintOrder="stroke fill"
+                                transform="translate(0, 13)"
+                                style={{
+                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                    fontSize: '170px',
+                                    fontWeight: 900,
+                                    letterSpacing: '4px'
                                 }}
                             >
                                 MIMO

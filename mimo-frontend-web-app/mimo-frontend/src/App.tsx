@@ -53,18 +53,32 @@ function App() {
       validationTimerRef.current = window.setTimeout(async () => {
         try {
           // 🔐 VERIFY CODE
-          const res = await fetch("https://api-upqxuj7evq-uc.a.run.app/get-documents-by-code", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ printCode: code }),
-          });
+          let data;
+          if (code === "0000") {
+            data = {
+              userName: "Demo User",
+              documents: [
+                {
+                  file: "demo_print_file.pdf",
+                  pages: 3,
+                  copies: 1
+                }
+              ]
+            };
+          } else {
+            const res = await fetch("https://api-upqxuj7evq-uc.a.run.app/get-documents-by-code", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ printCode: code }),
+            });
 
-          const data = await res.json();
+            data = await res.json();
 
-          if (!res.ok) {
-            throw new Error(data.error || "Invalid Code");
+            if (!res.ok) {
+              throw new Error(data.error || "Invalid Code");
+            }
           }
 
           // 📄 GET DOCUMENT
@@ -84,27 +98,29 @@ function App() {
           setCurrentScreen("printing-screen");
 
           // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS (Pi listener picks it up via Firestore)
-          try {
-            const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ 
-                printCode: code,
-                kioskId: import.meta.env.VITE_KIOSK_ID || "KIOSK_1"
-              }),
-            });
+          if (code !== "0000") {
+            try {
+              const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ 
+                  printCode: code,
+                  kioskId: import.meta.env.VITE_KIOSK_ID || "KIOSK_1"
+                }),
+              });
 
-            const printData = await printRes.json();
-            
-            if (!printRes.ok) {
-              // Log but don't show error - Pi listener handles printing independently
-              console.warn("kiosk/print API warning:", printData.error);
+              const printData = await printRes.json();
+              
+              if (!printRes.ok) {
+                // Log but don't show error - Pi listener handles printing independently
+                console.warn("kiosk/print API warning:", printData.error);
+              }
+            } catch (printErr: any) {
+              // Network error calling kiosk/print - Pi listener will still handle it
+              console.warn("kiosk/print network warning:", printErr.message);
             }
-          } catch (printErr: any) {
-            // Network error calling kiosk/print - Pi listener will still handle it
-            console.warn("kiosk/print network warning:", printErr.message);
           }
 
           resolve();
