@@ -13,7 +13,7 @@ import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { MimoHeader } from "../components/mimo-header";
-import { User, Mail, Phone, Building, Save, Printer, Bell, FileText, Gift, Copy, CheckCircle2, LogOut } from "lucide-react";
+import { User, Mail, Phone, Building, Save, Printer, Bell, FileText, Gift, Copy, CheckCircle2, LogOut, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 
@@ -97,9 +97,23 @@ export function UserProfile() {
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent">Account & Settings</h1>
-          <p className="text-base sm:text-lg text-slate-500">Manage your profile, printing preferences, and account settings</p>
+        <div className="flex items-center gap-4 pb-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full hover:bg-white hover:shadow-sm cursor-pointer shrink-0"
+            onClick={() => navigate("/upload")}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent">
+              Account & Settings
+            </h1>
+            <p className="text-base sm:text-lg text-slate-500">
+              Manage your profile, printing preferences, and account settings
+            </p>
+          </div>
         </div>
 
         {/* Profile Header */}
