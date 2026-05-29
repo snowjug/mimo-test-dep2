@@ -795,8 +795,11 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
 // ================= KIOSK: TRIGGER PI PRINT (SERVERLESS PULL MECHANISM) =================
 app.post("/kiosk/print", async (req, res) => {
   try {
-    const { printCode } = req.body;
+    const { printCode, kioskId } = req.body;
     if (!printCode) return res.status(400).json({ error: "Print code required" });
+    
+    // Default to KIOSK_1 if the frontend didn't send one, to prevent breakages
+    const targetKiosk = kioskId || "KIOSK_1";
 
     const snapshot = await db.collection("print_jobs")
       .where("printCode", "==", printCode)
@@ -834,10 +837,11 @@ app.post("/kiosk/print", async (req, res) => {
         continue;
       }
 
-      // Queue valid job for Pi listener
+      // Queue valid job for specific Pi listener
       await doc.ref.update({
         status: "printing",
         printerStatus: "Sending to Pi...",
+        kioskId: targetKiosk,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 

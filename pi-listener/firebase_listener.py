@@ -291,8 +291,13 @@ def keep_warm_loop():
 # Start keep warm in a background thread
 threading.Thread(target=keep_warm_loop, daemon=True).start()
 
-# Watch the print_jobs collection where status == 'printing'
-query = db.collection('print_jobs').where('status', '==', 'printing')
+# Kiosk Routing: Only pick up jobs explicitly meant for this physical kiosk
+KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
+print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
+print(f"📡 Waiting for jobs (status: 'printing', kioskId: '{KIOSK_ID}')...")
+
+# Watch the print_jobs collection where status == 'printing' AND kioskId matches
+query = db.collection('print_jobs').where('status', '==', 'printing').where('kioskId', '==', KIOSK_ID)
 query_watch = query.on_snapshot(on_snapshot)
 
 # Keep the main thread alive

@@ -100,6 +100,11 @@ function App() {
           // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS (Pi listener picks it up via Firestore)
           if (code !== "0000") {
             try {
+              // Read specific Kiosk ID from URL so one Vercel deployment supports infinite kiosks!
+              // Example: printmimo.tech/kiosk?kioskId=KIOSK_2
+              const urlParams = new URLSearchParams(window.location.search);
+              const dynamicKioskId = urlParams.get("kioskId") || import.meta.env.VITE_KIOSK_ID || "KIOSK_1";
+
               const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
                 method: "POST",
                 headers: {
@@ -107,7 +112,7 @@ function App() {
                 },
                 body: JSON.stringify({ 
                   printCode: code,
-                  kioskId: import.meta.env.VITE_KIOSK_ID || "KIOSK_1"
+                  kioskId: dynamicKioskId
                 }),
               });
 
