@@ -536,12 +536,17 @@ app.get("/profile", authenticateToken, async (req, res) => {
 app.put("/profile", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { username, mobileNumber } = req.body;
-    await db.collection("users").doc(userId).update({
-      username,
-      mobileNumber: mobileNumber || "",
+    const { username, mobileNumber, photoUrl } = req.body;
+    
+    const updateData = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    
+    if (username !== undefined) updateData.username = username;
+    if (mobileNumber !== undefined) updateData.mobileNumber = mobileNumber || "";
+    if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
+
+    await db.collection("users").doc(userId).update(updateData);
     res.json({ message: "Profile updated" });
   } catch (err) {
     console.error(err);

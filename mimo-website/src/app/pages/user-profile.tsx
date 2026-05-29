@@ -16,6 +16,8 @@ import { MimoHeader } from "../components/mimo-header";
 import { User, Mail, Phone, Building, Save, Printer, Bell, FileText, Gift, Copy, CheckCircle2, LogOut, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { storage } from "../../lib/firebase";
 
 export function UserProfile() {
   const navigate = useNavigate();
@@ -75,15 +77,33 @@ export function UserProfile() {
     if (!file) return;
 
     setIsUploadingPhoto(true);
-    const formData = new FormData();
-    formData.append("photo", file);
 
     try {
-      const res = await api.post("/upload-profile-photo", formData);
-      setPhotoUrl(res.data.photoUrl);
+      const uniqueFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const storageRef = ref(storage, `profiles/${name.replace(/[^a-zA-Z0-9]/g, '_')}/${uniqueFileName}`);
+      
+      // Upload directly to Firebase Storage client-side
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      
+      const downloadURL = await new Promise<string>((resolve, reject) => {
+        uploadTask.on(
+          "state_changed",
+          null,
+          (error) => reject(error),
+          async () => {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(url);
+          }
+        );
+      });
+
+      // Update the user's photoUrl in Firestore via /profile PUT route
+      await api.put("/profile", { photoUrl: downloadURL });
+      
+      setPhotoUrl(downloadURL);
       toast.success("Profile photo updated!");
     } catch (err) {
-      console.error(err);
+      console.error("Profile photo upload failed:", err);
       toast.error("Failed to upload photo");
     } finally {
       setIsUploadingPhoto(false);
