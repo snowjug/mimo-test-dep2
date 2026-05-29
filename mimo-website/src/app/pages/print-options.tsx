@@ -353,6 +353,84 @@ export function PrintOptions() {
     if (copies > 1) setCopies(copies - 1);
   };
 
+  const printDestinationCard = (
+    <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-blue-600" /> Print Destination
+        </CardTitle>
+        <CardDescription>Where do you want to print this?</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div 
+          onClick={() => { setDirectKioskId(null); }}
+          className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === null ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${directKioskId === null ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+              <MonitorSmartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <p className={`text-sm font-bold ${directKioskId === null ? 'text-blue-900' : 'text-slate-700'}`}>Any Kiosk (Use Print Code)</p>
+              <p className="text-[10px] text-slate-500 leading-tight">Pay now, then enter the 4-digit code at any tablet.</p>
+            </div>
+          </div>
+        </div>
+
+        <div 
+          onClick={() => { setDirectKioskId("CV-001"); setColorMode("bw"); }}
+          className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'CV-001' ? 'border-slate-600 bg-slate-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${directKioskId === 'CV-001' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-500'}`}>
+              <Printer className="w-5 h-5" />
+            </div>
+            <div>
+              <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'CV-001' ? 'text-slate-900' : 'text-slate-700'}`}>
+                KIOSK-001-CV <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">B&W</Badge>
+              </p>
+              <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Boys Hostel in Black & White.</p>
+            </div>
+          </div>
+        </div>
+
+        <div 
+          onClick={() => { setDirectKioskId("SV-002-BW"); setColorMode("bw"); }}
+          className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'SV-002-BW' ? 'border-slate-600 bg-slate-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${directKioskId === 'SV-002-BW' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-500'}`}>
+              <Printer className="w-5 h-5" />
+            </div>
+            <div>
+              <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'SV-002-BW' ? 'text-slate-900' : 'text-slate-700'}`}>
+                KIOSK-002-SV <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">B&W</Badge>
+              </p>
+              <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Girls Hostel in Black & White.</p>
+            </div>
+          </div>
+        </div>
+
+        <div 
+          onClick={() => { setDirectKioskId("SV-002-COLOR"); setColorMode("color"); }}
+          className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'SV-002-COLOR' ? 'border-pink-500 bg-gradient-to-r from-pink-50/50 to-blue-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${directKioskId === 'SV-002-COLOR' ? 'bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-yellow-100 via-pink-200 to-blue-200 text-pink-700' : 'bg-slate-100 text-slate-500'}`}>
+              <Printer className="w-5 h-5" />
+            </div>
+            <div>
+              <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'SV-002-COLOR' ? 'text-pink-900' : 'text-slate-700'}`}>
+                KIOSK-002-SV <Badge className="bg-gradient-to-r from-yellow-400 via-pink-500 to-blue-500 border-0 hover:opacity-90 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">COLOR</Badge>
+              </p>
+              <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Girls Hostel in vibrant Color.</p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 py-2 sm:p-4" style={{ fontFamily: "'Outfit', sans-serif" }}>
       {/* Global Styles for Custom Fonts */}
@@ -374,6 +452,11 @@ export function PrintOptions() {
             <h1 className="text-2xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-700 bg-clip-text text-transparent tracking-tight leading-tight pb-1 mb-0.5">Print Configuration</h1>
             <p className="text-xs sm:text-sm text-slate-500 font-medium">Customize how you want your documents to look</p>
           </div>
+        </div>
+
+        {/* Mobile Print Destination (Visible only on mobile) */}
+        <div className="block lg:hidden">
+          {printDestinationCard}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
@@ -917,82 +1000,10 @@ export function PrintOptions() {
 
           {/* Sidebar (Destination & Cost Summary) */}
           <div className="lg:col-span-1 sticky top-6 space-y-4">
-            {/* Print Destination Selection */}
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-blue-600" /> Print Destination
-                </CardTitle>
-                <CardDescription>Where do you want to print this?</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div 
-                  onClick={() => { setDirectKioskId(null); }}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === null ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${directKioskId === null ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                      <MonitorSmartphone className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className={`text-sm font-bold ${directKioskId === null ? 'text-blue-900' : 'text-slate-700'}`}>Any Kiosk (Use Print Code)</p>
-                      <p className="text-[10px] text-slate-500 leading-tight">Pay now, then enter the 4-digit code at any tablet.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div 
-                  onClick={() => { setDirectKioskId("CV-001"); setColorMode("bw"); }}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'CV-001' ? 'border-slate-600 bg-slate-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${directKioskId === 'CV-001' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-500'}`}>
-                      <Printer className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'CV-001' ? 'text-slate-900' : 'text-slate-700'}`}>
-                        KIOSK-001-CV <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">B&W</Badge>
-                      </p>
-                      <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Boys Hostel in Black & White.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div 
-                  onClick={() => { setDirectKioskId("SV-002-BW"); setColorMode("bw"); }}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'SV-002-BW' ? 'border-slate-600 bg-slate-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${directKioskId === 'SV-002-BW' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-500'}`}>
-                      <Printer className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'SV-002-BW' ? 'text-slate-900' : 'text-slate-700'}`}>
-                        KIOSK-002-SV <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">B&W</Badge>
-                      </p>
-                      <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Girls Hostel in Black & White.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div 
-                  onClick={() => { setDirectKioskId("SV-002-COLOR"); setColorMode("color"); }}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'SV-002-COLOR' ? 'border-pink-500 bg-gradient-to-r from-pink-50/50 to-blue-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${directKioskId === 'SV-002-COLOR' ? 'bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-yellow-100 via-pink-200 to-blue-200 text-pink-700' : 'bg-slate-100 text-slate-500'}`}>
-                      <Printer className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'SV-002-COLOR' ? 'text-pink-900' : 'text-slate-700'}`}>
-                        KIOSK-002-SV <Badge className="bg-gradient-to-r from-yellow-400 via-pink-500 to-blue-500 border-0 hover:opacity-90 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">COLOR</Badge>
-                      </p>
-                      <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Girls Hostel in vibrant Color.</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Desktop Print Destination Selection */}
+            <div className="hidden lg:block">
+              {printDestinationCard}
+            </div>
 
             {/* Cost Summary - Premium Dark Style */}
             <Card className="border-0 bg-gradient-to-br from-[#093765] to-blue-600 text-white overflow-hidden animate-in fade-in duration-500 rounded-2xl sm:rounded-[2rem] shadow-2xl relative group">
