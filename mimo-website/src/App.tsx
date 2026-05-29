@@ -20,6 +20,12 @@ import AdminDashboard from "./app/pages/mimo-admin-dashboard";
 export default function App() {
   const [showSplash, setShowSplash] = useState(false);
 
+  // Silent background ping to wake up the Firebase Cloud Function (Cold Start bypass)
+  useEffect(() => {
+    const apiUrl = import.meta.env.VITE_API_URL || "https://api-upqxuj7evq-uc.a.run.app";
+    fetch(apiUrl).catch(() => {}); // Ignore errors, just fire and forget to wake up server
+  }, []);
+
   return (
     <>
       <AnimatePresence>

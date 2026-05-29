@@ -1160,7 +1160,8 @@ app.get("/validate-coupon/:code", async (req, res) => {
   }
 });
 
-exports.api = onRequest({ cors: true, maxInstances: 10, minInstances: 1 }, app);
+// Export the main Express App
+exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
 
 // ================= AUTO REFUND LISTENER =================
 exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
