@@ -232,7 +232,7 @@ def on_snapshot(col_snapshot, changes, read_time):
             # If valid, process it!
             if data.get("status") == "printing" and not data.get("isPrinted", False):
                 print(f"\n🔔 New job detected: {doc.id}")
-                process_job(doc)
+                threading.Thread(target=process_job, args=(doc,), daemon=True).start()
 
 # ================= START LISTENER =================
 print("\n📡 Pi Listener Started. Waiting for jobs (status: 'printing')...")

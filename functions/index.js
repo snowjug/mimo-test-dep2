@@ -469,9 +469,11 @@ app.post("/create-order", authMiddleware, async (req, res) => {
         for (const r of ranges) {
           const parts = r.split("-").map(p => parseInt(p.trim()));
           if (parts.length === 1 && !isNaN(parts[0])) {
-            customCount += 1;
+            if (parts[0] >= 1 && parts[0] <= numPages) customCount += 1;
           } else if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-            customCount += (parts[1] - parts[0] + 1);
+            if (parts[0] >= 1 && parts[1] <= numPages && parts[0] <= parts[1]) {
+              customCount += (parts[1] - parts[0] + 1);
+            }
           }
         }
         if (customCount > 0) numPages = customCount;
@@ -1158,7 +1160,7 @@ app.get("/validate-coupon/:code", async (req, res) => {
   }
 });
 
-exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
+exports.api = onRequest({ cors: true, maxInstances: 10, minInstances: 1 }, app);
 
 // ================= AUTO REFUND LISTENER =================
 exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
