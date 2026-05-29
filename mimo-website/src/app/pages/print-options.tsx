@@ -389,7 +389,7 @@ export function PrintOptions() {
               <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'CV-001' ? 'text-slate-900' : 'text-slate-700'}`}>
                 KIOSK-001-CV <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">B&W</Badge>
               </p>
-              <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Boys Hostel in Black & White.</p>
+              <p className="text-[10px] text-slate-500 leading-tight">Print at C.V Raman Block in Black & White.</p>
             </div>
           </div>
         </div>
@@ -406,7 +406,7 @@ export function PrintOptions() {
               <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'SV-002-BW' ? 'text-slate-900' : 'text-slate-700'}`}>
                 KIOSK-002-SV <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">B&W</Badge>
               </p>
-              <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Girls Hostel in Black & White.</p>
+              <p className="text-[10px] text-slate-500 leading-tight">Print at Swami Vivekananda Block in Black & White.</p>
             </div>
           </div>
         </div>
@@ -423,7 +423,7 @@ export function PrintOptions() {
               <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'SV-002-COLOR' ? 'text-pink-900' : 'text-slate-700'}`}>
                 KIOSK-002-SV <Badge className="bg-gradient-to-r from-yellow-400 via-pink-500 to-blue-500 border-0 hover:opacity-90 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">COLOR</Badge>
               </p>
-              <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Girls Hostel in vibrant Color.</p>
+              <p className="text-[10px] text-slate-500 leading-tight">Print at Swami Vivekananda Block in vibrant Color.</p>
             </div>
           </div>
         </div>
