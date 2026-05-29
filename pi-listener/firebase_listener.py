@@ -269,6 +269,18 @@ def heartbeat_loop():
 # Start heartbeat in a background thread
 threading.Thread(target=heartbeat_loop, daemon=True).start()
 
+def keep_warm_loop():
+    """ Pings the Firebase API every 10 minutes to prevent cold starts """
+    while True:
+        try:
+            requests.get("https://api-upqxuj7evq-uc.a.run.app/", timeout=10)
+        except:
+            pass
+        time.sleep(600) # 10 minutes
+
+# Start keep warm in a background thread
+threading.Thread(target=keep_warm_loop, daemon=True).start()
+
 # Watch the print_jobs collection where status == 'printing'
 query = db.collection('print_jobs').where('status', '==', 'printing')
 query_watch = query.on_snapshot(on_snapshot)
