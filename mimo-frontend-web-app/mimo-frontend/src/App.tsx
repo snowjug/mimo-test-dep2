@@ -5,7 +5,6 @@ import { PrintingScreen } from './components/screens/PrintingScreen';
 import { SummaryScreen } from './components/screens/SummaryScreen';
 import { SystemErrorScreen } from './components/screens/SystemErrorScreen';
 import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
-import { KioskSetupScreen } from './components/screens/KioskSetupScreen';
 
 export type ScreenState =
   | 'main-interface'
@@ -166,10 +165,7 @@ function App() {
   const goToCodeEntry = useCallback(() => setCurrentScreen('code-entry-screen'), []);
   const goToSummary = useCallback(() => setCurrentScreen('summary-screen'), []);
 
-  // Show Setup Screen if no kioskId is configured in URL
-  if (!currentKioskId) {
-    return <KioskSetupScreen />;
-  }
+  // Setup screen removed as per user request to drop URL parameters
 
   return (
     <>
