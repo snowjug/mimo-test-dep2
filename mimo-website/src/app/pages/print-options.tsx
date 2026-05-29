@@ -943,8 +943,8 @@ export function PrintOptions() {
                       <Printer className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className={`text-sm font-bold ${directKioskId === 'CV-001' ? 'text-blue-900' : 'text-slate-700'}`}>Kiosk 001</p>
-                      <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Boys Hostel. Bypasses tablet code.</p>
+                      <p className={`text-sm font-bold ${directKioskId === 'CV-001' ? 'text-blue-900' : 'text-slate-700'}`}>Kiosk 001 - CV Raman</p>
+                      <p className="text-[10px] text-slate-500 leading-tight">Directly print to CV Raman Boys Hostel. Bypasses tablet code.</p>
                     </div>
                   </div>
                 </div>
@@ -958,11 +958,12 @@ export function PrintOptions() {
                       <Printer className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className={`text-sm font-bold ${directKioskId === 'SV-002' ? 'text-blue-900' : 'text-slate-700'}`}>Kiosk 002</p>
-                      <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Girls Hostel. Bypasses tablet code.</p>
+                      <p className={`text-sm font-bold ${directKioskId === 'SV-002' ? 'text-blue-900' : 'text-slate-700'}`}>Kiosk 002 - SV Girls Hostel</p>
+                      <p className="text-[10px] text-slate-500 leading-tight">Directly print to SV Girls Hostel. Bypasses tablet code.</p>
                     </div>
                   </div>
                 </div>
+
               </CardContent>
             </Card>
 
