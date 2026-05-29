@@ -5,6 +5,7 @@ import { PrintingScreen } from './components/screens/PrintingScreen';
 import { SummaryScreen } from './components/screens/SummaryScreen';
 import { SystemErrorScreen } from './components/screens/SystemErrorScreen';
 import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
+import { KioskSetupScreen } from './components/screens/KioskSetupScreen';
 
 export type ScreenState =
   | 'main-interface'
@@ -15,6 +16,9 @@ export type ScreenState =
   | 'maintenance-screen';
 
 function App() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentKioskId = urlParams.get("kioskId");
+
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('main-interface');
   const [code, setCode] = useState('');
   const [toastMsg, setToastMsg] = useState('');
@@ -101,9 +105,8 @@ function App() {
           if (code !== "0000") {
             try {
               // Read specific Kiosk ID from URL so one Vercel deployment supports infinite kiosks!
-              // Example: printmimo.tech/kiosk?kioskId=KIOSK_2
-              const urlParams = new URLSearchParams(window.location.search);
-              const dynamicKioskId = urlParams.get("kioskId") || import.meta.env.VITE_KIOSK_ID || "KIOSK_1";
+              // Example: printmimo.tech/kiosk?kioskId=SV-002
+              const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID || "CV-001";
 
               const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
                 method: "POST",
@@ -142,7 +145,7 @@ function App() {
         }
       }, 300);
     });
-  }, [code, showToast]);
+  }, [code, showToast, currentKioskId]);
 
   // ================= RESET =================
   const handleReset = useCallback(() => {
@@ -162,6 +165,11 @@ function App() {
 
   const goToCodeEntry = useCallback(() => setCurrentScreen('code-entry-screen'), []);
   const goToSummary = useCallback(() => setCurrentScreen('summary-screen'), []);
+
+  // Show Setup Screen if no kioskId is configured in URL
+  if (!currentKioskId) {
+    return <KioskSetupScreen />;
+  }
 
   return (
     <>
