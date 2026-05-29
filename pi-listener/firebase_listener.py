@@ -47,7 +47,7 @@ def convert_to_pdf(input_path):
         print(f"❌ Conversion failed: {e}")
         return None
 
-def print_file(file_path, copies=1):
+def print_file(file_path, copies=1, page_range=None):
     """ Sends file to CUPS printer and verifies it printed successfully """
     try:
         # Validate file exists and has real content
@@ -65,8 +65,11 @@ def print_file(file_path, copies=1):
                 return False
             print(f"✅ Valid PDF confirmed ({file_size} bytes)")
 
-        print(f"🖨️  Sending to CUPS: {file_path} ({copies} copies)")
-        cmd = ["lp", "-d", PRINTER_NAME, "-n", str(copies), file_path]
+        print(f"🖨️  Sending to CUPS: {file_path} ({copies} copies, pages: {page_range or 'all'})")
+        cmd = ["lp", "-d", PRINTER_NAME, "-n", str(copies)]
+        if page_range:
+            cmd.extend(["-P", str(page_range)])
+        cmd.append(file_path)
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
         
         # Extract job ID from lp output (e.g., "request id is Brother_HL_L5210DN_series-3372 (1 file(s))")
@@ -161,6 +164,13 @@ def process_job(doc_snapshot):
     file_name = doc.get("fileName", "document.pdf")
     copies = doc.get("copies", 1)
     
+    # Extract page range configuration
+    print_options = doc.get("printOptions", {})
+    page_selection = print_options.get("pageSelection") or print_options.get("pagesToPrint") or "all"
+    page_range = None
+    if page_selection == "custom":
+        page_range = print_options.get("pageRange") or print_options.get("customPageRange")
+    
     local_path = None
     final_path = None
 
@@ -184,7 +194,7 @@ def process_job(doc_snapshot):
                 return
 
         # 3. Print
-        success = print_file(final_path, copies)
+        success = print_file(final_path, copies, page_range)
         
         # 4. Update Status
         if success:

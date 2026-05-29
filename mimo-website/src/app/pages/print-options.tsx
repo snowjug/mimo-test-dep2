@@ -14,6 +14,67 @@ interface UploadedFile {
   size: number;
 }
 
+// Parse range string (e.g. "1-3,5") to list of page numbers
+const parsePageRange = (rangeStr: string, maxPages: number): number[] => {
+  const selected: number[] = [];
+  const cleaned = rangeStr.replace(/\s+/g, "");
+  if (!cleaned) return [];
+  
+  const parts = cleaned.split(",");
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.includes("-")) {
+      const rangeParts = part.split("-");
+      if (rangeParts.length === 2) {
+        const start = parseInt(rangeParts[0], 10);
+        const end = parseInt(rangeParts[1], 10);
+        if (!isNaN(start) && !isNaN(end) && start > 0 && end >= start) {
+          for (let i = start; i <= Math.min(end, maxPages); i++) {
+            selected.push(i);
+          }
+        }
+      }
+    } else {
+      const val = parseInt(part, 10);
+      if (!isNaN(val) && val > 0 && val <= maxPages) {
+        selected.push(val);
+      }
+    }
+  }
+  return Array.from(new Set(selected)).sort((a, b) => a - b);
+};
+
+// Generate compact range string (e.g. [1,2,3,5] -> "1-3,5")
+const generatePageRange = (selectedPages: number[], maxPages: number): string => {
+  if (selectedPages.length === 0) return "";
+  if (selectedPages.length === maxPages) return `1-${maxPages}`;
+  
+  const sorted = [...selectedPages].sort((a, b) => a - b);
+  const ranges: string[] = [];
+  let start = sorted[0];
+  let end = sorted[0];
+  
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === end + 1) {
+      end = sorted[i];
+    } else {
+      if (start === end) {
+        ranges.push(`${start}`);
+      } else {
+        ranges.push(`${start}-${end}`);
+      }
+      start = sorted[i];
+      end = sorted[i];
+    }
+  }
+  if (start === end) {
+    ranges.push(`${start}`);
+  } else {
+    ranges.push(`${start}-${end}`);
+  }
+  return ranges.join(",");
+};
+
 export function PrintOptions() {
   const navigate = useNavigate();
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -25,6 +86,13 @@ export function PrintOptions() {
   const [orientation, setOrientation] = useState("portrait");
   const [photoLayout, setPhotoLayout] = useState("1");
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
+
+  const [activeFileIndex, setActiveFileIndex] = useState(0);
+  const [fileConfigs, setFileConfigs] = useState<Record<string, {
+    pageSelection: "all" | "custom";
+    pageRange: string;
+    selectedPages: number[];
+  }>>({});
 
   // Standard grid layouts
   const gridLayouts = [
@@ -44,9 +112,28 @@ export function PrintOptions() {
       return;
     }
 
-    setFiles(JSON.parse(storedFiles));
+    const parsedFiles = JSON.parse(storedFiles);
+    setFiles(parsedFiles);
+    
+    // Initialize configs
+    const initialConfigs: Record<string, {
+      pageSelection: "all" | "custom";
+      pageRange: string;
+      selectedPages: number[];
+    }> = {};
+    parsedFiles.forEach((file: any) => {
+      const pCount = file.pageCount || 1;
+      initialConfigs[file.name] = {
+        pageSelection: "all",
+        pageRange: `1-${pCount}`,
+        selectedPages: Array.from({ length: pCount }, (_, i) => i + 1)
+      };
+    });
+    setFileConfigs(initialConfigs);
+
     if (uploadTotalPages) setTotalPages(Number(uploadTotalPages));
     if (uploadAmount) setBaseTotalCost(Number(uploadAmount));
+
 
     // Scroll to top when page loads
     window.scrollTo(0, 0);
@@ -63,6 +150,119 @@ export function PrintOptions() {
   const [totalPages, setTotalPages] = useState(0);
   const [baseTotalCost, setBaseTotalCost] = useState(0);
 
+  // Recalculate totalPages when fileConfigs or pageSelection changes
+  useEffect(() => {
+    if (files.length === 0 || Object.keys(fileConfigs).length === 0) return;
+    
+    let totalPrintedPages = 0;
+    files.forEach((file) => {
+      const config = fileConfigs[file.name];
+      if (config) {
+        if (pageSelection === "all") {
+          totalPrintedPages += (file.pageCount || 1);
+        } else {
+          totalPrintedPages += config.selectedPages.length;
+        }
+      } else {
+        totalPrintedPages += (file.pageCount || 1);
+      }
+    });
+    
+    setTotalPages(totalPrintedPages);
+  }, [fileConfigs, pageSelection, files]);
+
+  // Handler to toggle a single page
+  const handleTogglePage = (fileName: string, pageNum: number) => {
+    setFileConfigs((prev) => {
+      const config = prev[fileName];
+      if (!config) return prev;
+      
+      const maxPages = files.find(f => f.name === fileName)?.pageCount || 1;
+      let newSelected = [...config.selectedPages];
+      if (newSelected.includes(pageNum)) {
+        newSelected = newSelected.filter(p => p !== pageNum);
+      } else {
+        newSelected.push(pageNum);
+      }
+      newSelected.sort((a, b) => a - b);
+      
+      return {
+        ...prev,
+        [fileName]: {
+          ...config,
+          selectedPages: newSelected,
+          pageRange: generatePageRange(newSelected, maxPages)
+        }
+      };
+    });
+  };
+
+  // Handler for quick actions
+  const handleQuickSelect = (fileName: string, type: "first-half" | "second-half" | "odds" | "evens") => {
+    setFileConfigs((prev) => {
+      const config = prev[fileName];
+      if (!config) return prev;
+      
+      const maxPages = files.find(f => f.name === fileName)?.pageCount || 1;
+      let newSelected: number[] = [];
+      if (type === "first-half") {
+        const mid = Math.ceil(maxPages / 2);
+        for (let i = 1; i <= mid; i++) newSelected.push(i);
+      } else if (type === "second-half") {
+        const mid = Math.ceil(maxPages / 2);
+        for (let i = mid + 1; i <= maxPages; i++) newSelected.push(i);
+      } else if (type === "odds") {
+        for (let i = 1; i <= maxPages; i += 2) newSelected.push(i);
+      } else if (type === "evens") {
+        for (let i = 2; i <= maxPages; i += 2) newSelected.push(i);
+      }
+      
+      return {
+        ...prev,
+        [fileName]: {
+          ...config,
+          selectedPages: newSelected,
+          pageRange: generatePageRange(newSelected, maxPages)
+        }
+      };
+    });
+  };
+
+  // Handler for manual text input change
+  const handleTextRangeChange = (fileName: string, text: string) => {
+    setFileConfigs((prev) => {
+      const config = prev[fileName];
+      if (!config) return prev;
+      
+      const maxPages = files.find(f => f.name === fileName)?.pageCount || 1;
+      const newSelected = parsePageRange(text, maxPages);
+      
+      return {
+        ...prev,
+        [fileName]: {
+          ...config,
+          pageRange: text,
+          selectedPages: newSelected
+        }
+      };
+    });
+  };
+
+  // Handler to toggle page selection globally (All vs Custom)
+  const handlePageSelectionChange = (val: "all" | "custom") => {
+    setPageSelection(val);
+    setFileConfigs((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach(fileName => {
+        updated[fileName] = {
+          ...updated[fileName],
+          pageSelection: val
+        };
+      });
+      return updated;
+    });
+  };
+
   let sheetsNeeded = totalPages;
   if (hasImages && photoLayout !== "1") {
     sheetsNeeded = Math.ceil(totalPages / Number(photoLayout));
@@ -76,14 +276,35 @@ export function PrintOptions() {
   
   const totalCost = actualPages * copies * basePrice;
 
+  // Check if any file configured for "custom" has 0 pages selected
+  let hasSelectionError = false;
+  if (pageSelection === "custom") {
+    files.forEach((file) => {
+      const config = fileConfigs[file.name];
+      if (!config || config.selectedPages.length === 0) {
+        hasSelectionError = true;
+      }
+    });
+  }
+
   const handleContinue = () => {
+    // Prepare simplified fileConfigs to save in sessionStorage
+    const simplifiedConfigs: Record<string, { pageSelection: string; pageRange: string }> = {};
+    Object.keys(fileConfigs).forEach(fileName => {
+      simplifiedConfigs[fileName] = {
+        pageSelection: fileConfigs[fileName].pageSelection,
+        pageRange: fileConfigs[fileName].pageRange
+      };
+    });
+
     // Store print options for payment page
     sessionStorage.setItem("printOptions", JSON.stringify({
       copies,
       colorMode,
       doubleSided,
       pageSelection,
-      pageRange,
+      pageRange: files.length > 0 ? (fileConfigs[files[0].name]?.pageRange || "") : "", // fallback
+      fileConfigs: simplifiedConfigs,
       orientation,
       photoLayout,
       totalPages: actualPages * copies,
@@ -101,7 +322,13 @@ export function PrintOptions() {
   };
 
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 py-2 sm:p-4">
+    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 py-2 sm:p-4" style={{ fontFamily: "'Outfit', sans-serif" }}>
+      {/* Global Styles for Custom Fonts */}
+      <style>
+        {`
+          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+        `}
+      </style>
       <div className="mx-auto max-w-6xl space-y-3 sm:space-y-5">
 
         {/* Header */}
@@ -267,7 +494,7 @@ export function PrintOptions() {
                 </div>
                 <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
                   <button
-                    onClick={() => setPageSelection("all")}
+                    onClick={() => handlePageSelectionChange("all")}
                     type="button"
                     className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
                       pageSelection === "all"
@@ -281,7 +508,7 @@ export function PrintOptions() {
                     <span>All Pages</span>
                   </button>
                   <button
-                    onClick={() => setPageSelection("custom")}
+                    onClick={() => handlePageSelectionChange("custom")}
                     type="button"
                     className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
                       pageSelection === "custom"
@@ -302,16 +529,136 @@ export function PrintOptions() {
                   />
                 </div>
               </div>
-              {pageSelection === "custom" && (
-                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-1.5 animate-in slide-in-from-top-1 fade-in duration-200">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">Page Numbers</span>
-                  <Input
-                    type="text"
-                    placeholder="e.g. 1-5, 8, 11-13"
-                    value={pageRange}
-                    onChange={(e) => setPageRange(e.target.value)}
-                    className="bg-slate-50 border-2 border-slate-200/80 shadow-inner h-10 w-full text-slate-800 placeholder:text-slate-400 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 focus-visible:bg-white font-medium"
-                  />
+              
+              {pageSelection === "custom" && files.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-1 fade-in duration-200">
+                  {/* File Selector Tabs (if multiple files exist) */}
+                  {files.length > 1 && (
+                    <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/40">
+                      {files.map((file, idx) => {
+                        const isActive = activeFileIndex === idx;
+                        const config = fileConfigs[file.name];
+                        const selectedCount = config ? config.selectedPages.length : 0;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setActiveFileIndex(idx)}
+                            className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                              isActive
+                                ? "bg-white text-[#093765] shadow-xs border border-slate-200/50"
+                                : "text-slate-500 hover:text-slate-800"
+                            }`}
+                          >
+                            <span className="truncate max-w-[100px]">{file.name}</span>
+                            <Badge className="px-1 py-0 text-[9px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold border-0">
+                              {selectedCount} pgs
+                            </Badge>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Active File Config */}
+                  {(() => {
+                    const activeFile = files[activeFileIndex];
+                    if (!activeFile) return null;
+                    const config = fileConfigs[activeFile.name] || {
+                      pageSelection: "custom",
+                      pageRange: "",
+                      selectedPages: []
+                    };
+                    const maxPages = activeFile.pageCount || 1;
+                    const pageNumbers = Array.from({ length: maxPages }, (_, i) => i + 1);
+
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between pl-1">
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-slate-800 truncate pr-2" title={activeFile.name}>
+                              {activeFile.name}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                              Select pages to print ({maxPages} total pages)
+                            </p>
+                          </div>
+                          {config.selectedPages.length === 0 && (
+                            <Badge className="bg-red-100 text-red-700 border-red-200 text-[9px] uppercase font-bold shrink-0">
+                              No Pages Selected
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Interactive Page Grid */}
+                        <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-48 overflow-y-auto">
+                          {pageNumbers.map((num) => {
+                            const isSelected = config.selectedPages.includes(num);
+                            return (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => handleTogglePage(activeFile.name, num)}
+                                className={`h-8 w-8 text-xs font-bold rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+                                  isSelected
+                                    ? "bg-[#093765] text-white border-[#093765] shadow-xs active:scale-95"
+                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 active:scale-95"
+                                }`}
+                              >
+                                {num}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Quick Action Selection Buttons */}
+                        <div className="flex flex-wrap gap-1.5 pl-1">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelect(activeFile.name, "first-half")}
+                            className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
+                          >
+                            First Half
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelect(activeFile.name, "second-half")}
+                            className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
+                          >
+                            Second Half
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelect(activeFile.name, "odds")}
+                            className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
+                          >
+                            Odd Pages
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelect(activeFile.name, "evens")}
+                            className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
+                          >
+                            Even Pages
+                          </button>
+                        </div>
+
+                        {/* Synced Text Input */}
+                        <div className="flex flex-col gap-1 mt-1 pl-1">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                            Or enter page range (e.g., 1-3,5,7-9)
+                          </span>
+                          <Input
+                            type="text"
+                            placeholder="e.g. 1-5, 8, 11-13"
+                            value={config.pageRange}
+                            onChange={(e) => handleTextRangeChange(activeFile.name, e.target.value)}
+                            className="bg-slate-50 border-2 border-slate-200/80 shadow-inner h-9 w-full text-slate-800 placeholder:text-slate-400 focus-visible:ring-[#093765] focus-visible:border-[#093765] focus-visible:bg-white font-semibold text-xs rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </Card>
@@ -563,12 +910,21 @@ export function PrintOptions() {
                   </div>
                 </div>
 
-                <Button
-                  className="w-full h-12 sm:h-14 bg-[#093765] hover:bg-[#052345] border border-white/10 text-white font-bold text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 hover:-translate-y-0.5 transition-all duration-300 active:scale-95 flex items-center justify-center gap-3"
+                 <Button
+                  className="w-full h-12 sm:h-14 bg-[#093765] hover:bg-[#052345] border border-white/10 text-white font-bold text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 hover:-translate-y-0.5 transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleContinue}
+                  disabled={files.length === 0 || hasSelectionError}
                 >
                   Continue to Pay
                 </Button>
+
+                {hasSelectionError && (
+                  <div className="flex items-center justify-center gap-2 pt-1">
+                    <span className="text-[10px] text-red-300 font-bold bg-red-500/10 px-2 py-1 rounded border border-red-500/20">
+                      ⚠️ Select at least 1 page for each file
+                    </span>
+                  </div>
+                )}
 
                 {doubleSided === "double" && (
                   <div className="flex items-center justify-center gap-2 pt-1 opacity-80">

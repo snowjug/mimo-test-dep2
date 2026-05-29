@@ -462,9 +462,13 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       jobIds.push(doc.id);
       let numPages = doc.data().pageCount || 1;
 
+      const fileConfig = printOptions?.fileConfigs?.[doc.data().fileName];
+      const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
+      const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
+
       // Handle custom page ranges
-      if (printOptions?.pagesToPrint === "custom" && printOptions?.customPageRange) {
-        const ranges = String(printOptions.customPageRange).split(",");
+      if (jobPageSelection === "custom" && jobPageRange) {
+        const ranges = String(jobPageRange).split(",");
         let customCount = 0;
         for (const r of ranges) {
           const parts = r.split("-").map(p => parseInt(p.trim()));
@@ -499,8 +503,15 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       totalAmount += jobCost;
 
       batchUpdate.update(doc.ref, { 
-        printOptions: printOptions || {},
+        printOptions: {
+          ...printOptions,
+          pageSelection: jobPageSelection,
+          pagesToPrint: jobPageSelection,
+          pageRange: jobPageRange,
+          customPageRange: jobPageRange,
+        },
         orderId,
+        pageCount: numPages,
         totalCost: jobCost,
         finalCost: jobCost,
         merchantTransactionId: orderId,

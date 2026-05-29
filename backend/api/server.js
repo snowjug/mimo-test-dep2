@@ -1143,6 +1143,35 @@ app.get("/validate-coupon/:code", async (req, res) => {
   }
 });
 
+const parsePageRange = (rangeStr, maxPages) => {
+  const selected = [];
+  const cleaned = String(rangeStr || "").replace(/\s+/g, "");
+  if (!cleaned) return [];
+  
+  const parts = cleaned.split(",");
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.includes("-")) {
+      const rangeParts = part.split("-");
+      if (rangeParts.length === 2) {
+        const start = parseInt(rangeParts[0], 10);
+        const end = parseInt(rangeParts[1], 10);
+        if (!isNaN(start) && !isNaN(end) && start > 0 && end >= start) {
+          for (let i = start; i <= Math.min(end, maxPages); i++) {
+            selected.push(i);
+          }
+        }
+      }
+    } else {
+      const val = parseInt(part, 10);
+      if (!isNaN(val) && val > 0 && val <= maxPages) {
+        selected.push(val);
+      }
+    }
+  }
+  return Array.from(new Set(selected)).sort((a, b) => a - b);
+};
+
 // ================= CREATE ORDER =================
 app.post("/create-order", authenticateToken, async (req, res) => {
   try {
@@ -1203,15 +1232,47 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     const batchUpdate = db.batch();
     jobsSnapshot.forEach((doc) => {
       jobIds.push(doc.id);
-      const pages = doc.data().pageCount || 0;
-      const jobCost = pages * copies * pricePerPage;
+      const originalPageCount = doc.data().pageCount || 0;
+      let pages = originalPageCount;
       
-      totalPages += pages;
+      const fileConfig = printOptions?.fileConfigs?.[doc.data().fileName];
+      const jobPageSelection = fileConfig?.pageSelection || printOptions?.pageSelection || "all";
+      const jobPageRange = fileConfig?.pageRange || printOptions?.pageRange || "";
+
+      if (jobPageSelection === "custom" && jobPageRange) {
+        const selectedPages = parsePageRange(jobPageRange, originalPageCount);
+        if (selectedPages.length > 0) {
+          pages = selectedPages.length;
+        }
+      }
+
+      // Handle N-up layouts
+      let divisor = 1;
+      if (printOptions?.photoLayout === "2") divisor = 2;
+      if (printOptions?.photoLayout === "4") divisor = 4;
+      if (printOptions?.photoLayout === "6") divisor = 6;
+      if (printOptions?.photoLayout === "9") divisor = 9;
+      
+      let sheetsNeeded = Math.ceil(pages / divisor);
+
+      // Handle double-sided
+      const actualPages = printOptions?.doubleSided === "double" ? Math.ceil(sheetsNeeded / 2) : sheetsNeeded;
+
+      const jobCost = actualPages * copies * pricePerPage;
+      
+      totalPages += actualPages;
       totalAmount += jobCost;
 
       batchUpdate.update(doc.ref, { 
-        printOptions: printOptions || {},
+        printOptions: {
+          ...printOptions,
+          pageSelection: jobPageSelection,
+          pagesToPrint: jobPageSelection,
+          pageRange: jobPageRange,
+          customPageRange: jobPageRange,
+        },
         orderId,
+        pageCount: pages,
         totalCost: jobCost,
         finalCost: jobCost,
         merchantTransactionId: orderId,
