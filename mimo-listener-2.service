@@ -1,0 +1,16 @@
+[Unit]
+Description=Mimo Firebase Print Listener
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/mimo
+Environment="PRINTER_NAME=Brother_HL_L2440DW_series"
+Environment="KIOSK_ID=KIOSK_2"
+ExecStart=/home/pi/mimo/venv/bin/python /home/pi/mimo/firebase_listener.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

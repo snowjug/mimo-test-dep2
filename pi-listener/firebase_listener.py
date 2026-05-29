@@ -10,6 +10,8 @@ import threading
 
 # ================= CONFIGURATION =================
 PRINTER_NAME = os.environ.get("PRINTER_NAME", "Brother_HL_L5210DN_series")
+# Kiosk Routing Identity
+KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
 TEMP_DIR = "/tmp/mimo_prints"
 
 if not os.path.exists(TEMP_DIR):
@@ -267,7 +269,7 @@ def heartbeat_loop():
             except:
                 status = "lpstat failed"
                 
-            db.collection("system_status").document("pi").set({
+            db.collection("system_status").document(KIOSK_ID).set({
                 "lastSeen": firestore.SERVER_TIMESTAMP,
                 "printerStatus": status
             }, merge=True)
@@ -291,8 +293,6 @@ def keep_warm_loop():
 # Start keep warm in a background thread
 threading.Thread(target=keep_warm_loop, daemon=True).start()
 
-# Kiosk Routing: Only pick up jobs explicitly meant for this physical kiosk
-KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
 print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
 print(f"📡 Waiting for jobs (status: 'printing', kioskId: '{KIOSK_ID}')...")
 
