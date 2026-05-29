@@ -22,26 +22,18 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if signedIn() && resource.data.userId == request.auth.uid;
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /print_jobs/{jobId} {
-      allow read, delete: if signedIn() && resource.data.userId == request.auth.uid;
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if signedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /payment_transactions/{transactionId} {
-      allow read, delete: if signedIn() && resource.data.userId == request.auth.uid;
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if signedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /mimo_coin_transactions/{transactionId} {
-      allow read, delete: if signedIn() && resource.data.userId == request.auth.uid;
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if signedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
     // Default deny for everything else
