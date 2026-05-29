@@ -86,7 +86,7 @@ export function PrintOptions() {
   const [orientation, setOrientation] = useState("portrait");
   const [photoLayout, setPhotoLayout] = useState("1");
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
-  const [directKioskId, setDirectKioskId] = useState<string | null>(null);
+  const [directKioskId, setDirectKioskId] = useState<string | null>("CV-001");
 
   const [activeFileIndex, setActiveFileIndex] = useState(0);
   const [fileConfigs, setFileConfigs] = useState<Record<string, {
@@ -362,20 +362,7 @@ export function PrintOptions() {
         <CardDescription>Where do you want to print this?</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div 
-          onClick={() => { setDirectKioskId(null); }}
-          className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === null ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${directKioskId === null ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-              <MonitorSmartphone className="w-5 h-5" />
-            </div>
-            <div>
-              <p className={`text-sm font-bold ${directKioskId === null ? 'text-blue-900' : 'text-slate-700'}`}>Any Kiosk (Use Print Code)</p>
-              <p className="text-[10px] text-slate-500 leading-tight">Pay now, then enter the 4-digit code at any tablet.</p>
-            </div>
-          </div>
-        </div>
+
 
         <div 
           onClick={() => { setDirectKioskId("CV-001"); setColorMode("bw"); }}
