@@ -1232,10 +1232,10 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     const batchUpdate = db.batch();
     jobsSnapshot.forEach((doc) => {
       jobIds.push(doc.id);
-      const originalPageCount = doc.data().pageCount || 0;
+      const fileConfig = printOptions?.fileConfigs?.[doc.data().fileName];
+      const originalPageCount = fileConfig?.pageCount || doc.data().pageCount || 0;
       let pages = originalPageCount;
       
-      const fileConfig = printOptions?.fileConfigs?.[doc.data().fileName];
       const jobPageSelection = fileConfig?.pageSelection || printOptions?.pageSelection || "all";
       const jobPageRange = fileConfig?.pageRange || printOptions?.pageRange || "";
 

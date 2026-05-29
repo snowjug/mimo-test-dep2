@@ -248,6 +248,33 @@ export function PrintOptions() {
     });
   };
 
+  // Handler to update page count manually (e.g. for non-PDFs)
+  const handleUpdatePageCount = (fileName: string, newCount: number) => {
+    // 1. Update files state
+    const updatedFiles = files.map(f => {
+      if (f.name === fileName) {
+        return { ...f, pageCount: newCount };
+      }
+      return f;
+    });
+    setFiles(updatedFiles);
+    sessionStorage.setItem("printFiles", JSON.stringify(updatedFiles));
+
+    // 2. Update fileConfigs
+    setFileConfigs(prev => {
+      const config = prev[fileName];
+      if (!config) return prev;
+      return {
+        ...prev,
+        [fileName]: {
+          ...config,
+          pageRange: `1-${newCount}`,
+          selectedPages: Array.from({ length: newCount }, (_, i) => i + 1)
+        }
+      };
+    });
+  };
+
   // Handler to toggle page selection globally (All vs Custom)
   const handlePageSelectionChange = (val: "all" | "custom") => {
     setPageSelection(val);
@@ -289,11 +316,12 @@ export function PrintOptions() {
 
   const handleContinue = () => {
     // Prepare simplified fileConfigs to save in sessionStorage
-    const simplifiedConfigs: Record<string, { pageSelection: string; pageRange: string }> = {};
+    const simplifiedConfigs: Record<string, { pageSelection: string; pageRange: string; pageCount: number }> = {};
     Object.keys(fileConfigs).forEach(fileName => {
       simplifiedConfigs[fileName] = {
         pageSelection: fileConfigs[fileName].pageSelection,
-        pageRange: fileConfigs[fileName].pageRange
+        pageRange: fileConfigs[fileName].pageRange,
+        pageCount: files.find(f => f.name === fileName)?.pageCount || 1
       };
     });
 
@@ -571,6 +599,7 @@ export function PrintOptions() {
                     };
                     const maxPages = activeFile.pageCount || 1;
                     const pageNumbers = Array.from({ length: maxPages }, (_, i) => i + 1);
+                    const isPdf = activeFile.name.toLowerCase().endsWith(".pdf") || (activeFile as any).type === "application/pdf";
 
                     return (
                       <div className="space-y-3">
@@ -581,6 +610,23 @@ export function PrintOptions() {
                             </p>
                             <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
                               Select pages to print ({maxPages} total pages)
+                              {!isPdf && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const val = prompt(`Enter actual total pages for ${activeFile.name}:`, String(maxPages));
+                                    if (val) {
+                                      const num = parseInt(val);
+                                      if (!isNaN(num) && num > 0) {
+                                        handleUpdatePageCount(activeFile.name, num);
+                                      }
+                                    }
+                                  }}
+                                  className="ml-2 text-blue-600 underline font-bold hover:text-blue-800 cursor-pointer"
+                                >
+                                  Change
+                                </button>
+                              )}
                             </p>
                           </div>
                           {config.selectedPages.length === 0 && (
@@ -941,10 +987,10 @@ export function PrintOptions() {
         {/* Preview Modal */}
         {selectedPreview !== null && (
           <div
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-2 sm:p-4 pt-10 sm:pt-6 overflow-y-auto"
             onClick={() => setSelectedPreview(null)}
           >
-            <Card className="max-w-4xl w-full h-[90vh] flex flex-col animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+            <Card className="max-w-4xl w-full h-[90vh] flex flex-col animate-in slide-in-from-top-10 duration-300" onClick={(e) => e.stopPropagation()}>
               <CardHeader className="flex-shrink-0">
                 <CardTitle>Document Preview</CardTitle>
                 <CardDescription>{files[selectedPreview]?.name}</CardDescription>

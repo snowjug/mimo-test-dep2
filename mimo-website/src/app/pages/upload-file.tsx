@@ -21,6 +21,108 @@ interface UploadedFile {
   pageCount?: number;
 }
 
+const estimateDocxPages = async (file: File): Promise<number> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+    const view = new DataView(arrayBuffer);
+    
+    // Find End of Central Directory (EOCD) signature: 0x06054b50
+    let eocdOffset = -1;
+    for (let i = buffer.length - 22; i >= 0; i--) {
+      if (view.getUint32(i, true) === 0x06054b50) {
+        eocdOffset = i;
+        break;
+      }
+    }
+    if (eocdOffset === -1) {
+      return 1;
+    }
+    
+    const cdCount = view.getUint16(eocdOffset + 10, true);
+    const cdStartOffset = view.getUint32(eocdOffset + 16, true);
+    
+    let words = 0;
+    let pagesMetadata = 1;
+    let paragraphs = 0;
+    let pageBreaks = 0;
+
+    const decompressEntry = async (dataOffset: number, compSize: number): Promise<string> => {
+      if (compSize === 0) return "";
+      const compressedData = buffer.slice(dataOffset, dataOffset + compSize);
+      const ds = new DecompressionStream('deflate-raw');
+      const writer = ds.writable.getWriter();
+      
+      // Start writing and close concurrently to prevent backpressure deadlock
+      const writePromise = writer.write(compressedData).then(() => writer.close());
+      const response = new Response(ds.readable);
+      const text = await response.text();
+      await writePromise;
+      return text;
+    };
+    
+    let cdOffset = cdStartOffset;
+    for (let i = 0; i < cdCount; i++) {
+      if (cdOffset + 46 > buffer.length) break;
+      const sig = view.getUint32(cdOffset, true);
+      if (sig !== 0x02014b50) break;
+      
+      const compSize = view.getUint32(cdOffset + 20, true);
+      const fileNameLen = view.getUint16(cdOffset + 28, true);
+      const extraFieldLen = view.getUint16(cdOffset + 30, true);
+      const commentLen = view.getUint16(cdOffset + 32, true);
+      const localHeaderOffset = view.getUint32(cdOffset + 42, true);
+      
+      const fileNameBytes = buffer.slice(cdOffset + 46, cdOffset + 46 + fileNameLen);
+      const fileName = new TextDecoder("utf-8").decode(fileNameBytes);
+      
+      if (localHeaderOffset + 30 <= buffer.length) {
+        const lfSig = view.getUint32(localHeaderOffset, true);
+        if (lfSig === 0x04034b50) {
+          const lfFileNameLen = view.getUint16(localHeaderOffset + 26, true);
+          const lfExtraFieldLen = view.getUint16(localHeaderOffset + 28, true);
+          const dataOffset = localHeaderOffset + 30 + lfFileNameLen + lfExtraFieldLen;
+          
+          if (fileName === 'docProps/app.xml') {
+            const text = await decompressEntry(dataOffset, compSize);
+            const pagesMatch = text.match(/<Pages>(\d+)<\/Pages>/);
+            const wordsMatch = text.match(/<Words>(\d+)<\/Words>/);
+            pagesMetadata = pagesMatch ? parseInt(pagesMatch[1], 10) : 1;
+            words = wordsMatch ? parseInt(wordsMatch[1], 10) : 0;
+          }
+          
+          if (fileName === 'word/document.xml') {
+            const text = await decompressEntry(dataOffset, compSize);
+            const pMatches = text.match(/<w:p\b/g);
+            paragraphs = pMatches ? pMatches.length : 0;
+            
+            const lrbMatches = text.match(/<w:lastRenderedPageBreak\b/g);
+            const lrbCount = lrbMatches ? lrbMatches.length : 0;
+            
+            const brMatches = text.match(/<w:br\b[^>]*?w:type="page"/g);
+            const brCount = brMatches ? brMatches.length : 0;
+            
+            pageBreaks = lrbCount + brCount;
+          }
+        }
+      }
+      
+      cdOffset += 46 + fileNameLen + extraFieldLen + commentLen;
+    }
+
+    const estPagesByWords = Math.ceil(words / 350);
+    const estPagesByParagraphs = Math.ceil(paragraphs / 22);
+    const estPagesByBreaks = pageBreaks + 1;
+    return Math.max(pagesMetadata, estPagesByWords, estPagesByParagraphs, estPagesByBreaks);
+
+  } catch (err) {
+    console.error("Error reading DOCX pages:", err);
+  }
+  
+  // Fallback: rough estimation based on size
+  return file.size > 2000000 ? Math.max(1, Math.floor(file.size / 500000)) : 1;
+};
+
 export function UploadFile() {
   const navigate = useNavigate();
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -99,6 +201,7 @@ export function UploadFile() {
       // 1. Parse PDFs locally for page counts
       const filesMeta = await Promise.all(fileArray.map(async (f) => {
         let pageCount = 1;
+        const isDocx = f.name.toLowerCase().endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
         if (f.type === "application/pdf") {
           try {
             const arrayBuffer = await f.arrayBuffer();
@@ -107,8 +210,10 @@ export function UploadFile() {
           } catch (err) {
             console.error("Failed to parse PDF on client:", err);
           }
+        } else if (isDocx) {
+          pageCount = await estimateDocxPages(f);
         } else if (!f.type.startsWith("image/")) {
-            // Rough estimation for docx, pptx based on file size
+            // Rough estimation for other files (e.g. pptx, xlsx) based on file size
             pageCount = f.size > 2000000 ? Math.floor(f.size / 500000) : 1;
         }
         return { name: f.name, type: f.type, size: f.size, pageCount };
@@ -393,51 +498,53 @@ export function UploadFile() {
         </Card>
 
         {/* Quick Print - A4 Sheet & Mimo Graph */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <button
-            onClick={() => navigate("/blank-pages?type=a4")}
-            className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-blue-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="relative z-10 flex flex-col items-center sm:items-start gap-3">
-              <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-slate-300 bg-white flex items-center justify-center shadow-sm group-hover:border-[#093765] group-hover:shadow-md transition-all duration-300">
-                <FileIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-400 group-hover:text-[#093765] transition-colors duration-300" />
+        {files.length === 0 && (
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <button
+              onClick={() => navigate("/blank-pages?type=a4")}
+              className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-blue-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative z-10 flex flex-col items-center sm:items-start gap-3">
+                <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-slate-300 bg-white flex items-center justify-center shadow-sm group-hover:border-[#093765] group-hover:shadow-md transition-all duration-300">
+                  <FileIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-400 group-hover:text-[#093765] transition-colors duration-300" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-[#093765] transition-colors">A4 Sheet</h3>
+                  <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Blank white pages</p>
+                </div>
               </div>
-              <div className="text-center sm:text-left">
-                <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-[#093765] transition-colors">A4 Sheet</h3>
-                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Blank white pages</p>
-              </div>
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-blue-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
-          </button>
+              <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-blue-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
+            </button>
 
-          <button
-            onClick={() => navigate("/blank-pages?type=graph")}
-            className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="relative z-10 flex flex-col items-center sm:items-start gap-3">
-              <div
-                className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-emerald-300 bg-white flex items-center justify-center shadow-sm group-hover:border-emerald-500 group-hover:shadow-md transition-all duration-300"
-                style={{
-                  backgroundImage: "linear-gradient(rgba(16, 185, 129, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.12) 1px, transparent 1px)",
-                  backgroundSize: "6px 6px",
-                }}
-              >
-                <Grid3X3 className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-400 group-hover:text-emerald-600 transition-colors duration-300" />
+            <button
+              onClick={() => navigate("/blank-pages?type=graph")}
+              className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative z-10 flex flex-col items-center sm:items-start gap-3">
+                <div
+                  className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-emerald-300 bg-white flex items-center justify-center shadow-sm group-hover:border-emerald-500 group-hover:shadow-md transition-all duration-300"
+                  style={{
+                    backgroundImage: "linear-gradient(rgba(16, 185, 129, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.12) 1px, transparent 1px)",
+                    backgroundSize: "6px 6px",
+                  }}
+                >
+                  <Grid3X3 className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-400 group-hover:text-emerald-600 transition-colors duration-300" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-emerald-700 transition-colors">Mimo Graph</h3>
+                  <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Graph paper sheets</p>
+                </div>
               </div>
-              <div className="text-center sm:text-left">
-                <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-emerald-700 transition-colors">Mimo Graph</h3>
-                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Graph paper sheets</p>
-              </div>
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-emerald-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
-          </button>
-        </div>
+              <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-emerald-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
+            </button>
+          </div>
+        )}
 
         {/* Uploaded Files */}
         {files.length > 0 && (
-          <Card className="border-0 shadow-lg overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-500">
+          <Card className="border-0 shadow-lg overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-500 gap-3">
             <CardHeader>
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
@@ -446,12 +553,7 @@ export function UploadFile() {
                     {files.filter((f) => f.status === "completed").length} of {files.length} file(s) ready
                   </CardDescription>
                 </div>
-                {files.some((f) => f.status === "completed") && (
-                  <div className="text-left sm:text-right bg-indigo-50 px-4 py-2 rounded-lg w-full sm:w-auto">
-                    <p className="text-sm font-medium">Est. pages: {displayTotalPages}</p>
-                    <p className="text-xs text-gray-500">Total print time: ~{Math.ceil(displayTotalPages / 10)} mins</p>
-                  </div>
-                )}
+
               </div>
             </CardHeader>
             <CardContent>

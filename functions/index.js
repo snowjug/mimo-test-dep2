@@ -460,9 +460,8 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     const batchUpdate = db.batch();
     jobsSnapshot.forEach((doc) => {
       jobIds.push(doc.id);
-      let numPages = doc.data().pageCount || 1;
-
       const fileConfig = printOptions?.fileConfigs?.[doc.data().fileName];
+      let numPages = fileConfig?.pageCount || doc.data().pageCount || 1;
       const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
       const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
 
