@@ -7,7 +7,7 @@ import { Separator } from "../components/ui/separator";
 import { Badge } from "../components/ui/badge";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { MimoHeader } from "../components/mimo-header";
-import { ArrowLeft, FileText, Minus, Plus, Eye, Printer, Palette, Contrast, File, Files, Copy, Sliders } from "lucide-react";
+import { ArrowLeft, FileText, Minus, Plus, Eye, Printer, Palette, Contrast, File, Files, Copy, Sliders, MapPin, Grid3X3 } from "lucide-react";
 
 interface UploadedFile {
   name: string;
@@ -86,6 +86,7 @@ export function PrintOptions() {
   const [orientation, setOrientation] = useState("portrait");
   const [photoLayout, setPhotoLayout] = useState("1");
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
+  const [directKioskId, setDirectKioskId] = useState<string | null>(null);
 
   const [activeFileIndex, setActiveFileIndex] = useState(0);
   const [fileConfigs, setFileConfigs] = useState<Record<string, {
@@ -333,11 +334,12 @@ export function PrintOptions() {
       pageSelection,
       pageRange: files.length > 0 ? (fileConfigs[files[0].name]?.pageRange || "") : "", // fallback
       fileConfigs: simplifiedConfigs,
-      orientation,
-      photoLayout,
-      totalPages: actualPages * copies,
-      totalCost
+      fileConfigs,
+      totalCost,
+      totalPages: actualPages, // Store actual printable pages per set
+      directKioskId
     }));
+
     navigate("/payment");
   };
 
@@ -906,8 +908,65 @@ export function PrintOptions() {
             </Card>
           </div>
 
-          {/* Cost Summary - Premium Dark Style */}
-          <div className="lg:col-span-1 sticky top-6">
+          {/* Sidebar (Destination & Cost Summary) */}
+          <div className="lg:col-span-1 sticky top-6 space-y-4">
+            {/* Print Destination Selection */}
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-blue-600" /> Print Destination
+                </CardTitle>
+                <CardDescription>Where do you want to print this?</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div 
+                  onClick={() => setDirectKioskId(null)}
+                  className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${!directKioskId ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${!directKioskId ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                      <Grid3X3 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-bold ${!directKioskId ? 'text-blue-900' : 'text-slate-700'}`}>Walk-Up Tablet (Default)</p>
+                      <p className="text-[10px] text-slate-500 leading-tight">Get a 4-digit code and print at any physical kiosk tablet.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div 
+                  onClick={() => setDirectKioskId("CV-001")}
+                  className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'CV-001' ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${directKioskId === 'CV-001' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                      <Printer className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-bold ${directKioskId === 'CV-001' ? 'text-blue-900' : 'text-slate-700'}`}>Kiosk 001</p>
+                      <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Boys Hostel. Bypasses tablet code.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div 
+                  onClick={() => setDirectKioskId("SV-002")}
+                  className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'SV-002' ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${directKioskId === 'SV-002' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                      <Printer className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-bold ${directKioskId === 'SV-002' ? 'text-blue-900' : 'text-slate-700'}`}>Kiosk 002</p>
+                      <p className="text-[10px] text-slate-500 leading-tight">Directly print to Reva Girls Hostel. Bypasses tablet code.</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Cost Summary - Premium Dark Style */}
             <Card className="border-0 bg-gradient-to-br from-[#093765] to-blue-600 text-white overflow-hidden animate-in fade-in duration-500 rounded-2xl sm:rounded-[2rem] shadow-2xl relative group">
               <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <Printer className="w-32 h-32 rotate-12" />

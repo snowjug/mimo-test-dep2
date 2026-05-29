@@ -820,6 +820,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     // ✅ GENERATE ONLY ONCE HERE
     const printCode = Math.floor(1000 + Math.random() * 9000).toString();
     const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000);
+    const directKioskId = storedPrintOptions.directKioskId;
 
     const batch = db.batch();
     let totalAmountForCoins = 0;
@@ -828,19 +829,32 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       const data = doc.data();
       totalAmountForCoins += (data.pageCount || 0) * 2.3; // Defaulting to BW price for coins
       
-      batch.update(doc.ref, {
-        status: "paid",
-        "paymentStatus.status": "completed",
-        "paymentStatus.paidAt": admin.firestore.FieldValue.serverTimestamp(),
-        paymentTime: admin.firestore.FieldValue.serverTimestamp(),
-        printCode,
-        tokenId: printCode,
-        codeCreatedAt: now,
-        codeExpiresAt: expiresAt,
-        isPrinted: false,
-        printerStatus: "ready",
-        "printStatus.status": "ready"
-      });
+      if (directKioskId) {
+        batch.update(doc.ref, {
+          status: "printing",
+          kioskId: directKioskId,
+          "paymentStatus.status": "completed",
+          "paymentStatus.paidAt": admin.firestore.FieldValue.serverTimestamp(),
+          paymentTime: admin.firestore.FieldValue.serverTimestamp(),
+          isPrinted: false,
+          printerStatus: "Sent to Kiosk",
+          "printStatus.status": "printing"
+        });
+      } else {
+        batch.update(doc.ref, {
+          status: "paid",
+          "paymentStatus.status": "completed",
+          "paymentStatus.paidAt": admin.firestore.FieldValue.serverTimestamp(),
+          paymentTime: admin.firestore.FieldValue.serverTimestamp(),
+          printCode,
+          tokenId: printCode,
+          codeCreatedAt: now,
+          codeExpiresAt: expiresAt,
+          isPrinted: false,
+          printerStatus: "ready",
+          "printStatus.status": "ready"
+        });
+      }
     });
 
     // Calculate coins earned: 1 coin if payment is above ₹10
@@ -851,7 +865,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
         userId,
         type: "earned",
         amount: coinsEarned,
-        description: `Earned from print job ${printCode}`,
+        description: directKioskId ? `Earned from direct print` : `Earned from print job ${printCode}`,
         createdAt: now,
       });
 
@@ -869,7 +883,8 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
 
     res.json({
       message: "Payment success",
-      printCode,   // ✅ RETURN TO FRONTEND
+      printCode: directKioskId ? null : printCode,
+      directKioskId: directKioskId || null
     });
 
   } catch (err) {

@@ -27,15 +27,23 @@ export function PaymentVerify() {
           
           // Trigger the job finalization (generate code, etc)
           // Pass orderId so backend scopes to the correct order, not any pending job
-          const successResponse = await api.post("/payment-success", { orderId });
-          const { printCode } = successResponse.data;
+          const savedOptions = sessionStorage.getItem("printOptions");
+          const parsedOptions = savedOptions ? JSON.parse(savedOptions) : {};
+          const successResponse = await api.post("/payment-success", { orderId, printOptions: parsedOptions });
+          const { printCode, directKioskId } = successResponse.data;
 
-          sessionStorage.setItem("printCode", printCode);
-          toast.success("Payment confirmed!");
-          
-          setTimeout(() => {
-            navigate("/print-code");
-          }, 2000);
+          if (directKioskId) {
+            toast.success("Payment confirmed! Sending to Kiosk...");
+            setTimeout(() => {
+              navigate(`/direct-success?kioskId=${directKioskId}`);
+            }, 2000);
+          } else {
+            sessionStorage.setItem("printCode", printCode);
+            toast.success("Payment confirmed!");
+            setTimeout(() => {
+              navigate("/print-code");
+            }, 2000);
+          }
         } else {
           setStatus("failed");
           toast.error(`Payment status: ${order_status}`);
