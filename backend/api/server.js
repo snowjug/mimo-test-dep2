@@ -820,16 +820,22 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     // ✅ GENERATE ONLY ONCE HERE
     const printCode = Math.floor(1000 + Math.random() * 9000).toString();
     const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000);
-    const directKioskId = storedPrintOptions.directKioskId;
+    
+    // We will track if any job was a direct print to return to the frontend
+    let wasDirectPrint = false;
+    let finalDirectKioskId = null;
 
     const batch = db.batch();
     let totalAmountForCoins = 0;
 
     jobsToUpdate.forEach((doc) => {
       const data = doc.data();
+      const directKioskId = data.printOptions?.directKioskId;
       totalAmountForCoins += (data.pageCount || 0) * 2.3; // Defaulting to BW price for coins
       
       if (directKioskId) {
+        wasDirectPrint = true;
+        finalDirectKioskId = directKioskId;
         batch.update(doc.ref, {
           status: "printing",
           kioskId: directKioskId,
@@ -865,7 +871,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
         userId,
         type: "earned",
         amount: coinsEarned,
-        description: directKioskId ? `Earned from direct print` : `Earned from print job ${printCode}`,
+        description: wasDirectPrint ? `Earned from direct print` : `Earned from print job ${printCode}`,
         createdAt: now,
       });
 
@@ -883,8 +889,8 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
 
     res.json({
       message: "Payment success",
-      printCode: directKioskId ? null : printCode,
-      directKioskId: directKioskId || null
+      printCode: wasDirectPrint ? null : printCode,
+      directKioskId: finalDirectKioskId
     });
 
   } catch (err) {
