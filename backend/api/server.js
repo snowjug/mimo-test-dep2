@@ -836,31 +836,21 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       if (directKioskId) {
         wasDirectPrint = true;
         finalDirectKioskId = directKioskId;
-        batch.update(doc.ref, {
-          status: "printing",
-          kioskId: directKioskId,
-          "paymentStatus.status": "completed",
-          "paymentStatus.paidAt": admin.firestore.FieldValue.serverTimestamp(),
-          paymentTime: admin.firestore.FieldValue.serverTimestamp(),
-          isPrinted: false,
-          printerStatus: "Sent to Kiosk",
-          "printStatus.status": "printing"
-        });
-      } else {
-        batch.update(doc.ref, {
-          status: "paid",
-          "paymentStatus.status": "completed",
-          "paymentStatus.paidAt": admin.firestore.FieldValue.serverTimestamp(),
-          paymentTime: admin.firestore.FieldValue.serverTimestamp(),
-          printCode,
-          tokenId: printCode,
-          codeCreatedAt: now,
-          codeExpiresAt: expiresAt,
-          isPrinted: false,
-          printerStatus: "ready",
-          "printStatus.status": "ready"
-        });
       }
+      
+      batch.update(doc.ref, {
+        status: "paid",
+        "paymentStatus.status": "completed",
+        "paymentStatus.paidAt": admin.firestore.FieldValue.serverTimestamp(),
+        paymentTime: admin.firestore.FieldValue.serverTimestamp(),
+        printCode,
+        tokenId: printCode,
+        codeCreatedAt: now,
+        codeExpiresAt: expiresAt,
+        isPrinted: false,
+        printerStatus: "ready",
+        "printStatus.status": "ready"
+      });
     });
 
     // Calculate coins earned: 1 coin if payment is above ₹10
@@ -1869,11 +1859,22 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         continue;
       }
 
+      const directKioskId = data.printOptions?.directKioskId;
+      const colorMode = data.colorMode || data.printOptions?.colorMode;
+      
+      // Determine the true destination kiosk
+      let finalKioskId = kioskId;
+      if (directKioskId) {
+        finalKioskId = directKioskId;
+      } else if (colorMode === "color") {
+        finalKioskId = "SV-002"; // Force color jobs to the SV-002 Epson kiosk
+      }
+
       // Mark sending to Pi
       await doc.ref.update({
         status: "printing",
         printerStatus: "Sending to Pi...",
-        kioskId: kioskId,
+        kioskId: finalKioskId,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
