@@ -879,7 +879,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
 
     res.json({
       message: "Payment success",
-      printCode: wasDirectPrint ? null : printCode,
+      printCode: printCode,
       directKioskId: finalDirectKioskId
     });
 
