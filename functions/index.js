@@ -666,8 +666,21 @@ app.get("/verify-payment/:orderId", authMiddleware, async (req, res) => {
         return res.json({ order_status: "PAID" });
       }
     }
+    let printCode = null;
+    if (order_status === "PAID") {
+      try {
+        const internalRes = await axios.post(
+          `https://api-upqxuj7evq-uc.a.run.app/payment-success`,
+          { orderId },
+          { headers: { Authorization: req.header("Authorization") } }
+        );
+        printCode = internalRes.data.printCode;
+      } catch (internalErr) {
+        console.error("Internal payment-success call failed:", internalErr.response?.data || internalErr.message);
+      }
+    }
     
-    res.json({ order_status });
+    res.json({ order_status, printCode });
   } catch (err) {
     console.error("verify-payment error:", err.response?.data || err.message);
     // If Cashfree call fails, check local DB
@@ -675,7 +688,19 @@ app.get("/verify-payment/:orderId", authMiddleware, async (req, res) => {
       const localOrder = await db.collection("orders").where("orderId", "==", req.params.orderId).get();
       if (!localOrder.empty) {
         const s = localOrder.docs[0].data().status;
-        return res.json({ order_status: s === "PAID" || s === "SUCCESS" ? "PAID" : s });
+        let finalStatus = s === "PAID" || s === "SUCCESS" ? "PAID" : s;
+        let fallbackPrintCode = null;
+        if (finalStatus === "PAID") {
+          try {
+            const internalRes = await axios.post(
+              `https://api-upqxuj7evq-uc.a.run.app/payment-success`,
+              { orderId },
+              { headers: { Authorization: req.header("Authorization") } }
+            );
+            fallbackPrintCode = internalRes.data.printCode;
+          } catch (e) {}
+        }
+        return res.json({ order_status: finalStatus, printCode: fallbackPrintCode });
       }
     } catch(e) {}
     res.status(500).json({ error: "Failed to verify payment" });
