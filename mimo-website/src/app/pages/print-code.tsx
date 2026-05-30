@@ -13,7 +13,9 @@ export function PrintCode() {
   const [printCode, setPrintCode] = useState("");
   const [files, setFiles] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(true);
-  const [printStatus, setPrintStatus] = useState<"paid" | "printing" | "completed" | "failed">("paid");
+  const [printStatus, setPrintStatus] = useState<"paid" | "printing" | "completed" | "failed">(
+    () => (sessionStorage.getItem("printStatus") as any) || "paid"
+  );
 
   useEffect(() => {
     const storedCode = sessionStorage.getItem("printCode");
@@ -47,6 +49,7 @@ export function PrintCode() {
         
         if (data.status && data.status !== printStatus) {
           setPrintStatus(data.status);
+          sessionStorage.setItem("printStatus", data.status);
           if (data.status === "completed") {
             toast.success("Your document has been printed!");
           } else if (data.status === "failed") {
@@ -76,6 +79,7 @@ export function PrintCode() {
     sessionStorage.removeItem("uploadAmount");
     sessionStorage.removeItem("uploadTotalPages");
     sessionStorage.removeItem("totalPages");
+    sessionStorage.removeItem("printStatus");
     navigate("/upload");
   };
 
@@ -117,7 +121,8 @@ export function PrintCode() {
           <MimoHeader />
         </div>
 
-        <Card className="max-w-2xl w-full mx-auto border-0 shadow-2xl bg-white/90 backdrop-blur-xl animate-in zoom-in-95 duration-500 z-10 my-auto">
+        <div className="flex-1 flex items-center justify-center w-full z-10 py-2 sm:py-4">
+          <Card className="max-w-2xl w-full border-0 shadow-2xl bg-white/90 backdrop-blur-xl animate-in zoom-in-95 duration-500">
           <CardHeader className="text-center pt-2 pb-1 px-4">
             <div className="flex justify-center mt-2 mb-1">
               <div className="relative w-20 h-20 flex items-center justify-center">
@@ -200,7 +205,7 @@ export function PrintCode() {
                       <Printer className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                       <div>
                         <h3 className="font-bold text-xs text-blue-900 mb-1">How to Print</h3>
-                        <ol className="text-xs text-blue-800 space-y-1 list-decimal list-inside font-semibold">
+                        <ol className="text-xs text-blue-800 space-y-1 list-decimal list-outside pl-4 font-semibold">
                           <li>Go to the MIMO vending printer</li>
                           <li>Enter the 4-digit code on the printer's keypad</li>
                           <li>Press the "Print" button to start printing</li>
@@ -224,6 +229,7 @@ export function PrintCode() {
               </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     </>
   );

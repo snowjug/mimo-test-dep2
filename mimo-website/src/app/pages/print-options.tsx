@@ -522,10 +522,10 @@ export function PrintOptions() {
                         colorMode === "color" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
                       }`}
                     >
-                      <div className={`w-3.5 h-3.5 rounded-full shrink-0 transition-all duration-300 ${
+                      <div className={`w-3.5 h-3.5 rounded-full border shrink-0 transition-all duration-300 ${
                         colorMode === "color" 
-                          ? "bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-yellow-300 via-pink-400 to-blue-500 scale-110 shadow-sm" 
-                          : "bg-slate-300 scale-100"
+                          ? "bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 border-blue-600 scale-110 shadow-sm" 
+                          : "bg-slate-300 border-slate-400 scale-100"
                       }`} />
                       <span>Color</span>
                     </button>
