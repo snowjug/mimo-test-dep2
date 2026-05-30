@@ -25,16 +25,20 @@ export function PaymentVerify() {
         if (order_status === "PAID" || order_status === "SUCCESS") {
           setStatus("success");
 
-          if (directKioskId) {
-            toast.success("Payment confirmed! Sending to Kiosk...");
-            setTimeout(() => {
-              navigate(`/direct-success?kioskId=${directKioskId}`);
-            }, 2000);
-          } else if (printCode) {
+          if (printCode) {
             sessionStorage.setItem("printCode", printCode);
+            if (directKioskId) {
+              sessionStorage.setItem("directKioskId", directKioskId);
+            }
             toast.success("Payment confirmed!");
             setTimeout(() => {
               navigate("/print-code");
+            }, 2000);
+          } else if (directKioskId) {
+            // Legacy fallback: no code but direct kiosk set (should no longer happen)
+            toast.success("Payment confirmed! Sending to Kiosk...");
+            setTimeout(() => {
+              navigate(`/direct-success?kioskId=${directKioskId}`);
             }, 2000);
           } else {
             // Edge case: Webhook hasn't finished and internal generation failed
