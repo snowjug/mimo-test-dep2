@@ -842,11 +842,22 @@ app.post("/kiosk/print", async (req, res) => {
         continue;
       }
 
+      const directKioskId = data.printOptions?.directKioskId;
+      const colorMode = data.colorMode || data.printOptions?.colorMode;
+      
+      // Determine the true destination kiosk
+      let finalKioskId = targetKiosk;
+      if (directKioskId) {
+        finalKioskId = directKioskId;
+      } else if (colorMode === "color") {
+        finalKioskId = "SV-002"; // Force color jobs to the SV-002 Epson kiosk
+      }
+
       // Queue valid job for specific Pi listener
       await doc.ref.update({
         status: "printing",
         printerStatus: "Sending to Pi...",
-        kioskId: targetKiosk,
+        kioskId: finalKioskId,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
