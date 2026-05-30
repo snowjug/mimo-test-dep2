@@ -20,29 +20,28 @@ export function PaymentVerify() {
     const verify = async () => {
       try {
         const response = await api.get(`/verify-payment/${orderId}`);
-        const { order_status } = response.data;
+        const { order_status, printCode, directKioskId } = response.data;
 
         if (order_status === "PAID" || order_status === "SUCCESS") {
           setStatus("success");
-          
-          // Trigger the job finalization (generate code, etc)
-          // Pass orderId so backend scopes to the correct order, not any pending job
-          const savedOptions = sessionStorage.getItem("printOptions");
-          const parsedOptions = savedOptions ? JSON.parse(savedOptions) : {};
-          const successResponse = await api.post("/payment-success", { orderId, printOptions: parsedOptions });
-          const { printCode, directKioskId } = successResponse.data;
 
           if (directKioskId) {
             toast.success("Payment confirmed! Sending to Kiosk...");
             setTimeout(() => {
               navigate(`/direct-success?kioskId=${directKioskId}`);
             }, 2000);
-          } else {
+          } else if (printCode) {
             sessionStorage.setItem("printCode", printCode);
             toast.success("Payment confirmed!");
             setTimeout(() => {
               navigate("/print-code");
             }, 2000);
+          } else {
+            // Edge case: Webhook hasn't finished and internal generation failed
+            toast.success("Payment confirmed! Generating print code...");
+            setTimeout(() => {
+              navigate("/print-code"); // print-code page can try to fetch the code itself if needed
+            }, 3000);
           }
         } else {
           setStatus("failed");

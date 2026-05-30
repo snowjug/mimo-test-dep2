@@ -85,6 +85,7 @@ export function PrintOptions() {
   const [pageRange, setPageRange] = useState("");
   const [orientation, setOrientation] = useState("portrait");
   const [photoLayout, setPhotoLayout] = useState("1");
+  const [imageScaling, setImageScaling] = useState("fit");
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
   const [directKioskId, setDirectKioskId] = useState<string | null>("CV-001");
 
@@ -335,6 +336,7 @@ export function PrintOptions() {
       colorMode,
       doubleSided,
       pageSelection,
+      imageScaling,
       pageRange: files.length > 0 ? (fileConfigs[files[0].name]?.pageRange || "") : "", // fallback
       fileConfigs: simplifiedConfigs,
       totalCost,
@@ -540,6 +542,73 @@ export function PrintOptions() {
                 </div>
               </div>
             </Card>
+
+            {hasImages && (
+              <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-slate-800">Image Scaling</p>
+                      <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 px-1.5 py-0 text-[8px] sm:text-[9px] uppercase tracking-wider font-bold">
+                        Images Only
+                      </Badge>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium">How should the image fit on A4?</p>
+                  </div>
+                  
+                  <div className="flex flex-col items-center gap-3 w-full sm:w-auto">
+                    <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
+                      <button
+                        onClick={() => setImageScaling("fit")}
+                        type="button"
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                          imageScaling === "fit" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        <MonitorSmartphone className="w-3.5 h-3.5 shrink-0" />
+                        <span>Fit to A4</span>
+                      </button>
+                      <button
+                        onClick={() => setImageScaling("fill")}
+                        type="button"
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                          imageScaling === "fill" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        <Grid3X3 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Fill (Crop)</span>
+                      </button>
+                      <div
+                        className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
+                          imageScaling === "fit" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                        }`}
+                      />
+                    </div>
+                    
+                    {/* Visual Preview */}
+                    <div className="mt-2 bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col items-center w-full">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Live Preview (A4 Ratio)</p>
+                      <div className="relative bg-white shadow-sm border border-slate-300 w-24 sm:w-32 transition-all duration-300 flex items-center justify-center overflow-hidden" style={{ aspectRatio: "1 / 1.414" }}>
+                        {actualImages[0] ? (
+                           <img 
+                             src={actualImages[0].dataUrl} 
+                             alt="Preview" 
+                             className={`w-full h-full transition-all duration-500 ${imageScaling === "fit" ? "object-contain" : "object-cover"}`}
+                           />
+                        ) : (
+                           <div className="text-slate-300"><MonitorSmartphone className="w-8 h-8 opacity-20" /></div>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-slate-500 mt-3 text-center leading-tight">
+                        {imageScaling === "fit" 
+                          ? "Entire image printed. May have white borders." 
+                          : "Image zooms to fill page. Edges may be cropped."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             {/* Print Layout - Responsive & Interactive Segmented Control */}
             <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">

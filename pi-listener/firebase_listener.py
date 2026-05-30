@@ -49,6 +49,41 @@ def convert_to_pdf(input_path):
         print(f"❌ Conversion failed: {e}")
         return None
 
+def process_image_fill(input_path):
+    try:
+        from PIL import Image
+        print(f"⏳ Processing image for FILL/CROP to A4: {input_path}")
+        
+        with Image.open(input_path) as img:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            original_w, original_h = img.size
+            if original_w > original_h:
+                target_ratio = 1.414  # landscape
+            else:
+                target_ratio = 1 / 1.414  # portrait
+                
+            current_ratio = original_w / original_h
+            
+            if current_ratio > target_ratio + 0.01:
+                new_w = int(original_h * target_ratio)
+                left = (original_w - new_w) / 2
+                img = img.crop((left, 0, left + new_w, original_h))
+            elif current_ratio < target_ratio - 0.01:
+                new_h = int(original_w / target_ratio)
+                top = (original_h - new_h) / 2
+                img = img.crop((0, top, original_w, top + new_h))
+                
+            pdf_path = os.path.splitext(input_path)[0] + "_filled.pdf"
+            img.save(pdf_path, "PDF", resolution=300.0)
+            
+        print(f"✅ Image fill processing successful: {pdf_path}")
+        return pdf_path
+    except Exception as e:
+        print(f"❌ Image fill processing failed: {e}")
+        return None
+
 def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME):
     try:
         file_size = os.path.getsize(file_path)
@@ -137,6 +172,7 @@ def process_job(doc_snapshot):
     color_mode = doc.get("colorMode", "monochrome")
     
     print_options = doc.get("printOptions", {})
+    image_scaling = print_options.get("imageScaling", "fit")
     page_selection = print_options.get("pageSelection") or print_options.get("pagesToPrint") or "all"
     page_range = None
     if page_selection == "custom":
@@ -156,7 +192,13 @@ def process_job(doc_snapshot):
 
         final_path = local_path
         ext = os.path.splitext(local_path)[1].lower()
-        if ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
+        
+        if ext in [".jpg", ".jpeg", ".png"] and image_scaling == "fill":
+            pdf_path = process_image_fill(local_path)
+            if pdf_path:
+                final_path = pdf_path
+                
+        elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
             pdf_path = convert_to_pdf(local_path)
             if pdf_path:
                 final_path = pdf_path

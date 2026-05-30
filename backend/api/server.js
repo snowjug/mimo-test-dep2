@@ -1414,40 +1414,48 @@ app.get("/verify-payment/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    // 1. Query Cashfree directly for real-time status (don't rely on webhook timing)
     let cashfreeStatus = null;
     try {
-      const cfRes = await axios.get(
-        `${CASHFREE_BASE_URL}/orders/${orderId}`,
-        { headers: cashfreeHeaders, timeout: 10000 }
-      );
-      cashfreeStatus = cfRes.data.order_status; // "PAID", "ACTIVE", "EXPIRED" etc
+      const cfRes = await axios.get(`${CASHFREE_BASE_URL}/orders/${orderId}`, { headers: cashfreeHeaders, timeout: 10000 });
+      cashfreeStatus = cfRes.data.order_status;
       console.log(`[VERIFY-PAYMENT] Cashfree status for ${orderId}: ${cashfreeStatus}`);
     } catch (cfErr) {
       console.warn("[VERIFY-PAYMENT] Cashfree API failed, falling back to Firestore:", cfErr.message);
     }
 
-    // 2. If Cashfree says PAID, update Firestore immediately (don't wait for webhook)
-    if (cashfreeStatus === "PAID") {
-      const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
-      if (!orderSnapshot.empty) {
-        await orderSnapshot.docs[0].ref.update({ status: "PAID" });
-      }
-      return res.json({ order_status: "PAID" });
-    }
-
-    // 3. Fallback: check Firestore (in case webhook already fired)
     const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
-    if (orderSnapshot.empty) {
-      // If not in Firestore at all yet but Cashfree says paid, return cashfree status
-      return res.json({ order_status: cashfreeStatus || "CREATED" });
+    let userId = null;
+    let order_status = cashfreeStatus || "CREATED";
+
+    if (!orderSnapshot.empty) {
+      const orderDoc = orderSnapshot.docs[0];
+      userId = orderDoc.data().userId;
+      if (cashfreeStatus === "PAID") {
+        await orderDoc.ref.update({ status: "PAID" });
+      } else if (!cashfreeStatus) {
+        order_status = orderDoc.data().status;
+      }
     }
 
-    const orderData = orderSnapshot.docs[0].data();
-    const order_status = orderData.status;
-    console.log(`[VERIFY-PAYMENT] Firestore status for ${orderId}: ${order_status}`);
+    let printCode = null;
+    let directKioskId = null;
 
-    res.json({ order_status });
+    if (order_status === "PAID" && userId) {
+      try {
+        const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+        const internalRes = await axios.post(
+          `http://localhost:${process.env.PORT || 8080}/payment-success`,
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { headers: { Authorization: `Bearer ${dummyToken}` } }
+        );
+        printCode = internalRes.data.printCode;
+        directKioskId = internalRes.data.directKioskId;
+      } catch (internalErr) {
+        console.error("[VERIFY-PAYMENT] Internal /payment-success failed:", internalErr.response?.data || internalErr.message);
+      }
+    }
+
+    res.json({ order_status, printCode, directKioskId });
   } catch (err) {
     console.error(err);
     res.status(500).send("Verification failed");
