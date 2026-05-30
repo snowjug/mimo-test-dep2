@@ -59,6 +59,9 @@ export function PrintCode() {
       }
     };
 
+    // Run status check immediately on mount to avoid the initial 3-second delay
+    checkStatus();
+
     const interval = setInterval(checkStatus, 3000);
     return () => clearInterval(interval);
   }, [printCode, printStatus]);
@@ -119,7 +122,7 @@ export function PrintCode() {
           <MimoHeader />
         </div>
 
-        <div className="flex-1 flex items-center justify-center w-full z-10 py-2 sm:py-4">
+        <div className="flex-1 flex items-start justify-center w-full z-10 pt-3 sm:pt-6 pb-6">
           <Card className="max-w-2xl w-full border-0 shadow-2xl bg-white/90 backdrop-blur-xl animate-in zoom-in-95 duration-500">
           <CardHeader className="text-center pt-2 pb-1 px-4">
             <div className="flex justify-center mt-2 mb-1">
@@ -159,7 +162,7 @@ export function PrintCode() {
                     ? "Printed Successfully!"
                     : "Payment Successful!"}
             </CardTitle>
-            <CardDescription className="text-xs sm:text-sm transition-all max-w-md mx-auto">
+            <CardDescription className="text-xs sm:text-sm transition-all max-w-md mx-auto min-h-[32px] sm:min-h-[40px] flex items-center justify-center">
               {isProcessing 
                 ? "Please wait while we securely prepare your documents..." 
                 : printStatus === "printing"
