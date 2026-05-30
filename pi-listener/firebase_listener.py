@@ -277,15 +277,19 @@ def watchdog_loop():
     while True:
         try:
             for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
-                subprocess.run(["sudo", "cupsenable", printer], capture_output=True)
-                
+                # Only re-enable if the printer is currently disabled
+                status_res = subprocess.run(["lpstat", "-p", printer], capture_output=True, text=True)
+                if "disabled" in status_res.stdout.lower():
+                    print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
+                    subprocess.run(["sudo", "cupsenable", printer], capture_output=True)
+
             result = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True)
-            
+
             for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
                 if printer in result.stdout:
                     stuck_cycles[printer] += 1
                     print(f"⚠️ Watchdog: Stuck job detected on {printer} (Cycle {stuck_cycles[printer]})")
-                    
+
                     if stuck_cycles[printer] >= 2:
                         print(f"🔧 Watchdog: Kicking ipp-usb to wake up sleeping printer {printer}...")
                         subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
