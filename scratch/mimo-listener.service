@@ -1,0 +1,17 @@
+[Unit]
+Description=Mimo Firebase Print Listener
+After=network.target
+
+[Service]
+Type=simple
+User=printpi
+WorkingDirectory=/home/printpi
+Environment="BW_PRINTER_NAME=Brother_HL_L5210DN_series_USB"
+Environment="COLOR_PRINTER_NAME=Brother_HL_L5210DN_series_USB"
+Environment="KIOSK_ID=CV-001"
+ExecStart=/usr/bin/python3 /home/printpi/firebase_listener.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
