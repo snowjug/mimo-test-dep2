@@ -10,33 +10,31 @@ import { toast } from "sonner";
 
 export function PrintCode() {
   const navigate = useNavigate();
-  const [printCode, setPrintCode] = useState("");
-  const [files, setFiles] = useState<any[]>([]);
-  const [isProcessing, setIsProcessing] = useState(true);
+  const [printCode, setPrintCode] = useState(() => sessionStorage.getItem("printCode") || "");
+  const [files, setFiles] = useState<any[]>(() => {
+    const storedFiles = sessionStorage.getItem("printFiles");
+    if (storedFiles && storedFiles !== "undefined") {
+      try {
+        return JSON.parse(storedFiles);
+      } catch (err) {
+        console.error("Failed to parse stored files", err);
+      }
+    }
+    return [];
+  });
+  const [isProcessing, setIsProcessing] = useState(() => {
+    const storedCode = sessionStorage.getItem("printCode");
+    return !storedCode;
+  });
   const [printStatus, setPrintStatus] = useState<"paid" | "printing" | "completed" | "failed">(
     () => (sessionStorage.getItem("printStatus") as any) || "paid"
   );
 
   useEffect(() => {
-    const storedCode = sessionStorage.getItem("printCode");
-    const storedFiles = sessionStorage.getItem("printFiles");
-
-    if (!storedCode) {
+    if (!printCode) {
       navigate("/");
-      return;
     }
-
-    setPrintCode(storedCode);
-    if (storedFiles && storedFiles !== "undefined") {
-      try {
-        setFiles(JSON.parse(storedFiles));
-      } catch (err) {
-        console.error("Failed to parse stored files", err);
-      }
-    }
-    
-    setIsProcessing(false);
-  }, [navigate]);
+  }, [printCode, navigate]);
 
   useEffect(() => {
     if (!printCode || printStatus === "completed" || printStatus === "failed") return;
