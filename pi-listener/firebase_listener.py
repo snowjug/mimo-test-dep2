@@ -84,7 +84,7 @@ def process_image_fill(input_path):
         print(f"❌ Image fill processing failed: {e}")
         return None
 
-def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME):
+def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None):
     try:
         file_size = os.path.getsize(file_path)
         if file_size < 100:
@@ -102,24 +102,37 @@ def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAM
         cmd = ["lp", "-d", printer_name, "-n", str(copies)]
         if page_range:
             cmd.extend(["-P", str(page_range)])
+        if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
+            cmd.extend(["-o", f"number-up={photo_layout}"])
         cmd.append(file_path)
         
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
         lp_output = result.stdout.strip()
         print(f"CUPS: {lp_output}")
         
-        time.sleep(2)
         import re
         match = re.search(r'is (\S+-\d+)', lp_output)
         if match:
             job_id = match.group(1)
-            status_result = subprocess.run(["lpstat", "-l", job_id], capture_output=True, text=True, timeout=10)
+            print(f"⏳ Waiting for physical printer to finish job {job_id}...")
+            
+            # Hardware polling loop: wait until job leaves the active queue
+            import time
+            start_wait = time.time()
+            while time.time() - start_wait < 300: # 5 minutes max timeout
+                active_jobs = subprocess.run(["lpstat"], capture_output=True, text=True).stdout
+                if job_id not in active_jobs:
+                    break # Job has physically left the queue!
+                time.sleep(2)
+                
+            # Final check to see if it failed
+            status_result = subprocess.run(["lpstat", "-W", "completed", "-l", job_id], capture_output=True, text=True, timeout=10)
             status_output = status_result.stdout
             if "job-completed-with-errors" in status_output or "loadFilename failed" in status_output:
                 print(f"❌ CUPS rendered the job with errors")
                 return False
 
-        print("✅ Print job submitted and verified successfully!")
+        print("✅ Physical print job completed successfully!")
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Print failed: {e.stderr.strip() if e.stderr else str(e)}")
@@ -173,6 +186,7 @@ def process_job(doc_snapshot):
     
     print_options = doc.get("printOptions", {})
     image_scaling = print_options.get("imageScaling", "fit")
+    photo_layout = print_options.get("photoLayout")
     page_selection = print_options.get("pageSelection") or print_options.get("pagesToPrint") or "all"
     page_range = None
     if page_selection == "custom":
@@ -206,7 +220,7 @@ def process_job(doc_snapshot):
                 doc_ref.update({"status": "failed", "printerStatus": "LibreOffice conversion failed"})
                 return
 
-        success = print_file(final_path, copies, page_range, target_printer)
+        success = print_file(final_path, copies, page_range, target_printer, photo_layout)
         
         if success:
             doc_ref.update({
