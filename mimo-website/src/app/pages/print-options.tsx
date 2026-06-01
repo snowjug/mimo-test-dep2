@@ -86,6 +86,7 @@ export function PrintOptions() {
   const [orientation, setOrientation] = useState("portrait");
   const [photoLayout, setPhotoLayout] = useState("1");
   const [imageScaling, setImageScaling] = useState("fit");
+  const [customScale, setCustomScale] = useState(100);
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
   const [directKioskId, setDirectKioskId] = useState<string | null>("CV-001");
 
@@ -337,6 +338,8 @@ export function PrintOptions() {
       doubleSided,
       pageSelection,
       imageScaling,
+      customScale,
+      photoLayout,
       pageRange: files.length > 0 ? (fileConfigs[files[0].name]?.pageRange || "") : "", // fallback
       fileConfigs: simplifiedConfigs,
       totalCost,
@@ -557,33 +560,58 @@ export function PrintOptions() {
                   </div>
                   
                   <div className="flex flex-col items-center gap-3 w-full sm:w-auto">
-                    <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
+                    <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-72 h-10 select-none">
                       <button
                         onClick={() => setImageScaling("fit")}
                         type="button"
-                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
                           imageScaling === "fit" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
                         }`}
                       >
-                        <MonitorSmartphone className="w-3.5 h-3.5 shrink-0" />
-                        <span>Fit to A4</span>
+                        <MonitorSmartphone className="w-3 h-3 shrink-0" />
+                        <span>Fit</span>
                       </button>
                       <button
                         onClick={() => setImageScaling("fill")}
                         type="button"
-                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
                           imageScaling === "fill" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
                         }`}
                       >
-                        <Grid3X3 className="w-3.5 h-3.5 shrink-0" />
-                        <span>Fill (Crop)</span>
+                        <Grid3X3 className="w-3 h-3 shrink-0" />
+                        <span>Fill</span>
+                      </button>
+                      <button
+                        onClick={() => setImageScaling("custom")}
+                        type="button"
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
+                          imageScaling === "custom" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        <Sliders className="w-3 h-3 shrink-0" />
+                        <span>Custom</span>
                       </button>
                       <div
-                        className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
-                          imageScaling === "fit" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                        className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(33.33%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
+                          imageScaling === "fit" ? "translate-x-0" : imageScaling === "fill" ? "translate-x-[calc(100%+6px)]" : "translate-x-[calc(200%+12px)]"
                         }`}
                       />
                     </div>
+                    
+                    {/* Custom Scale Slider */}
+                    {imageScaling === "custom" && (
+                      <div className="w-full flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-top-2 duration-300">
+                        <span className="text-[10px] font-bold text-slate-500 w-7">{customScale}%</span>
+                        <input 
+                          type="range" 
+                          min="10" 
+                          max="100" 
+                          value={customScale} 
+                          onChange={(e) => setCustomScale(Number(e.target.value))}
+                          className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#093765]"
+                        />
+                      </div>
+                    )}
                     
                     {/* Visual Preview */}
                     <div className="mt-2 bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col items-center w-full">
@@ -593,7 +621,8 @@ export function PrintOptions() {
                            <img 
                              src={actualImages[0].dataUrl} 
                              alt="Preview" 
-                             className={`w-full h-full transition-all duration-500 ${imageScaling === "fit" ? "object-contain" : "object-cover"}`}
+                             className={`w-full h-full transition-all duration-500 ${imageScaling === "fill" ? "object-cover" : "object-contain"}`}
+                             style={imageScaling === "custom" ? { transform: `scale(${customScale / 100})`, transformOrigin: "center center" } : {}}
                            />
                         ) : (
                            <div className="text-slate-300"><MonitorSmartphone className="w-8 h-8 opacity-20" /></div>
@@ -602,7 +631,9 @@ export function PrintOptions() {
                       <p className="text-[9px] text-slate-500 mt-3 text-center leading-tight">
                         {imageScaling === "fit" 
                           ? "Entire image printed. May have white borders." 
-                          : "Image zooms to fill page. Edges may be cropped."}
+                          : imageScaling === "fill"
+                          ? "Image zooms to fill page. Edges may be cropped."
+                          : `Image scaled to ${customScale}%. Centered on A4.`}
                       </p>
                     </div>
                   </div>

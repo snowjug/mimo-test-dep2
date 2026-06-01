@@ -84,6 +84,52 @@ def process_image_fill(input_path):
         print(f"❌ Image fill processing failed: {e}")
         return None
 
+def process_image_custom(input_path, scale_pct):
+    try:
+        from PIL import Image
+        print(f"⏳ Processing image for CUSTOM scale ({scale_pct}%) to A4: {input_path}")
+        
+        with Image.open(input_path) as img:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+                
+            # A4 at 300 DPI is 2480x3508
+            canvas_w, canvas_h = 2480, 3508
+            
+            # Determine orientation
+            original_w, original_h = img.size
+            is_landscape = original_w > original_h
+            if is_landscape:
+                canvas_w, canvas_h = 3508, 2480
+                
+            canvas = Image.new('RGB', (canvas_w, canvas_h), (255, 255, 255))
+            
+            # Max width and height the image can take (Fit to A4)
+            fit_ratio = min(canvas_w / original_w, canvas_h / original_h)
+            fit_w = int(original_w * fit_ratio)
+            fit_h = int(original_h * fit_ratio)
+            
+            # Now scale it down by the user's custom percentage
+            final_w = max(1, int(fit_w * (scale_pct / 100.0)))
+            final_h = max(1, int(fit_h * (scale_pct / 100.0)))
+            
+            # Resize image
+            resized_img = img.resize((final_w, final_h), Image.Resampling.LANCZOS)
+            
+            # Paste exactly in the center
+            paste_x = (canvas_w - final_w) // 2
+            paste_y = (canvas_h - final_h) // 2
+            canvas.paste(resized_img, (paste_x, paste_y))
+            
+            pdf_path = os.path.splitext(input_path)[0] + "_custom.pdf"
+            canvas.save(pdf_path, "PDF", resolution=300.0)
+            
+        print(f"✅ Image custom scale processing successful: {pdf_path}")
+        return pdf_path
+    except Exception as e:
+        print(f"❌ Image custom scale processing failed: {e}")
+        return None
+
 def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None):
     try:
         file_size = os.path.getsize(file_path)
@@ -186,6 +232,7 @@ def process_job(doc_snapshot):
     
     print_options = doc.get("printOptions", {})
     image_scaling = print_options.get("imageScaling", "fit")
+    custom_scale = int(print_options.get("customScale", 100))
     photo_layout = print_options.get("photoLayout")
     page_selection = print_options.get("pageSelection") or print_options.get("pagesToPrint") or "all"
     page_range = None
@@ -207,10 +254,15 @@ def process_job(doc_snapshot):
         final_path = local_path
         ext = os.path.splitext(local_path)[1].lower()
         
-        if ext in [".jpg", ".jpeg", ".png"] and image_scaling == "fill":
-            pdf_path = process_image_fill(local_path)
-            if pdf_path:
-                final_path = pdf_path
+        if ext in [".jpg", ".jpeg", ".png"]:
+            if image_scaling == "fill":
+                pdf_path = process_image_fill(local_path)
+                if pdf_path:
+                    final_path = pdf_path
+            elif image_scaling == "custom":
+                pdf_path = process_image_custom(local_path, custom_scale)
+                if pdf_path:
+                    final_path = pdf_path
                 
         elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
             pdf_path = convert_to_pdf(local_path)
