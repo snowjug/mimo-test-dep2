@@ -2024,6 +2024,10 @@ setInterval(async () => {
       const { PDFDocument } = require("pdf-lib");
       const pdfDoc = await PDFDocument.load(buffer);
       pages = pdfDoc.getPageCount();
+    } else if (data.mimetype.startsWith("image/")) {
+      // Images are exactly 1 page and should NOT be converted to PDF on the backend
+      // so the Pi's Pillow library can apply custom scaling and layout.
+      pages = 1;
     } else {
       const tempInput = path.join(os.tmpdir(), `temp_${Date.now()}${path.extname(data.fileName).toLowerCase()}`);
       fs.writeFileSync(tempInput, buffer);
