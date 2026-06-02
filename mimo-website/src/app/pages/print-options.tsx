@@ -496,7 +496,12 @@ export function PrintOptions() {
                 </div>
                 <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
                   <button
-                    onClick={() => setColorMode("bw")}
+                    onClick={() => {
+                      setColorMode("bw");
+                      if (directKioskId === "SV-002-COLOR") {
+                        setDirectKioskId("SV-002-BW");
+                      }
+                    }}
                     type="button"
                     className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
                       colorMode === "bw"
