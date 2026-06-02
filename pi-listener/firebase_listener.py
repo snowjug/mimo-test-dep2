@@ -49,10 +49,50 @@ def convert_to_pdf(input_path):
         print(f"❌ Conversion failed: {e}")
         return None
 
-def process_image_fill(input_path):
+def apply_photo_layout(canvas, layout_str):
+    if not layout_str or str(layout_str) == "1":
+        return canvas
+        
+    from PIL import Image
+    w, h = canvas.size
+    new_canvas = Image.new('RGB', (w, h), (255, 255, 255))
+    layout = str(layout_str)
+    
+    if layout == "2":
+        resized = canvas.resize((int(w * 0.707), int(h * 0.707)), Image.Resampling.LANCZOS)
+        rotated = resized.rotate(90, expand=True)
+        rw, rh = rotated.size
+        new_canvas.paste(rotated, ((w - rw) // 2, (h // 2 - rh) // 2))
+        new_canvas.paste(rotated, ((w - rw) // 2, h // 2 + (h // 2 - rh) // 2))
+    elif layout == "4":
+        resized = canvas.resize((w // 2, h // 2), Image.Resampling.LANCZOS)
+        rw, rh = w // 2, h // 2
+        new_canvas.paste(resized, (0, 0))
+        new_canvas.paste(resized, (rw, 0))
+        new_canvas.paste(resized, (0, rh))
+        new_canvas.paste(resized, (rw, rh))
+    elif layout == "6":
+        cell_w, cell_h = w // 2, h // 3
+        fit_ratio = min(cell_w / w, cell_h / h)
+        rw, rh = int(w * fit_ratio), int(h * fit_ratio)
+        resized = canvas.resize((rw, rh), Image.Resampling.LANCZOS)
+        for row in range(3):
+            for col in range(2):
+                paste_x = col * cell_w + (cell_w - rw) // 2
+                paste_y = row * cell_h + (cell_h - rh) // 2
+                new_canvas.paste(resized, (paste_x, paste_y))
+    elif layout == "9":
+        rw, rh = w // 3, h // 3
+        resized = canvas.resize((rw, rh), Image.Resampling.LANCZOS)
+        for row in range(3):
+            for col in range(3):
+                new_canvas.paste(resized, (col * rw, row * rh))
+    return new_canvas
+
+def process_image_fill(input_path, photo_layout=None):
     try:
         from PIL import Image
-        print(f"⏳ Processing image for FILL/CROP to A4: {input_path}")
+        print(f"⏳ Processing image for FILL/CROP to A4: {input_path} (Layout: {photo_layout})")
         
         with Image.open(input_path) as img:
             if img.mode != 'RGB':
@@ -75,6 +115,7 @@ def process_image_fill(input_path):
                 top = (original_h - new_h) / 2
                 img = img.crop((0, top, original_w, top + new_h))
                 
+            img = apply_photo_layout(img, photo_layout)
             pdf_path = os.path.splitext(input_path)[0] + "_filled.pdf"
             img.save(pdf_path, "PDF", resolution=300.0)
             
@@ -84,10 +125,10 @@ def process_image_fill(input_path):
         print(f"❌ Image fill processing failed: {e}")
         return None
 
-def process_image_custom(input_path, scale_pct):
+def process_image_custom(input_path, scale_pct, photo_layout=None):
     try:
         from PIL import Image
-        print(f"⏳ Processing image for CUSTOM scale ({scale_pct}%) to A4: {input_path}")
+        print(f"⏳ Processing image for CUSTOM scale ({scale_pct}%) to A4: {input_path} (Layout: {photo_layout})")
         
         with Image.open(input_path) as img:
             if img.mode != 'RGB':
@@ -121,6 +162,7 @@ def process_image_custom(input_path, scale_pct):
             paste_y = (canvas_h - final_h) // 2
             canvas.paste(resized_img, (paste_x, paste_y))
             
+            canvas = apply_photo_layout(canvas, photo_layout)
             pdf_path = os.path.splitext(input_path)[0] + "_custom.pdf"
             canvas.save(pdf_path, "PDF", resolution=300.0)
             
@@ -254,15 +296,17 @@ def process_job(doc_snapshot):
         final_path = local_path
         ext = os.path.splitext(local_path)[1].lower()
         
+        photo_layout_for_cups = photo_layout
         if ext in [".jpg", ".jpeg", ".png"]:
             if image_scaling == "fill":
-                pdf_path = process_image_fill(local_path)
+                pdf_path = process_image_fill(local_path, photo_layout)
                 if pdf_path:
                     final_path = pdf_path
             elif image_scaling == "custom":
-                pdf_path = process_image_custom(local_path, custom_scale)
+                pdf_path = process_image_custom(local_path, custom_scale, photo_layout)
                 if pdf_path:
                     final_path = pdf_path
+            photo_layout_for_cups = None # We already baked it into the image!
                 
         elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
             pdf_path = convert_to_pdf(local_path)
@@ -272,7 +316,7 @@ def process_job(doc_snapshot):
                 doc_ref.update({"status": "failed", "printerStatus": "LibreOffice conversion failed"})
                 return
 
-        success = print_file(final_path, copies, page_range, target_printer, photo_layout)
+        success = print_file(final_path, copies, page_range, target_printer, photo_layout_for_cups)
         
         if success:
             doc_ref.update({
