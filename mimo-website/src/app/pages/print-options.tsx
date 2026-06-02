@@ -600,7 +600,7 @@ export function PrintOptions() {
                     
                     {/* Custom Scale Slider */}
                     {imageScaling === "custom" && (
-                      <div className="w-full flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-top-2 duration-300">
+                      <div className="w-full flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm mt-1 mb-1">
                         <span className="text-[10px] font-bold text-slate-500 w-7">{customScale}%</span>
                         <input 
                           type="range" 
@@ -608,7 +608,7 @@ export function PrintOptions() {
                           max="100" 
                           value={customScale} 
                           onChange={(e) => setCustomScale(Number(e.target.value))}
-                          className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#093765]"
+                          className="flex-1 w-full cursor-pointer accent-[#093765]"
                         />
                       </div>
                     )}
