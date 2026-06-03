@@ -461,27 +461,30 @@ export default function AdminDashboard() {
           <div className="space-y-8 animate-in fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               
-              {/* KIOSK 1: Brother */}
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+              {Object.entries(hardware).map(([kioskId, data]: any) => (
+              <div key={kioskId} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
                 <div className="flex justify-between items-center mb-6">
                    <div>
-                     <h2 className="text-2xl font-black text-slate-900">CV-001 (B&W)</h2>
-                     <p className="text-sm text-slate-500 font-medium">Brother HL-L2440DW</p>
+                     <h2 className="text-2xl font-black text-slate-900">{kioskId} {data.type === 'color' ? '(COLOR)' : '(B&W)'}</h2>
+                     <p className="text-sm text-slate-500 font-medium">{data.name || 'Printer Kiosk'}</p>
                    </div>
                    <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-2">
-                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> ONLINE
+                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> {data.status?.toUpperCase() || 'ONLINE'}
                    </span>
                 </div>
                 
                 <div className="space-y-6">
-                  {/* Toner */}
+                  {/* Consumable */}
                   <div>
                      <div className="flex justify-between text-sm font-bold mb-2">
-                       <span className="flex items-center gap-2 text-slate-700"><Droplets className="w-4 h-4" /> Toner Level</span>
-                       <span className="text-slate-900">{hardware['CV-001']?.tonerLevel || 0}%</span>
+                       <span className={`flex items-center gap-2 text-slate-700`}>
+                          {data.type === 'color' ? <Droplets className="w-4 h-4 text-cyan-500" /> : <Droplets className="w-4 h-4" />}
+                          {data.type === 'color' ? 'Cyan/Magenta/Yellow Ink' : 'Toner Level'}
+                       </span>
+                       <span className="text-slate-900">{data.type === 'color' ? data.inkLevel || 0 : data.tonerLevel || 0}%</span>
                      </div>
                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor(hardware['CV-001']?.tonerLevel || 0)}`} style={{ width: `\${hardware['CV-001']?.tonerLevel || 0}%` }}></div>
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor(data.type === 'color' ? data.inkLevel || 0 : data.tonerLevel || 0)}`} style={{ width: `${data.type === 'color' ? data.inkLevel || 0 : data.tonerLevel || 0}%` }}></div>
                      </div>
                   </div>
                   
@@ -489,62 +492,24 @@ export default function AdminDashboard() {
                   <div>
                      <div className="flex justify-between text-sm font-bold mb-2">
                        <span className="flex items-center gap-2 text-slate-700"><Layers className="w-4 h-4" /> Paper Ream</span>
-                       <span className="text-slate-900">{hardware['CV-001']?.paperLevel || 0} pages</span>
+                       <span className="text-slate-900">{data.paperLevel || 0} pages</span>
                      </div>
                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor((hardware['CV-001']?.paperLevel || 0)/5)}`} style={{ width: `\${(hardware['CV-001']?.paperLevel || 0)/5}%` }}></div>
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor((data.paperLevel || 0)/5)}`} style={{ width: `${(data.paperLevel || 0)/5}%` }}></div>
                      </div>
                   </div>
                   
                   <div className="pt-4 border-t border-slate-100 flex gap-3">
-                     <button onClick={() => updateHardwareLevel('CV-001', { tonerLevel: 100 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Refill Toner</button>
-                     <button onClick={() => updateHardwareLevel('CV-001', { paperLevel: 500 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Add Paper (500)</button>
+                     {data.type === 'color' ? (
+                       <button onClick={() => updateHardwareLevel(kioskId, { inkLevel: 100 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Refill Ink</button>
+                     ) : (
+                       <button onClick={() => updateHardwareLevel(kioskId, { tonerLevel: 100 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Refill Toner</button>
+                     )}
+                     <button onClick={() => updateHardwareLevel(kioskId, { paperLevel: 500 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Add Paper</button>
                   </div>
                 </div>
               </div>
-
-              {/* KIOSK 2: Epson */}
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-                <div className="flex justify-between items-center mb-6">
-                   <div>
-                     <h2 className="text-2xl font-black text-slate-900">SV-002-COLOR</h2>
-                     <p className="text-sm text-slate-500 font-medium">Epson EcoTank L3250</p>
-                   </div>
-                   <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-2">
-                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> ONLINE
-                   </span>
-                </div>
-                
-                <div className="space-y-6">
-                  {/* Ink */}
-                  <div>
-                     <div className="flex justify-between text-sm font-bold mb-2">
-                       <span className="flex items-center gap-2 text-slate-700"><Droplets className="w-4 h-4 text-cyan-500" /> Cyan/Magenta/Yellow Ink</span>
-                       <span className="text-slate-900">{hardware['SV-002-COLOR']?.inkLevel || 0}%</span>
-                     </div>
-                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor(hardware['SV-002-COLOR']?.inkLevel || 0)}`} style={{ width: `\${hardware['SV-002-COLOR']?.inkLevel || 0}%` }}></div>
-                     </div>
-                  </div>
-                  
-                  {/* Paper */}
-                  <div>
-                     <div className="flex justify-between text-sm font-bold mb-2">
-                       <span className="flex items-center gap-2 text-slate-700"><Layers className="w-4 h-4" /> Paper Ream</span>
-                       <span className="text-slate-900">{hardware['SV-002-COLOR']?.paperLevel || 0} pages</span>
-                     </div>
-                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor((hardware['SV-002-COLOR']?.paperLevel || 0)/5)}`} style={{ width: `\${(hardware['SV-002-COLOR']?.paperLevel || 0)/5}%` }}></div>
-                     </div>
-                  </div>
-                  
-                  <div className="pt-4 border-t border-slate-100 flex gap-3">
-                     <button onClick={() => updateHardwareLevel('SV-002-COLOR', { inkLevel: 100 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Refill Ink Tanks</button>
-                     <button onClick={() => updateHardwareLevel('SV-002-COLOR', { paperLevel: 500 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Add Paper (500)</button>
-                  </div>
-                </div>
-              </div>
-
+            ))}
             </div>
           </div>
         )}
