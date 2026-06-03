@@ -1323,6 +1323,24 @@ app.get("/admin/metrics", adminAuthMiddleware, async (req, res) => {
   }
 });
 
+
+app.post("/admin/reset-metrics", adminAuthMiddleware, async (req, res) => {
+  try {
+    await db.collection("system").doc("metrics").set({
+      totalRevenue: 0,
+      totalOrders: 0,
+      totalPagesPrinted: 0,
+      totalFreePagesPrinted: 0,
+      pagesByPrice: { free: 0, paid: 0 },
+      dailyRevenue: {},
+      lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ success: true, message: "Metrics reset successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Export the main Express App
 exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
 
