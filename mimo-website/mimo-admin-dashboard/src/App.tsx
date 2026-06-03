@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import {
   Building, LogOut, Loader2, Printer, RefreshCcw, Tag,
-  Home, BarChart2, Ticket, Search, User, Zap, Activity
+  Home, BarChart2, Ticket, Search, User, Zap, Activity, Settings, Cpu, Droplets, Layers, Save, CheckCircle2
 } from 'lucide-react';
 import api from './api';
 
@@ -16,11 +16,15 @@ export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<any>(null);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [recentPrints, setRecentPrints] = useState<any[]>([]);
+  const [pricing, setPricing] = useState({ pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+  const [hardware, setHardware] = useState<any>({});
+  
   const [activeTab, setActiveTab] = useState('dashboard');
-
   const [newCoupon, setNewCoupon] = useState({ code: '', discount: '', expiry: '' });
   const [bulkCoupon, setBulkCoupon] = useState({ prefix: '', count: '10', discount: '50', expiry: '' });
   const [isResetting, setIsResetting] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [savedSettings, setSavedSettings] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -33,14 +37,21 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [metricsRes, couponsRes, printsRes] = await Promise.all([
+      const [metricsRes, couponsRes, printsRes, settingsRes, hardwareRes] = await Promise.all([
         api.get('/admin/metrics', { headers }),
         api.get('/admin/coupons', { headers }),
         api.get('/admin/recent-prints', { headers }).catch(() => ({ data: [] })),
+        api.get('/admin/settings', { headers }).catch(() => ({ data: { pricePerPageBW: 2.30, pricePerPageColor: 10.0 } })),
+        api.get('/admin/hardware', { headers }).catch(() => ({ data: {} }))
       ]);
       setMetrics(metricsRes.data);
       setCoupons(couponsRes.data);
       setRecentPrints(printsRes.data);
+      setPricing({
+        pricePerPageBW: settingsRes.data.pricePerPageBW || 2.30,
+        pricePerPageColor: settingsRes.data.pricePerPageColor || 10.00
+      });
+      setHardware(hardwareRes.data);
     } catch (err: any) {
       if (err.response?.status === 401 || err.response?.status === 403) {
         logout();
@@ -83,6 +94,29 @@ export default function AdminDashboard() {
       alert('Failed to reset metrics.');
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await api.post('/admin/settings', pricing, { headers: { Authorization: `Bearer ${token}` } });
+      setSavedSettings(true);
+      setTimeout(() => setSavedSettings(false), 3000);
+      fetchData();
+    } catch (err) {
+      alert('Failed to save settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const updateHardwareLevel = async (kioskId: string, updates: any) => {
+    try {
+      await api.post('/admin/hardware', { updates: { [kioskId]: updates } }, { headers: { Authorization: `Bearer ${token}` } });
+      fetchData();
+    } catch (err) {
+      alert('Failed to update hardware');
     }
   };
 
@@ -137,6 +171,12 @@ export default function AdminDashboard() {
   }, [metrics]);
 
   const isPiOffline = () => metrics?.piStatus?.isOffline ?? true;
+
+  const getPercentageColor = (val: number) => {
+    if (val > 50) return 'bg-emerald-500';
+    if (val > 20) return 'bg-amber-500';
+    return 'bg-red-500';
+  };
 
   // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────
   if (!token) {
@@ -210,10 +250,22 @@ export default function AdminDashboard() {
             <Home className="w-5 h-5" /> Dashboard
           </button>
           <button
+            onClick={() => setActiveTab('hardware')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'hardware' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
+            <Cpu className="w-5 h-5" /> Hardware Logs
+          </button>
+          <button
             onClick={() => setActiveTab('coupons')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'coupons' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
           >
             <Ticket className="w-5 h-5" /> Coupons
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
+            <Settings className="w-5 h-5" /> Settings
           </button>
         </nav>
 
@@ -233,18 +285,10 @@ export default function AdminDashboard() {
         {/* Header */}
         <header className="flex justify-between items-center mb-10">
           <div>
-            <h2 className="text-3xl font-bold text-slate-900">Dashboard Overview</h2>
-            <p className="text-slate-500 mt-1">Check your metrics and manage the Mimo fleet.</p>
+            <h2 className="text-3xl font-bold text-slate-900 capitalize">{activeTab} Overview</h2>
+            <p className="text-slate-500 mt-1">Manage the Mimo ecosystem and live analytics.</p>
           </div>
           <div className="flex items-center gap-6">
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search anything..."
-                className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 w-64"
-              />
-            </div>
             <button
               onClick={handleResetMetrics}
               disabled={isResetting}
@@ -261,7 +305,7 @@ export default function AdminDashboard() {
 
         {/* ─── DASHBOARD TAB ─────────────────────────── */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-8 animate-in">
+          <div className="space-y-8 animate-in fade-in">
 
             {/* KPI Grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -274,7 +318,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-slate-500 text-sm font-medium mb-1">Total Revenue</p>
-                  <h3 className="text-3xl font-bold text-slate-900">₹{metrics?.totalRevenue || '0.00'}</h3>
+                  <h3 className="text-3xl font-bold text-slate-900">₹{(metrics?.totalRevenue || 0).toFixed(2)}</h3>
                 </div>
               </div>
 
@@ -286,12 +330,26 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-slate-500 text-sm font-medium mb-1">Total Orders</p>
-                  <h3 className="text-3xl font-bold text-slate-900">{metrics?.totalOrders || '0'}</h3>
+                  <p className="text-slate-500 text-sm font-medium mb-1">Paid Pages</p>
+                  <h3 className="text-3xl font-bold text-slate-900">{(metrics?.totalPagesPrinted || 0) - (metrics?.totalFreePages || 0)}</h3>
                 </div>
               </div>
 
-              {/* Pages */}
+              {/* Free Pages */}
+              <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full -mr-10 -mt-10" />
+                <div className="flex justify-between items-start mb-4 relative">
+                  <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600">
+                    <Ticket className="w-6 h-6" />
+                  </div>
+                </div>
+                <div className="relative">
+                  <p className="text-slate-500 text-sm font-medium mb-1">Zero-Rupee Pages (Free)</p>
+                  <h3 className="text-3xl font-bold text-slate-900">{metrics?.totalFreePages || '0'}</h3>
+                </div>
+              </div>
+
+              {/* Total Pages */}
               <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col justify-between">
                 <div className="flex justify-between items-start mb-4">
                   <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600">
@@ -299,29 +357,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-slate-500 text-sm font-medium mb-1">Pages Printed</p>
+                  <p className="text-slate-500 text-sm font-medium mb-1">Total Lifetime Pages</p>
                   <h3 className="text-3xl font-bold text-slate-900">{metrics?.totalPagesPrinted || '0'}</h3>
-                </div>
-              </div>
-
-              {/* Pi Status */}
-              <div className={`p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border flex flex-col justify-between ${isPiOffline() ? 'bg-red-50/50 border-red-100' : 'bg-emerald-50/30 border-emerald-100'}`}>
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isPiOffline() ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                    <Printer className="w-6 h-6" />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className={`w-2.5 h-2.5 rounded-full ${isPiOffline() ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
-                    <span className={`text-xs font-bold uppercase tracking-wider ${isPiOffline() ? 'text-red-700' : 'text-emerald-700'}`}>
-                      {isPiOffline() ? 'Offline' : 'Online'}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <p className={`text-sm font-medium mb-1 ${isPiOffline() ? 'text-red-600/70' : 'text-emerald-700/70'}`}>Pi Fleet Status</p>
-                  <h3 className={`text-xl font-bold truncate ${isPiOffline() ? 'text-red-700' : 'text-emerald-800'}`}>
-                    {metrics?.piStatus?.printerStatus || 'Unknown'}
-                  </h3>
                 </div>
               </div>
             </div>
@@ -356,18 +393,39 @@ export default function AdminDashboard() {
                     )}
                   </div>
                 </div>
+                
+                {/* Print Modality */}
+                <div className="grid grid-cols-2 gap-6 mt-8">
+                  <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">B&W Pages Printed</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-1">{metrics?.totalBwPages || 0}</h3>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                      <div className="w-4 h-4 rounded-full bg-slate-800" />
+                    </div>
+                  </div>
+                  <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">Color Pages Printed</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-1">{metrics?.totalColorPages || 0}</h3>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center">
+                      <div className="w-4 h-4 rounded-full bg-rose-500" />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Activity Feed */}
               <div className="lg:col-span-1">
-                <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 h-full max-h-[500px] flex flex-col">
+                <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 h-full max-h-[600px] flex flex-col">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-lg font-bold text-slate-900">Activity Log</h2>
-                    <span className="text-sm font-medium text-blue-600 cursor-pointer hover:underline">View All</span>
                   </div>
                   <div className="flex-1 overflow-y-auto pr-2 space-y-4">
                     {recentPrints.length > 0 ? recentPrints.map((job, idx) => (
-                      <div key={idx} className="flex items-start gap-4 p-3 rounded-2xl hover:bg-slate-50 transition-colors">
+                      <div key={idx} className="flex items-start gap-4 p-3 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
                           <Printer className="w-5 h-5 text-slate-500" />
                         </div>
@@ -375,13 +433,16 @@ export default function AdminDashboard() {
                           <p className="text-sm font-bold text-slate-900 truncate">{job.userEmail}</p>
                           <p className="text-xs text-slate-500 truncate mt-0.5">Printed: {job.file}</p>
                           <div className="flex items-center gap-2 mt-1.5">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${job.status === 'completed' || job.status === 'printed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${job.status === 'completed' || job.status === 'printed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                               {job.status?.toUpperCase()}
                             </span>
-                            <span className="text-xs font-semibold text-slate-700">{job.cost}</span>
+                            {job.cost === 0 || job.cost === "0" ? (
+                               <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">FREE</span>
+                            ) : (
+                               <span className="text-xs font-semibold text-slate-700">₹{job.cost}</span>
+                            )}
                           </div>
                         </div>
-                        <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{job.date?.split(',')[1]?.trim() || job.date}</span>
                       </div>
                     )) : (
                       <div className="flex flex-col items-center justify-center h-48 text-slate-400">
@@ -395,13 +456,162 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ─── HARDWARE TAB ─────────────────────────── */}
+        {activeTab === 'hardware' && (
+          <div className="space-y-8 animate-in fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* KIOSK 1: Brother */}
+              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+                <div className="flex justify-between items-center mb-6">
+                   <div>
+                     <h2 className="text-2xl font-black text-slate-900">CV-001 (B&W)</h2>
+                     <p className="text-sm text-slate-500 font-medium">Brother HL-L2440DW</p>
+                   </div>
+                   <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-2">
+                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> ONLINE
+                   </span>
+                </div>
+                
+                <div className="space-y-6">
+                  {/* Toner */}
+                  <div>
+                     <div className="flex justify-between text-sm font-bold mb-2">
+                       <span className="flex items-center gap-2 text-slate-700"><Droplets className="w-4 h-4" /> Toner Level</span>
+                       <span className="text-slate-900">{hardware['CV-001']?.tonerLevel || 0}%</span>
+                     </div>
+                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor(hardware['CV-001']?.tonerLevel || 0)}`} style={{ width: \`\${hardware['CV-001']?.tonerLevel || 0}%\` }}></div>
+                     </div>
+                  </div>
+                  
+                  {/* Paper */}
+                  <div>
+                     <div className="flex justify-between text-sm font-bold mb-2">
+                       <span className="flex items-center gap-2 text-slate-700"><Layers className="w-4 h-4" /> Paper Ream</span>
+                       <span className="text-slate-900">{hardware['CV-001']?.paperLevel || 0} pages</span>
+                     </div>
+                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor((hardware['CV-001']?.paperLevel || 0)/5)}`} style={{ width: \`\${(hardware['CV-001']?.paperLevel || 0)/5}%\` }}></div>
+                     </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-slate-100 flex gap-3">
+                     <button onClick={() => updateHardwareLevel('CV-001', { tonerLevel: 100 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Refill Toner</button>
+                     <button onClick={() => updateHardwareLevel('CV-001', { paperLevel: 500 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Add Paper (500)</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* KIOSK 2: Epson */}
+              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+                <div className="flex justify-between items-center mb-6">
+                   <div>
+                     <h2 className="text-2xl font-black text-slate-900">SV-002-COLOR</h2>
+                     <p className="text-sm text-slate-500 font-medium">Epson EcoTank L3250</p>
+                   </div>
+                   <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-2">
+                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> ONLINE
+                   </span>
+                </div>
+                
+                <div className="space-y-6">
+                  {/* Ink */}
+                  <div>
+                     <div className="flex justify-between text-sm font-bold mb-2">
+                       <span className="flex items-center gap-2 text-slate-700"><Droplets className="w-4 h-4 text-cyan-500" /> Cyan/Magenta/Yellow Ink</span>
+                       <span className="text-slate-900">{hardware['SV-002-COLOR']?.inkLevel || 0}%</span>
+                     </div>
+                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor(hardware['SV-002-COLOR']?.inkLevel || 0)}`} style={{ width: \`\${hardware['SV-002-COLOR']?.inkLevel || 0}%\` }}></div>
+                     </div>
+                  </div>
+                  
+                  {/* Paper */}
+                  <div>
+                     <div className="flex justify-between text-sm font-bold mb-2">
+                       <span className="flex items-center gap-2 text-slate-700"><Layers className="w-4 h-4" /> Paper Ream</span>
+                       <span className="text-slate-900">{hardware['SV-002-COLOR']?.paperLevel || 0} pages</span>
+                     </div>
+                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor((hardware['SV-002-COLOR']?.paperLevel || 0)/5)}`} style={{ width: \`\${(hardware['SV-002-COLOR']?.paperLevel || 0)/5}%\` }}></div>
+                     </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-slate-100 flex gap-3">
+                     <button onClick={() => updateHardwareLevel('SV-002-COLOR', { inkLevel: 100 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Refill Ink Tanks</button>
+                     <button onClick={() => updateHardwareLevel('SV-002-COLOR', { paperLevel: 500 })} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm transition-colors">Add Paper (500)</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* ─── SETTINGS TAB ─────────────────────────── */}
+        {activeTab === 'settings' && (
+          <div className="space-y-8 animate-in fade-in max-w-3xl">
+            <div className="bg-white p-8 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100">
+               <h2 className="text-xl font-bold text-slate-900 mb-2">Pricing Configuration</h2>
+               <p className="text-sm text-slate-500 mb-8">Update the per-page printing costs. These changes will instantly reflect on the frontend and in the Cashfree payment gateway.</p>
+               
+               <div className="space-y-6">
+                 <div className="grid grid-cols-2 gap-6">
+                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-full bg-slate-800" /> B&W Price (₹)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
+                        <input 
+                           type="number" 
+                           step="0.10"
+                           value={pricing.pricePerPageBW}
+                           onChange={(e) => setPricing({...pricing, pricePerPageBW: parseFloat(e.target.value)})}
+                           className="w-full pl-10 pr-4 py-4 rounded-xl bg-white border border-slate-200 text-xl font-black text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                   </div>
+                   
+                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-400 via-pink-500 to-yellow-400" /> Color Price (₹)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
+                        <input 
+                           type="number" 
+                           step="0.10"
+                           value={pricing.pricePerPageColor}
+                           onChange={(e) => setPricing({...pricing, pricePerPageColor: parseFloat(e.target.value)})}
+                           className="w-full pl-10 pr-4 py-4 rounded-xl bg-white border border-slate-200 text-xl font-black text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                   </div>
+                 </div>
+                 
+                 <div className="pt-6 border-t border-slate-100 flex justify-end">
+                    <button 
+                      onClick={saveSettings}
+                      disabled={savingSettings}
+                      className={`flex items-center gap-2 font-bold px-8 py-4 rounded-xl transition-all shadow-lg ${savedSettings ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'}`}
+                    >
+                      {savingSettings ? <Loader2 className="w-5 h-5 animate-spin" /> : savedSettings ? <CheckCircle2 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+                      {savedSettings ? 'Saved Successfully' : 'Save Pricing Details'}
+                    </button>
+                 </div>
+               </div>
+            </div>
+          </div>
+        )}
+
         {/* ─── COUPONS TAB ─────────────────────────── */}
         {activeTab === 'coupons' && (
-          <div className="space-y-8 animate-in">
+          <div className="space-y-8 animate-in fade-in">
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-
-              {/* Left: Create forms */}
-              <div className="xl:col-span-1 space-y-6">
+               {/* Same coupon code from original App.tsx */}
+               <div className="xl:col-span-1 space-y-6">
                 <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100">
                   <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2"><Tag className="w-5 h-5 text-indigo-500" /> Bulk Generator</h2>
                   <form onSubmit={createBulkCoupons} className="space-y-4">
@@ -490,6 +700,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
       </main>
     </div>
   );

@@ -1188,6 +1188,21 @@ const parsePageRange = (rangeStr, maxPages) => {
   return Array.from(new Set(selected)).sort((a, b) => a - b);
 };
 
+
+// ================= PUBLIC SETTINGS =================
+app.get("/api/settings", async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("pricing").get();
+    if (doc.exists) {
+      res.json(doc.data());
+    } else {
+      res.json({ pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ================= CREATE ORDER =================
 app.post("/create-order", authenticateToken, async (req, res) => {
   try {
@@ -2203,6 +2218,56 @@ app.get("/admin/metrics", authenticateAdmin, async (req, res) => {
     }
     
     res.json({ ...data, piStatus });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+app.get("/admin/settings", authenticateAdmin, async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("pricing").get();
+    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/settings", authenticateAdmin, async (req, res) => {
+  try {
+    const { pricePerPageBW, pricePerPageColor } = req.body;
+    await db.collection("mimo_settings").doc("pricing").set({
+      pricePerPageBW: Number(pricePerPageBW),
+      pricePerPageColor: Number(pricePerPageColor)
+    }, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/hardware", authenticateAdmin, async (req, res) => {
+  try {
+    const doc = await db.collection("hardware").doc("printers").get();
+    if (!doc.exists) {
+        const defaultData = {
+          "CV-001": { type: "bw", tonerLevel: 100, paperLevel: 500, status: "Online" },
+          "SV-002-COLOR": { type: "color", inkLevel: 100, paperLevel: 500, status: "Online" }
+        };
+        await db.collection("hardware").doc("printers").set(defaultData);
+        return res.json(defaultData);
+    }
+    res.json(doc.data());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/hardware", authenticateAdmin, async (req, res) => {
+  try {
+    const { updates } = req.body; // e.g. { "CV-001": { tonerLevel: 100 } }
+    await db.collection("hardware").doc("printers").set(updates, { merge: true });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

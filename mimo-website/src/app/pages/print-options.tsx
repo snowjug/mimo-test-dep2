@@ -152,6 +152,9 @@ export function PrintOptions() {
 
   const [totalPages, setTotalPages] = useState(0);
   const [baseTotalCost, setBaseTotalCost] = useState(0);
+  const [priceBW, setPriceBW] = useState(2.30);
+  const [priceColor, setPriceColor] = useState(10.00);
+  const [pricesLoaded, setPricesLoaded] = useState(false);
 
   // Recalculate totalPages when fileConfigs or pageSelection changes
   useEffect(() => {
