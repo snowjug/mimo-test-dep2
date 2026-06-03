@@ -1216,6 +1216,113 @@ app.get("/validate-coupon/:code", async (req, res) => {
   }
 });
 
+
+// ================= ADVANCED ADMIN & HARDWARE =================
+app.get("/api/settings", async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("pricing").get();
+    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/settings", adminAuthMiddleware, async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("pricing").get();
+    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/settings", adminAuthMiddleware, async (req, res) => {
+  try {
+    const { pricePerPageBW, pricePerPageColor } = req.body;
+    await db.collection("mimo_settings").doc("pricing").set({
+      pricePerPageBW: Number(pricePerPageBW),
+      pricePerPageColor: Number(pricePerPageColor)
+    }, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/hardware", adminAuthMiddleware, async (req, res) => {
+  try {
+    const doc = await db.collection("hardware").doc("printers").get();
+    if (!doc.exists) {
+        const defaultData = {
+          "CV-001": { type: "bw", tonerLevel: 100, paperLevel: 500, status: "Online" },
+          "SV-002-COLOR": { type: "color", inkLevel: 100, paperLevel: 500, status: "Online" }
+        };
+        await db.collection("hardware").doc("printers").set(defaultData);
+        return res.json(defaultData);
+    }
+    res.json(doc.data());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/hardware", adminAuthMiddleware, async (req, res) => {
+  try {
+    const { updates } = req.body;
+    await db.collection("hardware").doc("printers").set(updates, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/metrics", adminAuthMiddleware, async (req, res) => {
+  try {
+    const [ordersSnap, usersSnap, jobsSnap, metricsDoc] = await Promise.all([
+      db.collection("orders").get(),
+      db.collection("users").get(),
+      db.collection("print_jobs").get(),
+      db.collection("system").doc("metrics").get()
+    ]);
+
+    let totalRevenue = 0;
+    let totalPages = 0;
+    
+    ordersSnap.forEach((doc) => {
+      const data = doc.data();
+      if (data.status === "PAID" || data.status === "SUCCESS") {
+        totalRevenue += data.amount || 0;
+      }
+    });
+
+    jobsSnap.forEach((doc) => {
+      const data = doc.data();
+      if (data.status === "paid" || data.status === "completed" || data.status === "printed") {
+        totalPages += (data.pageCount || 0) * (data.printOptions?.copies || 1);
+      }
+    });
+
+    let totalFreePagesPrinted = 0;
+    let pagesByPrice = { free: 0, paid: 0 };
+    if (metricsDoc.exists) {
+      totalFreePagesPrinted = metricsDoc.data().totalFreePagesPrinted || 0;
+      pagesByPrice = metricsDoc.data().pagesByPrice || { free: 0, paid: 0 };
+    }
+
+    res.json({
+      totalRevenue,
+      totalPages,
+      totalFreePagesPrinted,
+      pagesByPrice,
+      totalOrders: ordersSnap.size,
+      activeUsers: usersSnap.size
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch metrics" });
+  }
+});
+
 // Export the main Express App
 exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
 
