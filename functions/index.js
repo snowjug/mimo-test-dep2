@@ -19,6 +19,38 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// ================= WHATSAPP CONFIG =================
+const WA_PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || "943206795552432";
+const WA_ACCESS_TOKEN = process.env.WA_ACCESS_TOKEN || "EAAkN2tEVOeMBRiZBa3iQBcB241gbQTJ1GXi0ZBufsJTIHA0hkCSZC9fuc4YqAKOcHkUneoPyPRZC3WuUARywUHdAVxXzy7hdN6IeBXyl5lj6xsnr69L5b4aC4F6ZBywQmOMWuZB31FkCmbopBX1ZCo0zhofMjprpsQ5CaHPi86VVq9MSRR4j9yulQzViz7pYaHYZAgZDZD";
+const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || "mimo_webhook_verify_2024";
+const WA_API_URL = `https://graph.facebook.com/v19.0/${WA_PHONE_NUMBER_ID}/messages`;
+
+/**
+ * Send a WhatsApp text message via Meta Cloud API.
+ * @param {string} to - Phone number in international format e.g. "919876543210"
+ * @param {string} message - Text to send
+ */
+async function sendWhatsAppMessage(to, message) {
+  try {
+    // Normalize: strip leading '+', spaces, dashes
+    const normalized = to.replace(/[^\d]/g, "");
+    await axios.post(WA_API_URL, {
+      messaging_product: "whatsapp",
+      to: normalized,
+      type: "text",
+      text: { body: message }
+    }, {
+      headers: {
+        Authorization: `Bearer ${WA_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      }
+    });
+    console.log(`[WHATSAPP] Message sent to ${normalized}`);
+  } catch (err) {
+    console.error(`[WHATSAPP ERROR] Failed to send to ${to}:`, err.response?.data || err.message);
+  }
+}
+
 // Initialize Firebase Admin (must be done before using it)
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -603,6 +635,19 @@ app.post("/create-order", authMiddleware, async (req, res) => {
         console.error("[EMAIL ERROR] Failed to send free order receipt:", emailErr);
       }
 
+      // Send WhatsApp Notification for free orders (Option A)
+      try {
+        const waUserDoc = await db.collection("users").doc(userId).get();
+        const waPhone = waUserDoc.exists ? waUserDoc.data().mobileNumber : null;
+        if (waPhone) {
+          await sendWhatsAppMessage(waPhone,
+            `✅ *Mimo Print Ready!*\n\nYour print code is:\n*${printCode}*\n\nHead to the Mimo kiosk and enter this code to collect your prints. This code is valid until you print! 🖨️`
+          );
+        }
+      } catch (waErr) {
+        console.error("[WHATSAPP] Free order notification failed:", waErr);
+      }
+
       return res.json({ orderId, paymentSessionId: null, amount: 0, printCode, free: true });
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -1081,6 +1126,19 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
       console.error("[EMAIL ERROR] Failed to send receipt:", emailErr);
     }
 
+    // Send WhatsApp Notification for paid orders (Option A)
+    try {
+      const waUserDoc = await db.collection("users").doc(userId).get();
+      const waPhone = waUserDoc.exists ? waUserDoc.data().mobileNumber : null;
+      if (waPhone) {
+        await sendWhatsAppMessage(waPhone,
+          `✅ *Mimo Print Ready!*\n\nPayment confirmed! Your print code is:\n*${printCode}*\n\nHead to the Mimo kiosk and enter this code to collect your prints. 🖨️`
+        );
+      }
+    } catch (waErr) {
+      console.error("[WHATSAPP] Paid order notification failed:", waErr);
+    }
+
     res.json({ message: "Payment success", printCode });
   } catch (err) {
     console.error(err);
@@ -1380,6 +1438,228 @@ app.get("/admin/recent-prints", adminAuthMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Recent prints error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ================= WHATSAPP WEBHOOK VERIFICATION (Option B) =================
+app.get("/whatsapp-webhook", (req, res) => {
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+  if (mode === "subscribe" && token === WA_VERIFY_TOKEN) {
+    console.log("[WHATSAPP] Webhook verified successfully.");
+    return res.status(200).send(challenge);
+  }
+  res.sendStatus(403);
+});
+
+// ================= WHATSAPP BOT MESSAGE HANDLER (Option B) =================
+app.post("/whatsapp-webhook", async (req, res) => {
+  try {
+    res.sendStatus(200); // Acknowledge immediately to avoid Meta retries
+
+    const body = req.body;
+    if (body.object !== "whatsapp_business_account") return;
+
+    const entry = body.entry?.[0];
+    const changes = entry?.changes?.[0];
+    const value = changes?.value;
+    const messages = value?.messages;
+    if (!messages || messages.length === 0) return;
+
+    const msg = messages[0];
+    const from = msg.from; // e.g. "919876543210"
+    const msgType = msg.type;
+
+    // Load or create bot session from Firestore
+    const sessionRef = db.collection("whatsapp_sessions").doc(from);
+    const sessionDoc = await sessionRef.get();
+    const session = sessionDoc.exists ? sessionDoc.data() : { state: "idle" };
+
+    // ── Handle PDF/document upload ──────────────────────────────────────────
+    if (msgType === "document") {
+      const doc = msg.document;
+      const mimeType = doc.mime_type || "";
+      if (!mimeType.includes("pdf") && !mimeType.includes("msword") && !mimeType.includes("openxmlformats")) {
+        await sendWhatsAppMessage(from, "❌ Sorry, only PDF files are supported right now. Please send a PDF document.");
+        return;
+      }
+
+      // Download file from Meta servers and upload to Firebase Storage
+      let fileUrl = "";
+      try {
+        const mediaRes = await axios.get(`https://graph.facebook.com/v19.0/${doc.id}`, {
+          headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` }
+        });
+        const downloadUrl = mediaRes.data.url;
+        const fileRes = await axios.get(downloadUrl, {
+          headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` },
+          responseType: "arraybuffer"
+        });
+        const buffer = Buffer.from(fileRes.data);
+        const fileName = doc.filename || `whatsapp_${Date.now()}.pdf`;
+        const bucket = admin.storage().bucket();
+        const fileRef = bucket.file(`uploads/wa_${from}/${fileName}`);
+        await fileRef.save(buffer, { contentType: "application/pdf", metadata: { contentType: "application/pdf" } });
+        const [signedUrl] = await fileRef.getSignedUrl({ action: "read", expires: Date.now() + 1000 * 60 * 60 * 24 * 7 });
+        fileUrl = signedUrl;
+        console.log(`[WHATSAPP BOT] File uploaded for ${from}: ${fileName}`);
+      } catch (uploadErr) {
+        console.error("[WHATSAPP BOT] File upload failed:", uploadErr);
+        await sendWhatsAppMessage(from, "❌ Sorry, we couldn't process your file. Please try again.");
+        return;
+      }
+
+      // Find or create a user account for this WhatsApp number
+      let userId;
+      const usersSnap = await db.collection("users").where("mobileNumber", "==", from).get();
+      if (!usersSnap.empty) {
+        userId = usersSnap.docs[0].id;
+      } else {
+        // Create a lightweight guest account linked to this WhatsApp number
+        const guestRef = await db.collection("users").add({
+          email: `wa_${from}@mimo.guest`,
+          username: `WA User ${from.slice(-4)}`,
+          mobileNumber: from,
+          isWhatsAppUser: true,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        userId = guestRef.id;
+      }
+
+      // Create a print job in Firestore
+      const jobRef = await db.collection("print_jobs").add({
+        userId,
+        fileName: doc.filename || `document_${Date.now()}.pdf`,
+        documentUrl: fileUrl,
+        fileUrl,
+        mimetype: "application/pdf",
+        fileSize: doc.file_size || 0,
+        fileType: "pdf",
+        isImage: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "pending",
+        source: "whatsapp"
+      });
+
+      // Save session state
+      await sessionRef.set({
+        state: "awaiting_color_choice",
+        jobId: jobRef.id,
+        userId,
+        fileName: doc.filename || "document.pdf"
+      });
+
+      await sendWhatsAppMessage(from,
+        `📄 Got your file *${doc.filename || "document.pdf"}*!\n\nHow do you want to print it?\nReply with:\n*1* - B&W (₹2.30/page)\n*2* - Color (₹10.00/page)`
+      );
+      return;
+    }
+
+    // ── Handle text replies ───────────────────────────────────────────────────
+    if (msgType === "text") {
+      const text = msg.text.body.trim();
+
+      // State: awaiting color choice
+      if (session.state === "awaiting_color_choice") {
+        let colorMode;
+        if (text === "1" || text.toLowerCase().includes("b&w") || text.toLowerCase().includes("black")) {
+          colorMode = "bw";
+        } else if (text === "2" || text.toLowerCase().includes("color") || text.toLowerCase().includes("colour")) {
+          colorMode = "color";
+        } else {
+          await sendWhatsAppMessage(from, "Please reply with *1* for B&W or *2* for Color.");
+          return;
+        }
+
+        // Get pricing from DB
+        const pricingDoc = await db.collection("mimo_settings").doc("pricing").get();
+        const pricing = pricingDoc.exists ? pricingDoc.data() : {};
+        const pricePerPage = colorMode === "color" ? (pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageBW || 2.30);
+
+        // For MVP: directly generate print code and create Cashfree order
+        // Count pages (simple estimate - 1 page for now, user can specify later)
+        await sessionRef.set({
+          ...session,
+          state: "awaiting_copies",
+          colorMode,
+          pricePerPage
+        });
+
+        await sendWhatsAppMessage(from,
+          `Got it! *${colorMode === "color" ? "Color" : "B&W"}* printing selected (₹${pricePerPage}/page).\n\nHow many copies do you want? Reply with a number (e.g. *1*):`
+        );
+        return;
+      }
+
+      // State: awaiting number of copies
+      if (session.state === "awaiting_copies") {
+        const copies = parseInt(text);
+        if (isNaN(copies) || copies < 1 || copies > 50) {
+          await sendWhatsAppMessage(from, "Please reply with a valid number between 1 and 50.");
+          return;
+        }
+
+        const totalAmount = Number((copies * session.pricePerPage).toFixed(2));
+
+        await sessionRef.set({
+          ...session,
+          state: "awaiting_payment",
+          copies,
+          totalAmount
+        });
+
+        // Create a Cashfree payment order
+        const orderId = `WA-${uuidv4().slice(0, 8).toUpperCase()}`;
+        try {
+          const cfRes = await axios.post(`${CASHFREE_BASE_URL}/orders`, {
+            order_id: orderId,
+            order_amount: totalAmount,
+            order_currency: "INR",
+            customer_details: {
+              customer_id: session.userId,
+              customer_phone: from,
+            },
+            order_meta: {
+              return_url: `https://api-upqxuj7evq-uc.a.run.app/payment-success?orderId=${orderId}&userId=${session.userId}`,
+              notify_url: `https://api-upqxuj7evq-uc.a.run.app/cashfree-webhook`
+            }
+          }, { headers: cashfreeHeaders });
+
+          const paymentLink = cfRes.data.payment_link || cfRes.data.payments?.url || `https://mimo-website.vercel.app/pay?order_id=${orderId}`;
+
+          await sessionRef.set({ ...session, state: "awaiting_payment", orderId, copies, totalAmount });
+          // Link the job to this order
+          await db.collection("print_jobs").doc(session.jobId).update({
+            orderId,
+            colorMode: session.colorMode,
+            copies
+          });
+
+          await sendWhatsAppMessage(from,
+            `🧾 *Order Summary*\n\nFile: ${session.fileName}\nPrint: ${session.colorMode === "color" ? "Color" : "B&W"} × ${copies} cop${copies > 1 ? "ies" : "y"}\nTotal: *₹${totalAmount}*\n\n💳 Pay here:\n${paymentLink}\n\nAfter payment, your *Print Code* will be sent to you automatically on WhatsApp! 🖨️`
+          );
+        } catch (cfErr) {
+          console.error("[WHATSAPP BOT] Cashfree order creation failed:", cfErr.response?.data || cfErr.message);
+          await sendWhatsAppMessage(from, "❌ Failed to create payment order. Please try again or visit our website.");
+          await sessionRef.set({ state: "idle" });
+        }
+        return;
+      }
+
+      // Default: Welcome message for any other state
+      await sendWhatsAppMessage(from,
+        `👋 *Welcome to Mimo Printing!*\n\nI'm your automated printing assistant. Here's how it works:\n\n📄 Simply *send me a PDF* file\n🎨 I'll ask B&W or Color\n💳 You pay via a secure link\n🖨️ Get your *Print Code* instantly!\n\nHead to any Mimo kiosk, enter your code, and collect your prints. It's that simple!`
+      );
+      return;
+    }
+
+    // Unsupported message type
+    await sendWhatsAppMessage(from, "I can only process PDF documents and text replies. Please send me a PDF file to get started!");
+
+  } catch (err) {
+    console.error("[WHATSAPP BOT ERROR]", err);
   }
 });
 
