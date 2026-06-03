@@ -481,7 +481,7 @@ export default function AdminDashboard() {
                        <span className="text-slate-900">{hardware['CV-001']?.tonerLevel || 0}%</span>
                      </div>
                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor(hardware['CV-001']?.tonerLevel || 0)}`} style={{ width: \`\${hardware['CV-001']?.tonerLevel || 0}%\` }}></div>
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor(hardware['CV-001']?.tonerLevel || 0)}`} style={{ width: `\${hardware['CV-001']?.tonerLevel || 0}%` }}></div>
                      </div>
                   </div>
                   
@@ -492,7 +492,7 @@ export default function AdminDashboard() {
                        <span className="text-slate-900">{hardware['CV-001']?.paperLevel || 0} pages</span>
                      </div>
                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor((hardware['CV-001']?.paperLevel || 0)/5)}`} style={{ width: \`\${(hardware['CV-001']?.paperLevel || 0)/5}%\` }}></div>
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor((hardware['CV-001']?.paperLevel || 0)/5)}`} style={{ width: `\${(hardware['CV-001']?.paperLevel || 0)/5}%` }}></div>
                      </div>
                   </div>
                   
@@ -523,7 +523,7 @@ export default function AdminDashboard() {
                        <span className="text-slate-900">{hardware['SV-002-COLOR']?.inkLevel || 0}%</span>
                      </div>
                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor(hardware['SV-002-COLOR']?.inkLevel || 0)}`} style={{ width: \`\${hardware['SV-002-COLOR']?.inkLevel || 0}%\` }}></div>
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor(hardware['SV-002-COLOR']?.inkLevel || 0)}`} style={{ width: `\${hardware['SV-002-COLOR']?.inkLevel || 0}%` }}></div>
                      </div>
                   </div>
                   
@@ -534,7 +534,7 @@ export default function AdminDashboard() {
                        <span className="text-slate-900">{hardware['SV-002-COLOR']?.paperLevel || 0} pages</span>
                      </div>
                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor((hardware['SV-002-COLOR']?.paperLevel || 0)/5)}`} style={{ width: \`\${(hardware['SV-002-COLOR']?.paperLevel || 0)/5}%\` }}></div>
+                       <div className={`h-3 rounded-full transition-all duration-1000 ${getPercentageColor((hardware['SV-002-COLOR']?.paperLevel || 0)/5)}`} style={{ width: `\${(hardware['SV-002-COLOR']?.paperLevel || 0)/5}%` }}></div>
                      </div>
                   </div>
                   
