@@ -1343,6 +1343,46 @@ app.post("/admin/reset-metrics", adminAuthMiddleware, async (req, res) => {
   }
 });
 
+
+app.get("/admin/recent-prints", adminAuthMiddleware, async (req, res) => {
+  try {
+    const ordersSnapshot = await db.collection("orders")
+      .orderBy("createdAt", "desc")
+      .limit(15)
+      .get();
+      
+    const recentPrints = [];
+    for (const doc of ordersSnapshot.docs) {
+      const data = doc.data();
+      let userEmail = "Guest User";
+      let fileName = "Unknown File";
+      
+      try {
+        if (data.userId) {
+          const userDoc = await db.collection("users").doc(data.userId).get();
+          if (userDoc.exists) userEmail = userDoc.data().email || "Guest User";
+        }
+        if (data.jobIds && data.jobIds.length > 0) {
+          const jobDoc = await db.collection("jobs").doc(data.jobIds[0]).get();
+          if (jobDoc.exists) fileName = jobDoc.data().fileName || "Unknown File";
+        }
+      } catch (e) {}
+
+      recentPrints.push({
+        userEmail,
+        file: fileName,
+        status: data.orderStatus || data.status || "completed",
+        cost: data.amount || 0
+      });
+    }
+    
+    res.json(recentPrints);
+  } catch (err) {
+    console.error("Recent prints error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Export the main Express App
 exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
 
