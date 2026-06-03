@@ -1221,7 +1221,7 @@ app.get("/validate-coupon/:code", async (req, res) => {
 app.get("/api/settings", async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("pricing").get();
-    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00, pricePerPageA4: 2.30, pricePerPageGraph: 2.00 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1230,7 +1230,7 @@ app.get("/api/settings", async (req, res) => {
 app.get("/admin/settings", adminAuthMiddleware, async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("pricing").get();
-    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00, pricePerPageA4: 2.30, pricePerPageGraph: 2.00 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1238,10 +1238,12 @@ app.get("/admin/settings", adminAuthMiddleware, async (req, res) => {
 
 app.post("/admin/settings", adminAuthMiddleware, async (req, res) => {
   try {
-    const { pricePerPageBW, pricePerPageColor } = req.body;
+    const { pricePerPageBW, pricePerPageColor, pricePerPageA4, pricePerPageGraph } = req.body;
     await db.collection("mimo_settings").doc("pricing").set({
       pricePerPageBW: Number(pricePerPageBW),
-      pricePerPageColor: Number(pricePerPageColor)
+      pricePerPageColor: Number(pricePerPageColor),
+      pricePerPageA4: Number(pricePerPageA4 || 2.30),
+      pricePerPageGraph: Number(pricePerPageGraph || 2.00)
     }, { merge: true });
     res.json({ success: true });
   } catch (err) {

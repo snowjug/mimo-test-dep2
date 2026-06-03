@@ -16,7 +16,7 @@ export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<any>(null);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [recentPrints, setRecentPrints] = useState<any[]>([]);
-  const [pricing, setPricing] = useState({ pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+  const [pricing, setPricing] = useState({ pricePerPageBW: 2.30, pricePerPageColor: 10.00, pricePerPageA4: 2.30, pricePerPageGraph: 2.00 });
   const [hardware, setHardware] = useState<any>({});
   
   const [activeTab, setActiveTab] = useState('dashboard');
