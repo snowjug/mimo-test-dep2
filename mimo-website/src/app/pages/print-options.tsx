@@ -468,6 +468,7 @@ export function PrintOptions() {
         {`
           @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
         `}
+      </style>
       <div className="mx-auto max-w-6xl space-y-2 sm:space-y-3">
 
         {/* Header */}
