@@ -486,13 +486,20 @@ export function PrintOptions() {
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-start gap-1 sm:gap-3">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 hover:text-[#093765] flex-shrink-0 h-9 w-9 sm:h-11 sm:w-11 mt-0 sm:mt-0.5 -ml-2" onClick={() => navigate("/upload")}>
-            <ArrowLeft className="w-4 h-4 sm:w-6 sm:h-6" strokeWidth={2.5} />
+        <div className="flex items-center gap-2 mb-1 lg:hidden">
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 hover:text-[#093765] h-10 w-10 -ml-2 shrink-0" onClick={() => navigate("/upload")}>
+            <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
           </Button>
-          <div className="min-w-0 pt-1 sm:pt-1.5 flex flex-col">
-            <h1 className="text-2xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-700 bg-clip-text text-transparent tracking-tight leading-tight mb-0.5">Print Configuration</h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium">Customize how you want your documents to look</p>
+          <span className="font-extrabold text-[#093765] text-lg">Print Settings</span>
+        </div>
+
+        <div className="hidden lg:flex items-start gap-3 mb-2">
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 hover:text-[#093765] flex-shrink-0 h-11 w-11 mt-0.5 -ml-2" onClick={() => navigate("/upload")}>
+            <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
+          </Button>
+          <div className="min-w-0 pt-1.5 flex flex-col">
+            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-700 bg-clip-text text-transparent tracking-tight leading-tight mb-0.5">Print Configuration</h1>
+            <p className="text-sm text-slate-500 font-medium">Customize how you want your documents to look</p>
           </div>
         </div>
 
@@ -501,15 +508,21 @@ export function PrintOptions() {
           {printDestinationCard}
         </div>
 
+        {/* Mobile Print Configuration Heading */}
+        <div className="flex flex-col lg:hidden mt-2">
+          <h2 className="text-xl font-extrabold text-[#093765] tracking-tight mb-0.5">Print Configuration</h2>
+          <p className="text-xs text-slate-500 font-medium">Customize how you want your documents to look</p>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Options Panel */}
           <div className="lg:col-span-2 space-y-3 sm:space-y-4">
             {/* Number of Copies - Responsive & Interactive */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
+            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Number of Copies</p>
-                  <p className="text-[10px] text-slate-500 font-medium">Select print quantity</p>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">Select print quantity</p>
                 </div>
                 <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100 w-full sm:w-auto">
                   <Button
@@ -538,17 +551,17 @@ export function PrintOptions() {
             </Card>
 
             {/* Color Mode - Coming Soon for Color only */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
+            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Color Mode</p>
-                  <p className="text-[10px] text-slate-500 font-medium">
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">
                     {directKioskId === "CV-001" 
                       ? `₹${pricePerPageBW.toFixed(2)}/page • B&W Only` 
                       : `₹${pricePerPageBW.toFixed(2)}/page B&W • ₹${pricePerPageColor.toFixed(2)}/page Color`}
                   </p>
                 </div>
-                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
+                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
                   <button
                     onClick={() => {
                       setColorMode("bw");
@@ -605,7 +618,7 @@ export function PrintOptions() {
             </Card>
 
             {hasImages && (
-              <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
+              <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                   <div>
                     <div className="flex items-center gap-2">
@@ -614,11 +627,11 @@ export function PrintOptions() {
                         Images Only
                       </Badge>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-medium">How should the image fit on A4?</p>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium">How should the image fit on A4?</p>
                   </div>
                   
                   <div className="flex flex-col items-center gap-3 w-full sm:w-auto">
-                    <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-72 h-10 select-none">
+                    <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-72 h-11 sm:h-12 select-none">
                       <button
                         onClick={() => setImageScaling("fit")}
                         type="button"
@@ -700,7 +713,7 @@ export function PrintOptions() {
             )}
 
             {/* Print Layout - Responsive & Interactive Segmented Control */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
+            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -709,9 +722,9 @@ export function PrintOptions() {
                       Eco
                     </Badge>
                   </div>
-                  <p className="text-[10px] text-slate-500 font-medium">Single or double-sided</p>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">Single or double-sided</p>
                 </div>
-                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
+                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
                   <button
                     onClick={() => setDoubleSided("single")}
                     type="button"
@@ -760,13 +773,13 @@ export function PrintOptions() {
             </Card>
 
             {/* Page Selection - Responsive & Interactive Segmented Control */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-3 hover:shadow-md transition-all duration-300">
+            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Pages to Print</p>
-                  <p className="text-[10px] text-slate-500 font-medium">{pageSelection === "all" ? "All pages" : "Custom range"}</p>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">{pageSelection === "all" ? "All pages" : "Custom range"}</p>
                 </div>
-                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
+                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
                   <button
                     onClick={() => handlePageSelectionChange("all")}
                     type="button"
@@ -966,9 +979,9 @@ export function PrintOptions() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                   <div>
                     <p className="text-sm font-bold text-slate-800">Orientation</p>
-                    <p className="text-[10px] text-slate-500 font-medium">Page direction</p>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium">Page direction</p>
                   </div>
-                  <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-60 h-10 select-none">
+                  <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-60 h-11 sm:h-12 select-none">
                     <button
                       onClick={() => setOrientation("portrait")}
                       type="button"

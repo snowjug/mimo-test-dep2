@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
-import { Copy, CheckCircle2, CheckCircle, Home, Printer, QrCode, Download, Share2, Mail, Loader2 } from "lucide-react";
+import { Copy, CheckCircle2, CheckCircle, Home, Printer, QrCode, Download, Share2, Mail, Loader2, X } from "lucide-react";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { MimoHeader } from "../components/mimo-header";
 import { toast } from "sonner";
@@ -88,6 +88,57 @@ export function PrintCode() {
     <>
       <style>
         {`
+          @font-face {
+            font-family: 'Lovelo';
+            src: url('/fonts/Lovelo-Black.otf') format('opentype');
+          }
+          @keyframes paperOut {
+            0%   { height: 0px; opacity: 0; }
+            15%  { opacity: 1; }
+            60%  { height: 52px; }
+            80%  { height: 48px; }
+            100% { height: 52px; }
+          }
+          @keyframes paperPulse {
+            0%, 100% { height: 44px; }
+            50%       { height: 52px; }
+          }
+          @keyframes printerBob {
+            0%, 100% { transform: translateY(0px); }
+            50%       { transform: translateY(-3px); }
+          }
+          @keyframes printerShake {
+            0%,100% { transform: translateX(0); }
+            20%      { transform: translateX(-2px); }
+            40%      { transform: translateX(2px); }
+            60%      { transform: translateX(-1px); }
+            80%      { transform: translateX(1px); }
+          }
+          @keyframes checkPop {
+            0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+            70%  { transform: scale(1.2) rotate(5deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+          }
+          @keyframes glowPulse {
+            0%, 100% { box-shadow: 0 0 0px 0px rgba(9,55,101,0.2); }
+            50%       { box-shadow: 0 0 18px 6px rgba(9,55,101,0.15); }
+          }
+          @keyframes lineSlide {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+          }
+          @keyframes feedIn {
+            0% { transform: translateY(-12px); opacity: 0; }
+            30% { transform: translateY(-2px); opacity: 1; }
+            70% { transform: translateY(8px); opacity: 0; }
+            100% { transform: translateY(18px); opacity: 0; }
+          }
+          @keyframes feedOut {
+            0% { transform: translateY(-18px); opacity: 0; }
+            30% { transform: translateY(-8px); opacity: 0; }
+            70% { transform: translateY(2px); opacity: 1; }
+            100% { transform: translateY(12px); opacity: 0; }
+          }
           @keyframes slideUpPaper {
             0% { transform: translateY(50px); opacity: 0; }
             10% { opacity: 1; }
@@ -113,6 +164,13 @@ export function PrintCode() {
           .animate-printing-motion {
             animation: printingMotion 2s ease-in-out infinite alternate;
           }
+          .printer-bob { animation: printerBob 2s ease-in-out infinite; }
+          .printer-shake { animation: printerShake 0.4s ease-in-out infinite; }
+          .printer-glow { animation: glowPulse 2s ease-in-out infinite; }
+          .paper-out { animation: paperOut 0.7s ease-out forwards; }
+          .paper-pulse { animation: paperPulse 1.2s ease-in-out infinite; }
+          .check-pop { animation: checkPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+          .line-slide { animation: lineSlide 1.2s linear infinite; }
         `}
       </style>
       <div className="min-h-[100dvh] w-full flex flex-col px-2 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4 bg-slate-50/50 relative">
@@ -124,37 +182,63 @@ export function PrintCode() {
 
         <div className="flex-1 flex flex-col items-center justify-start w-full max-w-xl mx-auto z-10 pt-1 sm:pt-2 pb-2 px-4 space-y-2 sm:space-y-3">
           
-          {/* Status Card */}
-          <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-100 p-3 flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
-            <div className="flex justify-center mb-1">
-              <div className="relative w-12 h-12 flex items-center justify-center scale-75">
-                {/* Printer Base */}
-                <div className="absolute bottom-2 w-16 h-9 bg-[#093765] rounded-lg flex items-center justify-center shadow-md z-20">
-                  <Printer className={`w-5 h-5 text-white/80 ${isProcessing ? 'animate-pulse' : ''}`} />
+          {/* Status Container (Overlapped Badge + Card) */}
+          <div className="w-full relative pt-10 mt-2 z-10 animate-in zoom-in-95 duration-500">
+            
+            {/* Elegant Printer Animation - OVERLAPPING STATUS CARD */}
+            <div className="absolute top-0 left-0 right-0 flex justify-center z-20">
+              <div className={`relative w-20 h-20 flex items-center justify-center rounded-full shadow-md transition-all duration-700 border-4 border-white ${
+                printStatus === 'completed' ? 'bg-green-500' :
+                printStatus === 'failed' ? 'bg-red-500' :
+                'bg-[#093765]'
+              }`}>
+                
+                {/* Pulse effect in background */}
+                {(isProcessing || printStatus === 'printing') && (
+                  <>
+                    <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-20" />
+                    <div className="absolute inset-0 bg-blue-300 rounded-full animate-pulse opacity-30" />
+                  </>
+                )}
+
+                {/* Paper feeding in (Top) */}
+                {(isProcessing || printStatus === 'printing') && (
+                  <div className="absolute top-1 animate-[feedIn_1.5s_ease-in-out_infinite] z-0">
+                    <FileText className="w-5 h-5 text-white/50" strokeWidth={1.5} />
+                  </div>
+                )}
+
+                {/* The Printer */}
+                <div className="relative z-10 bg-inherit rounded-full p-1.5">
+                  <Printer className="w-8 h-8 text-white" strokeWidth={1.5} />
                 </div>
 
-                {/* Paper Animation Logic */}
-                {isProcessing || printStatus === "printing" ? (
-                  <div className="absolute bottom-8 w-10 h-12 bg-white border border-gray-200 shadow-sm rounded-t z-10 flex flex-col items-center justify-center animate-printing-motion overflow-hidden">
-                    <div className="w-6 h-0.5 bg-gray-200 rounded-full mb-1"></div>
-                    <div className="w-4 h-0.5 bg-gray-200 rounded-full mb-1"></div>
-                    <div className="w-6 h-0.5 bg-gray-200 rounded-full"></div>
-                    {/* Simulated print head moving */}
-                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-blue-400/20 shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse" />
+                {/* Paper coming out (Bottom) */}
+                {(isProcessing || printStatus === 'printing') && (
+                  <div className="absolute bottom-1 animate-[feedOut_1.5s_ease-in-out_infinite] z-0">
+                    <FileText className="w-5 h-5 text-white/90" strokeWidth={1.5} />
                   </div>
-                ) : printStatus === "completed" ? (
-                  <div className="absolute bottom-8 w-10 h-12 bg-white border border-gray-200 shadow-sm rounded-t animate-slide-up-paper z-10 flex flex-col items-center justify-center">
-                    <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center mb-1 animate-scale-check" style={{ animationDelay: '0.4s' }}>
-                      <CheckCircle className="w-3 h-3 text-green-600" />
-                    </div>
-                    <div className="w-6 h-0.5 bg-gray-100 rounded-full mb-1"></div>
-                    <div className="w-4 h-0.5 bg-gray-100 rounded-full"></div>
+                )}
+
+                {/* Success Checkmark */}
+                {printStatus === 'completed' && (
+                  <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm animate-in zoom-in duration-300 border border-slate-100">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
                   </div>
-                ) : null}
+                )}
+
+                {/* Failed X */}
+                {printStatus === 'failed' && (
+                  <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm animate-in zoom-in duration-300 border border-slate-100">
+                    <X className="w-5 h-5 text-red-600" />
+                  </div>
+                )}
               </div>
             </div>
             
-            <h2 className="text-lg sm:text-xl font-extrabold mb-0.5 text-gray-900 transition-all">
+            {/* Status Card */}
+            <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200 p-4 pt-12 sm:p-5 sm:pt-14 flex flex-col items-center text-center">
+            <h2 className="text-xl sm:text-2xl font-extrabold mb-1 text-gray-900 transition-all tracking-tight">
               {isProcessing 
                 ? "Processing Print Job..." 
                 : printStatus === "printing" 
@@ -177,10 +261,10 @@ export function PrintCode() {
             <div className="flex items-center justify-between w-full max-w-[240px] mx-auto mt-1 mb-0.5">
               {/* Step 1: Paid */}
               <div className="flex flex-col items-center">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${printStatus !== 'failed' ? 'bg-[#093765] text-white shadow-sm' : 'bg-gray-200 text-gray-500'}`}>
-                  <CheckCircle2 className="w-3 h-3" />
+                <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold ${printStatus !== 'failed' ? 'bg-[#093765] text-white' : 'bg-gray-200 text-gray-500'}`}>
+                  <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" />
                 </div>
-                <span className="text-[9px] font-bold text-gray-700 mt-1">Paid</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 mt-1">Paid</span>
               </div>
               
               {/* Line 1 */}
@@ -188,10 +272,10 @@ export function PrintCode() {
 
               {/* Step 2: Printing */}
               <div className="flex flex-col items-center">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${(printStatus === 'printing' || printStatus === 'completed') ? 'bg-[#093765] text-white shadow-sm' : 'bg-gray-200 text-gray-400'} ${printStatus === 'printing' ? 'animate-pulse shadow-[0_0_8px_rgba(9,55,101,0.5)] ring-2 ring-[#093765]/20 ring-offset-1' : ''}`}>
-                  {printStatus === 'completed' ? <CheckCircle2 className="w-3 h-3" /> : <Printer className="w-3 h-3" />}
+                <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${(printStatus === 'printing' || printStatus === 'completed') ? 'bg-[#093765] text-white' : 'bg-gray-200 text-gray-400'} ${printStatus === 'printing' ? 'animate-pulse' : ''}`}>
+                  {printStatus === 'completed' ? <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" /> : <Printer className="w-3 h-3 sm:w-4 sm:h-4" />}
                 </div>
-                <span className={`text-[9px] font-bold mt-1 transition-colors duration-500 ${(printStatus === 'printing' || printStatus === 'completed') ? 'text-gray-700' : 'text-gray-400'}`}>Printing</span>
+                <span className={`text-[9px] sm:text-[10px] font-bold mt-1 transition-colors duration-500 ${(printStatus === 'printing' || printStatus === 'completed') ? 'text-gray-700' : 'text-gray-400'}`}>Printing</span>
               </div>
               
               {/* Line 2 */}
@@ -199,15 +283,16 @@ export function PrintCode() {
 
               {/* Step 3: Done */}
               <div className="flex flex-col items-center">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${printStatus === 'completed' ? 'bg-green-500 text-white shadow-sm ring-2 ring-green-500/20 ring-offset-1' : 'bg-gray-200 text-gray-400'}`}>
-                  <CheckCircle className="w-3 h-3" />
+                <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${printStatus === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
                 </div>
-                <span className={`text-[9px] font-bold mt-1 transition-colors duration-500 ${printStatus === 'completed' ? 'text-green-600' : 'text-gray-400'}`}>Done</span>
+                <span className={`text-[9px] sm:text-[10px] font-bold mt-1 transition-colors duration-500 ${printStatus === 'completed' ? 'text-green-600' : 'text-gray-400'}`}>Done</span>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Print Code Card */}
+        {/* Print Code Card */}
           <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-100 p-2 sm:p-2.5 animate-in slide-in-from-bottom-4 duration-700 delay-100">
             <div className="bg-gradient-to-br from-blue-50 to-slate-50 border-2 border-blue-100 rounded-xl p-3 sm:p-4 relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-2 opacity-5 pointer-events-none">

@@ -149,44 +149,41 @@ export function Payment() {
 
   return (
     <div className="min-h-[100dvh] w-full bg-slate-50/50 px-2 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4">
-      <div className="mx-auto max-w-5xl space-y-3 sm:space-y-4">
+      <div className="mx-auto max-w-5xl space-y-1 sm:space-y-2">
 
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-white hover:shadow-sm" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-5 h-5" />
+        <div className="flex items-center gap-2 mb-1">
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 hover:text-[#093765] h-10 w-10 -ml-2 shrink-0" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
           </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent">Secure Checkout</h1>
-            
-          </div>
+          <h1 className="text-xl sm:text-3xl font-extrabold text-[#093765] tracking-tight pt-0.5">Secure Checkout</h1>
         </div>
 
         <div className="max-w-md mx-auto w-full group">
-          <div className="relative mb-24" style={{ filter: 'drop-shadow(0 15px 20px rgba(0, 0, 0, 0.08))' }}>
+          <div className="relative mb-2" style={{ filter: 'drop-shadow(0 15px 20px rgba(0, 0, 0, 0.08))' }}>
             {/* Order Summary - Torn Receipt Style */}
             <Card 
-              className="border-0 bg-[#fefdfb] text-slate-900 overflow-hidden animate-in fade-in duration-500 rounded-none pt-4 pb-8 px-4 sm:pt-6 sm:pb-10 sm:px-6 font-mono relative"
+              className="border-0 bg-[#fefdfb] text-slate-900 overflow-hidden animate-in fade-in duration-500 rounded-none pt-3 pb-4 px-3 sm:pt-4 sm:pb-5 sm:px-4 font-mono relative"
               style={{
                 clipPath: 'polygon(0% 12px, 2.5% 0px, 5% 12px, 7.5% 0px, 10% 12px, 12.5% 0px, 15% 12px, 17.5% 0px, 20% 12px, 22.5% 0px, 25% 12px, 27.5% 0px, 30% 12px, 32.5% 0px, 35% 12px, 37.5% 0px, 40% 12px, 42.5% 0px, 45% 12px, 47.5% 0px, 50% 12px, 52.5% 0px, 55% 12px, 57.5% 0px, 60% 12px, 62.5% 0px, 65% 12px, 67.5% 0px, 70% 12px, 72.5% 0px, 75% 12px, 77.5% 0px, 80% 12px, 82.5% 0px, 85% 12px, 87.5% 0px, 90% 12px, 92.5% 0px, 95% 12px, 97.5% 0px, 100% 12px, 100% calc(100% - 12px), 97.5% 100%, 95% calc(100% - 12px), 92.5% 100%, 90% calc(100% - 12px), 87.5% 100%, 85% calc(100% - 12px), 82.5% 100%, 80% calc(100% - 12px), 77.5% 100%, 75% calc(100% - 12px), 72.5% 100%, 70% calc(100% - 12px), 67.5% 100%, 65% calc(100% - 12px), 62.5% 100%, 60% calc(100% - 12px), 57.5% 100%, 55% calc(100% - 12px), 52.5% 100%, 50% calc(100% - 12px), 47.5% 100%, 45% calc(100% - 12px), 42.5% 100%, 40% calc(100% - 12px), 37.5% 100%, 35% calc(100% - 12px), 32.5% 100%, 30% calc(100% - 12px), 27.5% 100%, 25% calc(100% - 12px), 22.5% 100%, 20% calc(100% - 12px), 17.5% 100%, 15% calc(100% - 12px), 12.5% 100%, 10% calc(100% - 12px), 7.5% 100%, 5% calc(100% - 12px), 2.5% 100%, 0% calc(100% - 12px))'
               }}
             >
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] opacity-20 pointer-events-none"></div>
               
-              <div className="text-center mb-1 mt-1 relative z-10">
-                <p className="font-extrabold text-lg sm:text-xl uppercase tracking-[0.2em] text-slate-800">Order Receipt</p>
-                <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">
+              <div className="text-center mb-0 mt-1 relative z-10">
+                <p className="font-extrabold text-base sm:text-xl uppercase tracking-[0.2em] text-slate-800">Order Receipt</p>
+                <div className="flex items-center justify-center gap-2 text-[9px] sm:text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">
                   <span>TXN: #{txnId}</span>
                   <span>•</span>
                   <span>{new Date().toLocaleDateString()}</span>
                 </div>
               </div>
 
-              <div className="border-t border-dashed border-slate-300 w-full my-3" />
+              <div className="border-t border-dashed border-slate-300 w-full my-2 sm:my-3" />
 
-              <div className="bg-slate-50/80 p-3 rounded-lg border border-slate-200/60 space-y-2 relative z-10">
+              <div className="bg-slate-50/80 p-2 sm:p-3 rounded-lg border border-slate-200/60 space-y-1.5 sm:space-y-2 relative z-10">
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-slate-600 uppercase font-bold tracking-wider">Documents</span>
                   <span className="font-bold text-slate-900">{files.length}</span>
@@ -236,7 +233,7 @@ export function Payment() {
                 </>
               )}
 
-              <div className="space-y-1.5 mt-4 relative z-10 px-1">
+              <div className="space-y-1 mt-3 relative z-10 px-1">
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-slate-700 uppercase font-bold tracking-wide">Basic Total</span>
                   <span className="font-bold text-slate-900">₹{totalCost.toFixed(2)}</span>
@@ -258,7 +255,7 @@ export function Payment() {
               </div>
 
               {/* Promo Section Integrated into Receipt */}
-              <div className="mt-4 mb-3 relative z-10">
+              <div className="mt-2.5 mb-1.5 relative z-10">
                 {!appliedPromo ? (
                   <div className="relative mx-1">
                     <Input
@@ -295,23 +292,23 @@ export function Payment() {
                 )}
               </div>
 
-              <div className="border-t-[1.5px] border-dashed border-slate-400 w-full mt-5 mb-3 relative z-10" />
+              <div className="border-t-[1.5px] border-dashed border-slate-400 w-full mt-3 mb-2 relative z-10" />
 
-              <div className="flex justify-between items-center py-1 relative z-10 px-1">
+              <div className="flex justify-between items-center py-0.5 relative z-10 px-1">
                 <span className="font-black text-sm sm:text-base uppercase tracking-widest text-slate-800">Amount Due</span>
                 <span className="text-2xl sm:text-3xl font-black text-[#093765] tracking-tighter">
                   ₹{totalAmount.toFixed(2)}
                 </span>
               </div>
 
-              <div className="text-center mt-6 mb-2 relative z-10 opacity-60">
-                <p className="text-[9px] sm:text-[10px] text-slate-600 uppercase tracking-[0.2em] leading-relaxed font-bold">
+              <div className="text-center mt-4 mb-1 relative z-10 opacity-60">
+                <p className="text-[8px] sm:text-[9px] text-slate-600 uppercase tracking-[0.2em] leading-relaxed font-bold">
                   Thank you for printing with MIMO<br />
                   Terminal ID: {terminalId}
                 </p>
               </div>
 
-              <div className="mt-4 relative z-10 px-1 mb-2">
+              <div className="mt-2 relative z-10 px-1 mb-1">
                 <Button
                   className="w-full h-12 text-sm bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg shadow-blue-900/20 transition-all duration-200 font-black uppercase tracking-widest rounded-xl"
                   onClick={handlePayment}

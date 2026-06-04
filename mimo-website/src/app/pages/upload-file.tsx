@@ -401,32 +401,30 @@ export function UploadFile() {
         </div>
 
         {/* Printer Status */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-[#093765] to-blue-600 text-white overflow-hidden relative group">
-          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-            <Printer className="w-32 h-32 rotate-12" />
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-[#093765] via-blue-700 to-blue-500 text-white overflow-hidden relative group hover:shadow-2xl transition-shadow duration-300">
+          <div className="absolute top-0 right-0 p-6 opacity-[0.07] group-hover:opacity-[0.14] transition-opacity duration-500 pointer-events-none">
+            <Printer className="w-36 h-36 rotate-12" />
           </div>
+          {/* Subtle shimmer overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 pointer-events-none" />
           <CardContent className="p-4 sm:p-6 relative z-10">
             <div className="flex flex-row items-center justify-between gap-3 sm:gap-6">
               <div className="flex-1">
-                <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                  <h3 className="font-bold text-base sm:text-xl">My Dashboard</h3>
-                  <Badge className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-md text-[10px] sm:text-xs">
-                    <CheckCircle className="w-3 h-3 mr-1 hidden sm:inline" />
-                    Active User
-                  </Badge>
+                <div className="flex items-center gap-2 sm:gap-3 mb-3">
+                  <h3 className="font-extrabold text-base sm:text-xl tracking-tight">My Dashboard</h3>
                 </div>
-                <div className="grid grid-cols-3 gap-2 sm:gap-4 max-w-md mt-2 sm:mt-4">
-                  <div className="bg-white/10 rounded-lg p-1.5 sm:p-2 text-center backdrop-blur-sm">
-                    <div className="text-[9px] sm:text-xs opacity-80 flex items-center justify-center gap-1 mb-0.5 sm:mb-1"><History className="w-3 h-3" /> <span className="hidden sm:inline">Printouts</span></div>
-                    <div className="font-bold text-xs sm:text-base">{userStats.totalDocs}</div>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-md">
+                  <div className="bg-white/10 hover:bg-white/20 rounded-xl p-2 sm:p-3 text-center backdrop-blur-sm border border-white/10 transition-colors duration-200 cursor-default">
+                    <div className="text-[9px] sm:text-[10px] opacity-70 flex items-center justify-center gap-1 mb-1 uppercase tracking-wider font-semibold"><History className="w-3 h-3" /> Prints</div>
+                    <div className="font-black text-sm sm:text-xl">{userStats.totalDocs}</div>
                   </div>
-                  <div className="bg-white/10 rounded-lg p-1.5 sm:p-2 text-center backdrop-blur-sm">
-                    <div className="text-[9px] sm:text-xs opacity-80 flex items-center justify-center gap-1 mb-0.5 sm:mb-1"><Layers className="w-3 h-3" /> <span className="hidden sm:inline">Pages</span></div>
-                    <div className="font-bold text-xs sm:text-base">{userStats.totalPages}</div>
+                  <div className="bg-white/10 hover:bg-white/20 rounded-xl p-2 sm:p-3 text-center backdrop-blur-sm border border-white/10 transition-colors duration-200 cursor-default">
+                    <div className="text-[9px] sm:text-[10px] opacity-70 flex items-center justify-center gap-1 mb-1 uppercase tracking-wider font-semibold"><Layers className="w-3 h-3" /> Pages</div>
+                    <div className="font-black text-sm sm:text-xl">{userStats.totalPages}</div>
                   </div>
-                  <div className="bg-white/10 rounded-lg p-1.5 sm:p-2 text-center backdrop-blur-sm">
-                    <div className="text-[9px] sm:text-xs opacity-80 flex items-center justify-center gap-1 mb-0.5 sm:mb-1"><Wallet className="w-3 h-3" /> <span className="hidden sm:inline">Spent</span></div>
-                    <div className="font-bold text-xs sm:text-base">₹{Number(userStats.totalSpent).toFixed(0)}</div>
+                  <div className="bg-white/10 hover:bg-white/20 rounded-xl p-2 sm:p-3 text-center backdrop-blur-sm border border-white/10 transition-colors duration-200 cursor-default">
+                    <div className="text-[9px] sm:text-[10px] opacity-70 flex items-center justify-center gap-1 mb-1 uppercase tracking-wider font-semibold"><Wallet className="w-3 h-3" /> Spent</div>
+                    <div className="font-black text-sm sm:text-xl">₹{Number(userStats.totalSpent).toFixed(0)}</div>
                   </div>
                 </div>
               </div>
@@ -435,21 +433,19 @@ export function UploadFile() {
         </Card>
 
         {/* Upload Area */}
-        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-xl">
-          {/* No Header */}
-          <CardContent className={files.length > 0 ? "p-3 sm:p-6" : "p-4 sm:p-6"}>
+        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-xl">
+          <CardContent className={files.length > 0 ? "p-3 sm:p-5" : "p-3 sm:p-5"}>
             <div
-              className={`border-2 sm:border-3 border-dashed transition-all duration-500 ease-in-out group cursor-pointer ${isDragging
-                ? "border-indigo-500 bg-indigo-50/50 scale-[1.02] shadow-xl"
-                : "border-gray-200 hover:border-indigo-400 hover:bg-gray-50/80"
-                } ${files.length > 0
-                  ? "p-4 sm:p-6 rounded-2xl flex flex-col sm:flex-row items-center justify-center gap-4 text-center"
-                  : "p-4 sm:p-8 rounded-3xl text-center flex flex-col items-center justify-center"
-                }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
+              className={`border-2 border-dashed transition-all duration-300 ease-in-out group cursor-pointer ${
+                isDragging
+                  ? "border-[#093765] bg-blue-50/60 scale-[1.01] shadow-lg shadow-blue-100"
+                  : "border-slate-200 hover:border-[#093765]/60 hover:bg-blue-50/30"
+              } ${
+                files.length > 0
+                  ? "p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-center gap-4 text-center"
+                  : "p-6 sm:p-10 rounded-2xl text-center flex flex-col items-center justify-center"
+              }`}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
@@ -457,40 +453,39 @@ export function UploadFile() {
               {files.length > 0 ? (
                 <>
                   <div className="flex items-center justify-center gap-3">
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-300 ${isDragging ? 'bg-indigo-100' : 'bg-gray-100 group-hover:bg-indigo-50'}`}>
-                      <Upload className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-300 ${isDragging ? "text-indigo-600" : "text-gray-500 group-hover:text-indigo-500"}`} />
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-300 ${isDragging ? 'bg-blue-100' : 'bg-slate-100 group-hover:bg-blue-50'}`}>
+                      <Upload className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-300 ${isDragging ? "text-[#093765]" : "text-slate-400 group-hover:text-[#093765]"}`} />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-sm sm:text-base font-semibold text-gray-700">Add more files</h3>
-                      <p className="text-xs text-gray-500 hidden sm:block">Support for PDF, DOCX, TXT, and Images</p>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-700 group-hover:text-[#093765] transition-colors">Add more files</h3>
+                      <p className="text-xs text-slate-400">PDF, DOCX, TXT, Images</p>
                     </div>
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-                    onChange={(e) => handleFileSelect(e.target.files)}
-                  />
+                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png" onChange={(e) => handleFileSelect(e.target.files)} />
                 </>
               ) : (
                 <>
-                  <div className={`w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 rounded-full flex items-center justify-center transition-all duration-300 ${isDragging ? 'bg-indigo-100' : 'bg-gray-100 group-hover:bg-indigo-50'}`}>
-                    <Upload className={`w-8 h-8 sm:w-10 sm:h-10 transition-colors duration-300 ${isDragging ? "text-indigo-600" : "text-gray-400 group-hover:text-indigo-500"}`} />
+                  {/* Pulsing ring + icon */}
+                  <div className="relative mb-5">
+                    <div className={`absolute inset-0 rounded-full transition-all duration-300 ${isDragging ? 'bg-blue-200 scale-125 opacity-40' : 'bg-transparent group-hover:bg-blue-100 group-hover:scale-110 opacity-0 group-hover:opacity-50'}`} />
+                    <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all duration-300 relative z-10 border-2 ${
+                      isDragging ? 'bg-blue-100 border-[#093765]' : 'bg-slate-100 border-transparent group-hover:bg-blue-50 group-hover:border-[#093765]/30'
+                    }`}>
+                      <Upload className={`w-7 h-7 sm:w-9 sm:h-9 transition-all duration-300 ${
+                        isDragging ? "text-[#093765] scale-110" : "text-slate-400 group-hover:text-[#093765] group-hover:scale-110 group-hover:-translate-y-0.5"
+                      }`} />
+                    </div>
                   </div>
-                  <h3 className="text-lg sm:text-2xl font-semibold mb-2 sm:mb-3 text-gray-700">Drop files to upload</h3>
-                  <p className="text-sm sm:text-base text-gray-500 mb-6 sm:mb-8 max-w-md mx-auto px-4">
-                    Support for PDF, DOCX, TXT, and Image files. Optimized for fast printing.
+                  <h3 className="text-base sm:text-xl font-extrabold mb-1.5 text-slate-700 group-hover:text-[#093765] transition-colors duration-200">
+                    {isDragging ? "Release to upload!" : "Drop files here to print"}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-400 mb-1 max-w-xs mx-auto">
+                    PDF, DOCX, TXT, JPG, PNG
                   </p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-                    onChange={(e) => handleFileSelect(e.target.files)}
-                  />
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#093765]/60 border border-[#093765]/20 rounded-full px-3 py-1 mt-3 bg-blue-50/50">
+                    <Upload className="w-3 h-3" /> Browse files
+                  </span>
+                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png" onChange={(e) => handleFileSelect(e.target.files)} />
                 </>
               )}
             </div>
@@ -558,13 +553,20 @@ export function UploadFile() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {files.map((file, index) => (
+                {files.map((file, index) => {
+                  const isPdf = file.name.toLowerCase().endsWith('.pdf');
+                  const isImage = file.type?.startsWith('image/');
+                  return (
                   <div
                     key={index}
-                    className="flex items-center gap-4 p-4 border border-gray-100 rounded-xl bg-white hover:shadow-md transition-all duration-200 group"
+                    className="flex items-center gap-3 p-3 sm:p-4 border border-slate-100 rounded-2xl bg-white hover:shadow-md hover:border-[#093765]/20 transition-all duration-200 group animate-in slide-in-from-left-2 fade-in duration-300"
                   >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${file.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-                      <FileText className="w-6 h-6" />
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                      file.status === 'completed'
+                        ? isPdf ? 'bg-red-50 text-red-500' : isImage ? 'bg-purple-50 text-purple-500' : 'bg-blue-50 text-[#093765]'
+                        : file.status === 'uploading' ? 'bg-amber-50 text-amber-500' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {isImage ? <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6" /> : <FileText className="w-5 h-5 sm:w-6 sm:h-6" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -610,15 +612,17 @@ export function UploadFile() {
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="flex flex-col sm:flex-row gap-2 mt-4">
                 <Button
-                  className="flex-1 h-12 text-lg bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg shadow-blue-900/20 transition-all duration-300 rounded-xl"
+                  className="flex-1 h-12 text-sm sm:text-base font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl"
                   disabled={files.length === 0 || files.some((f) => f.status === "uploading")}
                   onClick={handlePrint}
                 >
-                  Continue ({files.filter((f) => f.status === "completed").length} file{files.filter((f) => f.status === "completed").length !== 1 ? "s" : ""})
+                  <Printer className="w-4 h-4 mr-2" />
+                  Continue to Print · {files.filter((f) => f.status === "completed").length} file{files.filter((f) => f.status === "completed").length !== 1 ? "s" : ""}
                 </Button>
                 <Button variant="outline" className="h-12 px-6 rounded-xl hover:bg-gray-100" onClick={() => {
                   setFiles([]);

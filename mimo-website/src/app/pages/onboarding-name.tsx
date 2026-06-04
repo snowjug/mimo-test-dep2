@@ -44,16 +44,17 @@ export function OnboardingName() {
   };
 
   return (
-    <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-indigo-50 via-white to-blue-50 relative overflow-hidden">
-      {/* Dynamic background elements */}
+    <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-slate-900 via-[#093765] to-blue-900 relative overflow-hidden">
+      {/* Animated background blobs */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1.5 }}
         className="absolute inset-0 z-0"
       >
-        <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-400/10 blur-[140px] animate-pulse" />
-        <div className="absolute bottom-[-15%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[140px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-[-20%] left-[-15%] w-[60%] h-[60%] rounded-full bg-blue-500/20 blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-20%] right-[-15%] w-[60%] h-[60%] rounded-full bg-indigo-600/20 blur-[120px] animate-pulse" style={{ animationDelay: '1.5s' }} />
+        <div className="absolute top-[40%] right-[20%] w-[30%] h-[30%] rounded-full bg-cyan-500/10 blur-[80px] animate-pulse" style={{ animationDelay: '0.7s' }} />
       </motion.div>
 
       <div className="w-full max-w-md relative z-10">
@@ -61,9 +62,24 @@ export function OnboardingName() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="text-center space-y-4 sm:space-y-6"
+          className="text-center space-y-4 sm:space-y-5"
         >
-          {/* Logo Animation */}
+          {/* MIMO Logo */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+            className="mb-2"
+          >
+            <span
+              className="text-4xl sm:text-5xl font-black text-white tracking-wider drop-shadow-lg"
+              style={{ fontFamily: "'Lovelo', sans-serif" }}
+            >
+              MIMO
+            </span>
+          </motion.div>
+
+          {/* Printer Icon Animation */}
           <motion.div
             initial={{ scale: 0.8, rotate: -10 }}
             animate={{ scale: 1, rotate: 0 }}
@@ -73,9 +89,9 @@ export function OnboardingName() {
               damping: 20,
               delay: 0.2
             }}
-            className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-3xl shadow-2xl mb-1 sm:mb-2 border border-white/50 group"
+            className="inline-flex items-center justify-center w-14 h-14 sm:w-18 sm:h-18 bg-white/15 backdrop-blur-sm rounded-3xl shadow-2xl mb-1 border border-white/20 group"
           >
-            <Printer className="w-8 h-8 sm:w-10 sm:h-10 text-[#093765] transition-transform duration-500 group-hover:scale-110" />
+            <Printer className="w-7 h-7 sm:w-9 sm:h-9 text-white transition-transform duration-500 group-hover:scale-110" />
           </motion.div>
 
           <div className="space-y-1 sm:space-y-2">
@@ -83,7 +99,7 @@ export function OnboardingName() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="text-3xl sm:text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[#093765] via-blue-700 to-indigo-800"
+              className="text-2xl sm:text-3xl font-black tracking-tight text-white"
             >
               One last thing!
             </motion.h1>
@@ -91,13 +107,13 @@ export function OnboardingName() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
-              className="text-slate-500 font-medium text-lg"
+              className="text-blue-200/80 font-medium text-base"
             >
               How should we address you?
             </motion.p>
           </div>
 
-          <Card className="border-0 shadow-[0_20px_50px_rgba(0,0,0,0.1)] bg-white/80 backdrop-blur-2xl overflow-hidden mx-1 sm:mx-0">
+          <Card className="border-0 shadow-[0_20px_60px_rgba(0,0,0,0.3)] bg-white/95 backdrop-blur-2xl overflow-hidden mx-1 sm:mx-0">
             <motion.div
               initial={{ scaleX: 0 }}
               animate={{ scaleX: 1 }}
@@ -146,7 +162,7 @@ export function OnboardingName() {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 sm:h-14 bg-[#093765] hover:bg-[#052345] text-white shadow-xl shadow-blue-900/20 rounded-xl sm:rounded-2xl text-base sm:text-lg font-bold group transition-all duration-300 active:scale-[0.98]"
+                  className="w-full h-12 sm:h-14 bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-xl shadow-blue-900/30 rounded-xl sm:rounded-2xl text-base sm:text-lg font-black uppercase tracking-widest group transition-all duration-300 active:scale-[0.98] hover:shadow-2xl"
                   disabled={loading}
                 >
                   <AnimatePresence mode="wait">
@@ -180,7 +196,7 @@ export function OnboardingName() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1 }}
-            className="text-slate-400 text-sm font-medium"
+            className="text-blue-200/60 text-xs font-medium"
           >
             You can always change this later in your profile settings.
           </motion.p>
