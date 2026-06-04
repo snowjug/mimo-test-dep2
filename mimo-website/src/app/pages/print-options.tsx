@@ -366,11 +366,18 @@ export function PrintOptions() {
 
   const printDestinationCard = (
     <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
-      <CardHeader className="px-4 pt-4 pb-1 gap-1">
-        <CardTitle className="text-base flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-blue-600" /> Print Destination
-        </CardTitle>
-        <CardDescription className="text-xs">Where do you want to print this?</CardDescription>
+      <CardHeader className="px-4 pt-4 pb-2 flex flex-row items-start gap-3 space-y-0">
+        <div className="p-2 bg-blue-50/80 rounded-xl shrink-0">
+          <MapPin className="w-5 h-5 text-blue-600" />
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <CardTitle className="text-lg font-extrabold text-slate-900">
+            Print Destination
+          </CardTitle>
+          <CardDescription className="text-sm font-medium text-slate-500">
+            Where do you want to print this?
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-3">
         <div 
@@ -409,7 +416,12 @@ export function PrintOptions() {
         </div>
 
         <div 
-          onClick={() => { setDirectKioskId("SV-002"); }}
+          onClick={() => { 
+            setDirectKioskId("SV-002"); 
+            if (colorMode === "color") {
+              setDoubleSided("single");
+            }
+          }}
           className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
             directKioskId === 'SV-002' 
               ? (colorMode === 'color' 
@@ -567,6 +579,7 @@ export function PrintOptions() {
                           setDirectKioskId("SV-002");
                         }
                         setColorMode("color");
+                        setDoubleSided("single");
                       }}
                       className={`control-btn w-full h-full relative z-10 text-center py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all duration-300 ${
                         colorMode === "color" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
@@ -714,12 +727,21 @@ export function PrintOptions() {
                     <span>1-Sided</span>
                   </button>
                   <button
-                    onClick={() => setDoubleSided("double")}
+                    onClick={() => {
+                      if (!(directKioskId === "SV-002" && colorMode === "color")) {
+                        setDoubleSided("double");
+                      } else {
+                        // Toast alert or just do nothing since button is disabled
+                      }
+                    }}
+                    disabled={directKioskId === "SV-002" && colorMode === "color"}
                     type="button"
                     className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
                       doubleSided === "double"
                         ? "text-[#093765]"
                         : "text-slate-500 hover:text-slate-700"
+                    } ${
+                      directKioskId === "SV-002" && colorMode === "color" ? "opacity-40 cursor-not-allowed bg-slate-100" : ""
                     }`}
                   >
                     <Files className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${

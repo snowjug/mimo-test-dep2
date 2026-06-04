@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { MimoCoinsDisplay } from "./mimo-coins-display";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { HelpCircle, Printer, Upload, QrCode, FileCheck } from "lucide-react";
 import api from "../api";
 
 export function MimoHeader() {
@@ -43,6 +45,57 @@ export function MimoHeader() {
           </h1>
         </div>
       <div className="flex items-center gap-1 sm:gap-3 pb-1">
+        
+        <Dialog>
+          <DialogTrigger asChild>
+            <button className="flex items-center gap-1.5 cursor-pointer px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-full transition-all text-blue-800 border border-blue-200 shadow-sm mr-1 sm:mr-2">
+              <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+              <span className="font-bold text-xs sm:text-sm whitespace-nowrap">How to print?</span>
+            </button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                <Printer className="w-6 h-6 text-blue-600" />
+                How to use MIMO
+              </DialogTitle>
+              <DialogDescription className="text-base">
+                Follow these simple steps to print your documents easily.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex gap-4 items-start">
+                <div className="bg-blue-100 p-2 rounded-full shrink-0"><Upload className="w-5 h-5 text-blue-600" /></div>
+                <div>
+                  <h4 className="font-bold text-gray-900">1. Upload Files</h4>
+                  <p className="text-sm text-gray-600">Select and upload the PDF or Image files you wish to print.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 items-start">
+                <div className="bg-blue-100 p-2 rounded-full shrink-0"><FileCheck className="w-5 h-5 text-blue-600" /></div>
+                <div>
+                  <h4 className="font-bold text-gray-900">2. Configure Options</h4>
+                  <p className="text-sm text-gray-600">Choose your print destination, color mode, sides, layout, and number of copies.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 items-start">
+                <div className="bg-blue-100 p-2 rounded-full shrink-0"><QrCode className="w-5 h-5 text-blue-600" /></div>
+                <div>
+                  <h4 className="font-bold text-gray-900">3. Get Your Print Code</h4>
+                  <p className="text-sm text-gray-600">After payment, a secure 4-digit code will be generated for your print job.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 items-start">
+                <div className="bg-blue-100 p-2 rounded-full shrink-0"><Printer className="w-5 h-5 text-blue-600" /></div>
+                <div>
+                  <h4 className="font-bold text-gray-900">4. Print at Kiosk</h4>
+                  <p className="text-sm text-gray-600">Go to the selected MIMO printer kiosk, enter your 4-digit code on the keypad, and collect your printed document!</p>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <MimoCoinsDisplay />
         <div 
           className="flex items-center gap-1 sm:gap-3 cursor-pointer p-1 sm:p-2 hover:bg-slate-200/50 rounded-xl transition-colors" 
