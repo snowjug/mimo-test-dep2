@@ -115,14 +115,14 @@ export function PrintCode() {
           }
         `}
       </style>
-      <div className="min-h-[100dvh] w-full flex flex-col p-2 sm:p-4 bg-slate-50/50 relative">
+      <div className="min-h-[100dvh] w-full flex flex-col px-2 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4 bg-slate-50/50 relative">
 
         {/* Header */}
-        <div className="w-full max-w-6xl mx-auto mb-1 sm:mb-3 z-10">
+        <div className="w-full max-w-6xl mx-auto z-10">
           <MimoHeader />
         </div>
 
-        <div className="flex-1 flex items-start justify-center w-full z-10 pt-3 sm:pt-6 pb-6">
+        <div className="flex-1 flex items-start justify-center w-full z-10 pt-1.5 sm:pt-3 pb-6">
           <Card className="max-w-2xl w-full border-0 shadow-2xl bg-white/90 backdrop-blur-xl animate-in zoom-in-95 duration-500">
           <CardHeader className="text-center pt-2 pb-1 px-4">
             <div className="flex justify-center mt-2 mb-1">

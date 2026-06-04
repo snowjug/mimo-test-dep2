@@ -148,13 +148,13 @@ export function Payment() {
   }
 
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 p-2 sm:p-4">
-      <div className="mx-auto max-w-5xl space-y-3 sm:space-y-5">
+    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-2 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4">
+      <div className="mx-auto max-w-5xl space-y-3 sm:space-y-4">
 
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-center gap-4 pb-2">
+        <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" className="rounded-full hover:bg-white hover:shadow-sm" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>

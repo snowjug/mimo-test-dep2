@@ -7,11 +7,14 @@ import { Separator } from "../components/ui/separator";
 import { Badge } from "../components/ui/badge";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { MimoHeader } from "../components/mimo-header";
-import { ArrowLeft, FileText, Minus, Plus, Eye, Printer, Palette, Contrast, File, Files, Copy, Sliders, MapPin, Grid3X3, MonitorSmartphone } from "lucide-react";
+import { ArrowLeft, FileText, Minus, Plus, Eye, Printer, Palette, Contrast, File, Files, Copy, Sliders, MapPin, Grid3X3, MonitorSmartphone, Check } from "lucide-react";
 
 interface UploadedFile {
   name: string;
   size: number;
+  type?: string;
+  url?: string;
+  pageCount?: number;
 }
 
 // Parse range string (e.g. "1-3,5") to list of page numbers
@@ -146,7 +149,7 @@ export function PrintOptions() {
   const actualImages = files.filter(f => f.type && f.type.startsWith('image/')).map(f => ({
     name: f.name,
     mimetype: f.type,
-    dataUrl: (f as any).url
+    dataUrl: f.url
   }));
   const hasImages = actualImages.length > 0;
 
@@ -362,64 +365,96 @@ export function PrintOptions() {
   };
 
   const printDestinationCard = (
-    <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-blue-600" /> Print Destination
+    <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
+      <CardHeader className="px-4 pt-4 pb-1 gap-1">
+        <CardTitle className="text-base flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-blue-600" /> Print Destination
         </CardTitle>
-        <CardDescription>Where do you want to print this?</CardDescription>
+        <CardDescription className="text-xs">Where do you want to print this?</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-
-
+      <CardContent className="px-4 pb-4 space-y-3">
         <div 
           onClick={() => { setDirectKioskId("CV-001"); setColorMode("bw"); }}
-          className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'CV-001' ? 'border-slate-600 bg-slate-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+          className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
+            directKioskId === 'CV-001' 
+              ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]' 
+              : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+          } active:scale-[0.99]`}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${directKioskId === 'CV-001' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-500'}`}>
-              <Printer className="w-5 h-5" />
+            <div className={`p-2 rounded-xl transition-all duration-300 ${
+              directKioskId === 'CV-001' ? 'bg-[#093765] text-white shadow-sm scale-105' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
+            }`}>
+              <Printer className="w-4.5 h-4.5" />
             </div>
             <div>
-              <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'CV-001' ? 'text-slate-900' : 'text-slate-700'}`}>
-                KIOSK-001-CV <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">B&W</Badge>
+              <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
+                directKioskId === 'CV-001' ? 'text-[#093765]' : 'text-slate-700'
+              }`}>
+                KIOSK-001-CV 
+                <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
+                  B&W
+                </Badge>
               </p>
-              <p className="text-[10px] text-slate-500 leading-tight">Print at C.V Raman Block in Black & White.</p>
+              <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at C.V Raman Block in Black & White.</p>
             </div>
+          </div>
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
+            directKioskId === 'CV-001' 
+              ? 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs' 
+              : 'border-slate-200 bg-transparent'
+          }`}>
+            {directKioskId === 'CV-001' && <Check className="w-3 h-3" strokeWidth={3} />}
           </div>
         </div>
 
         <div 
-          onClick={() => { setDirectKioskId("SV-002-BW"); setColorMode("bw"); }}
-          className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'SV-002-BW' ? 'border-slate-600 bg-slate-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+          onClick={() => { setDirectKioskId("SV-002"); }}
+          className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
+            directKioskId === 'SV-002' 
+              ? (colorMode === 'color' 
+                  ? 'border-pink-500 bg-gradient-to-r from-indigo-50/20 via-pink-50/10 to-blue-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]' 
+                  : 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]')
+              : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+          } active:scale-[0.99]`}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${directKioskId === 'SV-002-BW' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-500'}`}>
-              <Printer className="w-5 h-5" />
+            <div className={`p-2 rounded-xl transition-all duration-300 ${
+              directKioskId === 'SV-002' 
+                ? (colorMode === 'color' 
+                    ? 'bg-gradient-to-br from-indigo-500 to-pink-500 text-white shadow-sm scale-105' 
+                    : 'bg-[#093765] text-white shadow-sm scale-105') 
+                : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
+            }`}>
+              <Printer className="w-4.5 h-4.5" />
             </div>
             <div>
-              <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'SV-002-BW' ? 'text-slate-900' : 'text-slate-700'}`}>
-                KIOSK-002-SV <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">B&W</Badge>
+              <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
+                directKioskId === 'SV-002' 
+                  ? (colorMode === 'color' ? 'text-pink-900' : 'text-[#093765]') 
+                  : 'text-slate-700'
+              }`}>
+                KIOSK-002-SV 
+                <span className="flex gap-1">
+                  <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
+                    B&W
+                  </Badge>
+                  <Badge className="bg-gradient-to-r from-yellow-400 via-pink-500 to-blue-500 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
+                    COLOR
+                  </Badge>
+                </span>
               </p>
-              <p className="text-[10px] text-slate-500 leading-tight">Print at Swami Vivekananda Block in Black & White.</p>
+              <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at Swami Vivekananda Block in B&W or vibrant Color.</p>
             </div>
           </div>
-        </div>
-
-        <div 
-          onClick={() => { setDirectKioskId("SV-002-COLOR"); setColorMode("color"); }}
-          className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 ${directKioskId === 'SV-002-COLOR' ? 'border-pink-500 bg-gradient-to-r from-pink-50/50 to-blue-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${directKioskId === 'SV-002-COLOR' ? 'bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-yellow-100 via-pink-200 to-blue-200 text-pink-700' : 'bg-slate-100 text-slate-500'}`}>
-              <Printer className="w-5 h-5" />
-            </div>
-            <div>
-              <p className={`text-sm font-bold flex items-center gap-2 ${directKioskId === 'SV-002-COLOR' ? 'text-pink-900' : 'text-slate-700'}`}>
-                KIOSK-002-SV <Badge className="bg-gradient-to-r from-yellow-400 via-pink-500 to-blue-500 border-0 hover:opacity-90 text-[9px] py-0 px-1.5 h-4 leading-4 text-white">COLOR</Badge>
-              </p>
-              <p className="text-[10px] text-slate-500 leading-tight">Print at Swami Vivekananda Block in vibrant Color.</p>
-            </div>
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
+            directKioskId === 'SV-002' 
+              ? (colorMode === 'color' 
+                  ? 'bg-gradient-to-r from-indigo-500 to-pink-500 border-pink-500 text-white scale-110 shadow-xs' 
+                  : 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs') 
+              : 'border-slate-200 bg-transparent'
+          }`}>
+            {directKioskId === 'SV-002' && <Check className="w-3 h-3" strokeWidth={3} />}
           </div>
         </div>
       </CardContent>
@@ -427,24 +462,23 @@ export function PrintOptions() {
   );
 
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 py-2 sm:p-4" style={{ fontFamily: "'Outfit', sans-serif" }}>
+    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4" style={{ fontFamily: "'Outfit', sans-serif" }}>
       {/* Global Styles for Custom Fonts */}
       <style>
         {`
           @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
         `}
-      </style>
-      <div className="mx-auto max-w-6xl space-y-3 sm:space-y-5">
+      <div className="mx-auto max-w-6xl space-y-2 sm:space-y-3">
 
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-start gap-1 sm:gap-3 pb-2 sm:pb-3">
+        <div className="flex items-start gap-1 sm:gap-3">
           <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 hover:text-[#093765] flex-shrink-0 h-9 w-9 sm:h-11 sm:w-11 mt-0 sm:mt-0.5 -ml-2" onClick={() => navigate("/upload")}>
             <ArrowLeft className="w-4 h-4 sm:w-6 sm:h-6" strokeWidth={2.5} />
           </Button>
           <div className="min-w-0 pt-1 sm:pt-1.5 flex flex-col">
-            <h1 className="text-2xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-700 bg-clip-text text-transparent tracking-tight leading-tight pb-1 mb-0.5">Print Configuration</h1>
+            <h1 className="text-2xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-700 bg-clip-text text-transparent tracking-tight leading-tight mb-0.5">Print Configuration</h1>
             <p className="text-xs sm:text-sm text-slate-500 font-medium">Customize how you want your documents to look</p>
           </div>
         </div>
@@ -495,15 +529,16 @@ export function PrintOptions() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Color Mode</p>
-                  <p className="text-[10px] text-slate-500 font-medium">₹{pricePerPageBW}/page • B&W Only</p>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    {directKioskId === "CV-001" 
+                      ? `₹${pricePerPageBW.toFixed(2)}/page • B&W Only` 
+                      : `₹${pricePerPageBW.toFixed(2)}/page B&W • ₹${pricePerPageColor.toFixed(2)}/page Color`}
+                  </p>
                 </div>
                 <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-10 select-none">
                   <button
                     onClick={() => {
                       setColorMode("bw");
-                      if (directKioskId === "SV-002-COLOR") {
-                        setDirectKioskId("SV-002-BW");
-                      }
                     }}
                     type="button"
                     className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
@@ -526,10 +561,11 @@ export function PrintOptions() {
                     <button
                       type="button"
                       onClick={() => {
-                        setColorMode("color");
-                        if (directKioskId === "SV-002-BW" || directKioskId === "CV-001") {
-                          setDirectKioskId("SV-002-COLOR");
+                        if (directKioskId === "CV-001") {
+                          toast.info("Switched to KIOSK-002-SV for Color printing");
+                          setDirectKioskId("SV-002");
                         }
+                        setColorMode("color");
                       }}
                       className={`control-btn w-full h-full relative z-10 text-center py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all duration-300 ${
                         colorMode === "color" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
@@ -786,7 +822,7 @@ export function PrintOptions() {
                     };
                     const maxPages = activeFile.pageCount || 1;
                     const pageNumbers = Array.from({ length: maxPages }, (_, i) => i + 1);
-                    const isPdf = activeFile.name.toLowerCase().endsWith(".pdf") || (activeFile as any).type === "application/pdf";
+                    const isPdf = activeFile.name.toLowerCase().endsWith(".pdf") || activeFile.type === "application/pdf";
 
                     return (
                       <div className="space-y-3">
@@ -897,12 +933,12 @@ export function PrintOptions() {
             </Card>
 
             {/* Orientation & Layout */}
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300">
-              <CardHeader className="pb-3">
-                <CardTitle>Layout & Orientation</CardTitle>
-                <CardDescription>Set page orientation and how content is arranged</CardDescription>
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
+              <CardHeader className="px-4 pt-4 pb-1 gap-1">
+                <CardTitle className="text-base">Layout & Orientation</CardTitle>
+                <CardDescription className="text-xs">Set page orientation and how content is arranged</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="px-4 pb-4 space-y-4">
                 {/* Orientation Toggle */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                   <div>
@@ -1058,12 +1094,12 @@ export function PrintOptions() {
             </Card>
 
             {/* File Preview */}
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300">
-              <CardHeader>
-                <CardTitle>Document Preview</CardTitle>
-                <CardDescription>Files ready to print</CardDescription>
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
+              <CardHeader className="px-4 pt-4 pb-1 gap-1">
+                <CardTitle className="text-base">Document Preview</CardTitle>
+                <CardDescription className="text-xs">Files ready to print</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 pb-4">
                 <div className="space-y-3">
                   {files.map((file, index) => (
                     <div
@@ -1101,15 +1137,15 @@ export function PrintOptions() {
             </div>
 
             {/* Cost Summary - Premium Dark Style */}
-            <Card className="border-0 bg-gradient-to-br from-[#093765] to-blue-600 text-white overflow-hidden animate-in fade-in duration-500 rounded-2xl sm:rounded-[2rem] shadow-2xl relative group">
+            <Card className="border-0 bg-gradient-to-br from-[#093765] to-blue-600 text-white overflow-hidden animate-in fade-in duration-500 rounded-2xl sm:rounded-[2rem] shadow-2xl relative group gap-0">
               <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <Printer className="w-32 h-32 rotate-12" />
               </div>
-              <CardHeader className="border-b border-white/5 pb-4 sm:pb-6 bg-white/[0.02] px-4 sm:px-6 pt-4 sm:pt-6 relative z-10">
+              <CardHeader className="border-b border-white/5 pb-3 sm:pb-3.5 bg-white/[0.02] px-4 sm:px-5 pt-3.5 sm:pt-4 relative z-10">
                 <CardTitle className="text-lg sm:text-xl font-bold tracking-tight">Cost Summary</CardTitle>
                 <CardDescription className="text-blue-100/70 text-xs">Final printing breakdown</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-5 p-4 sm:p-6 relative z-10">
+              <CardContent className="space-y-3 sm:space-y-3.5 p-4 sm:p-5 relative z-10">
                 <div className="space-y-3 sm:space-y-4 font-medium text-xs">
                   <div className="flex justify-between items-center text-blue-100/90">
                     <span>Documents</span>
@@ -1192,7 +1228,7 @@ export function PrintOptions() {
                 <div className="bg-gray-100 rounded-lg p-2 flex-1 flex items-center justify-center overflow-hidden">
                   {(() => {
                     const previewFile = files[selectedPreview];
-                    const previewDataUrl = (previewFile as any)?.url;
+                    const previewDataUrl = previewFile?.url;
                     const isPdf = previewFile?.name.toLowerCase().endsWith(".pdf") || previewFile?.type === "application/pdf";
                     const isImage = previewFile?.type?.startsWith("image/");
                     

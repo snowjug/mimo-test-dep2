@@ -30,13 +30,13 @@ export function PrinterSettings() {
   };
 
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 p-3 sm:p-6">
-      <div className="mx-auto max-w-4xl space-y-4 sm:space-y-8">
+    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 pt-0 pb-3 sm:px-6 sm:pt-0 sm:pb-6">
+      <div className="mx-auto max-w-4xl space-y-3.5 sm:space-y-4">
 
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent">Settings</h1>
           <p className="text-base sm:text-lg text-slate-500">Customize your MIMO experience</p>
         </div>

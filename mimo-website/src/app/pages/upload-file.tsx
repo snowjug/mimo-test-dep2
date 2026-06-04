@@ -346,8 +346,8 @@ export function UploadFile() {
   };
 
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 p-2 sm:p-4">
-      <div className="mx-auto max-w-5xl space-y-4 sm:space-y-6">
+    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-2 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4">
+      <div className="mx-auto max-w-5xl space-y-2 sm:space-y-3">
 
         {/* Global Styles for Custom Fonts */}
         <style>
@@ -363,7 +363,7 @@ export function UploadFile() {
 
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex flex-col items-start cursor-pointer group select-none ml-2 pt-2">
+          <div className="flex flex-col items-start cursor-pointer group select-none ml-2 pt-1">
             <div className="z-20 -mb-2 relative animate-[float-hey_3s_ease-in-out_infinite] hover:rotate-0 hover:scale-[1.15] transition-all duration-300">
               <span
                 className="text-[3.5rem] sm:text-[6rem] bg-clip-text text-transparent bg-gradient-to-tr from-[#093765] via-blue-600 to-[#a855f7] leading-none drop-shadow-[0_8px_8px_rgba(9,55,101,0.4)] pr-2"
@@ -395,7 +395,7 @@ export function UploadFile() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           <h1 className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent animate-in fade-in slide-in-from-left-4 duration-500">Upload Documents</h1>
           <p className="text-base sm:text-lg text-slate-500">Prepare your files for the MIMO printer</p>
         </div>

@@ -111,13 +111,13 @@ export function UserProfile() {
   };
 
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 p-3 sm:p-6">
-      <div className="mx-auto max-w-5xl space-y-4 sm:space-y-8">
+    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 pt-0 pb-3 sm:px-6 sm:pt-0 sm:pb-6">
+      <div className="mx-auto max-w-5xl space-y-3.5 sm:space-y-4">
 
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-center gap-4 pb-2">
+        <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
