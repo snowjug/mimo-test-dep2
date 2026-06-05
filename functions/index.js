@@ -1331,8 +1331,8 @@ app.get("/wa-pay-success/:orderId", async (req, res) => {
     
     if (!printCode) {
       // Payment just completed, trigger fulfillment
-      const cfStatus = await axios.get(`${CASHFREE_BASE_URL}/orders/${orderId}`, { headers: cashfreeHeaders });
-      if (cfStatus.data.order_status === "PAID") {
+      const cfStatus = await axios.get(`${CASHFREE_BASE_URL}/links/${orderId}`, { headers: cashfreeHeaders });
+      if (cfStatus.data.link_status === "PAID") {
         printCode = Math.floor(1000 + Math.random() * 9000).toString();
         const batch = db.batch();
         waJobs.forEach(d => batch.update(d.ref, { status: "paid", printCode, paymentTime: admin.firestore.FieldValue.serverTimestamp() }));
@@ -1489,7 +1489,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
       // Save session state
       await sessionRef.set({
-        state: "pending",
+        state: "awaiting_color",
         jobId: jobRef.id,
         userId,
         fileName: doc.filename || "document.pdf",
@@ -1497,20 +1497,56 @@ app.post("/whatsapp-webhook", async (req, res) => {
         copies: 1
       });
 
-      const checkoutUrl = `https://api-upqxuj7evq-uc.a.run.app/wa-checkout/${jobRef.id}`;
-      await sendWhatsAppCTAButton(from,
-        `📄 *${doc.filename || "document.pdf"}* uploaded successfully!\n\nClick below to select your print settings (Color/B&W, Copies) and pay securely.`,
-        "⚙️ Configure & Pay",
-        checkoutUrl
+      await sendWhatsAppButtons(from, 
+        `📄 *${doc.filename || "document.pdf"}* uploaded successfully!\n\nPlease select Print Type:`, 
+        [
+          { id: "color_bw", title: "⚫ B&W (₹2.30)" },
+          { id: "color_color", title: "🎨 Color (₹10.00)" }
+        ]
       );
+      return res.sendStatus(200);
+    }
+
+    // ── Handle interactive button replies ───────────────────────────────────────
+    if (msgType === "interactive" && msg.interactive.type === "button_reply") {
+      const buttonId = msg.interactive.button_reply.id;
+      
+      if (session.state === "awaiting_color") {
+        const colorMode = buttonId === "color_color" ? "color" : "bw";
+        await sessionRef.update({ state: "awaiting_copies", colorMode });
+        await sendWhatsAppButtons(from, "How many copies?", [
+          { id: "copies_1", title: "1 Copy" },
+          { id: "copies_2", title: "2 Copies" },
+          { id: "copies_3", title: "3 Copies" }
+        ], "Select copies or type a number");
+        return res.sendStatus(200);
+      }
+
+      if (session.state === "awaiting_copies" && buttonId.startsWith("copies_")) {
+        const copies = parseInt(buttonId.replace("copies_", ""));
+        await _processCopiesToPayment(from, session, sessionRef, copies);
+        return res.sendStatus(200);
+      }
       return res.sendStatus(200);
     }
 
     // ── Handle text replies ───────────────────────────────────────────────────
     if (msgType === "text") {
+      const textBody = msg.text.body.trim();
+      
+      if (session.state === "awaiting_copies") {
+        const copies = parseInt(textBody);
+        if (!isNaN(copies) && copies > 0 && copies <= 100) {
+          await _processCopiesToPayment(from, session, sessionRef, copies);
+        } else {
+          await sendWhatsAppMessage(from, "Please enter a valid number of copies (1-100).");
+        }
+        return res.sendStatus(200);
+      }
+      
       // Default: Welcome message
       await sendWhatsAppMessage(from,
-        `👋 *Welcome to Mimo Printing!*\n\nSend me a *PDF file* and I'll guide you through printing it at any Mimo kiosk.\n\n📄 Upload PDF → ⚙️ Configure → 💳 Pay → 🖨️ Collect!`
+        `👋 *Welcome to Mimo Printing!*\n\nSend me a *PDF file* and I'll guide you through printing it at any Mimo kiosk.\n\n📄 Upload PDF → ⚙️ Select Settings → 💳 Pay → 🖨️ Collect!`
       );
       return res.sendStatus(200);
     }
@@ -1588,209 +1624,52 @@ async function sendWhatsAppOrderCard(to, { orderId, fileName, colorMode, copies,
   }
 }
 
-// ================= WHATSAPP MINI WEB CHECKOUT =================
-app.get("/wa-checkout/:jobId", async (req, res) => {
+// ── Helper: create Cashfree order and send Pay Now CTA button ─────────
+async function _processCopiesToPayment(from, session, sessionRef, copies) {
+  const pricingDoc = await db.collection("mimo_settings").doc("pricing").get();
+  const pricing = pricingDoc.exists ? pricingDoc.data() : {};
+  const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageBW || 2.30);
+  
+  let totalAmount = Number((copies * pricePerPage).toFixed(2));
+  if (totalAmount < 1.00) totalAmount = 1.00;
+  
+  const orderId = `WA-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
+
   try {
-    const { jobId } = req.params;
-    const jobDoc = await db.collection("print_jobs").doc(jobId).get();
-    const CASHFREE_MODE = process.env.CASHFREE_ENV === "production" ? "production" : "sandbox";
-    
-    if (!jobDoc.exists) return res.status(404).send("Job not found");
-    const job = jobDoc.data();
-    
-    if (job.status === "paid" || job.status === "completed") {
-      return res.send(`
-        <html><body style="font-family:sans-serif; text-align:center; padding: 40px;">
-          <div style="font-size:60px">✅</div>
-          <h2>Already Paid!</h2>
-          <p>This document has already been paid for. Check WhatsApp for your Print Code.</p>
-        </body></html>
-      `);
-    }
-
-    const pricingDoc = await db.collection("mimo_settings").doc("pricing").get();
-    const pricing = pricingDoc.exists ? pricingDoc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00 };
-
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
-        <title>Mimo Checkout</title>
-        <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background: #f8fafc; color: #0f172a; }
-          .card { background: white; border-radius: 20px; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.06); }
-          h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 800; }
-          .file-name { color: #64748b; font-size: 14px; margin-bottom: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 12px; background: #f1f5f9; border-radius: 8px; font-family: monospace; }
-          
-          .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px; margin-top: 24px; letter-spacing: 1px; }
-          
-          .toggle-group { display: flex; background: #f1f5f9; border-radius: 14px; padding: 6px; }
-          .toggle-btn { flex: 1; text-align: center; padding: 14px; border-radius: 10px; font-weight: 700; color: #64748b; cursor: pointer; transition: all 0.2s; font-size: 15px; }
-          .toggle-btn.active { background: white; color: #0f172a; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-          
-          .stepper { display: flex; align-items: center; justify-content: space-between; background: #f1f5f9; border-radius: 14px; padding: 12px 16px; }
-          .step-btn { background: white; border: none; width: 44px; height: 44px; border-radius: 10px; font-size: 24px; font-weight: 600; color: #0f172a; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-          .step-btn:active { transform: scale(0.95); }
-          .step-val { font-size: 20px; font-weight: 800; }
-          
-          .total-row { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; padding-top: 24px; border-top: 2px dashed #e2e8f0; }
-          .total-label { font-size: 16px; font-weight: 600; color: #64748b; }
-          .total-val { font-size: 32px; font-weight: 900; color: #0f172a; letter-spacing: -1px; }
-          
-          .pay-btn { background: #16a34a; color: white; border: none; width: 100%; padding: 18px; border-radius: 14px; font-size: 18px; font-weight: 800; margin-top: 24px; cursor: pointer; box-shadow: 0 8px 24px rgba(22, 163, 74, 0.25); transition: all 0.2s; }
-          .pay-btn:active { transform: translateY(2px); }
-          .pay-btn:disabled { background: #94a3b8; box-shadow: none; transform: none; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h2>Print Settings</h2>
-          <div class="file-name">📄 ${job.fileName || "Document"}</div>
-          
-          <div class="section-title">Color Mode</div>
-          <div class="toggle-group">
-            <div id="btn-bw" class="toggle-btn active" onclick="setColor('bw')">⚫ B&W</div>
-            <div id="btn-color" class="toggle-btn" onclick="setColor('color')">🎨 Color</div>
-          </div>
-          
-          <div class="section-title">Copies</div>
-          <div class="stepper">
-            <button class="step-btn" onclick="updateCopies(-1)">-</button>
-            <div id="copies-val" class="step-val">1</div>
-            <button class="step-btn" onclick="updateCopies(1)">+</button>
-          </div>
-          
-          <div class="total-row">
-            <div class="total-label">Total Amount</div>
-            <div id="total-val" class="total-val">₹2.30</div>
-          </div>
-          
-          <button id="pay-btn" class="pay-btn" onclick="payNow()">💳 Pay ₹2.30</button>
-        </div>
-        
-        <script>
-          let copies = 1;
-          let colorMode = "bw";
-          const priceBW = ${pricing.pricePerPageBW || 2.30};
-          const priceColor = ${pricing.pricePerPageColor || 10.00};
-          const jobId = "${jobId}";
-          
-          function setColor(mode) {
-            colorMode = mode;
-            document.getElementById('btn-bw').className = mode === 'bw' ? 'toggle-btn active' : 'toggle-btn';
-            document.getElementById('btn-color').className = mode === 'color' ? 'toggle-btn active' : 'toggle-btn';
-            updateTotal();
-          }
-          
-          function updateCopies(delta) {
-            copies += delta;
-            if (copies < 1) copies = 1;
-            if (copies > 50) copies = 50;
-            document.getElementById('copies-val').innerText = copies;
-            updateTotal();
-          }
-          
-          function updateTotal() {
-            const price = colorMode === 'color' ? priceColor : priceBW;
-            const total = (price * copies).toFixed(2);
-            document.getElementById('total-val').innerText = '₹' + total;
-            document.getElementById('pay-btn').innerText = '💳 Pay ₹' + total;
-          }
-          
-          async function payNow() {
-            const btn = document.getElementById('pay-btn');
-            btn.disabled = true;
-            btn.innerText = '⏳ Processing...';
-            
-            try {
-              const res = await fetch('/wa-create-order', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId, colorMode, copies })
-              });
-              const data = await res.json();
-              
-              if (data.paymentSessionId) {
-                const isProd = "${CASHFREE_MODE}" === "production";
-                const baseUrl = isProd ? "https://payments.cashfree.com/order/#" : "https://payments-test.cashfree.com/order/#";
-                window.location.href = baseUrl + data.paymentSessionId;
-              } else {
-                alert('Failed to initialize payment');
-                btn.disabled = false;
-                updateTotal();
-              }
-            } catch (err) {
-              alert('Network error. Please try again.');
-              btn.disabled = false;
-              updateTotal();
-            }
-          }
-          
-          // Init
-          updateTotal();
-        </script>
-      </body>
-      </html>
-    `);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Server Error");
-  }
-});
-
-// ================= WHATSAPP API: CREATE ORDER =================
-app.post("/wa-create-order", async (req, res) => {
-  try {
-    const { jobId, colorMode, copies } = req.body;
-    
-    const jobDoc = await db.collection("print_jobs").doc(jobId).get();
-    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
-    const job = jobDoc.data();
-    
-    const pricingDoc = await db.collection("mimo_settings").doc("pricing").get();
-    const pricing = pricingDoc.exists ? pricingDoc.data() : {};
-    const pricePerPage = colorMode === "color" ? (pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageBW || 2.30);
-    
-    // For now assuming 1 page per document as default, later we can extract page count
-    let totalAmount = Number((copies * pricePerPage).toFixed(2));
-    
-    // Ensure Cashfree minimum transaction amount of ₹1.00 is met
-    if (totalAmount < 1.00) totalAmount = 1.00;
-    
-    const orderId = `WA-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
-
-    // Create Cashfree Order
-    const cfRes = await axios.post(`${CASHFREE_BASE_URL}/orders`, {
-      order_id: orderId,
-      order_amount: totalAmount,
-      order_currency: "INR",
+    const cfRes = await axios.post(`${CASHFREE_BASE_URL}/links`, {
+      link_id: orderId,
+      link_amount: totalAmount,
+      link_currency: "INR",
+      link_purpose: "Mimo Print Order",
       customer_details: {
-        customer_id: job.userId,
-        customer_phone: "9999999999", // WhatsApp numbers are linked in sessions
+        customer_phone: "9999999999",
+        customer_name: session.userId || "WA User"
       },
-      order_meta: {
+      link_meta: {
         return_url: `https://api-upqxuj7evq-uc.a.run.app/wa-pay-success/${orderId}`,
         notify_url: `https://api-upqxuj7evq-uc.a.run.app/cashfree-webhook`
       }
     }, { headers: cashfreeHeaders });
 
-    // Update job with selected options and order ID
-    await jobDoc.ref.update({
-      orderId,
-      colorMode,
-      copies,
-      totalCost: totalAmount
+    await db.collection("print_jobs").doc(session.jobId).update({
+      orderId, colorMode: session.colorMode, copies, totalCost: totalAmount
     });
+    
+    await sessionRef.update({ state: "idle" });
 
-    res.json({ paymentSessionId: cfRes.data.payment_session_id, orderId });
+    const paymentLink = cfRes.data.link_url;
 
-  } catch (err) {
-    console.error("[WA CREATE ORDER ERROR]", err.response?.data || err.message);
-    res.status(500).json({ error: "Failed to create order" });
+    await sendWhatsAppCTAButton(from, 
+      `🧾 *Order Summary*\n\nDocument: ${session.fileName}\nPrint: ${session.colorMode === "color" ? "🎨 Color" : "⚫ B&W"}\nCopies: ${copies}\n\n*Total: ₹${totalAmount}*\n\nClick below to securely pay using PhonePe, GPay, Paytm, etc.`,
+      "💳 Pay Now",
+      paymentLink
+    );
+  } catch (cfErr) {
+    console.error("[WHATSAPP BOT] Cashfree order creation failed:", cfErr.response?.data || cfErr.message);
+    await sendWhatsAppMessage(from, "❌ Failed to create payment order. Please try again.");
+    await sessionRef.set({ state: "idle" });
   }
-});
+}
 
 // Export the main Express App
 exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
