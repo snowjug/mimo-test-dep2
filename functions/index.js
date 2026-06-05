@@ -1721,7 +1721,7 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
   if (totalAmount <= 0) {
     // FREE ORDER
     const orderId = `WA-FREE-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
-    const printCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const printCode = Math.floor(1000 + Math.random() * 9000).toString();
     await db.collection("print_jobs").doc(session.jobId).update({
       orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: 0, printDestination: session.destination || "Any", status: "paid", printCode, couponUsed: couponCode || null
     });
