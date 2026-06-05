@@ -9,6 +9,7 @@ const axios = require("axios");
 const { OAuth2Client } = require("google-auth-library");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const pdfParse = require("pdf-parse");
 
 // Nodemailer Transporter
 const transporter = nodemailer.createTransport({
@@ -1192,33 +1193,39 @@ app.post("/admin/reset-metrics", adminAuthMiddleware, async (req, res) => {
 
 app.get("/admin/recent-prints", adminAuthMiddleware, async (req, res) => {
   try {
-    const ordersSnapshot = await db.collection("orders")
+    const jobsSnapshot = await db.collection("print_jobs")
       .orderBy("createdAt", "desc")
-      .limit(15)
+      .limit(30)
       .get();
       
     const recentPrints = [];
-    for (const doc of ordersSnapshot.docs) {
+    for (const doc of jobsSnapshot.docs) {
       const data = doc.data();
-      let userEmail = "Guest User";
-      let fileName = "Unknown File";
+      let userEmail = data.userEmail || "Guest User";
       
       try {
-        if (data.userId) {
+        if (!data.userEmail && data.userId && data.source !== "whatsapp") {
           const userDoc = await db.collection("users").doc(data.userId).get();
           if (userDoc.exists) userEmail = userDoc.data().email || "Guest User";
         }
-        if (data.jobIds && data.jobIds.length > 0) {
-          const jobDoc = await db.collection("jobs").doc(data.jobIds[0]).get();
-          if (jobDoc.exists) fileName = jobDoc.data().fileName || "Unknown File";
-        }
       } catch (e) {}
 
+      let dateStr = "";
+      if (data.createdAt) {
+        dateStr = data.createdAt.toDate ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString();
+      }
+
       recentPrints.push({
-        userEmail,
-        file: fileName,
-        status: data.orderStatus || data.status || "completed",
-        cost: data.amount || 0
+        id: doc.id,
+        createdAt: dateStr,
+        userEmail: data.source === "whatsapp" ? data.userId || "WA User" : userEmail,
+        file: data.fileName || "Unknown File",
+        status: data.status || "completed",
+        cost: data.totalCost || data.amount || 0,
+        copies: data.copies || 1,
+        pageCount: data.pageCount || 1,
+        colorMode: data.colorMode || "bw",
+        destination: data.printDestination || data.kioskId || "Any"
       });
     }
     
@@ -1487,21 +1494,31 @@ app.post("/whatsapp-webhook", async (req, res) => {
         source: "whatsapp"
       });
 
+      // Count PDF Pages
+      let pageCount = 1;
+      try {
+        const pdfData = await pdfParse(buffer);
+        pageCount = pdfData.numpages || 1;
+      } catch (err) {
+        console.error("Failed to parse PDF pages:", err);
+      }
+
       // Save session state
       await sessionRef.set({
-        state: "awaiting_color",
+        state: "awaiting_destination",
         jobId: jobRef.id,
         userId,
         fileName: doc.filename || "document.pdf",
         colorMode: "bw",
-        copies: 1
+        copies: 1,
+        pageCount
       });
 
       await sendWhatsAppButtons(from, 
-        `📄 *${doc.filename || "document.pdf"}* uploaded successfully!\n\nPlease select Print Type:`, 
+        `📄 *${doc.filename || "document.pdf"}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`, 
         [
-          { id: "color_bw", title: "⚫ B&W (₹2.30)" },
-          { id: "color_color", title: "🎨 Color (₹10.00)" }
+          { id: "dest_cv", title: "📍 KIOSK-001-CV" },
+          { id: "dest_sv", title: "📍 KIOSK-002-SV" }
         ]
       );
       return res.sendStatus(200);
@@ -1511,6 +1528,26 @@ app.post("/whatsapp-webhook", async (req, res) => {
     if (msgType === "interactive" && msg.interactive.type === "button_reply") {
       const buttonId = msg.interactive.button_reply.id;
       
+      if (session.state === "awaiting_destination") {
+         if (buttonId === "dest_cv") {
+           // CV is B&W only, skip color selection
+           await sessionRef.update({ state: "awaiting_copies", destination: "KIOSK-001-CV", colorMode: "bw" });
+           await sendWhatsAppButtons(from, "How many copies?", [
+             { id: "copies_1", title: "1 Copy" },
+             { id: "copies_2", title: "2 Copies" },
+             { id: "copies_3", title: "3 Copies" }
+           ], "Select copies or type a number");
+         } else if (buttonId === "dest_sv") {
+           // SV has both options
+           await sessionRef.update({ state: "awaiting_color", destination: "KIOSK-002-SV" });
+           await sendWhatsAppButtons(from, "Please select Print Type:", [
+             { id: "color_bw", title: "⚫ B&W (₹2.30/pg)" },
+             { id: "color_color", title: "🎨 Color (₹10.00/pg)" }
+           ]);
+         }
+         return res.sendStatus(200);
+      }
+
       if (session.state === "awaiting_color") {
         const colorMode = buttonId === "color_color" ? "color" : "bw";
         await sessionRef.update({ state: "awaiting_copies", colorMode });
@@ -1630,7 +1667,8 @@ async function _processCopiesToPayment(from, session, sessionRef, copies) {
   const pricing = pricingDoc.exists ? pricingDoc.data() : {};
   const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageBW || 2.30);
   
-  let totalAmount = Number((copies * pricePerPage).toFixed(2));
+  const pageCount = session.pageCount || 1;
+  let totalAmount = Number((copies * pageCount * pricePerPage).toFixed(2));
   if (totalAmount < 1.00) totalAmount = 1.00;
   
   const orderId = `WA-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
@@ -1652,7 +1690,7 @@ async function _processCopiesToPayment(from, session, sessionRef, copies) {
     }, { headers: cashfreeHeaders });
 
     await db.collection("print_jobs").doc(session.jobId).update({
-      orderId, colorMode: session.colorMode, copies, totalCost: totalAmount
+      orderId, colorMode: session.colorMode, copies, pageCount, totalCost: totalAmount, printDestination: session.destination || "Any"
     });
     
     await sessionRef.update({ state: "idle" });
@@ -1660,7 +1698,7 @@ async function _processCopiesToPayment(from, session, sessionRef, copies) {
     const paymentLink = cfRes.data.link_url;
 
     await sendWhatsAppCTAButton(from, 
-      `🧾 *Order Summary*\n\nDocument: ${session.fileName}\nPrint: ${session.colorMode === "color" ? "🎨 Color" : "⚫ B&W"}\nCopies: ${copies}\n\n*Total: ₹${totalAmount}*\n\nClick below to securely pay using PhonePe, GPay, Paytm, etc.`,
+      `🧾 *Order Summary*\n\nDocument: ${session.fileName} (${pageCount} pages)\nLocation: ${session.destination || "Any"}\nPrint: ${session.colorMode === "color" ? "🎨 Color" : "⚫ B&W"}\nCopies: ${copies}\n\n*Total: ₹${totalAmount}*\n\nClick below to securely pay using PhonePe, GPay, Paytm, etc.`,
       "💳 Pay Now",
       paymentLink
     );

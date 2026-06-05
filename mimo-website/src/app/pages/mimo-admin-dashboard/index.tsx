@@ -16,10 +16,11 @@ export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<any>(null);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [recentPrints, setRecentPrints] = useState<any[]>([]);
-  const [pricing, setPricing] = useState({ pricePerPageBW: 2.30, pricePerPageColor: 10.00, pricePerPageA4: 2.30, pricePerPageGraph: 2.00 });
+  const [pricing, setPricing] = useState({ pricePerPageBW: 2.30, pricePerPageColor: 10.00, pricePerPageA4: 2.30, pricePerPageGraph: 2.00, pricePerPageWABW: 2.30, pricePerPageWAColor: 10.00 });
   const [hardware, setHardware] = useState<any>({});
   
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [newCoupon, setNewCoupon] = useState({ code: '', discount: '', expiry: '' });
   const [bulkCoupon, setBulkCoupon] = useState({ prefix: '', count: '10', discount: '50', expiry: '' });
   const [isResetting, setIsResetting] = useState(false);
@@ -49,7 +50,11 @@ export default function AdminDashboard() {
       setRecentPrints(printsRes.data);
       setPricing({
         pricePerPageBW: settingsRes.data.pricePerPageBW || 2.30,
-        pricePerPageColor: settingsRes.data.pricePerPageColor || 10.00
+        pricePerPageColor: settingsRes.data.pricePerPageColor || 10.00,
+        pricePerPageA4: settingsRes.data.pricePerPageA4 || 2.30,
+        pricePerPageGraph: settingsRes.data.pricePerPageGraph || 2.00,
+        pricePerPageWABW: settingsRes.data.pricePerPageWABW || 2.30,
+        pricePerPageWAColor: settingsRes.data.pricePerPageWAColor || 10.00
       });
       setHardware(hardwareRes.data);
     } catch (err: any) {
@@ -234,53 +239,58 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[#F8FAFC] flex">
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-        <div className="p-6 flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20">
+      <aside className={`bg-white border-r border-slate-200 flex flex-col fixed h-full z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-300 ${isSidebarExpanded ? 'w-64' : 'w-20'}`}>
+        <div className={`p-6 flex items-center ${isSidebarExpanded ? 'gap-3' : 'justify-center'} mb-4 cursor-pointer`} onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}>
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-blue-600/20">
             <span className="text-white font-black text-xl">M</span>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Mimo Admin</h1>
+          {isSidebarExpanded && <h1 className="text-xl font-bold text-slate-900 tracking-tight whitespace-nowrap">Mimo Admin</h1>}
         </div>
 
-        <nav className="flex-1 px-4 space-y-1">
+        <nav className="flex-1 px-4 space-y-2">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            className={`w-full flex items-center ${isSidebarExpanded ? 'gap-3 px-4' : 'justify-center px-0'} py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            title="Dashboard"
           >
-            <Home className="w-5 h-5" /> Dashboard
+            <Home className="w-5 h-5 shrink-0" /> {isSidebarExpanded && 'Dashboard'}
           </button>
           <button
             onClick={() => setActiveTab('hardware')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'hardware' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            className={`w-full flex items-center ${isSidebarExpanded ? 'gap-3 px-4' : 'justify-center px-0'} py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'hardware' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            title="Hardware Logs"
           >
-            <Cpu className="w-5 h-5" /> Hardware Logs
+            <Cpu className="w-5 h-5 shrink-0" /> {isSidebarExpanded && 'Hardware Logs'}
           </button>
           <button
             onClick={() => setActiveTab('coupons')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'coupons' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            className={`w-full flex items-center ${isSidebarExpanded ? 'gap-3 px-4' : 'justify-center px-0'} py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'coupons' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            title="Coupons"
           >
-            <Ticket className="w-5 h-5" /> Coupons
+            <Ticket className="w-5 h-5 shrink-0" /> {isSidebarExpanded && 'Coupons'}
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            className={`w-full flex items-center ${isSidebarExpanded ? 'gap-3 px-4' : 'justify-center px-0'} py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            title="Settings"
           >
-            <Settings className="w-5 h-5" /> Settings
+            <Settings className="w-5 h-5 shrink-0" /> {isSidebarExpanded && 'Settings'}
           </button>
         </nav>
 
         <div className="p-4 border-t border-slate-100">
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all"
+            className={`w-full flex items-center ${isSidebarExpanded ? 'gap-3 px-4' : 'justify-center px-0'} py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all`}
+            title="Logout"
           >
-            <LogOut className="w-5 h-5" /> Logout
+            <LogOut className="w-5 h-5 shrink-0" /> {isSidebarExpanded && 'Logout'}
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 p-8">
+      <main className={`flex-1 transition-all duration-300 ${isSidebarExpanded ? 'ml-64' : 'ml-20'} p-8`}>
 
         {/* Header */}
         <header className="flex justify-between items-center mb-10">
@@ -364,93 +374,103 @@ export default function AdminDashboard() {
             </div>
 
             {/* Charts & Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-bold text-slate-900">Revenue Analytics</h2>
-                    <select className="bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg px-3 py-1.5 outline-none focus:border-blue-500">
-                      <option>This Month</option>
-                      <option>Last Month</option>
-                    </select>
+            <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 mt-8">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-bold text-slate-900">Revenue Analytics</h2>
+                <select className="bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg px-3 py-1.5 outline-none focus:border-blue-500">
+                  <option>This Month</option>
+                  <option>Last Month</option>
+                </select>
+              </div>
+              <div className="h-72 w-full mt-4">
+                {revenueData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
+                      <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} dx={-10} />
+                      <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px' }} />
+                      <Bar dataKey="revenue" fill="#3b82f6" radius={[6, 6, 6, 6]} maxBarSize={40} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                    <BarChart2 className="w-12 h-12 mb-3 text-slate-200" />
+                    <p className="text-sm font-medium">No revenue data yet.</p>
                   </div>
-                  <div className="h-72 w-full mt-4">
-                    {revenueData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
-                          <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} dx={-10} />
-                          <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px' }} />
-                          <Bar dataKey="revenue" fill="#3b82f6" radius={[6, 6, 6, 6]} maxBarSize={40} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                        <BarChart2 className="w-12 h-12 mb-3 text-slate-200" />
-                        <p className="text-sm font-medium">No revenue data yet.</p>
-                      </div>
-                    )}
-                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Print Modality */}
+            <div className="grid grid-cols-2 gap-6 mt-8">
+              <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">B&W Pages Printed</p>
+                  <h3 className="text-2xl font-bold text-slate-900 mt-1">{metrics?.totalBwPages || 0}</h3>
                 </div>
-                
-                {/* Print Modality */}
-                <div className="grid grid-cols-2 gap-6 mt-8">
-                  <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-500">B&W Pages Printed</p>
-                      <h3 className="text-2xl font-bold text-slate-900 mt-1">{metrics?.totalBwPages || 0}</h3>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
-                      <div className="w-4 h-4 rounded-full bg-slate-800" />
-                    </div>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-500">Color Pages Printed</p>
-                      <h3 className="text-2xl font-bold text-slate-900 mt-1">{metrics?.totalColorPages || 0}</h3>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center">
-                      <div className="w-4 h-4 rounded-full bg-rose-500" />
-                    </div>
-                  </div>
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                  <div className="w-4 h-4 rounded-full bg-slate-800" />
                 </div>
               </div>
-
-              {/* Activity Feed */}
-              <div className="lg:col-span-1">
-                <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 h-full max-h-[600px] flex flex-col">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-bold text-slate-900">Activity Log</h2>
-                  </div>
-                  <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                    {recentPrints.length > 0 ? recentPrints.map((job, idx) => (
-                      <div key={idx} className="flex items-start gap-4 p-3 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
-                          <Printer className="w-5 h-5 text-slate-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-900 truncate">{job.userEmail}</p>
-                          <p className="text-xs text-slate-500 truncate mt-0.5">Printed: {job.file}</p>
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${job.status === 'completed' || job.status === 'printed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {job.status?.toUpperCase()}
-                            </span>
-                            {job.cost === 0 || job.cost === "0" ? (
-                               <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">FREE</span>
-                            ) : (
-                               <span className="text-xs font-semibold text-slate-700">₹{job.cost}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )) : (
-                      <div className="flex flex-col items-center justify-center h-48 text-slate-400">
-                        <p className="text-sm">No recent activity.</p>
-                      </div>
-                    )}
-                  </div>
+              <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Color Pages Printed</p>
+                  <h3 className="text-2xl font-bold text-slate-900 mt-1">{metrics?.totalColorPages || 0}</h3>
                 </div>
+                <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center">
+                  <div className="w-4 h-4 rounded-full bg-rose-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Full-width Activity Log Table */}
+            <div className="bg-white p-6 rounded-3xl shadow-[0_2px_12px_rgb(0,0,0,0.02)] border border-slate-100 mt-8 overflow-hidden">
+              <h2 className="text-lg font-bold text-slate-900 mb-6">Recent Activity Log</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="pb-4 px-4 text-xs font-bold uppercase text-slate-400">Date & Time</th>
+                      <th className="pb-4 px-4 text-xs font-bold uppercase text-slate-400">User Details</th>
+                      <th className="pb-4 px-4 text-xs font-bold uppercase text-slate-400">File Printed</th>
+                      <th className="pb-4 px-4 text-xs font-bold uppercase text-slate-400">Printer</th>
+                      <th className="pb-4 px-4 text-xs font-bold uppercase text-slate-400">Mode</th>
+                      <th className="pb-4 px-4 text-xs font-bold uppercase text-slate-400 text-center">Pages</th>
+                      <th className="pb-4 px-4 text-xs font-bold uppercase text-slate-400 text-center">Status</th>
+                      <th className="pb-4 px-4 text-xs font-bold uppercase text-slate-400 text-right">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {recentPrints.map((job, idx) => (
+                      <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                        <td className="py-4 px-4 text-slate-500 text-xs">{job.createdAt ? new Date(job.createdAt).toLocaleString() : '-'}</td>
+                        <td className="py-4 px-4 font-medium text-slate-900">{job.userEmail}</td>
+                        <td className="py-4 px-4 text-slate-600 truncate max-w-xs">{job.file}</td>
+                        <td className="py-4 px-4 text-slate-600"><span className="bg-slate-100 px-2 py-1 rounded text-xs">{job.destination || "Any"}</span></td>
+                        <td className="py-4 px-4">{job.colorMode === 'color' ? '🎨 Color' : '⚫ B&W'}</td>
+                        <td className="py-4 px-4 text-center font-bold">{job.copies || 1} x {job.pageCount || 1}</td>
+                        <td className="py-4 px-4 text-center">
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${job.status === 'completed' || job.status === 'printed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {job.status?.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          {job.cost === 0 || job.cost === "0" ? (
+                             <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded-full">FREE</span>
+                          ) : (
+                             <span className="text-sm font-bold text-slate-900">₹{job.cost}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {recentPrints.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-slate-400">No recent activity.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -522,10 +542,10 @@ export default function AdminDashboard() {
                <p className="text-sm text-slate-500 mb-8">Update the per-page printing costs. These changes will instantly reflect on the frontend and in the Cashfree payment gateway.</p>
                
                <div className="space-y-6">
-                 <div className="grid grid-cols-2 gap-6">
+                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                         <div className="w-3 h-3 rounded-full bg-slate-800" /> B&W Price (₹)
+                         <div className="w-3 h-3 rounded-full bg-slate-800" /> Web App B&W (₹)
                       </label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
@@ -541,7 +561,7 @@ export default function AdminDashboard() {
                    
                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                         <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-400 via-pink-500 to-yellow-400" /> Color Price (₹)
+                         <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-400 via-pink-500 to-yellow-400" /> Web App Color (₹)
                       </label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
@@ -550,6 +570,70 @@ export default function AdminDashboard() {
                            step="0.10"
                            value={pricing.pricePerPageColor}
                            onChange={(e) => setPricing({...pricing, pricePerPageColor: parseFloat(e.target.value)})}
+                           className="w-full pl-10 pr-4 py-4 rounded-xl bg-white border border-slate-200 text-xl font-black text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                   </div>
+
+                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-full bg-emerald-500" /> WhatsApp B&W (₹)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
+                        <input 
+                           type="number" 
+                           step="0.10"
+                           value={pricing.pricePerPageWABW}
+                           onChange={(e) => setPricing({...pricing, pricePerPageWABW: parseFloat(e.target.value)})}
+                           className="w-full pl-10 pr-4 py-4 rounded-xl bg-white border border-slate-200 text-xl font-black text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        />
+                      </div>
+                   </div>
+
+                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-full bg-emerald-500" /> WhatsApp Color (₹)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
+                        <input 
+                           type="number" 
+                           step="0.10"
+                           value={pricing.pricePerPageWAColor}
+                           onChange={(e) => setPricing({...pricing, pricePerPageWAColor: parseFloat(e.target.value)})}
+                           className="w-full pl-10 pr-4 py-4 rounded-xl bg-white border border-slate-200 text-xl font-black text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        />
+                      </div>
+                   </div>
+
+                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-sm bg-slate-400" /> A4 Blank Sheet (₹)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
+                        <input 
+                           type="number" 
+                           step="0.10"
+                           value={pricing.pricePerPageA4}
+                           onChange={(e) => setPricing({...pricing, pricePerPageA4: parseFloat(e.target.value)})}
+                           className="w-full pl-10 pr-4 py-4 rounded-xl bg-white border border-slate-200 text-xl font-black text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                   </div>
+
+                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-sm bg-[linear-gradient(45deg,#cbd5e1_25%,transparent_25%,transparent_75%,#cbd5e1_75%,#cbd5e1),linear-gradient(45deg,#cbd5e1_25%,transparent_25%,transparent_75%,#cbd5e1_75%,#cbd5e1)] bg-[length:4px_4px]" /> Graph Sheet (₹)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
+                        <input 
+                           type="number" 
+                           step="0.10"
+                           value={pricing.pricePerPageGraph}
+                           onChange={(e) => setPricing({...pricing, pricePerPageGraph: parseFloat(e.target.value)})}
                            className="w-full pl-10 pr-4 py-4 rounded-xl bg-white border border-slate-200 text-xl font-black text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                         />
                       </div>
