@@ -1561,7 +1561,12 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
       if (session.state === "awaiting_copies" && buttonId.startsWith("copies_")) {
         const copies = parseInt(buttonId.replace("copies_", ""));
-        await _processCopiesToPayment(from, session, sessionRef, copies);
+        await _askForCoupon(from, session, sessionRef, copies);
+        return res.sendStatus(200);
+      }
+
+      if (session.state === "awaiting_coupon" && buttonId === "skip_coupon") {
+        await _finalizePayment(from, session, sessionRef, null);
         return res.sendStatus(200);
       }
       return res.sendStatus(200);
@@ -1574,10 +1579,15 @@ app.post("/whatsapp-webhook", async (req, res) => {
       if (session.state === "awaiting_copies") {
         const copies = parseInt(textBody);
         if (!isNaN(copies) && copies > 0 && copies <= 100) {
-          await _processCopiesToPayment(from, session, sessionRef, copies);
+          await _askForCoupon(from, session, sessionRef, copies);
         } else {
           await sendWhatsAppMessage(from, "Please enter a valid number of copies (1-100).");
         }
+        return res.sendStatus(200);
+      }
+
+      if (session.state === "awaiting_coupon") {
+        await _finalizePayment(from, session, sessionRef, textBody.trim().toUpperCase());
         return res.sendStatus(200);
       }
       
@@ -1655,24 +1665,74 @@ async function sendWhatsAppOrderCard(to, { orderId, fileName, colorMode, copies,
     } else {
       const paymentLink = `https://api-upqxuj7evq-uc.a.run.app/wa-pay/${orderId}`;
       await sendWhatsAppMessage(to,
-        `🧾 *Order Summary*\n\nFile: ${fileName}\nPrint: ${colorMode === "color" ? "Color" : "B&W"} × ${copies} cop${copies > 1 ? "ies" : "y"}\nTotal: *₹${totalAmount}*\n\n💳 Pay here:\n${paymentLink}`
+        `Order #${orderId.slice(-6)}\n------------------------\n*Print Job*\nQuantity ${copies}\n------------------------\nTotal            ₹${totalAmount.toFixed(2)}\n\nMimo Printing\n\n💳 *Pay Now:*\n${paymentLink}`
       );
     }
   }
 }
 
-// ── Helper: create Cashfree order and send Pay Now CTA button ─────────
-async function _processCopiesToPayment(from, session, sessionRef, copies) {
+async function _askForCoupon(from, session, sessionRef, copies) {
   const pricingDoc = await db.collection("mimo_settings").doc("pricing").get();
   const pricing = pricingDoc.exists ? pricingDoc.data() : {};
-  const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageBW || 2.30);
+  const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageWAColor || pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageWABW || pricing.pricePerPageBW || 2.30);
   
   const pageCount = session.pageCount || 1;
   let totalAmount = Number((copies * pageCount * pricePerPage).toFixed(2));
-  if (totalAmount < 1.00) totalAmount = 1.00;
   
-  const orderId = `WA-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
+  await sessionRef.update({ state: "awaiting_coupon", copies, rawTotal: totalAmount });
+  
+  await sendWhatsAppButtons(from, `🧾 *Order Summary*\n\nDocument: ${session.fileName} (${pageCount} pages)\nLocation: ${session.destination || "Any"}\nPrint: ${session.colorMode === "color" ? "🎨 Color" : "⚫ B&W"}\nCopies: ${copies}\n\n*Total: ₹${totalAmount.toFixed(2)}*\n\nDo you have a discount coupon? Type the code below, or click Skip to proceed to payment.`, [
+    { id: "skip_coupon", title: "Skip & Pay" }
+  ]);
+}
 
+async function _finalizePayment(from, session, sessionRef, couponCode) {
+  let totalAmount = session.rawTotal || 1.00;
+  let discountAmount = 0;
+  
+  if (couponCode) {
+    try {
+      const couponDoc = await db.collection("coupons").doc(couponCode).get();
+      if (couponDoc.exists) {
+        const data = couponDoc.data();
+        let isExpired = false;
+        
+        if (data.expiryDate) {
+          const expiryDate = data.expiryDate.toDate ? data.expiryDate.toDate() : new Date(data.expiryDate);
+          if (expiryDate < new Date()) isExpired = true;
+        }
+
+        if (!isExpired) {
+          const discountPct = data.discountPercentage || 0;
+          discountAmount = (totalAmount * discountPct) / 100;
+          totalAmount = Number((totalAmount - discountAmount).toFixed(2));
+          await sendWhatsAppMessage(from, `✅ Coupon applied! ₹${discountAmount.toFixed(2)} off.`);
+        } else {
+          await sendWhatsAppMessage(from, `❌ Coupon expired. Proceeding with original amount.`);
+        }
+      } else {
+        await sendWhatsAppMessage(from, `❌ Invalid coupon code. Proceeding with original amount.`);
+      }
+    } catch(e) {
+      console.error("[WHATSAPP] Coupon check error:", e);
+    }
+  }
+
+  if (totalAmount <= 0) {
+    // FREE ORDER
+    const orderId = `WA-FREE-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
+    const printCode = Math.floor(100000 + Math.random() * 900000).toString();
+    await db.collection("print_jobs").doc(session.jobId).update({
+      orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: 0, printDestination: session.destination || "Any", status: "paid", printCode, couponUsed: couponCode || null
+    });
+    await sessionRef.update({ state: "idle" });
+    await sendWhatsAppMessage(from, `🎉 *100% Free!* Your order is fully covered.\n\nYour Print Code is:\n*${printCode}*\n\nHead to the Mimo kiosk and enter this code! 🖨️`);
+    return;
+  }
+
+  if (totalAmount < 1.00) totalAmount = 1.00; // Minimum Cashfree amount
+
+  const orderId = `WA-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
   try {
     const cfRes = await axios.post(`${CASHFREE_BASE_URL}/links`, {
       link_id: orderId,
@@ -1690,17 +1750,15 @@ async function _processCopiesToPayment(from, session, sessionRef, copies) {
     }, { headers: cashfreeHeaders });
 
     await db.collection("print_jobs").doc(session.jobId).update({
-      orderId, colorMode: session.colorMode, copies, pageCount, totalCost: totalAmount, printDestination: session.destination || "Any"
+      orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: totalAmount, printDestination: session.destination || "Any", couponUsed: couponCode || null
     });
     
     await sessionRef.update({ state: "idle" });
 
     const paymentLink = cfRes.data.link_url;
 
-    await sendWhatsAppCTAButton(from, 
-      `🧾 *Order Summary*\n\nDocument: ${session.fileName} (${pageCount} pages)\nLocation: ${session.destination || "Any"}\nPrint: ${session.colorMode === "color" ? "🎨 Color" : "⚫ B&W"}\nCopies: ${copies}\n\n*Total: ₹${totalAmount}*\n\nClick below to securely pay using PhonePe, GPay, Paytm, etc.`,
-      "💳 Pay Now",
-      paymentLink
+    await sendWhatsAppMessage(from, 
+      `Order #${orderId.slice(-6)}\n------------------------\n*Print Job*\nQuantity ${session.copies}\n------------------------\nTotal            ₹${totalAmount.toFixed(2)}\n\nMimo Printing\n\n💳 *Pay Now:*\n${paymentLink}`
     );
   } catch (cfErr) {
     console.error("[WHATSAPP BOT] Cashfree order creation failed:", cfErr.response?.data || cfErr.message);
