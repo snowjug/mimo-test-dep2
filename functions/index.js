@@ -1445,11 +1445,11 @@ app.post("/whatsapp-webhook", async (req, res) => {
       const doc = msg.document || msg.image;
       const mimeType = doc.mime_type || "";
       
-      const isPdf = mimeType.includes("pdf") || mimeType.includes("msword") || mimeType.includes("openxmlformats");
+      const isPdf = mimeType.includes("pdf");
       const isImage = mimeType.includes("image/jpeg") || mimeType.includes("image/png") || mimeType.includes("image/jpg");
 
       if (!isPdf && !isImage) {
-        await sendWhatsAppMessage(from, "❌ Sorry, only PDF, JPG, and PNG files are supported right now. Please send a valid file.");
+        await sendWhatsAppMessage(from, "❌ Sorry, we only support standard PDF, JPG, and PNG files. Word documents (.doc/.docx) are NOT supported. Please convert your file to a PDF and upload again.");
         return res.sendStatus(200);
       }
 
