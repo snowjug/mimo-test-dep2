@@ -1356,14 +1356,17 @@ app.get("/wa-pay-success/:orderId", async (req, res) => {
         if (!waSession.empty) {
           const phone = waSession.docs[0].id;
           const jobData = waJobs.docs[0].data();
-          await sendWhatsAppOrderCard(phone, {
-            orderId,
-            fileName: jobData.fileName || "Document",
-            colorMode: jobData.colorMode || "bw",
-            copies: jobData.copies || 1,
-            totalAmount: jobData.totalCost || 0,
-            status: "paid",
-            printCode
+          const botPhoneNumberId = jobData.botPhoneNumberId || process.env.WA_PHONE_NUMBER_ID || "943206795552432";
+          await waContext.run({ phoneNumberId: botPhoneNumberId }, async () => {
+            await sendWhatsAppOrderCard(phone, {
+              orderId,
+              fileName: jobData.fileName || "Document",
+              colorMode: jobData.colorMode || "bw",
+              copies: jobData.copies || 1,
+              totalAmount: jobData.totalCost || 0,
+              status: "paid",
+              printCode
+            });
           });
         }
       }
