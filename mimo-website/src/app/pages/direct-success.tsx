@@ -41,8 +41,8 @@ export function DirectSuccess() {
             <div className="text-center">
               <p className="text-sm text-blue-600/80 font-bold uppercase tracking-wider mb-1">Destination</p>
               <h3 className="text-xl font-bold text-blue-900">
-                {kioskId === 'CV-001' ? 'Kiosk 001 - Reva Boys Hostel' : 
-                 kioskId === 'SV-002' ? 'Kiosk 002 - Reva Girls Hostel' : 
+                {kioskId === 'CV-001' ? 'CV B&W - Reva Boys Hostel' : 
+                 kioskId === 'SV-002' ? 'SV Color and B&W - Reva Girls Hostel' : 
                  kioskId}
               </h3>
             </div>
