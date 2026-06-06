@@ -1757,9 +1757,8 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
 
     const paymentLink = cfRes.data.link_url;
 
-    await sendWhatsAppMessage(from, 
-      `Order #${orderId.slice(-6)}\n------------------------\n*Print Job*\nQuantity ${session.copies}\n------------------------\nTotal            ₹${totalAmount.toFixed(2)}\n\nMimo Printing\n\n💳 *Pay Now:*\n${paymentLink}`
-    );
+    const bodyText = `Order #${orderId.slice(-6)}\n------------------------\n*Print Job*\nQuantity ${session.copies}\n------------------------\nTotal            ₹${totalAmount.toFixed(2)}\n\nMimo Printing`;
+    await sendWhatsAppCTAButton(from, bodyText, "Pay Now", paymentLink);
   } catch (cfErr) {
     console.error("[WHATSAPP BOT] Cashfree order creation failed:", cfErr.response?.data || cfErr.message);
     await sendWhatsAppMessage(from, "❌ Failed to create payment order. Please try again.");
