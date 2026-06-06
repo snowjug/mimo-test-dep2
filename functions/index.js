@@ -24,7 +24,13 @@ const transporter = nodemailer.createTransport({
 const WA_PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || "943206795552432";
 const WA_ACCESS_TOKEN = process.env.WA_ACCESS_TOKEN || "EAAkN2tEVOeMBRiZBa3iQBcB241gbQTJ1GXi0ZBufsJTIHA0hkCSZC9fuc4YqAKOcHkUneoPyPRZC3WuUARywUHdAVxXzy7hdN6IeBXyl5lj6xsnr69L5b4aC4F6ZBywQmOMWuZB31FkCmbopBX1ZCo0zhofMjprpsQ5CaHPi86VVq9MSRR4j9yulQzViz7pYaHYZAgZDZD";
 const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || "mimo_webhook_verify_2024";
-const WA_API_URL = `https://graph.facebook.com/v19.0/${WA_PHONE_NUMBER_ID}/messages`;
+const { AsyncLocalStorage } = require('async_hooks');
+const waContext = new AsyncLocalStorage();
+function getWaApiUrl() {
+  const store = waContext.getStore();
+  const id = store?.phoneNumberId || WA_PHONE_NUMBER_ID;
+  return `https://graph.facebook.com/v19.0/${id}/messages`;
+}
 
 /**
  * Send a WhatsApp text message via Meta Cloud API.
@@ -34,7 +40,7 @@ const WA_API_URL = `https://graph.facebook.com/v19.0/${WA_PHONE_NUMBER_ID}/messa
 async function sendWhatsAppMessage(to, message) {
   try {
     const normalized = to.replace(/[^\d]/g, "");
-    await axios.post(WA_API_URL, {
+    await axios.post(getWaApiUrl(), {
       messaging_product: "whatsapp",
       to: normalized,
       type: "text",
@@ -77,7 +83,7 @@ async function sendWhatsAppButtons(to, bodyText, buttons, headerText = null) {
       }
     };
     if (headerText) payload.interactive.header = { type: "text", text: headerText };
-    await axios.post(WA_API_URL, payload, {
+    await axios.post(getWaApiUrl(), payload, {
       headers: {
         Authorization: `Bearer ${WA_ACCESS_TOKEN}`,
         "Content-Type": "application/json"
@@ -99,7 +105,7 @@ async function sendWhatsAppButtons(to, bodyText, buttons, headerText = null) {
 async function sendWhatsAppCTAButton(to, bodyText, buttonText, url) {
   try {
     const normalized = to.replace(/[^\d]/g, "");
-    await axios.post(WA_API_URL, {
+    await axios.post(getWaApiUrl(), {
       messaging_product: "whatsapp",
       to: normalized,
       type: "interactive",
@@ -1401,6 +1407,10 @@ app.post("/whatsapp-webhook", async (req, res) => {
     const entry = body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
+    
+    const phoneNumberId = value?.metadata?.phone_number_id;
+    return waContext.run({ phoneNumberId }, async () => {
+
     const messages = value?.messages;
     if (!messages || messages.length === 0) return res.sendStatus(200);
 
@@ -1602,6 +1612,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     await sendWhatsAppMessage(from, "Please send a *PDF document* to get started! 📄");
     return res.sendStatus(200);
 
+    }); // END waContext.run
   } catch (err) {
     console.error("[WHATSAPP BOT ERROR]", err);
     return res.sendStatus(200); // 200 to prevent infinite Meta retries on fatal errors
@@ -1651,7 +1662,7 @@ async function sendWhatsAppOrderCard(to, { orderId, fileName, colorMode, copies,
       }
     };
 
-    await axios.post(WA_API_URL, payload, {
+    await axios.post(getWaApiUrl(), payload, {
       headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}`, "Content-Type": "application/json" }
     });
     console.log(`[WHATSAPP] Order card sent to ${normalized} (${status})`);
