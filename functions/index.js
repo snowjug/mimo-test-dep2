@@ -1428,9 +1428,13 @@ app.get("/admin/recent-prints", adminAuthMiddleware, async (req, res) => {
 
       recentPrints.push({
         userEmail,
+        userPhone: data.userPhone || data.phoneNumber || null,
         file: fileName,
         status: data.orderStatus || data.status || "completed",
-        cost: data.amount || 0
+        cost: data.amount || 0,
+        orderId: data.orderId || null,
+        refundStatus: data.refundStatus || null,
+        refundAmount: data.refundAmount || null
       });
     }
     

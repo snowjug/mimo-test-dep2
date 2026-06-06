@@ -2175,7 +2175,7 @@ app.get("/admin/recent-prints", authenticateAdmin, async (req, res) => {
   try {
     const snapshot = await db.collection("print_jobs")
       .orderBy("createdAt", "desc")
-      .limit(10)
+      .limit(50)
       .get();
       
     const history = snapshot.docs.map(doc => {
@@ -2186,8 +2186,16 @@ app.get("/admin/recent-prints", authenticateAdmin, async (req, res) => {
         cost: `₹${(data.totalCost || data.amount || 0).toFixed(2)}`,
         file: data.fileName || data.sourceFile?.fileName || "Print Order",
         date: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : "N/A",
+        createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : null,
         status: data.status,
-        pages: data.pageCount || 0
+        pages: data.pageCount || 0,
+        type: data.colorMode || (data.isColor ? 'color' : 'bw'),
+        printer: data.kioskId || data.printer || null,
+        copies: data.copies || 1,
+        orderId: data.orderId || null,
+        refundStatus: data.refundStatus || null,
+        refundAmount: data.refundAmount || null,
+        userPhone: data.userPhone || data.phoneNumber || null
       };
     });
     res.json(history);
