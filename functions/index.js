@@ -1514,11 +1514,17 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
       // Count PDF Pages
       let pageCount = 1;
-      try {
-        const pdfData = await pdfParse(buffer);
-        pageCount = pdfData.numpages || 1;
-      } catch (err) {
-        console.error("Failed to parse PDF pages:", err);
+      if (isPdf) {
+        try {
+          const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+          pageCount = pdfDoc.getPageCount();
+        } catch (err) {
+          console.error("Failed to parse PDF pages with pdf-lib:", err);
+          await sendWhatsAppMessage(from, "❌ Sorry, I couldn't read the pages in this PDF. It might be corrupted, password-protected, or in an unsupported format. Please save it as a standard PDF and try again.");
+          return res.sendStatus(200);
+        }
+      } else if (isImage) {
+        pageCount = 1;
       }
 
       // Save session state
@@ -1691,16 +1697,34 @@ async function sendWhatsAppOrderCard(to, { orderId, fileName, colorMode, copies,
 }
 
 async function _askForCoupon(from, session, sessionRef, copies) {
-  const pricingDoc = await db.collection("mimo_settings").doc("pricing").get();
+  const pricingDoc = await db.collection("settings").doc("pricing").get();
   const pricing = pricingDoc.exists ? pricingDoc.data() : {};
+  
   const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageWAColor || pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageWABW || pricing.pricePerPageBW || 2.30);
   
   const pageCount = session.pageCount || 1;
   let totalAmount = Number((copies * pageCount * pricePerPage).toFixed(2));
-  
+
+  // Update session
   await sessionRef.update({ state: "awaiting_coupon", copies, rawTotal: totalAmount });
   
-  await sendWhatsAppButtons(from, `🧾 *Order Summary*\n\nDocument: ${session.fileName} (${pageCount} pages)\nLocation: ${session.destination || "Any"}\nPrint: ${session.colorMode === "color" ? "🎨 Color" : "⚫ B&W"}\nCopies: ${copies}\n\n*Total: ₹${totalAmount.toFixed(2)}*\n\nDo you have a discount coupon? Type the code below, or click Skip to proceed to payment.`, [
+  const kioskName = session.destination === "KIOSK-001-CV" ? "🖨️ CV B&W" : "🖨️ SV Color and B&W";
+  const colorText = session.colorMode === "color" ? "🎨 Color" : "📄 B&W";
+  
+  const receiptText = `🧾 *MIMO PRINT SUMMARY* 🧾
+➖➖➖➖➖➖➖➖➖➖➖➖➖➖
+📄 *Document:* ${session.fileName}
+📑 *Pages:* ${pageCount}
+📍 *Kiosk:* ${kioskName}
+🎨 *Color Mode:* ${colorText}
+🖨️ *Copies:* ${copies}
+➖➖➖➖➖➖➖➖➖➖➖➖➖➖
+💵 *Total Amount:* ₹${totalAmount.toFixed(2)}
+
+🎟️ _Have a discount coupon?_
+Type the code below, or click *Skip & Pay* to proceed.`;
+
+  await sendWhatsAppButtons(from, receiptText, [
     { id: "skip_coupon", title: "Skip & Pay" }
   ]);
 }
