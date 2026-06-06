@@ -1517,8 +1517,8 @@ app.post("/whatsapp-webhook", async (req, res) => {
       await sendWhatsAppButtons(from, 
         `📄 *${doc.filename || "document.pdf"}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`, 
         [
-          { id: "dest_cv", title: "📍 KIOSK-001-CV" },
-          { id: "dest_sv", title: "📍 KIOSK-002-SV" }
+          { id: "dest_cv", title: "📍 CV B&W" },
+          { id: "dest_sv", title: "📍 SV Color and B&W" }
         ]
       );
       return res.sendStatus(200);
