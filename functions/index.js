@@ -1455,6 +1455,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
       // Download file from Meta servers and upload to Firebase Storage
       let fileUrl = "";
+      let buffer = null;
       try {
         const mediaRes = await axios.get(`https://graph.facebook.com/v19.0/${doc.id}`, {
           headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` }
@@ -1464,7 +1465,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
           headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` },
           responseType: "arraybuffer"
         });
-        const buffer = Buffer.from(fileRes.data);
+        buffer = Buffer.from(fileRes.data);
         const fileName = doc.filename || (isImage ? `whatsapp_${Date.now()}.jpg` : `whatsapp_${Date.now()}.pdf`);
         const bucket = admin.storage().bucket();
         const fileRef = bucket.file(`uploads/wa_${from}/${fileName}`);
