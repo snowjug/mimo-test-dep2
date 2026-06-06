@@ -9,7 +9,7 @@ const axios = require("axios");
 const { OAuth2Client } = require("google-auth-library");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-const pdfParse = require("pdf-parse");
+const { PDFDocument } = require("pdf-lib");
 
 // Nodemailer Transporter
 const transporter = nodemailer.createTransport({
@@ -1438,11 +1438,15 @@ app.post("/whatsapp-webhook", async (req, res) => {
     const session = sessionDoc.exists ? sessionDoc.data() : { state: "idle" };
 
     // ── Handle PDF/document upload ──────────────────────────────────────────
-    if (msgType === "document") {
-      const doc = msg.document;
+    if (msgType === "document" || msgType === "image") {
+      const doc = msg.document || msg.image;
       const mimeType = doc.mime_type || "";
-      if (!mimeType.includes("pdf") && !mimeType.includes("msword") && !mimeType.includes("openxmlformats")) {
-        await sendWhatsAppMessage(from, "❌ Sorry, only PDF files are supported right now. Please send a PDF document.");
+      
+      const isPdf = mimeType.includes("pdf") || mimeType.includes("msword") || mimeType.includes("openxmlformats");
+      const isImage = mimeType.includes("image/jpeg") || mimeType.includes("image/png") || mimeType.includes("image/jpg");
+
+      if (!isPdf && !isImage) {
+        await sendWhatsAppMessage(from, "❌ Sorry, only PDF, JPG, and PNG files are supported right now. Please send a valid file.");
         return res.sendStatus(200);
       }
 
@@ -1458,10 +1462,11 @@ app.post("/whatsapp-webhook", async (req, res) => {
           responseType: "arraybuffer"
         });
         const buffer = Buffer.from(fileRes.data);
-        const fileName = doc.filename || `whatsapp_${Date.now()}.pdf`;
+        const fileName = doc.filename || (isImage ? `whatsapp_${Date.now()}.jpg` : `whatsapp_${Date.now()}.pdf`);
         const bucket = admin.storage().bucket();
         const fileRef = bucket.file(`uploads/wa_${from}/${fileName}`);
-        await fileRef.save(buffer, { contentType: "application/pdf", metadata: { contentType: "application/pdf" } });
+        const cType = isImage ? mimeType : "application/pdf";
+        await fileRef.save(buffer, { contentType: cType, metadata: { contentType: cType } });
         const { getDownloadURL } = require("firebase-admin/storage");
         fileUrl = await getDownloadURL(fileRef);
         console.log(`[WHATSAPP BOT] File uploaded for ${from}: ${fileName}`);
@@ -1494,10 +1499,10 @@ app.post("/whatsapp-webhook", async (req, res) => {
         fileName: doc.filename || `document_${Date.now()}.pdf`,
         documentUrl: fileUrl,
         fileUrl,
-        mimetype: "application/pdf",
+        mimetype: isImage ? mimeType : "application/pdf",
         fileSize: doc.file_size || 0,
-        fileType: "pdf",
-        isImage: false,
+        fileType: isImage ? "image" : "pdf",
+        isImage: isImage,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         status: "pending",
@@ -1609,7 +1614,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     }
 
     // Unsupported message type
-    await sendWhatsAppMessage(from, "Please send a *PDF document* to get started! 📄");
+    await sendWhatsAppMessage(from, "Please send a *PDF, JPG, or PNG document* to get started! 📄");
     return res.sendStatus(200);
 
     }); // END waContext.run
@@ -1768,7 +1773,15 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
 
     const paymentLink = cfRes.data.link_url;
 
-    const bodyText = `Order #${orderId.slice(-6)}\n------------------------\n*Print Job*\nQuantity ${session.copies}\n------------------------\nTotal            ₹${totalAmount.toFixed(2)}\n\nMimo Printing`;
+    const bodyText = `🧾 *ORDER PAID* (#${orderId.slice(-6)})
+━━━━━━━━━━━━━━━━━
+📄 *File:* ${session.fileName}
+🔢 *Copies:* ${session.copies}
+🎨 *Type:* ${session.colorMode === "color" ? "Color" : "B&W"}
+━━━━━━━━━━━━━━━━━
+💰 *Amount Paid:* ₹${totalAmount.toFixed(2)}
+
+✨ Thank you for using Mimo Printing!`;
     await sendWhatsAppCTAButton(from, bodyText, "Pay Now", paymentLink);
   } catch (cfErr) {
     console.error("[WHATSAPP BOT] Cashfree order creation failed:", cfErr.response?.data || cfErr.message);
