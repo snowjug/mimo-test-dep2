@@ -187,7 +187,7 @@ def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAM
                 return False
 
         print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_path} ({copies} copies, pages: {page_range or 'all'})")
-        cmd = ["lp", "-d", printer_name, "-n", str(copies)]
+        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4", "-o", "fit-to-page"]
         if page_range:
             cmd.extend(["-P", str(page_range)])
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
