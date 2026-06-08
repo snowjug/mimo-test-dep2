@@ -753,6 +753,29 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     );
 
     const paymentTxnRef = db.collection("payment_transactions").doc();
+    await paymentTxnRef.set({
+      orderId,
+      userId,
+      amount,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: "INITIATED"
+    });
+
+    res.json({
+      orderId,
+      paymentSessionId: response.data.payment_session_id,
+      amount,
+    });
+  } catch (err) {
+    console.error("Cashfree Order Error:", err.response?.data || err.message);
+    res.status(500).json({ error: "Failed to create payment order" });
+  }
+});
+
+// ================= CHECK JOB STATUS =================
+app.post("/check-status", async (req, res) => {
+  try {
+    const { printCode } = req.body;
     if (!printCode) return res.status(400).json({ error: "printCode required" });
 
     const snapshot = await db.collection("print_jobs")
