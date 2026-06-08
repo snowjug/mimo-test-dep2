@@ -1876,11 +1876,12 @@ app.post("/kiosk/print", async (req, res) => {
     const jobData = jobDoc.data();
     
     let finalKioskId = kioskId;
-    if (jobData.kioskId) {
-      if (jobData.kioskId !== kioskId) {
-        console.warn(`Kiosk mismatch: job assigned to ${jobData.kioskId}, requested from ${kioskId}`);
+    const directKioskId = jobData?.settings?.directKioskId || jobData?.printOptions?.directKioskId || jobData.kioskId;
+    if (directKioskId) {
+      if (directKioskId !== kioskId) {
+        console.warn(`Kiosk mismatch: job assigned to ${directKioskId}, requested from ${kioskId}`);
       }
-      finalKioskId = jobData.kioskId; // Prioritize the user's choice from the front end
+      finalKioskId = directKioskId; // Prioritize the user's choice from the front end
     }
     
     // Set status to printing so the Pi's firebase_listener.py picks it up

@@ -202,7 +202,7 @@ function App() {
         statusTitle={
           printStatus === 'completed'
             ? 'Print Completed ✅'
-            : jobData
+            : (jobData && jobData.userName)
             ? `Hello ${jobData.userName.split(' ')[0]}..!`
             : 'Printing in Progress'
         }
