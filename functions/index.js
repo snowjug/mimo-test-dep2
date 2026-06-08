@@ -1869,31 +1869,27 @@ app.post("/kiosk/print", async (req, res) => {
   try {
     const { printCode, kioskId = "KIOSK_1" } = req.body;
     if (!printCode) return res.status(400).json({ error: "Print code required" });
-
-    const snapshot = await db.collection("print_jobs")
-      .where("printCode", "==", printCode)
-      .where("status", "==", "paid")
-      .get();
-
-    if (snapshot.empty) {
-      return res.status(400).json({ error: "No paid job found for this code" });
-    }
-
+    const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).where("status", "==", "paid").get();
+    if (snapshot.empty) return res.status(400).json({ error: "No paid job found for this code" });
     const jobDoc = snapshot.docs[0];
     const jobData = jobDoc.data();
-
-    // Set status to printing so the Pi's firebase_listener.py picks it up
-    await jobDoc.ref.update({ 
-      status: "printing", 
-      printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
-      kioskId 
-    });
-
-    // PULL ARCHITECTURE: We just return success immediately.
-    // The Pi's mimo-listener.service will poll this document, download the PDF, and print it.
-    // The Kiosk UI will poll /kiosk/job-status until the Pi updates it to 'completed'.
-    return res.json({ success: true, message: "Print job enqueued successfully", job: jobData });
-
+    if (jobData.kioskId && jobData.kioskId !== kioskId) {
+      console.warn(`Kiosk mismatch: job assigned to ${jobData.kioskId}, requested from ${kioskId}`);
+    }
+    await jobDoc.ref.update({ status: "printing", printStartedAt: admin.firestore.FieldValue.serverTimestamp(), kioskId });
+    try {
+      const { fileUrl, copies = 1 } = jobData;
+      const targetPiUrl = process.env.PI_BASE_URL || "https://splashed-giddily-populace.ngrok-free.dev";
+      const targetPrinter = process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
+      if (!fileUrl) throw new Error("Job missing fileUrl");
+      await triggerPiPrint(fileUrl, copies, targetPiUrl, targetPrinter);
+      await jobDoc.ref.update({ status: "completed", isPrinted: true, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+      return res.json({ success: true, message: "Print triggered successfully", job: jobData });
+    } catch (piErr) {
+      console.error("❌ PI PRINT ERROR:", piErr.message);
+      await jobDoc.ref.update({ status: "failed", error: piErr.message });
+      return res.status(500).json({ error: "Failed to trigger printer", details: piErr.message });
+    }
   } catch (err) {
     console.error("❌ KIOSK PRINT ERROR:", err);
     res.status(500).json({ error: "Server error" });
@@ -1901,3 +1897,126 @@ app.post("/kiosk/print", async (req, res) => {
 });
 
 
+exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
+
+// ================= AUTO REFUND LISTENER =================
+exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
+  const beforeData = event.data.before.data();
+  const afterData = event.data.after.data();
+
+  // Trigger ONLY if status changes to "failed"
+  if (beforeData.status !== "failed" && afterData.status === "failed") {
+    console.log(`[REFUND] Print job ${event.params.jobId} failed. Initiating auto-refund...`);
+    const orderId = afterData.orderId;
+    if (!orderId) {
+      console.log(`[REFUND] No orderId found for job ${event.params.jobId}. Cannot refund.`);
+      return;
+    }
+
+    // 1. Fetch the Order to get the actual amount paid
+    const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+    if (orderSnapshot.empty) {
+      console.log(`[REFUND] Order ${orderId} not found.`);
+      return;
+    }
+    const orderDoc = orderSnapshot.docs[0];
+    const orderData = orderDoc.data();
+
+    // Prevent double refunds
+    if (orderData.refundStatus === "SUCCESS") {
+      console.log(`[REFUND] Order ${orderId} is already refunded.`);
+      return;
+    }
+
+    // Skip refund if the amount is zero (100% discount or free order)
+    if (!orderData.amount || orderData.amount <= 0) {
+      console.log(`[REFUND] Order ${orderId} has a zero amount. Skipping Cashfree refund API call.`);
+      await orderDoc.ref.update({
+        refundStatus: "SUCCESS",
+        refundNote: "Zero amount order, no gateway refund required",
+        refundedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return;
+    }
+
+    try {
+      // 2. Call Cashfree Refunds API
+      const refundId = `refund_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
+      const response = await axios.post(
+        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        {
+          refund_amount: orderData.amount,
+          refund_id: refundId,
+          refund_note: `Auto-refund for failed print job ${event.params.jobId}`
+        },
+        { headers: cashfreeHeaders, timeout: 10000 }
+      );
+
+      console.log(`[REFUND] Cashfree API response for ${orderId}:`, response.data);
+
+      // 3. Update Order in Firestore
+      await orderDoc.ref.update({
+        refundStatus: "SUCCESS",
+        refundId: refundId,
+        refundedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log(`[REFUND] Order ${orderId} successfully marked as refunded in DB.`);
+    } catch (err) {
+      console.error(`[REFUND ERROR] Failed to refund order ${orderId}:`, err.response?.data || err.message);
+      await orderDoc.ref.update({
+        refundStatus: "FAILED",
+        refundError: err.response?.data?.message || err.message
+      });
+    }
+  }
+});
+
+// ================= STORAGE AUTO-CLEANUP =================
+exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
+  const beforeData = event.data.before.data();
+  const afterData = event.data.after.data();
+
+  // Trigger ONLY if status changes to "completed"
+  if (beforeData.status !== "completed" && afterData.status === "completed") {
+    console.log(`[STORAGE] Print job ${event.params.jobId} completed. Cleaning up file...`);
+    
+    if (!afterData.fileUrl) {
+      console.log(`[STORAGE] No fileUrl found for job ${event.params.jobId}.`);
+      return;
+    }
+
+    try {
+      // fileUrl format: "gs://mimo-v2-11868.firebasestorage.app/uploads/username/filename.pdf"
+      // Or: "https://firebasestorage.googleapis.com/v0/b/..."
+      
+      const fileUrl = afterData.fileUrl;
+      const bucket = admin.storage().bucket();
+      
+      let filePath = "";
+      if (fileUrl.startsWith("gs://")) {
+        const bucketName = bucket.name;
+        filePath = fileUrl.replace(`gs://${bucketName}/`, "");
+      } else if (fileUrl.includes("firebasestorage.googleapis.com")) {
+        // Extract from HTTP URL
+        const urlObj = new URL(fileUrl);
+        const pathParts = urlObj.pathname.split("/o/");
+        if (pathParts.length > 1) {
+          filePath = decodeURIComponent(pathParts[1].split("?")[0]);
+        }
+      }
+
+      if (!filePath) {
+        console.error(`[STORAGE ERROR] Could not parse path from: ${fileUrl}`);
+        return;
+      }
+
+      const fileRef = bucket.file(filePath);
+      await fileRef.delete();
+      console.log(`[STORAGE] Successfully deleted ${filePath}`);
+
+    } catch (err) {
+      console.error(`[STORAGE ERROR] Failed to delete file for job ${event.params.jobId}:`, err);
+    }
+  }
+});
