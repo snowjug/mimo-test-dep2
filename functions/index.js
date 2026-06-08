@@ -1823,6 +1823,80 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
 }
 
 // Export the main Express App
+
+// ================= NGROK HELPER =================
+const getNgrokUrl = async () => {
+  if (process.env.PI_BASE_URL && !process.env.PI_BASE_URL.includes('100.108') && !process.env.PI_BASE_URL.includes('tail2146')) {
+    return process.env.PI_BASE_URL;
+  }
+  return "https://splashed-giddily-populace.ngrok-free.dev";
+};
+
+// Helper: call the Pi print API for one file
+const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
+  const targetPiUrl = piUrl || await getNgrokUrl();
+  const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
+  const results = [];
+  for (let i = 0; i < copies; i++) {
+    const res = await fetch(`${targetPiUrl}/print`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+      body: JSON.stringify({ pdfUrl: fileUrl, file_url: fileUrl, printer_name: targetPrinter })
+    });
+    if (!res.ok) { const errText = await res.text(); throw new Error(`Pi HTTP error ${res.status}: ${errText}`); }
+    results.push(await res.json());
+  }
+  return results;
+};
+
+// ================= KIOSK: POLL JOB STATUS =================
+app.get("/kiosk/job-status", async (req, res) => {
+  try {
+    const { printCode } = req.query;
+    if (!printCode) return res.status(400).json({ error: "Print code required" });
+    const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).get();
+    if (snapshot.empty) return res.status(404).json({ error: "Job not found" });
+    const jobData = snapshot.docs[0].data();
+    res.json({ status: jobData.status || "pending", isPrinted: jobData.isPrinted || false });
+  } catch (err) {
+    console.error("❌ KIOSK JOB STATUS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch job status" });
+  }
+});
+
+// ================= KIOSK: TRIGGER PI PRINT =================
+app.post("/kiosk/print", async (req, res) => {
+  try {
+    const { printCode, kioskId = "KIOSK_1" } = req.body;
+    if (!printCode) return res.status(400).json({ error: "Print code required" });
+    const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).where("status", "==", "paid").get();
+    if (snapshot.empty) return res.status(400).json({ error: "No paid job found for this code" });
+    const jobDoc = snapshot.docs[0];
+    const jobData = jobDoc.data();
+    if (jobData.kioskId && jobData.kioskId !== kioskId) {
+      console.warn(`Kiosk mismatch: job assigned to ${jobData.kioskId}, requested from ${kioskId}`);
+    }
+    await jobDoc.ref.update({ status: "printing", printStartedAt: admin.firestore.FieldValue.serverTimestamp(), kioskId });
+    try {
+      const { fileUrl, copies = 1 } = jobData;
+      const targetPiUrl = process.env.PI_BASE_URL || "https://splashed-giddily-populace.ngrok-free.dev";
+      const targetPrinter = process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
+      if (!fileUrl) throw new Error("Job missing fileUrl");
+      await triggerPiPrint(fileUrl, copies, targetPiUrl, targetPrinter);
+      await jobDoc.ref.update({ status: "completed", isPrinted: true, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+      return res.json({ success: true, message: "Print triggered successfully", job: jobData });
+    } catch (piErr) {
+      console.error("❌ PI PRINT ERROR:", piErr.message);
+      await jobDoc.ref.update({ status: "failed", error: piErr.message });
+      return res.status(500).json({ error: "Failed to trigger printer", details: piErr.message });
+    }
+  } catch (err) {
+    console.error("❌ KIOSK PRINT ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
 exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
 
 // ================= AUTO REFUND LISTENER =================
