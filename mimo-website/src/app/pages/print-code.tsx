@@ -7,6 +7,7 @@ import { Copy, CheckCircle2, CheckCircle, Home, Printer, QrCode, Download, Share
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { MimoHeader } from "../components/mimo-header";
 import { toast } from "sonner";
+import { AdSenseBlock } from "../components/AdSenseBlock";
 
 export function PrintCode() {
   const navigate = useNavigate();
@@ -315,6 +316,24 @@ export function PrintCode() {
                   COPY CODE
                 </Button>
               </div>
+            </div>
+          </div>
+
+          {/* --- SWIGGY-STYLE "WHILE YOU WAIT" ADS SECTION --- */}
+          <div className="w-full mt-2 relative z-10 animate-in slide-in-from-bottom-12 fade-in duration-700 delay-300">
+            <div className="flex items-center justify-center space-x-4 mb-3">
+              <div className="h-px bg-slate-300 flex-1"></div>
+              <h3 className="text-xs font-black tracking-widest text-slate-500 uppercase">While You Wait</h3>
+              <div className="h-px bg-slate-300 flex-1"></div>
+            </div>
+            
+            {/* AdSense Block Container */}
+            <div className="bg-white/60 backdrop-blur-md rounded-2xl shadow-sm border border-white/40 overflow-hidden p-2 min-h-[100px] flex items-center justify-center relative">
+              <AdSenseBlock className="rounded-xl overflow-hidden min-h-[100px] z-10" />
+              {/* Fallback visual while AdSense is loading */}
+              <p className="absolute text-slate-400 text-xs font-medium text-center px-4 z-0">
+                Advertisement Space
+              </p>
             </div>
           </div>
 

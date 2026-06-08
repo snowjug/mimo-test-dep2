@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { CheckCircle, Printer, MapPin, ArrowRight } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { AdSenseBlock } from "../components/AdSenseBlock";
 
 export function DirectSuccess() {
   const [searchParams] = useSearchParams();
@@ -66,6 +67,24 @@ export function DirectSuccess() {
           
         </CardContent>
       </Card>
+
+      {/* --- SWIGGY-STYLE "WHILE YOU WAIT" ADS SECTION --- */}
+      <div className="w-full max-w-md mt-6 relative z-10 animate-in slide-in-from-bottom-12 fade-in duration-700 delay-300">
+        <div className="flex items-center justify-center space-x-4 mb-4">
+          <div className="h-px bg-slate-300 flex-1"></div>
+          <h3 className="text-sm font-black tracking-widest text-slate-500 uppercase">While You Wait</h3>
+          <div className="h-px bg-slate-300 flex-1"></div>
+        </div>
+        
+        {/* AdSense Block Container */}
+        <div className="bg-white/60 backdrop-blur-md rounded-2xl shadow-lg border border-white/40 overflow-hidden p-2 min-h-[100px] flex items-center justify-center relative">
+          <AdSenseBlock className="rounded-xl overflow-hidden min-h-[100px] z-10" />
+          {/* Fallback visual while AdSense is loading or if it's blocked by adblockers */}
+          <p className="absolute text-slate-400 text-xs font-medium text-center px-4 z-0">
+            Advertisement Space
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
