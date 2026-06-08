@@ -13,6 +13,7 @@ The system supports user login, payment verification, print job creation, and ki
 ## Live Deployments
 
 - **Main Frontend URL**: https://printmimo.tech (or https://www.printmimo.tech)
+- **Company Landing Page**: https://printmimo.tech/landing
 - **Kiosk URL**: https://kisokmechine.vercel.app/
 
 Key backend responsibilities include:
