@@ -1,44 +1,1557 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MIMO — Smart Printing Solutions for Modern Campuses</title>
-  <meta name="description" content="Upload your file, get a 4-digit code, print instantly at any MIMO kiosk. No USB, no queues, no hassle. Smart printing for modern campuses." />
-  <meta name="keywords" content="MIMO, print kiosk, smart printing, campus printing, self-service print, Vision Printt" />
-  <meta property="og:title" content="MIMO — Your file. Your print. In seconds." />
-  <meta property="og:description" content="Smart printing solutions for modern campuses and offices." />
-  <meta property="og:type" content="website" />
+  <title>MIMO — Printing Made Easy</title>
+  <meta name="description" content="MIMO makes printing easy. Upload your file, get a 4-digit code, and print at the nearest MIMO kiosk in seconds. No queues, no cash, complete privacy." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
   <style>
-    /* ── RESET & BASE ── */
+    /* ── Reset ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', sans-serif; color: #0f172a; background: #fff; line-height: 1.6; overflow-x: hidden; }
+    html, body {
+      font-family: 'Outfit', sans-serif;
+      background: #e8ecf5;
+      min-height: 100%;
+      -webkit-font-smoothing: antialiased;
+    }
     a { text-decoration: none; color: inherit; }
-    img { max-width: 100%; display: block; }
 
-    /* ── CSS VARIABLES ── */
-    :root {
-      --navy: #093765;
-      --navy-dark: #060d1f;
-      --navy-mid: #0a1a3a;
-      --blue: #2563eb;
-      --blue-light: #3b82f6;
-      --cyan: #06b6d4;
-      --white: #ffffff;
-      --slate-50: #f8fafc;
-      --slate-100: #f1f5f9;
-      --slate-200: #e2e8f0;
-      --slate-400: #94a3b8;
-      --slate-500: #64748b;
-      --slate-600: #475569;
-      --slate-700: #334155;
-      --slate-800: #1e293b;
-      --slate-900: #0f172a;
-      --radius: 1rem;
-      --radius-lg: 1.5rem;
-      --shadow-xl: 0 20px 60px rgba(0,0,0,0.12)
-<truncated 53860 bytes>
+    /* ── Page wrap ── */
+    .page-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* ── Phone-card container ── */
+    .phone-card {
+      width: 100%;
+      max-width: 430px;
+      min-height: 100vh;
+      background: #F8F9FE;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 80px rgba(0,0,0,0.22);
+    }
+
+    /* ═══════════════════════════════════════════
+       HEADER
+    ═══════════════════════════════════════════ */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3rem 1.5rem 1rem;
+      position: relative;
+      z-index: 20;
+      animation: slideDown 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    .logo-block h1 {
+      font-size: 1.875rem;
+      font-weight: 900;
+      color: #111827;
+      letter-spacing: -.03em;
+      line-height: 1;
+    }
+    .logo-block p {
+      font-size: .8125rem;
+      font-weight: 500;
+      color: #6B7280;
+      margin-top: .15rem;
+    }
+    .header-actions { display: flex; align-items: center; gap: .75rem; }
+    .btn-get-started {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: .875rem;
+      padding: .65rem 1.25rem;
+      border-radius: 99px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 18px rgba(74,107,255,.38);
+      transition: all .25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      white-space: nowrap;
+    }
+    .btn-get-started:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 8px 28px rgba(74,107,255,.5); }
+    .btn-get-started svg { width: 1rem; height: 1rem; }
+    .btn-menu {
+      width: 2.75rem; height: 2.75rem;
+      background: #fff;
+      border: none; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      transition: all .2s ease;
+    }
+    .btn-menu:hover { background: #EEF2FF; transform: scale(1.08); }
+    .btn-menu svg { width: 1.5rem; height: 1.5rem; }
+
+    /* ═══════════════════════════════════════════
+       HERO
+    ═══════════════════════════════════════════ */
+    .hero {
+      position: relative;
+      height: 440px;
+      flex-shrink: 0;
+      background: radial-gradient(circle at 75% 60%, rgba(74,107,255,0.15) 0%, rgba(74,107,255,0.04) 45%, transparent 75%);
+      overflow: visible;
+    }
+
+    /* Floating orbs behind mascot */
+    .hero-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(40px);
+      pointer-events: none;
+      animation: pulse-orb 4s ease-in-out infinite;
+    }
+    .hero-orb-1 { width: 180px; height: 180px; background: rgba(74,107,255,0.12); right: -20px; bottom: 40px; animation-delay: 0s; }
+    .hero-orb-2 { width: 120px; height: 120px; background: rgba(124,58,237,0.08); right: 60px; bottom: 80px; animation-delay: 1.5s; }
+
+    /* Speech bubble */
+    .speech-bubble {
+      position: absolute;
+      top: 2rem; left: 2rem;
+      background: #fff;
+      padding: .75rem 1.1rem;
+      border-radius: 1.125rem;
+      box-shadow: 0 6px 20px rgba(0,0,0,.09);
+      transform: rotate(-3deg);
+      z-index: 20;
+      animation: bubblePop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s both, bobble 3s ease-in-out 1.2s infinite;
+    }
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -5px; right: 22px;
+      width: 12px; height: 12px;
+      background: #fff;
+      border-radius: 2px;
+      transform: rotate(45deg);
+      box-shadow: 2px 2px 4px rgba(0,0,0,.05);
+      z-index: -1;
+    }
+    .bubble-text { font-size: 1.0625rem; font-weight: 700; color: #111827; line-height: 1.3; }
+    .bubble-text span { color: #4A6BFF; }
+    .bubble-heart { margin-top: .25rem; color: #4A6BFF; }
+    .bubble-heart svg { width: 1rem; height: 1rem; }
+
+    /* Mascot */
+    .mascot-wrap {
+      position: absolute; inset: 0;
+      display: flex; align-items: flex-end; justify-content: flex-end;
+      overflow: visible;
+      pointer-events: none;
+    }
+    .mascot-img {
+      height: 90%; width: auto; object-fit: contain;
+      transform: scale(1.05) translateY(-0.5rem) translateX(0.5rem);
+      transform-origin: bottom right;
+      mix-blend-mode: multiply;
+      animation: mascotFloat 6s ease-in-out infinite;
+    }
+
+    /* ═══════════════════════════════════════════
+       ACTION CARDS
+    ═══════════════════════════════════════════ */
+    .cards {
+      padding: 0 1.5rem 2rem;
+      display: flex; flex-direction: column; gap: 1rem;
+      z-index: 30; position: relative;
+      margin-top: -3.5rem; /* Adjusted to prevent cutting off the mascot */
+    }
+    .card-main {
+      background: #fff;
+      border-radius: 1.5rem;
+      padding: 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 12px 32px rgba(74,107,255,.08);
+      cursor: pointer;
+      transition: transform .3s cubic-bezier(0.34,1.56,0.64,1), box-shadow .3s ease;
+      text-decoration: none;
+      animation: slideUp 0.6s ease 0.3s both;
+    }
+    .card-main:hover { transform: scale(1.02) translateY(-4px); box-shadow: 0 20px 48px rgba(74,107,255,.15); }
+    .card-main:active { transform: scale(0.98) translateY(0); box-shadow: 0 8px 24px rgba(74,107,255,.1); }
+    .card-main-left { display: flex; align-items: center; gap: 1.125rem; }
+    .card-icon {
+      width: 3.5rem; height: 3.5rem;
+      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .card-icon svg { width: 1.625rem; height: 1.625rem; color: #4A6BFF; }
+    .card-title { font-size: 1.125rem; font-weight: 700; color: #111827; }
+    .card-sub { font-size: .8125rem; color: #6B7280; margin-top: .15rem; font-weight: 500; }
+    .card-arrow {
+      width: 2.625rem; height: 2.625rem;
+      background: linear-gradient(135deg, #4A6BFF, #7C3AED);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(74,107,255,.35);
+      transition: transform .2s ease;
+    }
+    .card-main:hover .card-arrow { transform: translateX(4px) scale(1.08); box-shadow: 0 6px 20px rgba(74,107,255,.5); }
+    .card-arrow svg { width: 1.125rem; height: 1.125rem; color: #fff; }
+
+    /* Mini cards */
+    .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .card-mini {
+      background: #fff;
+      border-radius: 1.25rem; padding: 1.125rem;
+      display: flex; flex-direction: column; justify-content: space-between;
+      min-height: 8rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,.04);
+      cursor: pointer;
+      transition: transform .3s cubic-bezier(0.34,1.56,0.64,1), box-shadow .3s ease;
+      text-decoration: none;
+      animation: slideUp 0.6s ease 0.45s both;
+    }
+    .card-mini:hover { transform: scale(1.04) translateY(-4px); box-shadow: 0 18px 42px rgba(0,0,0,.08); }
+    .card-mini:active { transform: scale(0.98) translateY(0); box-shadow: 0 8px 20px rgba(0,0,0,.05); }
+    .card-mini-top { display: flex; align-items: flex-start; gap: .75rem; }
+    .card-mini-icon {
+      width: 2.5rem; height: 2.5rem;
+      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .card-mini-icon svg { width: 1.15rem; height: 1.15rem; color: #4A6BFF; }
+    .card-mini-info { padding-top: .1rem; }
+    .card-mini-title { font-size: .9375rem; font-weight: 700; color: #111827; line-height: 1.2; }
+    .card-mini-sub { font-size: .6875rem; color: #6B7280; margin-top: .2rem; font-weight: 500; }
+    .card-mini-bottom { display: flex; justify-content: flex-end; }
+    .mini-arrow { color: #4A6BFF; transition: transform .2s ease; }
+    .card-mini:hover .mini-arrow { transform: translateX(4px) scale(1.15); color: #7C3AED; }
+    .mini-arrow svg { width: 1.15rem; height: 1.15rem; }
+
+    /* ═══════════════════════════════════════════
+       STATS BAR
+    ═══════════════════════════════════════════ */
+    .stats-bar {
+      background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
+      margin: 0 1.5rem;
+      border-radius: 1.5rem;
+      padding: 1.5rem 1rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0;
+      box-shadow: 0 10px 30px rgba(74,107,255,.35);
+    }
+    .stat-item {
+      text-align: center;
+      position: relative;
+    }
+    .stat-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      right: 0; top: 15%; bottom: 15%;
+      width: 1px;
+      background: rgba(255,255,255,0.2);
+    }
+    .stat-num {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1;
+      letter-spacing: -.02em;
+    }
+    .stat-label {
+      font-size: 0.6875rem;
+      color: rgba(255,255,255,0.75);
+      font-weight: 500;
+      margin-top: 0.3rem;
+    }
+
+    /* ═══════════════════════════════════════════
+       SECTIONS — SHARED
+    ═══════════════════════════════════════════ */
+    .section {
+      padding: 2.5rem 1.5rem;
+      border-top: 1px solid #e5e7eb;
+    }
+    .section-header { margin-bottom: 1.75rem; }
+    .section-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: #EEF2FF;
+      color: #4A6BFF;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.3rem 0.75rem;
+      border-radius: 99px;
+      margin-bottom: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #111827;
+      margin-bottom: 0.5rem;
+      letter-spacing: -.03em;
+      line-height: 1.2;
+    }
+    .section-subtitle {
+      font-size: 0.875rem;
+      color: #6B7280;
+      line-height: 1.6;
+      font-weight: 500;
+    }
+
+    /* ═══════════════════════════════════════════
+       PROBLEM CARDS
+    ═══════════════════════════════════════════ */
+    .list-card {
+      background: #fff;
+      border-radius: 1.25rem;
+      padding: 1.25rem;
+      margin-bottom: 0.875rem;
+      display: flex;
+      gap: 1rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,.04);
+      border: 1px solid transparent;
+      transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+    }
+    .list-card:hover { border-color: #EEF2FF; box-shadow: 0 8px 25px rgba(74,107,255,.1); transform: translateY(-2px); }
+    .list-icon {
+      width: 2.75rem; height: 2.75rem;
+      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      font-size: 1.25rem;
+      color: #4A6BFF;
+      font-weight: 700;
+    }
+    .list-text h4 { font-size: 1.0625rem; font-weight: 700; color: #111827; margin-bottom: 0.25rem; }
+    .list-text p { font-size: 0.8125rem; color: #6B7280; line-height: 1.5; }
+
+    /* ═══════════════════════════════════════════
+       STEPS — HOW IT WORKS
+    ═══════════════════════════════════════════ */
+    .steps-wrap { position: relative; margin-top: 1rem; }
+    .steps-wrap::before {
+      content: '';
+      position: absolute;
+      left: calc(2.375rem - 1px);
+      top: 2.75rem;
+      bottom: 2.75rem;
+      width: 2px;
+      background: linear-gradient(to bottom, #4A6BFF, #7C3AED, #4A6BFF);
+      background-size: 100% 200%;
+      animation: lineFlow 3s linear infinite;
+      border-radius: 1px;
+      opacity: 0.45;
+      z-index: 2;
+    }
+    .step-card {
+      background: #fff;
+      border-radius: 1.25rem;
+      padding: 1.25rem 1.25rem 1.25rem 1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 1.125rem;
+      box-shadow: 0 6px 20px rgba(0,0,0,.04);
+      border: 1px solid #f3f4f6;
+      transition: all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      left: 0;
+      cursor: pointer;
+    }
+    .step-card:hover { box-shadow: 0 12px 32px rgba(74,107,255,.1); left: 8px; border-color: #EEF2FF; }
+    .step-card:active { left: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.05); }
+    .step-num {
+      min-width: 2.75rem; height: 2.75rem;
+      background: linear-gradient(135deg, #4A6BFF, #7C3AED);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(74,107,255,.35);
+      flex-shrink: 0;
+      transition: all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      z-index: 3;
+    }
+    .step-card:hover .step-num { transform: scale(1.1) rotate(-5deg); box-shadow: 0 8px 24px rgba(74,107,255,.5); }
+    .step-text h4 { font-size: 1.0625rem; font-weight: 700; color: #111827; margin-bottom: 0.25rem; }
+    .step-text p { font-size: 0.8125rem; color: #6B7280; line-height: 1.5; }
+
+    /* ═══════════════════════════════════════════
+       FEATURES GRID
+    ═══════════════════════════════════════════ */
+    .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+    .feature-card {
+      background: #fff;
+      border-radius: 1.5rem;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      box-shadow: 0 6px 20px rgba(0,0,0,.04);
+      border: 1px solid #f9fafb;
+      transition: all .3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .feature-card:hover { border-color: #EEF2FF; box-shadow: 0 16px 36px rgba(74,107,255,.12); transform: translateY(-6px) scale(1.02); }
+    .feature-icon {
+      width: 2.75rem; height: 2.75rem;
+      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 0.75rem auto;
+      font-size: 1.25rem;
+      transition: transform .3s ease;
+    }
+    .feature-card:hover .feature-icon { transform: rotate(10deg) scale(1.15); }
+    .feature-card h4 { font-size: 0.875rem; font-weight: 700; color: #111827; margin-bottom: 0.25rem; }
+    .feature-card p { font-size: 0.75rem; color: #6B7280; line-height: 1.4; }
+
+    /* ═══════════════════════════════════════════
+       TESTIMONIALS
+    ═══════════════════════════════════════════ */
+    .testimonial-scroll {
+      display: flex;
+      gap: 0.875rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      scroll-snap-type: x mandatory;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .testimonial-scroll::-webkit-scrollbar { display: none; }
+    .testimonial-card {
+      background: #fff;
+      border-radius: 1.25rem;
+      padding: 1.25rem;
+      min-width: 240px;
+      flex-shrink: 0;
+      scroll-snap-align: start;
+      box-shadow: 0 4px 15px rgba(0,0,0,.04);
+      border: 1px solid #f3f4f6;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .testimonial-card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(74,107,255,.1); }
+    .testimonial-stars { color: #FBBF24; font-size: 0.875rem; margin-bottom: 0.75rem; letter-spacing: 0.1em; }
+    .testimonial-text { font-size: 0.875rem; color: #374151; line-height: 1.6; font-style: italic; margin-bottom: 1rem; }
+    .testimonial-author { display: flex; align-items: center; gap: 0.625rem; }
+    .author-avatar {
+      width: 2rem; height: 2rem; border-radius: 50%;
+      background: linear-gradient(135deg, #4A6BFF, #7C3AED);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.875rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .author-name { font-size: 0.875rem; font-weight: 700; color: #111827; }
+    .author-role { font-size: 0.75rem; color: #6B7280; }
+
+    /* ═══════════════════════════════════════════
+       CTA BANNER
+    ═══════════════════════════════════════════ */
+    .cta-banner {
+      margin: 0 1.5rem 2rem;
+      background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
+      border-radius: 1.5rem;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 12px 36px rgba(74,107,255,.4);
+    }
+    .cta-banner::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.07);
+    }
+    .cta-banner::after {
+      content: '';
+      position: absolute;
+      bottom: -30px; left: -30px;
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+    }
+    .cta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      padding: 0.3rem 0.875rem;
+      border-radius: 99px;
+      margin-bottom: 0.875rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      backdrop-filter: blur(4px);
+    }
+    .cta-title {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: -.03em;
+      line-height: 1.2;
+      margin-bottom: 0.5rem;
+      position: relative;
+      z-index: 1;
+    }
+    .cta-subtitle {
+      font-size: 0.875rem;
+      color: rgba(255,255,255,0.8);
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+    .btn-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #fff;
+      color: #4A6BFF;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      padding: 0.875rem 1.75rem;
+      border-radius: 99px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+      transition: all .25s cubic-bezier(0.34,1.56,0.64,1);
+      position: relative;
+      z-index: 1;
+    }
+    .btn-cta:hover { transform: scale(1.06) translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,.2); }
+
+    /* ═══════════════════════════════════════════
+       FAQ
+    ═══════════════════════════════════════════ */
+    .faq-item {
+      background: #fff;
+      border-radius: 1.25rem;
+      margin-bottom: 0.875rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,.03);
+      border: 1px solid #f3f4f6;
+      overflow: hidden;
+      transition: box-shadow .3s ease;
+    }
+    .faq-item:hover { box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+    .faq-question {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.125rem 1.25rem;
+      cursor: pointer;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: #111827;
+      user-select: none;
+      gap: 0.5rem;
+    }
+    .faq-icon {
+      width: 1.75rem; height: 1.75rem;
+      background: #EEF2FF;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: transform .3s ease, background .2s ease;
+    }
+    .faq-icon svg { width: 0.875rem; height: 0.875rem; color: #4A6BFF; transition: transform .3s ease; }
+    .faq-item.open .faq-icon { background: #4A6BFF; }
+    .faq-item.open .faq-icon svg { color: #fff; transform: rotate(45deg); }
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .35s cubic-bezier(0.4, 0, 0.2, 1), padding .35s ease;
+      font-size: 0.875rem;
+      color: #6B7280;
+      line-height: 1.6;
+      padding: 0 1.25rem;
+    }
+    .faq-answer.open { max-height: 200px; padding-bottom: 1.25rem; }
+
+    /* ═══════════════════════════════════════════
+       TRUST BADGES (inline)
+    ═══════════════════════════════════════════ */
+    .trust-strip {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 0;
+      margin-top: 1rem;
+    }
+    .trust-row {
+      display: flex;
+      align-items: center;
+      gap: 1.125rem;
+      background: #fff;
+      border-radius: 1.25rem;
+      padding: 1.25rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,.04);
+      border: 1px solid transparent;
+      transition: transform .3s ease, box-shadow .3s ease;
+    }
+    .trust-row:hover {
+      transform: translateX(4px);
+      box-shadow: 0 8px 25px rgba(74,107,255,.08);
+      border-color: #EEF2FF;
+    }
+    .trust-icon-wrap {
+      width: 2.75rem; height: 2.75rem;
+      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .trust-icon-wrap svg { width: 1.25rem; height: 1.25rem; color: #4A6BFF; }
+    .trust-row-text h4 { font-size: 0.9375rem; font-weight: 700; color: #111827; }
+    .trust-row-text p { font-size: 0.8125rem; color: #6B7280; margin-top: 0.1rem; }
+
+    /* ═══════════════════════════════════════════
+       BUTTONS
+    ═══════════════════════════════════════════ */
+    .btn-primary {
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      width: 100%;
+      background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 1rem;
+      border-radius: 1.25rem;
+      margin-top: 1.5rem;
+      box-shadow: 0 6px 22px rgba(74,107,255,.4);
+      transition: all .25s cubic-bezier(0.34,1.56,0.64,1);
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 32px rgba(74,107,255,.5); }
+    .btn-primary svg { width: 1.125rem; height: 1.125rem; }
+
+    /* ═══════════════════════════════════════════
+       FOOTER
+    ═══════════════════════════════════════════ */
+    .footer-main {
+      background: #fff;
+      color: #111827;
+      padding: 2.5rem 1.5rem 2rem;
+      border-top-left-radius: 1.5rem;
+      border-top-right-radius: 1.5rem;
+      z-index: 20;
+      box-shadow: 0 -4px 20px rgba(0,0,0,.04);
+    }
+    .footer-brand { margin-bottom: 2rem; }
+    .footer-brand h2 {
+      font-size: 1.75rem; font-weight: 900;
+      margin-bottom: 0.35rem;
+      letter-spacing: -.03em;
+      background: linear-gradient(135deg, #4A6BFF, #7C3AED);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .footer-brand .tagline { font-size: 0.875rem; color: #6B7280; line-height: 1.5; margin-bottom: 1rem; }
+    .footer-address { font-size: 0.8125rem; color: #6B7280; line-height: 1.6; }
+    .footer-address strong { display: flex; gap: 0.35rem; align-items: flex-start; }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .footer-col h4 { font-size: 0.9375rem; font-weight: 700; color: #111827; margin-bottom: 1rem; }
+    .footer-col ul { list-style: none; }
+    .footer-col li { margin-bottom: 0.625rem; }
+    .footer-col a {
+      font-size: 0.875rem; color: #6B7280;
+      transition: color .2s ease;
+      display: inline-flex; align-items: center; gap: 0.25rem;
+    }
+    .footer-col a:hover { color: #4A6BFF; }
+    .footer-divider { height: 1px; background: #e5e7eb; margin-bottom: 1.5rem; }
+    .footer-bottom { text-align: center; }
+    .footer-bottom-copy { font-size: 0.8125rem; color: #9CA3AF; }
+    .footer-legal { margin-top: 0.625rem; display: flex; justify-content: center; gap: 0.25rem; flex-wrap: wrap; }
+    .footer-legal a { font-size: 0.75rem; color: #9CA3AF; padding: 0 0.5rem; transition: color .2s; }
+    .footer-legal a:hover { color: #4A6BFF; }
+    .footer-legal span { color: #e5e7eb; }
+    .footer-credit {
+      margin-top: 0.875rem;
+      font-size: 0.75rem;
+      color: #9CA3AF;
+    }
+    .footer-credit strong { color: #4A6BFF; }
+
+    /* ═══════════════════════════════════════════
+       SCROLL REVEAL
+    ═══════════════════════════════════════════ */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+
+    /* ═══════════════════════════════════════════
+       KEYFRAMES
+    ═══════════════════════════════════════════ */
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes bubblePop {
+      from { opacity: 0; transform: rotate(-3deg) scale(0.6); }
+      to   { opacity: 1; transform: rotate(-3deg) scale(1); }
+    }
+    @keyframes bobble {
+      0%, 100% { transform: rotate(-3deg) translateY(0); }
+      50%       { transform: rotate(-2deg) translateY(-6px); }
+    }
+    @keyframes mascotFloat {
+      0%, 100% { filter: drop-shadow(-12px 8px 16px rgba(9,55,101,0.12)) drop-shadow(-4px 4px 6px rgba(9,55,101,0.08)); }
+      50% { filter: drop-shadow(-16px 14px 22px rgba(9,55,101,0.18)) drop-shadow(-6px 6px 10px rgba(9,55,101,0.1)); }
+    }
+    @keyframes pulse-orb {
+      0%, 100% { transform: scale(1); opacity: 0.7; }
+      50%       { transform: scale(1.2); opacity: 1; }
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes lineFlow {
+      0% { background-position: 0% 0%; }
+      100% { background-position: 0% -200%; }
+    }
+
+    /* ═══════════════════════════════════════════
+       PRICING SECTION
+    ═══════════════════════════════════════════ */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .pricing-card {
+      background: #fff;
+      border-radius: 1.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 6px 20px rgba(0,0,0,.04);
+      border: 2px solid transparent;
+      transition: all .3s cubic-bezier(0.34,1.56,0.64,1);
+      text-align: center;
+    }
+    .pricing-card.featured {
+      border-color: #4A6BFF;
+      box-shadow: 0 10px 30px rgba(74,107,255,.15);
+    }
+    .pricing-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(74,107,255,.12); }
+    .pricing-card-icon { font-size: 1.75rem; margin-bottom: 0.625rem; }
+    .pricing-card-label { font-size: 0.8125rem; font-weight: 600; color: #6B7280; margin-bottom: 0.375rem; }
+    .pricing-card-price {
+      font-size: 1.625rem;
+      font-weight: 900;
+      color: #111827;
+      letter-spacing: -.02em;
+      line-height: 1;
+    }
+    .pricing-card-price sup { font-size: 0.9rem; font-weight: 700; vertical-align: super; }
+    .pricing-card-per { font-size: 0.75rem; color: #6B7280; margin-top: 0.25rem; font-weight: 500; }
+    .pricing-note {
+      background: #EEF2FF;
+      border-radius: 0.875rem;
+      padding: 0.875rem 1rem;
+      margin-top: 0.875rem;
+      font-size: 0.8125rem;
+      color: #4A6BFF;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* Hide desktop panel on mobile/tablet */
+    .desktop-panel { display: none; }
+
+    /* ═══════════════════════════════════════════
+       RESPONSIVE — TABLET (≥ 640px)
+    ═══════════════════════════════════════════ */
+    @media (min-width: 640px) {
+      .page-wrap { padding: 2rem; background: #e8ecf5; }
+      .phone-card {
+        max-width: 600px;
+        border-radius: 2rem;
+        min-height: auto;
+        box-shadow: 0 24px 80px rgba(0,0,0,.2);
+      }
+      header { padding: 2.5rem 2rem 1rem; }
+      .hero { height: 360px; }
+      .cards { padding: 0 2rem 2rem; }
+      .section { padding: 2.5rem 2rem; }
+      .stats-bar { margin: 0 2rem; }
+      .cta-banner { margin: 0 2rem 2rem; }
+      .footer-main { padding: 2.5rem 2rem 2rem; }
+      .section-title { font-size: 1.625rem; }
+    }
+
+    /* ═══════════════════════════════════════════
+       RESPONSIVE — DESKTOP (≥ 1024px)
+    ═══════════════════════════════════════════ */
+    @media (min-width: 1024px) {
+      .page-wrap {
+        display: grid;
+        grid-template-columns: 420px 1fr;
+        align-items: start;
+        gap: 3rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 3rem 2rem;
+        min-height: 100vh;
+      }
+      .desktop-panel { display: flex; }
+      .phone-card {
+        max-width: 420px;
+        border-radius: 2.5rem;
+        position: sticky;
+        top: 3rem;
+        height: calc(100vh - 6rem);
+        overflow-y: auto;
+        scrollbar-width: none;
+      }
+      .phone-card::-webkit-scrollbar { display: none; }
+      .desktop-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        padding-top: 1rem;
+      }
+      .desktop-hero-text {
+        animation: slideDown 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+      }
+      .desktop-hero-text .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: #EEF2FF;
+        color: #4A6BFF;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.35rem 0.875rem;
+        border-radius: 99px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+      }
+      .desktop-hero-text h2 {
+        font-size: 2.5rem;
+        font-weight: 900;
+        color: #111827;
+        letter-spacing: -.04em;
+        line-height: 1.1;
+        margin-bottom: 0.875rem;
+      }
+      .desktop-hero-text h2 span { color: #4A6BFF; }
+      .desktop-hero-text p {
+        font-size: 1rem;
+        color: #6B7280;
+        line-height: 1.7;
+        margin-bottom: 1.5rem;
+      }
+      .desktop-cta-row {
+        display: flex;
+        gap: 0.875rem;
+        flex-wrap: wrap;
+      }
+      .desktop-btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        padding: 0.9rem 1.75rem;
+        border-radius: 99px;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 6px 22px rgba(74,107,255,.4);
+        transition: all .25s cubic-bezier(0.34,1.56,0.64,1);
+        text-decoration: none;
+      }
+      .desktop-btn-primary:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 12px 32px rgba(74,107,255,.5); }
+      .desktop-btn-outline {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: #fff;
+        color: #4A6BFF;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 0.9rem 1.75rem;
+        border-radius: 99px;
+        border: 2px solid #EEF2FF;
+        cursor: pointer;
+        transition: all .2s ease;
+        text-decoration: none;
+      }
+      .desktop-btn-outline:hover { border-color: #4A6BFF; color: #4A6BFF; background: #EEF2FF; }
+      .desktop-feature-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.875rem;
+      }
+      .desktop-feature-tile {
+        background: #fff;
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+        display: flex;
+        gap: 0.875rem;
+        align-items: flex-start;
+        box-shadow: 0 4px 15px rgba(0,0,0,.04);
+        border: 1px solid transparent;
+        transition: all .2s ease;
+      }
+      .desktop-feature-tile:hover { border-color: #EEF2FF; box-shadow: 0 8px 24px rgba(74,107,255,.1); transform: translateY(-2px); }
+      .desktop-tile-icon {
+        width: 2.75rem; height: 2.75rem;
+        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        font-size: 1.25rem;
+      }
+      .desktop-tile-text h4 { font-size: 0.9375rem; font-weight: 700; color: #111827; margin-bottom: 0.25rem; }
+      .desktop-tile-text p { font-size: 0.8125rem; color: #6B7280; line-height: 1.5; }
+      .desktop-stats-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.875rem;
+      }
+      .desktop-stat-tile {
+        background: #fff;
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,.04);
+      }
+      .desktop-stat-num {
+        font-size: 1.75rem;
+        font-weight: 900;
+        color: #4A6BFF;
+        letter-spacing: -.02em;
+        line-height: 1;
+      }
+      .desktop-stat-label { font-size: 0.8125rem; color: #6B7280; margin-top: 0.3rem; font-weight: 500; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+<div class="phone-card">
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div class="logo-block">
+      <h1>MIMO</h1>
+      <p>Printing Made Easy</p>
+    </div>
+    <div class="header-actions">
+      <a href="https://printmimo.tech" class="btn-get-started" id="header-cta">
+        Get Started
+        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <button class="btn-menu" aria-label="Menu" id="menu-btn">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div class="hero-orb hero-orb-1"></div>
+    <div class="hero-orb hero-orb-2"></div>
+
+    <div class="speech-bubble">
+      <p class="bubble-text">Hi! <span>I'm MIMO</span></p>
+      <div class="bubble-heart">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="mascot-wrap">
+      <img src="koala-mascot.png" alt="MIMO Blue Koala Mascot" class="mascot-img" />
+    </div>
+  </section>
+
+  <!-- ── ACTION CARDS ── -->
+  <div class="cards">
+    <a href="https://printmimo.tech" class="card-main" id="print-now-card">
+      <div class="card-main-left">
+        <div class="card-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="card-title">Print Now</div>
+          <div class="card-sub">Start printing in seconds</div>
+        </div>
+      </div>
+      <div class="card-arrow">
+        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </a>
+
+    <div class="cards-grid">
+      <a href="#find-machine" class="card-mini" id="find-machine-card">
+        <div class="card-mini-top">
+          <div class="card-mini-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="card-mini-info">
+            <div class="card-mini-title">Find Machine</div>
+            <div class="card-mini-sub">Locate nearby</div>
+          </div>
+        </div>
+        <div class="card-mini-bottom">
+          <span class="mini-arrow">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </a>
+
+      <a href="#how-it-works" class="card-mini" id="how-it-works-card">
+        <div class="card-mini-top">
+          <div class="card-mini-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="card-mini-info">
+            <div class="card-mini-title">How It Works</div>
+            <div class="card-mini-sub">Simple &amp; quick</div>
+          </div>
+        </div>
+        <div class="card-mini-bottom">
+          <span class="mini-arrow">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- ── STATS BAR ── -->
+  <div class="stats-bar reveal" style="margin-bottom: 2rem;">
+    <div class="stat-item">
+      <div class="stat-num" data-target="5000">0</div>
+      <div class="stat-label">Happy Students</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num" data-target="12">0</div>
+      <div class="stat-label">Campus Kiosks</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">99%</div>
+      <div class="stat-label">Uptime</div>
+    </div>
+  </div>
+
+  <!-- ── PROBLEM SOLVED ── -->
+  <section class="section" style="border-top: none; padding-top: 0;" id="problems">
+    <div class="section-header reveal">
+      <div class="section-pill">✦ The Problem</div>
+      <h2 class="section-title">Printing, Finally Fixed</h2>
+      <p class="section-subtitle">Tired of long queues, exact change, and unhelpful shopkeepers? We were too. MIMO is here to change printing for students, forever.</p>
+    </div>
+
+    <div class="list-card reveal reveal-delay-1">
+      <div class="list-icon">🥇</div>
+      <div class="list-text">
+        <h4>No More Long Queues</h4>
+        <p>Print instantly from your phone and collect from our self-service kiosks. Zero waiting.</p>
+      </div>
+    </div>
+    <div class="list-card reveal reveal-delay-2">
+      <div class="list-icon">🪙</div>
+      <div class="list-text">
+        <h4>Cashless &amp; Convenient</h4>
+        <p>Pay seamlessly using UPI, cards, or net banking. No more scrambling for exact change.</p>
+      </div>
+    </div>
+    <div class="list-card reveal reveal-delay-3">
+      <div class="list-icon">🔒</div>
+      <div class="list-text">
+        <h4>Complete Privacy</h4>
+        <p>Your documents are yours. Once printed, they are instantly and permanently deleted.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ── -->
+  <section class="section" style="background: #fff; border-top: none;" id="how-it-works">
+    <div class="section-header reveal">
+      <div class="section-pill">✦ The Process</div>
+      <h2 class="section-title">How MIMO Works</h2>
+      <p class="section-subtitle">A seamless, delightful experience in just 3 simple steps.</p>
+    </div>
+
+    <div class="steps-wrap">
+      <div class="step-card reveal reveal-delay-1">
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <h4>Upload Your Files</h4>
+          <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload your documents from any device.</p>
+        </div>
+      </div>
+      <div class="step-card reveal reveal-delay-2">
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <h4>Customise Your Print</h4>
+          <p>Select copies, B&amp;W or color, paper size, and print layout directly on your phone — no app needed.</p>
+        </div>
+      </div>
+      <div class="step-card reveal reveal-delay-3">
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <h4>Enter Code &amp; Collect</h4>
+          <p>You'll receive a secure 4-digit code. Enter it at the kiosk, and your prints come out instantly!</p>
+        </div>
+      </div>
+    </div>
+
+    <a href="https://printmimo.tech" class="btn-primary">
+      Print Now
+      <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+  </section>
+
+  <!-- ── FEATURES ── -->
+  <section class="section" id="features">
+    <div class="section-header reveal">
+      <div class="section-pill">✦ Features</div>
+      <h2 class="section-title">Built for Modern Students</h2>
+      <p class="section-subtitle">Everything you need for a hassle-free printing experience, built into one seamless platform.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;">
+            <path d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h4>Cloud Ready</h4>
+        <p>Upload from Drive, WhatsApp, or local storage.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;">
+            <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h4>High-Quality</h4>
+        <p>Professional laser printing for crisp, clear text.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;">
+            <path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h4>No App Needed</h4>
+        <p>Works smoothly in any mobile browser.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon">🕒</div>
+        <h4>Always Online</h4>
+        <p>Our kiosks are available 24/7, even on weekends.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon">💵</div>
+        <h4>Pay What You Print</h4>
+        <p>Transparent pricing, no hidden fees. Ever.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon">🎓</div>
+        <h4>Campus First</h4>
+        <p>Placed strategically in hostels &amp; student zones.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── FAQ ── -->
+  <section class="section" id="faq">
+    <div class="section-header reveal">
+      <div class="section-pill">✦ FAQ</div>
+      <h2 class="section-title">Got Questions?</h2>
+      <p class="section-subtitle">Everything you need to know about MIMO, answered.</p>
+    </div>
+
+    <div class="reveal">
+      <div class="faq-item" id="faq-1">
+        <div class="faq-question" onclick="toggleFaq('faq-1')">
+          What file formats does MIMO support?
+          <div class="faq-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="faq-answer" id="faq-1-answer">
+          MIMO supports PDF, DOC, DOCX, JPG, and PNG files. PDFs are recommended for the best print quality. You can convert most documents to PDF before uploading.
+        </div>
+      </div>
+
+      <div class="faq-item" id="faq-2">
+        <div class="faq-question" onclick="toggleFaq('faq-2')">
+          How long is my print code valid?
+          <div class="faq-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="faq-answer" id="faq-2-answer">
+          Your 4-digit print code is valid for 24 hours after payment. If you don't collect your prints within this window, your payment is automatically refunded.
+        </div>
+      </div>
+
+      <div class="faq-item" id="faq-3">
+        <div class="faq-question" onclick="toggleFaq('faq-3')">
+          What payment methods are accepted?
+          <div class="faq-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="faq-answer" id="faq-3-answer">
+          We accept all major UPI apps (Google Pay, PhonePe, Paytm), debit/credit cards, and net banking. All payments are processed securely via Razorpay.
+        </div>
+      </div>
+
+      <div class="faq-item" id="faq-4">
+        <div class="faq-question" onclick="toggleFaq('faq-4')">
+          Is my document data safe and private?
+          <div class="faq-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="faq-answer" id="faq-4-answer">
+          Absolutely. Your documents are encrypted in transit, and permanently deleted from our servers immediately after printing. We never store, read, or share your files.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TRUST BADGES ── -->
+  <section class="section" style="background: #fff; border-top: none;" id="trust">
+    <div class="section-header reveal">
+      <div class="section-pill">✦ Why Us</div>
+      <h2 class="section-title">You Can Trust MIMO</h2>
+    </div>
+
+    <div class="trust-strip">
+      <div class="trust-row reveal reveal-delay-1">
+        <div class="trust-icon-wrap">
+          <svg fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12.516 2.17a.75.75 0 00-1.032 0 11.209 11.209 0 01-7.877 3.08.75.75 0 00-.722.515A12.74 12.74 0 002.25 9.75c0 5.942 4.064 10.933 9.563 12.348a.749.749 0 00.374 0c5.499-1.415 9.563-6.406 9.563-12.348 0-1.39-.223-2.73-.635-3.985a.75.75 0 00-.722-.516l-.143.001c-2.996 0-5.717-1.17-7.734-3.08z"/>
+          </svg>
+        </div>
+        <div class="trust-row-text">
+          <h4>Secure by Design</h4>
+          <p>End-to-end encrypted. Your data is never stored or shared.</p>
+        </div>
+      </div>
+
+      <div class="trust-row reveal reveal-delay-2">
+        <div class="trust-icon-wrap">
+          <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+            <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="trust-row-text">
+          <h4>Instant Refunds</h4>
+          <p>If your print fails for any reason, you get an automatic refund.</p>
+        </div>
+      </div>
+
+      <div class="trust-row reveal reveal-delay-3">
+        <div class="trust-icon-wrap">
+          <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+            <path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="trust-row-text">
+          <h4>24/7 Availability</h4>
+          <p>Kiosks are online round the clock. Print whenever you need.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ── -->
+  <footer class="footer-main" id="footer">
+    <div class="footer-brand">
+      <h2>VisionPrintt</h2>
+      <p class="tagline">Smart printing solutions for modern campuses and offices.</p>
+      <div class="footer-address">
+        <strong><span>📍</span><span>Vision Printt Technologies<br>REVA NEST, Rukmini Knowledge Park<br>Kattegenahalli, Yelahanka<br>Bengaluru - 560064</span></strong>
+      </div>
+    </div>
+
+    <div class="footer-grid">
+      <div class="footer-col">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="#">Home</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="https://printmimo.tech">Print Now</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Support</h4>
+        <ul>
+          <li><a href="#">Contact Support</a></li>
+          <li><a href="#">Report Issue</a></li>
+          <li><a href="#">Feedback</a></li>
+          <li><a href="tel:+918123028797">+91 8123028797</a></li>
+          <li><a href="#">Mon–Fri, 9AM–6PM IST</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-divider"></div>
+    <div class="footer-bottom">
+      <div class="footer-bottom-copy">&copy; 2025 VisionPrintt. All rights reserved.</div>
+      <div class="footer-legal">
+        <a href="#">Privacy Policy</a>
+        <span>|</span>
+        <a href="#">Terms of Service</a>
+        <span>|</span>
+        <a href="#">Cookies</a>
+      </div>
+      <div class="footer-credit">Designed &amp; developed by <strong>Rathindra</strong></div>
+    </div>
+  </footer>
+
+</div><!-- /phone-card -->
+
+  <!-- ── DESKTOP PANEL (visible only at 1024px+) ── -->
+  <div class="desktop-panel" id="desktop-panel">
+
+    <div class="desktop-hero-text">
+      <div class="eyebrow">✦ Smart Campus Printing</div>
+      <h2>Print anything,<br>from <span>anywhere</span> on campus.</h2>
+      <p>MIMO lets you upload your documents from your phone, customise your print settings, pay via UPI, and collect a crisp printout — all without standing in a single queue.</p>
+      <div class="desktop-cta-row">
+        <a href="https://printmimo.tech" class="desktop-btn-primary">
+          Start Printing
+          <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;">
+            <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <a href="#how-it-works" class="desktop-btn-outline">
+          How It Works
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1rem;height:1rem;">
+            <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="desktop-stats-strip">
+      <div class="desktop-stat-tile">
+        <div class="desktop-stat-num">5,000+</div>
+        <div class="desktop-stat-label">Happy Students</div>
+      </div>
+      <div class="desktop-stat-tile">
+        <div class="desktop-stat-num">12</div>
+        <div class="desktop-stat-label">Campus Kiosks</div>
+      </div>
+      <div class="desktop-stat-tile">
+        <div class="desktop-stat-num">99%</div>
+        <div class="desktop-stat-label">Kiosk Uptime</div>
+      </div>
+    </div>
+
+    <div class="desktop-feature-grid">
+      <div class="desktop-feature-tile">
+        <div class="desktop-tile-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
+            <path d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="desktop-tile-text">
+          <h4>Cloud Ready</h4>
+          <p>Upload from Google Drive, WhatsApp, or your local device.</p>
+        </div>
+      </div>
+      <div class="desktop-feature-tile">
+        <div class="desktop-tile-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
+            <path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="desktop-tile-text">
+          <h4>Complete Privacy</h4>
+          <p>Files are permanently deleted right after printing.</p>
+        </div>
+      </div>
+      <div class="desktop-feature-tile">
+        <div class="desktop-tile-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
+            <path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="desktop-tile-text">
+          <h4>UPI &amp; Cards</h4>
+          <p>Pay via any UPI app, debit/credit card, or net banking.</p>
+        </div>
+      </div>
+      <div class="desktop-feature-tile">
+        <div class="desktop-tile-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
+            <path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="desktop-tile-text">
+          <h4>Always Available</h4>
+          <p>Kiosks run 24/7 — print even on weekends or late nights.</p>
+        </div>
+      </div>
+      <div class="desktop-feature-tile">
+        <div class="desktop-tile-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
+            <path d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="desktop-tile-text">
+          <h4>B&amp;W at ₹2.30/page</h4>
+          <p>Affordable, transparent pricing with zero hidden fees.</p>
+        </div>
+      </div>
+      <div class="desktop-feature-tile">
+        <div class="desktop-tile-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#7C3AED;">
+            <path d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.813-3.814a1.151 1.151 0 00-1.627-1.628l-3.814 3.813a15.995 15.995 0 00-4.648 4.764m3.42 3.42a15.994 15.994 0 01-3.395 1.622m-3.395 1.622a15.995 15.995 0 004.648 4.764l3.814 3.813a1.151 1.151 0 001.628-1.628l-3.813-3.814a15.995 15.995 0 00-4.764-4.648z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="desktop-tile-text">
+          <h4>Color at ₹10/page</h4>
+          <p>Vibrant color prints for presentations and assignments.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /desktop-panel -->
+
+</div><!-- /page-wrap -->
+
+<script>
+  /* ── Scroll Reveal ── */
+  const reveals = document.querySelectorAll('.reveal');
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  reveals.forEach(el => revealObserver.observe(el));
+
+  /* ── Counter Animation ── */
+  const counters = document.querySelectorAll('[data-target]');
+  const counterObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        const target = +el.dataset.target;
+        const suffix = target >= 1000 ? '+' : '+';
+        const duration = 1500;
+        const step = target / (duration / 16);
+        let current = 0;
+        const tick = () => {
+          current = Math.min(current + step, target);
+          el.textContent = (target >= 1000
+            ? Math.floor(current / 100) * 100
+            : Math.floor(current)) + suffix;
+          if (current < target) requestAnimationFrame(tick);
+          else el.textContent = (target >= 1000 ? target.toLocaleString() : target) + suffix;
+        };
+        tick();
+        counterObserver.unobserve(el);
+      }
+    });
+  }, { threshold: 0.5 });
+  counters.forEach(el => counterObserver.observe(el));
+
+  /* ── FAQ Toggle ── */
+  function toggleFaq(id) {
+    const item = document.getElementById(id);
+    const answer = document.getElementById(id + '-answer');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(el => {
+      el.classList.remove('open');
+      el.querySelector('.faq-answer').classList.remove('open');
+    });
+    if (!isOpen) {
+      item.classList.add('open');
+      answer.classList.add('open');
+    }
+  }
+</script>
+</body>
+</html>
