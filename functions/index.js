@@ -1871,25 +1871,26 @@ app.post("/kiosk/print", async (req, res) => {
     if (!printCode) return res.status(400).json({ error: "Print code required" });
     const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).where("status", "==", "paid").get();
     if (snapshot.empty) return res.status(400).json({ error: "No paid job found for this code" });
+    
     const jobDoc = snapshot.docs[0];
     const jobData = jobDoc.data();
+    
     if (jobData.kioskId && jobData.kioskId !== kioskId) {
       console.warn(`Kiosk mismatch: job assigned to ${jobData.kioskId}, requested from ${kioskId}`);
     }
-    await jobDoc.ref.update({ status: "printing", printStartedAt: admin.firestore.FieldValue.serverTimestamp(), kioskId });
-    try {
-      const { fileUrl, copies = 1 } = jobData;
-      const targetPiUrl = process.env.PI_BASE_URL || "https://splashed-giddily-populace.ngrok-free.dev";
-      const targetPrinter = process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
-      if (!fileUrl) throw new Error("Job missing fileUrl");
-      await triggerPiPrint(fileUrl, copies, targetPiUrl, targetPrinter);
-      await jobDoc.ref.update({ status: "completed", isPrinted: true, completedAt: admin.firestore.FieldValue.serverTimestamp() });
-      return res.json({ success: true, message: "Print triggered successfully", job: jobData });
-    } catch (piErr) {
-      console.error("❌ PI PRINT ERROR:", piErr.message);
-      await jobDoc.ref.update({ status: "failed", error: piErr.message });
-      return res.status(500).json({ error: "Failed to trigger printer", details: piErr.message });
-    }
+    
+    // Set status to printing so the Pi's firebase_listener.py picks it up
+    await jobDoc.ref.update({ 
+      status: "printing", 
+      printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
+      kioskId 
+    });
+
+    // PULL ARCHITECTURE: We just return success immediately.
+    // The Pi's mimo-listener.service will poll this document, download the PDF, and print it.
+    // The Kiosk UI will poll /kiosk/job-status until the Pi updates it to 'completed'.
+    return res.json({ success: true, message: "Print job enqueued successfully", job: jobData });
+    
   } catch (err) {
     console.error("❌ KIOSK PRINT ERROR:", err);
     res.status(500).json({ error: "Server error" });
