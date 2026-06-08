@@ -1875,15 +1875,19 @@ app.post("/kiosk/print", async (req, res) => {
     const jobDoc = snapshot.docs[0];
     const jobData = jobDoc.data();
     
-    if (jobData.kioskId && jobData.kioskId !== kioskId) {
-      console.warn(`Kiosk mismatch: job assigned to ${jobData.kioskId}, requested from ${kioskId}`);
+    let finalKioskId = kioskId;
+    if (jobData.kioskId) {
+      if (jobData.kioskId !== kioskId) {
+        console.warn(`Kiosk mismatch: job assigned to ${jobData.kioskId}, requested from ${kioskId}`);
+      }
+      finalKioskId = jobData.kioskId; // Prioritize the user's choice from the front end
     }
     
     // Set status to printing so the Pi's firebase_listener.py picks it up
     await jobDoc.ref.update({ 
       status: "printing", 
       printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
-      kioskId 
+      kioskId: finalKioskId 
     });
 
     // PULL ARCHITECTURE: We just return success immediately.
