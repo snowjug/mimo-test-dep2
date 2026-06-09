@@ -130,7 +130,7 @@ def process_image_custom(input_path, scale_pct):
         print(f"❌ Image custom scale processing failed: {e}")
         return None
 
-def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single"):
+def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
     try:
         file_size = os.path.getsize(file_path)
         if file_size < 100:
@@ -154,8 +154,10 @@ def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAM
         if double_sided == "double":
             cmd.extend(["-o", "sides=two-sided-long-edge"])
         
-        # Enforce exact 100% scale so graph paper and A4 sheets aren't zoomed in by CUPS auto-scaling
-        cmd.extend(["-o", "print-scaling=none"])
+        # Enforce exact 100% scale ONLY for graph paper / blank sheets so grid lines don't distort.
+        # User documents must be allowed to scale to support N-up layouts (4-per-page) and hardware margins.
+        if is_blank_sheet:
+            cmd.extend(["-o", "print-scaling=none"])
         
         cmd.append(file_path)
         
@@ -223,6 +225,7 @@ def process_job(doc_snapshot):
     custom_scale = int(print_options.get("customScale", 100))
     photo_layout = print_options.get("photoLayout")
     double_sided = print_options.get("doubleSided", "single")
+    is_blank_sheet = print_options.get("isBlankSheet", False)
     page_selection = print_options.get("pageSelection") or print_options.get("pagesToPrint") or "all"
     page_range = None
     if page_selection == "custom":
@@ -261,7 +264,7 @@ def process_job(doc_snapshot):
                 doc_ref.update({"status": "failed", "printerStatus": "LibreOffice conversion failed"})
                 return
 
-        success = print_file(final_path, copies, page_range, target_printer, photo_layout, double_sided)
+        success = print_file(final_path, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
         
         if success:
             doc_ref.update({
