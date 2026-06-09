@@ -130,21 +130,22 @@ def process_image_custom(input_path, scale_pct):
         print(f"❌ Image custom scale processing failed: {e}")
         return None
 
-def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
+def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
     try:
-        file_size = os.path.getsize(file_path)
-        if file_size < 100:
-            print(f"❌ File too small ({file_size} bytes)")
+        total_size = sum(os.path.getsize(p) for p in file_paths)
+        if total_size < 100:
+            print("❌ Invalid file(s) size")
             return False
 
-        if file_path.endswith('.pdf'):
-            with open(file_path, 'rb') as f:
-                header = f.read(8)
-            if not header.startswith(b'%PDF'):
-                print(f"❌ File not a valid PDF")
-                return False
+        for file_path in file_paths:
+            if file_path.endswith('.pdf'):
+                with open(file_path, 'rb') as f:
+                    header = f.read(8)
+                if not header.startswith(b'%PDF'):
+                    print(f"❌ File not a valid PDF")
+                    return False
 
-        print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_path} ({copies} copies, pages: {page_range or 'all'})")
+        print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_paths} ({copies} copies, pages: {page_range or 'all'})")
         cmd = ["lp", "-d", printer_name, "-n", str(copies)]
         if page_range:
             cmd.extend(["-P", str(page_range)])
@@ -159,7 +160,7 @@ def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAM
         if is_blank_sheet:
             cmd.extend(["-o", "print-scaling=none"])
         
-        cmd.append(file_path)
+        cmd.extend(file_paths)
         
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
         lp_output = result.stdout.strip()
@@ -231,40 +232,47 @@ def process_job(doc_snapshot):
     if page_selection == "custom":
         page_range = print_options.get("pageRange") or print_options.get("customPageRange")
     
-    local_path = None
-    final_path = None
+    files = doc.get("files")
+    if not files:
+        files = [{"url": file_url, "name": file_name, "type": doc.get("mimetype")}]
+        
+    local_paths = []
+    final_paths = []
 
     # Dynamic Printer Selection
     target_printer = COLOR_PRINTER_NAME if color_mode.lower() == "color" else BW_PRINTER_NAME
 
     try:
-        local_path = download_file(file_url, file_name)
-        if not local_path:
-            doc_ref.update({"status": "failed", "printerStatus": "Failed to download on Pi"})
-            return
-
-        final_path = local_path
-        ext = os.path.splitext(local_path)[1].lower()
-        
-        if ext in [".jpg", ".jpeg", ".png"]:
-            if image_scaling == "fill":
-                pdf_path = process_image_fill(local_path)
-                if pdf_path:
-                    final_path = pdf_path
-            elif image_scaling == "custom":
-                pdf_path = process_image_custom(local_path, custom_scale)
-                if pdf_path:
-                    final_path = pdf_path
-                
-        elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
-            pdf_path = convert_to_pdf(local_path)
-            if pdf_path:
-                final_path = pdf_path
-            else:
-                doc_ref.update({"status": "failed", "printerStatus": "LibreOffice conversion failed"})
+        for f in files:
+            f_url = f.get("url")
+            f_name = f.get("name", "document.pdf")
+            l_path = download_file(f_url, f_name)
+            if not l_path:
+                doc_ref.update({"status": "failed", "printerStatus": f"Failed to download {f_name}"})
                 return
+            local_paths.append(l_path)
+            
+            f_final = l_path
+            ext = os.path.splitext(l_path)[1].lower()
+            
+            if ext in [".jpg", ".jpeg", ".png"]:
+                if image_scaling == "fill":
+                    pdf_path = process_image_fill(l_path)
+                    if pdf_path: f_final = pdf_path
+                elif image_scaling == "custom":
+                    pdf_path = process_image_custom(l_path, custom_scale)
+                    if pdf_path: f_final = pdf_path
+                    
+            elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
+                pdf_path = convert_to_pdf(l_path)
+                if pdf_path: f_final = pdf_path
+                else:
+                    doc_ref.update({"status": "failed", "printerStatus": f"LibreOffice failed for {f_name}"})
+                    return
+            
+            final_paths.append(f_final)
 
-        success = print_file(final_path, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
+        success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
         
         if success:
             doc_ref.update({
@@ -282,10 +290,10 @@ def process_job(doc_snapshot):
         doc_ref.update({"status": "failed", "printerStatus": f"Pi processing error: {str(e)[:50]}"})
     finally:
         try:
-            if local_path and os.path.exists(local_path):
-                os.remove(local_path)
-            if final_path and final_path != local_path and os.path.exists(final_path):
-                os.remove(final_path)
+            for lp in local_paths:
+                if lp and os.path.exists(lp): os.remove(lp)
+            for fp in final_paths:
+                if fp and fp not in local_paths and os.path.exists(fp): os.remove(fp)
         except Exception as e:
             print(f"⚠️ Cleanup failed: {e}")
 
