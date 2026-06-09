@@ -291,8 +291,33 @@ def process_job(doc_snapshot):
             
             final_paths.append(f_final)
 
+        # Ensure all files are PDFs before merging
+        pdf_paths = []
+        for fp in final_paths:
+            if fp.lower().endswith(('.jpg', '.jpeg', '.png')):
+                pdf_fp = fp + ".pdf"
+                try:
+                    from PIL import Image
+                    with Image.open(fp) as img:
+                        img.convert("RGB").save(pdf_fp)
+                    pdf_paths.append(pdf_fp)
+                except Exception as e:
+                    print(f"❌ Failed to wrap image in PDF: {e}")
+                    pdf_paths.append(fp)
+            else:
+                pdf_paths.append(fp)
 
-
+        # Merge PDFs if doing an N-up layout, because CUPS number-up 
+        # only groups pages of a SINGLE document natively.
+        if photo_layout and str(photo_layout) in ["2", "4", "6", "9"] and len(pdf_paths) > 1:
+            print(f"🖼️ Merging {len(pdf_paths)} pages into a single PDF for {photo_layout}-per-page layout...")
+            merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
+            try:
+                subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
+                final_paths = [merged_pdf]
+                print(f"✅ Successfully merged PDFs with Ghostscript into {merged_pdf}")
+            except Exception as merge_err:
+                print(f"❌ Failed to merge PDFs with Ghostscript: {merge_err}")
         # Correct stale queue names on Kiosk 1 to point to the active USB interface
         if target_printer == "Brother_HL_L5210DN_series":
             target_printer = "Brother_HL_L5210DN_series_USB"
