@@ -291,20 +291,7 @@ def process_job(doc_snapshot):
             
             final_paths.append(f_final)
 
-        # Merge images into a single PDF if doing an N-up layout, because CUPS number-up 
-        # only groups pages of a SINGLE document, not separate files.
-        if photo_layout and str(photo_layout) in ["2", "4", "6", "9"] and len(final_paths) > 1:
-            print(f"🖼️ Merging {len(final_paths)} images into a single PDF for {photo_layout}-per-page layout...")
-            merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
-            try:
-                subprocess.run(["convert"] + final_paths + [merged_pdf], check=True, timeout=45)
-                # Cleanup the individual files since they are merged
-                for fp in final_paths:
-                    if os.path.exists(fp): os.remove(fp)
-                final_paths = [merged_pdf]
-                print(f"✅ Successfully merged images into {merged_pdf}")
-            except Exception as merge_err:
-                print(f"❌ Failed to merge images with ImageMagick: {merge_err}")
+
 
         # Correct stale queue names on Kiosk 1 to point to the active USB interface
         if target_printer == "Brother_HL_L5210DN_series":
