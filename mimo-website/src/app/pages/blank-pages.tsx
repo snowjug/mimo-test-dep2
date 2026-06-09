@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { MimoHeader } from "../components/mimo-header";
-import { ArrowLeft, Minus, Plus, FileText, Grid3X3, Loader2 } from "lucide-react";
+import { ArrowLeft, Minus, Plus, FileText, Grid3X3, Loader2, MapPin, Printer, Check } from "lucide-react";
 import api from "../api";
 
 export function BlankPages() {
@@ -12,6 +12,7 @@ export function BlankPages() {
   const [searchParams] = useSearchParams();
   const type = searchParams.get("type") || "a4"; // "a4" or "graph"
   const [pageCount, setPageCount] = useState(1);
+  const [directKioskId, setDirectKioskId] = useState<string | null>("CV-001");
 
   const isGraph = type === "graph";
   const label = isGraph ? "Mimo Graph Sheet" : "A4 Blank Sheet";
@@ -51,6 +52,7 @@ export function BlankPages() {
           totalCost,
           isBlankSheet: true,
           sheetType: type,
+          directKioskId: directKioskId?.startsWith("SV-002") ? "SV-002" : directKioskId,
         })
       );
 
@@ -150,6 +152,100 @@ export function BlankPages() {
                       ? "Standard graph paper with grid lines"
                       : "Plain white A4 sheet"}
                   </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Print Destination Selection */}
+          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
+            <CardHeader className="px-4 pt-4 pb-2 flex flex-row items-start gap-3 space-y-0">
+              <div className="p-2 bg-blue-50/80 rounded-xl shrink-0">
+                <MapPin className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <CardTitle className="text-lg font-extrabold text-slate-900">
+                  Print Destination
+                </CardTitle>
+                <CardDescription className="text-sm font-medium text-slate-500">
+                  Where do you want to print this?
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-3">
+              <div 
+                onClick={() => setDirectKioskId("CV-001")}
+                className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
+                  directKioskId === 'CV-001' 
+                    ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]' 
+                    : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+                } active:scale-[0.99]`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-xl transition-all duration-300 ${
+                    directKioskId === 'CV-001' ? 'bg-[#093765] text-white shadow-sm scale-105' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
+                  }`}>
+                    <Printer className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
+                      directKioskId === 'CV-001' ? 'text-[#093765]' : 'text-slate-700'
+                    }`}>
+                      KIOSK-001-CV 
+                      <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
+                        B&W
+                      </Badge>
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at C.V Raman Block in Black & White.</p>
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
+                  directKioskId === 'CV-001' 
+                    ? 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs' 
+                    : 'border-slate-200 bg-transparent'
+                }`}>
+                  {directKioskId === 'CV-001' && <Check className="w-3 h-3" strokeWidth={3} />}
+                </div>
+              </div>
+
+              <div 
+                onClick={() => setDirectKioskId("SV-002")}
+                className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
+                  directKioskId === 'SV-002' 
+                    ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]'
+                    : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+                } active:scale-[0.99]`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-xl transition-all duration-300 ${
+                    directKioskId === 'SV-002' 
+                      ? 'bg-[#093765] text-white shadow-sm scale-105'
+                      : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
+                  }`}>
+                    <Printer className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
+                      directKioskId === 'SV-002' 
+                        ? 'text-[#093765]' 
+                        : 'text-slate-700'
+                    }`}>
+                      KIOSK-002-SV 
+                      <span className="flex gap-1">
+                        <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
+                          B&W
+                        </Badge>
+                      </span>
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at Swami Vivekananda Block in B&W.</p>
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
+                  directKioskId === 'SV-002' 
+                    ? 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs' 
+                    : 'border-slate-200 bg-transparent'
+                }`}>
+                  {directKioskId === 'SV-002' && <Check className="w-3 h-3" strokeWidth={3} />}
                 </div>
               </div>
             </CardContent>
