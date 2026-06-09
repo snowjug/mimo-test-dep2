@@ -130,7 +130,7 @@ def process_image_custom(input_path, scale_pct):
         print(f"❌ Image custom scale processing failed: {e}")
         return None
 
-def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None):
+def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single"):
     try:
         file_size = os.path.getsize(file_path)
         if file_size < 100:
@@ -150,6 +150,9 @@ def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAM
             cmd.extend(["-P", str(page_range)])
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             cmd.extend(["-o", f"number-up={photo_layout}"])
+            
+        if double_sided == "double":
+            cmd.extend(["-o", "sides=two-sided-long-edge"])
         
         # Enforce exact 100% scale so graph paper and A4 sheets aren't zoomed in by CUPS auto-scaling
         cmd.extend(["-o", "print-scaling=none"])
@@ -219,6 +222,7 @@ def process_job(doc_snapshot):
     image_scaling = print_options.get("imageScaling", "fit")
     custom_scale = int(print_options.get("customScale", 100))
     photo_layout = print_options.get("photoLayout")
+    double_sided = print_options.get("doubleSided", "single")
     page_selection = print_options.get("pageSelection") or print_options.get("pagesToPrint") or "all"
     page_range = None
     if page_selection == "custom":
@@ -257,7 +261,7 @@ def process_job(doc_snapshot):
                 doc_ref.update({"status": "failed", "printerStatus": "LibreOffice conversion failed"})
                 return
 
-        success = print_file(final_path, copies, page_range, target_printer, photo_layout)
+        success = print_file(final_path, copies, page_range, target_printer, photo_layout, double_sided)
         
         if success:
             doc_ref.update({

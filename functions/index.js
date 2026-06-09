@@ -520,7 +520,7 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
       createdAt: now,
       updatedAt: now,
       status: "pending",
-      pageCount: Number(pageCount) || 1,
+      pageCount: 1, // The physical PDF template is exactly 1 page. The quantity is controlled purely by 'copies'.
       files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
       printOptions: { copies: Number(pageCount) || 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
       pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
@@ -621,7 +621,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     let totalPages = 0;
     const jobIds = [];
 
-    const isBlankSheet = printOptions?.blankSheet === true;
+    const isBlankSheet = printOptions?.isBlankSheet === true || printOptions?.blankSheet === true;
     const sheetType = printOptions?.sheetType || "a4";
     const colorMode = printOptions?.colorMode || "bw";
     
