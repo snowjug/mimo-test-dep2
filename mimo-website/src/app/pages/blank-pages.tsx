@@ -42,7 +42,7 @@ export function BlankPages() {
       sessionStorage.setItem(
         "printOptions",
         JSON.stringify({
-          copies: 1,
+          copies: pageCount,
           colorMode: "bw",
           doubleSided: "single",
           pageSelection: "all",
