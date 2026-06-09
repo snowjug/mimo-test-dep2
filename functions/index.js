@@ -772,6 +772,189 @@ app.post("/create-order", authMiddleware, async (req, res) => {
   }
 });
 
+
+// ================= VERIFY PAYMENT =================
+app.get("/verify-payment/:orderId", async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    let cashfreeStatus = null;
+    try {
+      const cfRes = await axios.get(`${CASHFREE_BASE_URL}/orders/${orderId}`, { headers: cashfreeHeaders, timeout: 10000 });
+      cashfreeStatus = cfRes.data.order_status;
+      console.log(`[VERIFY-PAYMENT] Cashfree status for ${orderId}: ${cashfreeStatus}`);
+    } catch (cfErr) {
+      console.warn("[VERIFY-PAYMENT] Cashfree API failed, falling back to Firestore:", cfErr.message);
+    }
+
+    let orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+    if (orderSnapshot.empty) {
+      orderSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+    }
+    let userId = null;
+    let order_status = cashfreeStatus || "CREATED";
+
+    if (!orderSnapshot.empty) {
+      const orderDoc = orderSnapshot.docs[0];
+      userId = orderDoc.data().userId;
+      if (cashfreeStatus === "PAID") {
+        await orderDoc.ref.update({ status: "PAID" });
+      } else if (!cashfreeStatus) {
+        order_status = orderDoc.data().status;
+      }
+    }
+
+    let printCode = null;
+    let directKioskId = null;
+
+    if (order_status === "PAID" && userId) {
+      try {
+        const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+        const internalRes = await axios.post(
+          `http://localhost:${process.env.PORT || 8080}/payment-success`,
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { headers: { Authorization: `Bearer ${dummyToken}` } }
+        );
+        printCode = internalRes.data.printCode;
+        directKioskId = internalRes.data.directKioskId;
+      } catch (internalErr) {
+        console.error("[VERIFY-PAYMENT] Internal /payment-success failed:", internalErr.response?.data || internalErr.message);
+      }
+    }
+
+    res.json({ order_status, printCode, directKioskId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Verification failed");
+  }
+});
+
+
+// ================= CASHFREE WEBHOOK =================
+app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  try {
+    let event;
+    if (Buffer.isBuffer(req.body)) {
+      const rawBody = req.body.toString("utf8");
+      const receivedSignature = req.headers["x-webhook-signature"];
+      const timestamp = req.headers["x-webhook-timestamp"];
+
+      if (receivedSignature && timestamp) {
+        const signedPayload = timestamp + rawBody;
+        const expectedSignature = crypto
+          .createHmac("sha256", process.env.CASHFREE_SECRET_KEY)
+          .update(signedPayload)
+          .digest("base64");
+        if (receivedSignature !== expectedSignature) {
+          console.warn("Webhook signature mismatch");
+          return res.status(403).send("Invalid signature");
+        }
+      }
+      event = JSON.parse(rawBody);
+    } else {
+      // Body already parsed by express.json()
+      event = req.body;
+    }
+
+    if (event.type === "PAYMENT_SUCCESS_WEBHOOK") {
+      const orderId = event.data.order.order_id;
+      const userId = event.data.customer_details.customer_id;
+      const paidAmount = event.data.order.order_amount;
+      const now = admin.firestore.FieldValue.serverTimestamp();
+
+      // Update Orders (V1 + V2 Schema)
+      let orders = await db.collection("orders").where("orderId", "==", orderId).get();
+      if (orders.empty) {
+        orders = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      }
+      const orderBatch = db.batch();
+      orders.forEach((doc) => {
+        orderBatch.update(doc.ref, { 
+          status: "PAID",
+          orderStatus: "completed",
+          "paymentDetails.paymentStatus": "completed",
+          "paymentDetails.paidAt": now
+        });
+      });
+      await orderBatch.commit();
+
+      // Update Print Jobs (V1 + V2 Schema)
+      const jobs = await db
+        .collection("print_jobs")
+        .where("userId", "==", userId)
+        .where("status", "==", "pending")
+        .get();
+        
+      const jobsBatch = db.batch();
+      let newTotalPages = 0;
+      
+      jobs.forEach((doc) => {
+        const pages = doc.data().pageCount || 0;
+        newTotalPages += pages;
+        jobsBatch.update(doc.ref, { 
+          status: "paid",
+          "paymentStatus.status": "completed",
+          "paymentStatus.paidAt": now,
+          paymentTime: now
+        });
+      });
+      await jobsBatch.commit();
+      
+      // ✅ Call /payment-success internally to generate the print code
+      try {
+        const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+        await axios.post(
+          `http://localhost:${process.env.PORT || 8080}/payment-success`,
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { headers: { Authorization: `Bearer ${dummyToken}` } }
+        );
+      } catch (internalErr) {
+        console.error("[WEBHOOK] Failed to call internal /payment-success:", internalErr.message);
+      }
+      
+      // Update User Statistics (V2 Schema)
+      const userRef = db.collection("users").doc(userId);
+      await userRef.update({
+        totalSpent: admin.firestore.FieldValue.increment(paidAmount),
+        totalPagesPrinted: admin.firestore.FieldValue.increment(newTotalPages)
+      });
+      
+      // Update Payment Transactions Audit (V2 Schema)
+      const txnSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      if (!txnSnapshot.empty) {
+        const paymentData = event.data.payment || {};
+        await txnSnapshot.docs[0].ref.update({
+          "transactionStatus.status": "completed",
+          "transactionStatus.gatewayStatus": paymentData.payment_status || "SUCCESS",
+          "transactionStatus.completedAt": now,
+          cashfreePaymentId: paymentData.cf_payment_id || null,
+          paymentMethod: paymentData.payment_group || "unknown",
+          paymentCurrency: paymentData.payment_currency || "INR",
+          paymentMessage: paymentData.payment_message || "Success",
+          paymentTime: paymentData.payment_time || now
+        });
+      }
+
+      // ✅ Update Global Admin Metrics ONLY on Real Payments
+      const dateString = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const metricsRef = db.collection("system").doc("metrics");
+      await metricsRef.set({
+        totalRevenue: admin.firestore.FieldValue.increment(paidAmount),
+        totalOrders: admin.firestore.FieldValue.increment(1),
+        totalPagesPrinted: admin.firestore.FieldValue.increment(newTotalPages),
+        [`dailyRevenue.${dateString}`]: admin.firestore.FieldValue.increment(paidAmount),
+        lastUpdatedAt: now
+      }, { merge: true });
+
+      res.status(200).send("Webhook received");
+    }
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
+
 // ================= CHECK JOB STATUS =================
 app.post("/check-status", async (req, res) => {
   try {
