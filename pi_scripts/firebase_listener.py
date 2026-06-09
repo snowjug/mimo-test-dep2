@@ -145,6 +145,11 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                     print(f"❌ File not a valid PDF")
                     return False
 
+        # Pre-flight check
+        status_cmd = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True)
+        if "disabled" in status_cmd.stdout.lower() or "unplugged" in status_cmd.stdout.lower():
+            raise Exception(f"Pre-flight failed: Printer {printer_name} is offline or unplugged.")
+
         print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_paths} ({copies} copies, pages: {page_range or 'all'})")
         cmd = ["lp", "-d", printer_name, "-n", str(copies)]
         if page_range:
@@ -155,8 +160,6 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         if double_sided == "double":
             cmd.extend(["-o", "sides=two-sided-long-edge"])
         
-        # Enforce exact 100% scale ONLY for graph paper / blank sheets so grid lines don't distort.
-        # User documents must be allowed to scale to support N-up layouts (4-per-page) and hardware margins.
         if is_blank_sheet:
             cmd.extend(["-o", "print-scaling=none"])
         
@@ -166,10 +169,26 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         lp_output = result.stdout.strip()
         print(f"CUPS: {lp_output}")
         
-        # FAST MODE: We do not wait for the physical printer to finish warming up and printing.
-        # As soon as it's in the CUPS queue, we tell the UI it's done so the user doesn't wait at 99%.
-        # The background watchdog thread will ensure the physical printer eventually prints it.
-        print("✅ Print job spooled successfully! Returning immediately for FAST UI response.")
+        import re
+        job_id_match = re.search(r'request id is (\S+)', lp_output)
+        if job_id_match:
+            job_id = job_id_match.group(1)
+            print(f"⏳ STRICT MODE: Validating hardware acceptance for job {job_id}...")
+            for _ in range(45):
+                time.sleep(1)
+                q_status = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True).stdout
+                if job_id not in q_status:
+                    print("✅ Job successfully passed to hardware!")
+                    return True
+                
+                p_status = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True).stdout.lower()
+                if "unplugged" in p_status or "turned off" in p_status:
+                    subprocess.run(["cancel", job_id])
+                    raise Exception("Printer hardware is unplugged or turned off.")
+                if "waiting for printer" in p_status:
+                    subprocess.run(["cancel", job_id])
+                    raise Exception("Printer hardware is unreachable (waiting for printer to become available).")
+            print("⏳ Job is large and still printing, assuming success.")
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Print failed: {e.stderr.strip() if e.stderr else str(e)}")
