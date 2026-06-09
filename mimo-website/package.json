@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && cd mimo-admin-dashboard && npm install && npm run build && npx -y shx cp -r dist ../dist/admin",
     "dev": "vite"
   },
   "dependencies": {
