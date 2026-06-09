@@ -150,6 +150,10 @@ def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAM
             cmd.extend(["-P", str(page_range)])
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             cmd.extend(["-o", f"number-up={photo_layout}"])
+        
+        # Enforce exact 100% scale so graph paper and A4 sheets aren't zoomed in by CUPS auto-scaling
+        cmd.extend(["-o", "print-scaling=none"])
+        
         cmd.append(file_path)
         
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
