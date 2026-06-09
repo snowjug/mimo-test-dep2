@@ -1,27 +1,31 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
-import { MimoCoinsDisplay } from "../components/mimo-coins-display";
-import { MimoHeader } from "../components/mimo-header";
-import { User, Mail, Phone, Building, Save, Printer, Bell, FileText, Gift, Copy, CheckCircle2, LogOut, ArrowLeft } from "lucide-react";
+import { User, Mail, Phone, Save, Bell, Gift, Copy, CheckCircle2, LogOut, ChevronRight, TrendingUp, TrendingDown, Clock, ShieldCheck, Printer, ArrowLeft, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 
+const NAV_ITEMS = [
+  { id: "personal", label: "Personal Info",    icon: User },
+  { id: "mimo-coins", label: "Mimo Coins",     icon: Gift },
+  { id: "activity",  label: "Print History",   icon: Printer },
+  { id: "notifications", label: "Notifications", icon: Bell },
+];
+
 export function UserProfile() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "personal";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -75,31 +79,18 @@ export function UserProfile() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setIsUploadingPhoto(true);
-
     try {
       const uniqueFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
       const storageRef = ref(storage, `profiles/${name.replace(/[^a-zA-Z0-9]/g, '_')}/${uniqueFileName}`);
-      
-      // Upload directly to Firebase Storage client-side
       const uploadTask = uploadBytesResumable(storageRef, file);
-      
       const downloadURL = await new Promise<string>((resolve, reject) => {
-        uploadTask.on(
-          "state_changed",
-          null,
-          (error) => reject(error),
-          async () => {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(url);
-          }
-        );
+        uploadTask.on("state_changed", null, (error) => reject(error), async () => {
+          const url = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(url);
+        });
       });
-
-      // Update the user's photoUrl in Firestore via /profile PUT route
       await api.put("/profile", { photoUrl: downloadURL });
-      
       setPhotoUrl(downloadURL);
       toast.success("Profile photo updated!");
     } catch (err) {
@@ -110,374 +101,415 @@ export function UserProfile() {
     }
   };
 
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 pt-0 pb-3 sm:px-6 sm:pt-0 sm:pb-6">
-      <div className="mx-auto max-w-5xl space-y-3.5 sm:space-y-4">
+    <div className="w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 px-3 pb-8 sm:px-6">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        .profile-page { font-family: 'Inter', sans-serif; }
+        .nav-item-active { background: linear-gradient(135deg, #093765 0%, #1d4ed8 100%); color: white; box-shadow: 0 4px 14px rgba(9,55,101,0.25); }
+        .nav-item-active svg { color: white !important; }
+        .coin-card { background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); }
+        .profile-hero { background: linear-gradient(135deg, #093765 0%, #1e40af 60%, #1d4ed8 100%); }
+        @keyframes float { 0%,100% { transform: translateY(0px) rotate(12deg); } 50% { transform: translateY(-8px) rotate(12deg); } }
+        .float-anim { animation: float 4s ease-in-out infinite; }
+        .glass-card { background: rgba(255,255,255,0.12); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.2); }
+      `}</style>
 
-        {/* Header */}
-        <MimoHeader />
+      <div className="profile-page mx-auto max-w-5xl">
 
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full hover:bg-white hover:shadow-sm cursor-pointer shrink-0"
+        {/* ── Page Header ── */}
+        <div className="flex items-center gap-2 pt-6 pb-6">
+          <button
             onClick={() => navigate("/upload")}
+            className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-200/40 -ml-1"
+            aria-label="Back"
           >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent">
-              Account & Settings
-            </h1>
-            <p className="text-base sm:text-lg text-slate-500">
-              Manage your profile, printing preferences, and account settings
-            </p>
-          </div>
+            <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
+          </button>
+          <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent tracking-tight leading-tight py-1">
+            Account & Settings
+          </h1>
         </div>
 
-        {/* Profile Header */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-[#093765] to-blue-600 text-white overflow-hidden relative group">
-          <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-            <Printer className="w-32 h-32 md:w-48 md:h-48 rotate-12" />
+        {/* ── Profile Hero Card ── */}
+        <div className="profile-hero rounded-2xl sm:rounded-3xl p-6 sm:p-8 mb-6 shadow-2xl shadow-blue-900/20 relative overflow-hidden">
+          {/* Floating Printer Watermark */}
+          <div className="absolute right-6 bottom-24 sm:right-12 sm:bottom-4 text-white pointer-events-none float-anim opacity-[0.12]">
+            <Printer className="w-32 h-32 sm:w-40 sm:h-40" strokeWidth={1.5} />
           </div>
-          <CardContent className="p-6 sm:p-8 relative z-10">
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8">
-              <Avatar className="w-24 h-24 sm:w-32 sm:h-32 border-4 border-white shadow-xl flex-shrink-0">
+
+          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-6 relative z-10">
+            {/* Avatar */}
+            <div className="relative group">
+              <input type="file" accept="image/*" id="photo-upload" className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
+              <Avatar className="w-24 h-24 sm:w-28 sm:h-28 border-4 border-white/30 shadow-2xl ring-4 ring-white/10 cursor-pointer" onClick={() => document.getElementById("photo-upload")?.click()}>
                 {photoUrl ? (
                   <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <AvatarFallback className="text-3xl sm:text-4xl bg-gradient-to-br from-[#093765] to-blue-600 text-white font-bold">
-                    {name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
+                  <AvatarFallback className="text-3xl sm:text-4xl font-black text-white" style={{ background: "rgba(255,255,255,0.15)" }}>
+                    {initials}
                   </AvatarFallback>
                 )}
               </Avatar>
-              
-              <div className="flex-1 flex flex-col items-center sm:items-start text-center sm:text-left mt-0 sm:mt-2">
-                <h2 className="text-2xl sm:text-3xl font-bold mb-1">{name}</h2>
-                <p className="text-blue-100/90 text-sm sm:text-base mb-4">{email}</p>
-                
 
-                <div className="relative w-full sm:w-auto">
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    id="photo-upload" 
-                    className="hidden" 
-                    onChange={handlePhotoUpload} 
-                    disabled={isUploadingPhoto}
-                  />
-                  <Button 
-                    variant="outline" 
-                    className="w-full sm:w-auto bg-white/10 hover:bg-white/20 border-white/20 text-white hover:text-white transition-all shadow-sm relative z-20"
-                    onClick={() => document.getElementById("photo-upload")?.click()}
-                    disabled={isUploadingPhoto}
-                  >
-                    {isUploadingPhoto ? (
-                      <div className="w-4 h-4 mr-2 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <User className="w-4 h-4 mr-2" />
-                    )}
-                    {isUploadingPhoto ? "Uploading..." : "Change Photo"}
-                  </Button>
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 text-center sm:text-left">
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow">{name || "—"}</h2>
+              <p className="text-blue-200 text-sm sm:text-base font-medium mt-0.5 mb-4">{email}</p>
+
+              {/* Stats row */}
+              <div className="flex flex-wrap justify-center sm:justify-start gap-3">
+                <div className="glass-card rounded-xl px-4 py-2 text-center">
+                  <div className="text-lg font-black text-white">{mimoCoinsInfo.balance}</div>
+                  <div className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">Mimo Coins</div>
+                </div>
+                <div className="glass-card rounded-xl px-4 py-2 text-center">
+                  <div className="text-lg font-black text-white">{printHistory.length}</div>
+                  <div className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">Print Jobs</div>
+                </div>
+                <div className="glass-card rounded-xl px-4 py-2 text-center">
+                  <div className="text-lg font-black text-white">₹{(mimoCoinsInfo.balance * 0.5).toFixed(0)}</div>
+                  <div className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">Coin Value</div>
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Profile Tabs */}
-            <Tabs
-          value={searchParams.get("tab") || "personal"}
-          onValueChange={(val) => setSearchParams({ tab: val })}
-          className="space-y-4 sm:space-y-6"
-        >
-          <div className="w-full">
-            <TabsList className="flex flex-wrap w-full bg-white/50 p-1 rounded-xl h-auto justify-center sm:justify-start gap-1">
-              <TabsTrigger className="flex-1 min-w-[120px] px-2 sm:px-6" value="personal">Personal Info</TabsTrigger>
-              <TabsTrigger className="flex-1 min-w-[120px] px-2 sm:px-6" value="mimo-coins">
-                <Gift className="w-4 h-4 mr-1 sm:mr-2 inline-block" />
-                Mimo Coins
-              </TabsTrigger>
-              <TabsTrigger className="flex-1 min-w-[120px] px-2 sm:px-6" value="activity">Activity</TabsTrigger>
-              <TabsTrigger className="flex-1 min-w-[120px] px-2 sm:px-6" value="notifications">Notifications</TabsTrigger>
-            </TabsList>
+        {/* ── Main Layout: Sidebar Nav + Content ── */}
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+
+          {/* Sidebar Navigation */}
+          <div className="sm:w-52 shrink-0">
+            <nav className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden p-2 flex sm:flex-col flex-row flex-wrap gap-1">
+              {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+                const isActive = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setSearchParams({ tab: id })}
+                    className={`flex items-center justify-center sm:justify-start gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer flex-1 sm:flex-none w-auto sm:w-full text-center sm:text-left
+                      ${isActive
+                        ? "nav-item-active"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      }`}
+                  >
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} strokeWidth={isActive ? 2.5 : 2} />
+                    <span className="hidden sm:inline">{label}</span>
+                    {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto hidden sm:block" strokeWidth={2.5} />}
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Log Out (desktop sidebar) */}
+            <button
+              onClick={() => {
+                localStorage.removeItem("mimo_user_name");
+                localStorage.removeItem("jwtToken");
+                sessionStorage.removeItem("jwtToken");
+                localStorage.removeItem("isAuthenticated");
+                navigate("/login");
+              }}
+              className="hidden sm:flex mt-3 w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-600 transition-all duration-200 cursor-pointer border border-red-100 bg-white shadow-sm"
+            >
+              <LogOut className="w-4 h-4 shrink-0" strokeWidth={2} />
+              Log Out
+            </button>
           </div>
 
-          {/* Personal Information */}
-          <TabsContent value="personal">
-            <Card className="border-0 shadow-md bg-white/80">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>Update your personal details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 w-4 h-4 text-indigo-400" />
-                      <Input
-                        id="name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="pl-10 bg-gray-50 border-gray-200"
-                      />
+          {/* Tab Content */}
+          <div className="flex-1 min-w-0">
+
+            {/* ─ Personal Info ─ */}
+            {activeTab === "personal" && (
+              <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl">
+                <CardContent className="p-4 sm:p-6">
+                  <h2 className="text-lg font-bold text-slate-900 mb-3 leading-tight">Personal Information</h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                        <Input
+                          id="name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="pl-10 pr-10 bg-gray-50 border-gray-200"
+                        />
+                        <Pencil className="absolute right-3 top-3 w-4 h-4 text-slate-400/70 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email Address</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                        <Input
+                          id="email"
+                          type="email"
+                          value={email}
+                          readOnly
+                          className="pl-10 bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-400">Email cannot be changed</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                        <Input
+                          id="phone"
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="pl-10 pr-10 bg-gray-50 border-gray-200"
+                        />
+                        <Pencil className="absolute right-3 top-3 w-4 h-4 text-slate-400/70 pointer-events-none" />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 w-4 h-4 text-indigo-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 bg-gray-50 border-gray-200"
-                      />
+                  <div className="flex flex-col sm:flex-row gap-3 mt-5">
+                    <Button onClick={handleSaveProfile} className="flex-1 bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg shadow-blue-900/20 rounded-xl transition-all duration-200">
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </Button>
+                    <Button variant="outline" className="sm:hidden flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-all shadow-sm rounded-xl"
+                      onClick={() => {
+                        localStorage.removeItem("mimo_user_name");
+                        localStorage.removeItem("jwtToken");
+                        sessionStorage.removeItem("jwtToken");
+                        localStorage.removeItem("isAuthenticated");
+                        navigate("/login");
+                      }}>
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Log Out
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ─ Mimo Coins ─ */}
+            {activeTab === "mimo-coins" && (
+              <div className="space-y-4">
+                {/* Balance Hero */}
+                <div className="coin-card rounded-2xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl shadow-violet-900/20">
+                  <div className="absolute -top-10 -right-10 w-44 h-44 bg-white/5 rounded-full pointer-events-none" />
+                  <div className="relative z-10 flex flex-col sm:flex-row items-center gap-6">
+                    <div className="w-20 h-20 bg-white/15 rounded-2xl flex items-center justify-center shrink-0 border border-white/20">
+                      <Gift className="w-10 h-10 text-white" />
+                    </div>
+                    <div className="text-center sm:text-left">
+                      <p className="text-purple-200 text-sm font-semibold uppercase tracking-widest mb-1">Current Balance</p>
+                      <h2 className="text-5xl font-black tracking-tight">{mimoCoinsInfo.balance}</h2>
+                      <p className="text-purple-200 text-sm mt-1 font-medium">≈ ₹{(mimoCoinsInfo.balance * 0.5).toFixed(2)} in discounts</p>
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 w-4 h-4 text-indigo-400" />
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="pl-10 bg-gray-50 border-gray-200"
-                      />
-                    </div>
-                  </div>
-
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                  <Button onClick={handleSaveProfile} className="flex-1 bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg shadow-blue-900/20 transition-all duration-200">
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </Button>
-                  <Button variant="outline" onClick={() => {
-                    localStorage.removeItem("mimo_user_name");
-                    localStorage.removeItem("jwtToken");
-                    sessionStorage.removeItem("jwtToken");
-                    localStorage.removeItem("isAuthenticated");
-                    navigate("/login");
-                  }} className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-all shadow-sm">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Log Out
-                  </Button>
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Card className="border-0 shadow-sm bg-white rounded-2xl">
+                    <CardContent className="p-5 flex items-center gap-4">
+                      <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                        <TrendingUp className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-black text-emerald-600">{mimoCoinsInfo.totalEarned}</div>
+                        <div className="text-xs text-slate-500 font-medium">Total Earned</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-sm bg-white rounded-2xl">
+                    <CardContent className="p-5 flex items-center gap-4">
+                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+                        <TrendingDown className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-black text-blue-600">{mimoCoinsInfo.totalUsed}</div>
+                        <div className="text-xs text-slate-500 font-medium">Total Used</div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          {/* Activity Log */}
-          <TabsContent value="activity">
-            <Card className="border-0 shadow-md bg-white/80">
-              <CardHeader>
-                <CardTitle>Print History</CardTitle>
-                <CardDescription>View details and costs of your past print jobs</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {printHistory.map((job) => (
-                    <div key={job.id} className="bg-white border border-slate-200 rounded-xl p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center gap-3">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                          <div className="flex items-center text-blue-600 bg-blue-50 border border-blue-200 rounded-md px-2 py-0.5 text-xs font-mono font-medium tracking-tight">
-                            Mimo Code: {job.printCode || "----"}
-                            <Copy className="w-3.5 h-3.5 ml-2 cursor-pointer opacity-70 hover:opacity-100" />
+                {/* How to Earn */}
+                <Card className="border-0 shadow-sm bg-white rounded-2xl">
+                  <div className="px-6 pt-5 pb-0 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-900 text-sm pb-1">How to Earn Mimo Coins</h3>
+                  </div>
+                  <CardContent className="p-5 pt-0 -mt-2.5 space-y-3">
+                    {[
+                      { label: "Earn 1 coin for any print job above", highlight: "₹10" },
+                      { label: "Use coins for up to", highlight: "50% discount" },
+                      { label: "1 coin", highlight: "= ₹0.5 discount" },
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
+                          <span className="text-[10px] font-black text-violet-700">{i + 1}</span>
+                        </div>
+                        <p className="text-sm text-slate-700 font-medium">{item.label} <span className="font-black text-violet-700">{item.highlight}</span></p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* History */}
+                <Card className="border-0 shadow-sm bg-white rounded-2xl overflow-hidden">
+                  <div className="px-6 pt-5 pb-3 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-900 text-sm">Transaction History</h3>
+                  </div>
+                  <CardContent className="p-0">
+                    {mimoCoinsInfo.history.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Gift className="w-12 h-12 mx-auto text-slate-200 mb-3" />
+                        <p className="text-sm text-slate-400 font-medium">No transactions yet</p>
+                        <p className="text-xs text-slate-300 mt-1">Start printing to earn coins!</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+                            <TableHead className="text-xs font-bold text-slate-500 uppercase tracking-wider">Transaction</TableHead>
+                            <TableHead className="text-xs font-bold text-slate-500 uppercase tracking-wider">Date</TableHead>
+                            <TableHead className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {mimoCoinsInfo.history.map((record: any) => (
+                            <TableRow key={record.id} className="hover:bg-slate-50/60">
+                              <TableCell>
+                                <div className="font-semibold text-sm text-slate-900">{record.description}</div>
+                                <div className="text-xs text-slate-400 font-mono">{record.id}</div>
+                              </TableCell>
+                              <TableCell className="text-sm text-slate-500">{record.date}</TableCell>
+                              <TableCell className={`text-right font-black text-sm ${record.type === 'earned' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                                {record.type === 'earned' ? '+' : '-'}{record.amount}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* ─ Print History ─ */}
+            {activeTab === "activity" && (
+              <Card className="border-0 shadow-sm bg-white rounded-2xl overflow-hidden">
+                <div className="px-6 pt-6 pb-0 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-slate-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">Print History</h2>
+                      <p className="text-xs text-slate-500 mt-0.5">{printHistory.length} job{printHistory.length !== 1 ? "s" : ""} total</p>
+                    </div>
+                  </div>
+                </div>
+                <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 -mt-2.5 space-y-3">
+                  {printHistory.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Printer className="w-12 h-12 mx-auto text-slate-200 mb-3" />
+                      <p className="text-sm text-slate-400 font-medium">No print jobs yet</p>
+                    </div>
+                  ) : (
+                    printHistory.map((job) => (
+                      <div key={job.id} className="border border-slate-100 rounded-xl p-4 hover:border-blue-200 hover:bg-blue-50/20 transition-all duration-200">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <div className="w-8 h-8 bg-emerald-50 rounded-full flex items-center justify-center shrink-0">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                            </div>
+                            <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-0.5 text-xs font-mono font-semibold gap-1.5">
+                              Code: {job.printCode || "----"}
+                              <Copy className="w-3 h-3 cursor-pointer hover:text-blue-900 transition-colors" />
+                            </Badge>
+                            <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                              {job.status}
+                            </Badge>
                           </div>
-                          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 rounded-full px-2.5 py-0 text-[10px] sm:text-xs">
-                            {job.status}
-                          </Badge>
+                          <span className="font-black text-base text-slate-900 shrink-0">{job.cost}</span>
                         </div>
-                        <div className="font-bold text-lg text-slate-900">
-                          {job.cost}
+                        <p className="text-sm text-slate-700 font-medium ml-10 mb-1 truncate">{job.file}</p>
+                        <div className="ml-10 flex items-center gap-3 text-xs text-slate-400 flex-wrap">
+                          <span>{job.details?.split('•')[0]?.trim() || "0 pages"}</span>
+                          <span className="w-1 h-1 rounded-full bg-slate-300" />
+                          <span>{job.details?.split('•')[1]?.trim() || "B&W"}</span>
+                          <span className="w-1 h-1 rounded-full bg-slate-300" />
+                          <span>{job.copies || 1} {job.copies === 1 ? 'copy' : 'copies'}</span>
+                          <span className="w-1 h-1 rounded-full bg-slate-300" />
+                          <span>{job.date}</span>
                         </div>
                       </div>
-                      <div className="pl-8 text-sm">
-                        <p className="text-slate-700 mb-1.5">{job.file}</p>
-                        <p className="text-slate-500 text-xs sm:text-sm mb-1.5">
-                          {job.details?.split('•')[0]?.trim() || "0 pages"} &nbsp;&nbsp; 
-                          {job.details?.split('•')[1]?.trim() || "B&W"} &nbsp;&nbsp; 
-                          {job.copies || 1} {job.copies === 1 ? 'copy' : 'copies'}
-                        </p>
-                        <p className="text-slate-400 text-xs">{job.date}</p>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ─ Notifications ─ */}
+            {activeTab === "notifications" && (
+              <Card className="border-0 shadow-sm bg-white rounded-2xl overflow-hidden">
+                <div className="px-6 pt-6 pb-0 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
+                      <Bell className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">Notification Settings</h2>
+                      <p className="text-xs text-slate-500 mt-0.5">Choose how you want to be notified</p>
+                    </div>
+                  </div>
+                </div>
+                <CardContent className="p-6 pt-0 -mt-2.5 space-y-1">
+
+                  {/* Notification Row Component */}
+                  {[
+                    { label: "Email Notifications", desc: "Receive updates and alerts via email", checked: emailNotifications, onChange: setEmailNotifications },
+                    ...(emailNotifications ? [
+                      { label: "Print Job Completed", desc: "Get notified when your print is ready", checked: printCompleteNotif, onChange: setPrintCompleteNotif },
+                    ] : []),
+                    { label: "SMS Notifications", desc: "Receive text messages for important updates", checked: smsNotifications, onChange: setSmsNotifications },
+                    { label: "Marketing Emails", desc: "Receive news and promotional offers", checked: marketingEmails, onChange: setMarketingEmails },
+                  ].map((item, i, arr) => (
+                    <div key={i}>
+                      <div className="flex items-center justify-between py-4">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
+                        </div>
+                        <Switch checked={item.checked} onCheckedChange={item.onChange} className="data-[state=checked]:bg-[#093765]" />
                       </div>
+                      {i < arr.length - 1 && <Separator className="opacity-60" />}
                     </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          {/* Mimo Coins */}
-          <TabsContent value="mimo-coins">
-            <div className="bg-[#fcfaff] rounded-xl border border-purple-50 shadow-sm p-4 sm:p-8 flex flex-col items-center w-full">
-              <div className="w-16 h-16 bg-[#f4ebff] rounded-full flex items-center justify-center mb-4">
-                <Gift className="w-8 h-8 text-purple-600" />
-              </div>
-              <h2 className="text-3xl font-bold text-purple-950 mb-1">{mimoCoinsInfo.balance} Mimo Coins</h2>
-              <p className="text-purple-700 mb-8 font-medium">Worth ₹{(mimoCoinsInfo.balance * 0.5).toFixed(2)} in discounts</p>
-
-              <div className="grid grid-cols-2 gap-4 w-full mb-6">
-                <div className="bg-white rounded-xl py-6 text-center border border-purple-100 shadow-sm">
-                  <div className="text-2xl font-bold text-green-600 mb-1">{mimoCoinsInfo.totalEarned}</div>
-                  <div className="text-sm text-slate-600">Total Coins Earned</div>
-                </div>
-                <div className="bg-white rounded-xl py-6 text-center border border-purple-100 shadow-sm">
-                  <div className="text-2xl font-bold text-blue-600 mb-1">{mimoCoinsInfo.totalUsed}</div>
-                  <div className="text-sm text-slate-600">Total Coins Used</div>
-                </div>
-              </div>
-
-              <div className="bg-[#f4ecfe] rounded-xl p-6 border border-[#eaddfc] w-full text-left">
-                <h3 className="font-semibold text-purple-950 mb-4">How to Earn Mimo Coins:</h3>
-                <ul className="space-y-3 text-purple-900 text-sm font-medium">
-                  <li className="flex items-start gap-2">
-                    <span className="shrink-0 mt-1.5 w-1 h-1 rounded-full bg-purple-600"></span>
-                    <span>Earn <strong>1 coin</strong> for any print job above <strong>₹10</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="shrink-0 mt-1.5 w-1 h-1 rounded-full bg-purple-600"></span>
-                    <span>Use coins for up to <strong>50% discount</strong> on prints</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="shrink-0 mt-1.5 w-1 h-1 rounded-full bg-purple-600"></span>
-                    <span><strong>1 coin = ₹0.5</strong> discount (2 coins = ₹1)</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <Card className="border-0 shadow-md bg-white/80 mt-6">
-              <CardHeader>
-                <CardTitle>Mimo Coins History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {mimoCoinsInfo.history.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Gift className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-                    <p>No coin history yet. Start printing to earn coins!</p>
+                  <div className="pt-4">
+                    <Button onClick={handleSaveProfile}
+                      className="w-full h-11 bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg shadow-blue-900/20 rounded-xl font-semibold transition-all duration-200 active:scale-[0.98]">
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Notification Settings
+                    </Button>
                   </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Transaction</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mimoCoinsInfo.history.map((record: any) => (
-                        <TableRow key={record.id}>
-                          <TableCell>
-                            <div className="font-medium text-sm text-gray-900">{record.description}</div>
-                            <div className="text-xs text-gray-500">{record.id}</div>
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-500">{record.date}</TableCell>
-                          <TableCell className={`text-right font-medium ${record.type === 'earned' ? 'text-green-600' : 'text-blue-600'}`}>
-                            {record.type === 'earned' ? '+' : '-'}{record.amount}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Notifications */}
-          <TabsContent value="notifications">
-            <Card className="border-0 shadow-md bg-white/80">
-              <CardHeader>
-                <CardTitle>Notification Settings</CardTitle>
-                <CardDescription>Choose how you want to be notified</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
-                    <Bell className="w-4 h-4" />
-                    Email Notifications
-                  </h4>
-
-                  <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="space-y-0.5">
-                        <Label>Enable Email Notifications</Label>
-                        <p className="text-sm text-gray-500">
-                          Receive updates via email
-                        </p>
-                      </div>
-                      <Switch
-                        checked={emailNotifications}
-                        onCheckedChange={setEmailNotifications}
-                      />
-                    </div>
-
-                    {emailNotifications && (
-                      <>
-                        <Separator />
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div className="space-y-0.5">
-                            <Label>Print Job Completed</Label>
-                            <p className="text-sm text-gray-500">
-                              Get notified when your print is ready
-                            </p>
-                          </div>
-                          <Switch
-                            checked={printCompleteNotif}
-                            onCheckedChange={setPrintCompleteNotif}
-                          />
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div className="space-y-0.5">
-                            <Label>Payment Receipts</Label>
-                            <p className="text-sm text-gray-500">
-                              Receive payment confirmations
-                            </p>
-                          </div>
-                          <Switch defaultChecked />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div className="space-y-0.5">
-                    <Label>Marketing Emails</Label>
-                    <p className="text-sm text-gray-500">
-                      Receive news and promotional offers
-                    </p>
-                  </div>
-                  <Switch
-                    checked={marketingEmails}
-                    onCheckedChange={setMarketingEmails}
-                  />
-                </div>
-
-                <Button onClick={handleSaveProfile} className="w-full bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg shadow-blue-900/20 transition-all duration-200">
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Notification Settings
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-        </Tabs>
+          </div>
+        </div>
       </div>
     </div>
   );

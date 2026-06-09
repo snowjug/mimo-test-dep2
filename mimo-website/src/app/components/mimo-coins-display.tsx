@@ -36,24 +36,12 @@ export function MimoCoinsDisplay() {
   }, []);
 
   return (
-    <>
-      {/* Desktop version */}
-      <div 
-        className="hidden sm:flex items-center gap-2 mr-4 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 rounded-full cursor-pointer transition-colors"
-        onClick={(e) => { e.stopPropagation(); navigate("/user-profile?tab=mimo-coins"); }}
-      >
-        <Gift className="w-4 h-4 text-purple-600" />
-        <span className="text-sm font-semibold text-purple-900">{mimoCoinsBalance} Coins</span>
-      </div>
-
-      {/* Mobile version (with count) */}
-      <div 
-        className="flex sm:hidden flex-shrink-0 items-center justify-center px-2 h-8 mr-1 bg-purple-50 hover:bg-purple-100 border border-purple-100 rounded-full cursor-pointer transition-colors gap-1"
-        onClick={(e) => { e.stopPropagation(); navigate("/user-profile?tab=mimo-coins"); }}
-      >
-        <Gift className="w-3 h-3 text-purple-600" />
-        <span className="text-xs font-bold text-purple-900">{mimoCoinsBalance}</span>
-      </div>
-    </>
+    <div 
+      className="flex items-center justify-center w-10 h-10 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-full cursor-pointer transition-all shrink-0 shadow-sm"
+      onClick={(e) => { e.stopPropagation(); navigate("/user-profile?tab=mimo-coins"); }}
+      title={`${mimoCoinsBalance} Mimo Coins`}
+    >
+      <Gift className="w-5 h-5 text-purple-600" />
+    </div>
   );
 }
