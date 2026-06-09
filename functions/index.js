@@ -522,7 +522,7 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
       status: "pending",
       pageCount: Number(pageCount) || 1,
       files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
-      printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
+      printOptions: { copies: Number(pageCount) || 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
       pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
       paymentStatus: { status: "pending" },
       printStatus: { status: "pending" }
