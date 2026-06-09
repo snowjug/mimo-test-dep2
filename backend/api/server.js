@@ -1428,7 +1428,10 @@ app.get("/verify-payment/:orderId", async (req, res) => {
       console.warn("[VERIFY-PAYMENT] Cashfree API failed, falling back to Firestore:", cfErr.message);
     }
 
-    const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+    let orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+    if (orderSnapshot.empty) {
+      orderSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+    }
     let userId = null;
     let order_status = cashfreeStatus || "CREATED";
 
@@ -1500,7 +1503,10 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       const now = admin.firestore.FieldValue.serverTimestamp();
 
       // Update Orders (V1 + V2 Schema)
-      const orders = await db.collection("orders").where("orderId", "==", orderId).get();
+      let orders = await db.collection("orders").where("orderId", "==", orderId).get();
+      if (orders.empty) {
+        orders = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      }
       const orderBatch = db.batch();
       orders.forEach((doc) => {
         orderBatch.update(doc.ref, { 

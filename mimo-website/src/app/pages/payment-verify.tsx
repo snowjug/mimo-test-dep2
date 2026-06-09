@@ -16,6 +16,8 @@ export function PaymentVerify() {
   useEffect(() => {
     if (!orderId || isVerifying.current) return;
     isVerifying.current = true;
+    let pollCount = 0;
+    const maxPolls = 15;
 
     const verify = async () => {
       try {
@@ -47,6 +49,15 @@ export function PaymentVerify() {
               navigate("/print-code"); // print-code page can try to fetch the code itself if needed
             }, 3000);
           }
+        } else if (order_status === "ACTIVE" || order_status === "PENDING") {
+          pollCount++;
+          if (pollCount < maxPolls) {
+            setTimeout(verify, 2000); // Poll again after 2 seconds
+          } else {
+            setStatus("failed");
+            toast.error("Payment verification timed out.");
+            isVerifying.current = false;
+          }
         } else {
           setStatus("failed");
           toast.error(`Payment status: ${order_status}`);
@@ -54,9 +65,14 @@ export function PaymentVerify() {
         }
       } catch (err) {
         console.error(err);
-        setStatus("failed");
-        toast.error("Failed to verify payment");
-        isVerifying.current = false;
+        pollCount++;
+        if (pollCount < maxPolls) {
+          setTimeout(verify, 2000); // Retry on error too (network blip)
+        } else {
+          setStatus("failed");
+          toast.error("Failed to verify payment");
+          isVerifying.current = false;
+        }
       }
     };
 
