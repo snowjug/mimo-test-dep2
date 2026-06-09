@@ -479,6 +479,61 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
   }
 });
 
+// ================= CREATE BLANK JOB =================
+app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const { type, pageCount } = req.body; // "a4" or "graph"
+    
+    // 1. Clear abandoned jobs to prevent overcharging
+    const existingJobs = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("status", "==", "pending")
+      .get();
+      
+    if (!existingJobs.empty) {
+      const deleteBatch = db.batch();
+      existingJobs.forEach(doc => deleteBatch.delete(doc.ref));
+      await deleteBatch.commit();
+    }
+
+    // 2. Create the blank job
+    const isGraph = type === "graph";
+    const fileName = isGraph ? "mimo_graph.pdf" : "blank_a4.pdf";
+    const actualUrl = isGraph 
+      ? "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fmimo_graph.pdf" 
+      : "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fblank_a4.pdf";
+    
+    // Determine exact size based on uploaded files
+    const fileSize = isGraph ? 1806 : 583;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    await db.collection("print_jobs").add({
+      userId,
+      fileName,
+      documentUrl: actualUrl,
+      fileUrl: actualUrl,
+      mimetype: "application/pdf",
+      fileSize: fileSize,
+      fileType: "pdf",
+      isImage: false,
+      createdAt: now,
+      updatedAt: now,
+      status: "pending",
+      pageCount: Number(pageCount) || 1,
+      files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
+      printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
+      pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
+      paymentStatus: { status: "pending" },
+      printStatus: { status: "pending" }
+    });
+
+    res.json({ message: "Blank job queued successfully" });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ================= REMOVE ABANDONED FILE =================
 app.delete("/remove-file", authMiddleware, async (req, res) => {
   try {
@@ -753,6 +808,212 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     );
 
     const paymentTxnRef = db.collection("payment_transactions").doc();
+    await paymentTxnRef.set({
+      orderId,
+      userId,
+      amount,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: "INITIATED"
+    });
+
+    res.json({
+      orderId,
+      paymentSessionId: response.data.payment_session_id,
+      amount,
+    });
+  } catch (err) {
+    console.error("Cashfree Order Error:", err.response?.data || err.message);
+    res.status(500).json({ error: "Failed to create payment order" });
+  }
+});
+
+
+// ================= VERIFY PAYMENT =================
+app.get("/verify-payment/:orderId", async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    let cashfreeStatus = null;
+    try {
+      const cfRes = await axios.get(`${CASHFREE_BASE_URL}/orders/${orderId}`, { headers: cashfreeHeaders, timeout: 10000 });
+      cashfreeStatus = cfRes.data.order_status;
+      console.log(`[VERIFY-PAYMENT] Cashfree status for ${orderId}: ${cashfreeStatus}`);
+    } catch (cfErr) {
+      console.warn("[VERIFY-PAYMENT] Cashfree API failed, falling back to Firestore:", cfErr.message);
+    }
+
+    let orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+    if (orderSnapshot.empty) {
+      orderSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+    }
+    let userId = null;
+    let order_status = cashfreeStatus || "CREATED";
+
+    if (!orderSnapshot.empty) {
+      const orderDoc = orderSnapshot.docs[0];
+      userId = orderDoc.data().userId;
+      if (cashfreeStatus === "PAID") {
+        await orderDoc.ref.update({ status: "PAID" });
+      } else if (!cashfreeStatus) {
+        order_status = orderDoc.data().status;
+      }
+    }
+
+    let printCode = null;
+    let directKioskId = null;
+
+    if (order_status === "PAID" && userId) {
+      try {
+        const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+        const internalRes = await axios.post(
+          `http://localhost:${process.env.PORT || 8080}/payment-success`,
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { headers: { Authorization: `Bearer ${dummyToken}` } }
+        );
+        printCode = internalRes.data.printCode;
+        directKioskId = internalRes.data.directKioskId;
+      } catch (internalErr) {
+        console.error("[VERIFY-PAYMENT] Internal /payment-success failed:", internalErr.response?.data || internalErr.message);
+      }
+    }
+
+    res.json({ order_status, printCode, directKioskId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Verification failed");
+  }
+});
+
+
+// ================= CASHFREE WEBHOOK =================
+app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  try {
+    let event;
+    if (Buffer.isBuffer(req.body)) {
+      const rawBody = req.body.toString("utf8");
+      const receivedSignature = req.headers["x-webhook-signature"];
+      const timestamp = req.headers["x-webhook-timestamp"];
+
+      if (receivedSignature && timestamp) {
+        const signedPayload = timestamp + rawBody;
+        const expectedSignature = crypto
+          .createHmac("sha256", process.env.CASHFREE_SECRET_KEY)
+          .update(signedPayload)
+          .digest("base64");
+        if (receivedSignature !== expectedSignature) {
+          console.warn("Webhook signature mismatch");
+          return res.status(403).send("Invalid signature");
+        }
+      }
+      event = JSON.parse(rawBody);
+    } else {
+      // Body already parsed by express.json()
+      event = req.body;
+    }
+
+    if (event.type === "PAYMENT_SUCCESS_WEBHOOK") {
+      const orderId = event.data.order.order_id;
+      const userId = event.data.customer_details.customer_id;
+      const paidAmount = event.data.order.order_amount;
+      const now = admin.firestore.FieldValue.serverTimestamp();
+
+      // Update Orders (V1 + V2 Schema)
+      let orders = await db.collection("orders").where("orderId", "==", orderId).get();
+      if (orders.empty) {
+        orders = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      }
+      const orderBatch = db.batch();
+      orders.forEach((doc) => {
+        orderBatch.update(doc.ref, { 
+          status: "PAID",
+          orderStatus: "completed",
+          "paymentDetails.paymentStatus": "completed",
+          "paymentDetails.paidAt": now
+        });
+      });
+      await orderBatch.commit();
+
+      // Update Print Jobs (V1 + V2 Schema)
+      const jobs = await db
+        .collection("print_jobs")
+        .where("userId", "==", userId)
+        .where("status", "==", "pending")
+        .get();
+        
+      const jobsBatch = db.batch();
+      let newTotalPages = 0;
+      
+      jobs.forEach((doc) => {
+        const pages = doc.data().pageCount || 0;
+        newTotalPages += pages;
+        jobsBatch.update(doc.ref, { 
+          status: "paid",
+          "paymentStatus.status": "completed",
+          "paymentStatus.paidAt": now,
+          paymentTime: now
+        });
+      });
+      await jobsBatch.commit();
+      
+      // ✅ Call /payment-success internally to generate the print code
+      try {
+        const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+        await axios.post(
+          `http://localhost:${process.env.PORT || 8080}/payment-success`,
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { headers: { Authorization: `Bearer ${dummyToken}` } }
+        );
+      } catch (internalErr) {
+        console.error("[WEBHOOK] Failed to call internal /payment-success:", internalErr.message);
+      }
+      
+      // Update User Statistics (V2 Schema)
+      const userRef = db.collection("users").doc(userId);
+      await userRef.update({
+        totalSpent: admin.firestore.FieldValue.increment(paidAmount),
+        totalPagesPrinted: admin.firestore.FieldValue.increment(newTotalPages)
+      });
+      
+      // Update Payment Transactions Audit (V2 Schema)
+      const txnSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      if (!txnSnapshot.empty) {
+        const paymentData = event.data.payment || {};
+        await txnSnapshot.docs[0].ref.update({
+          "transactionStatus.status": "completed",
+          "transactionStatus.gatewayStatus": paymentData.payment_status || "SUCCESS",
+          "transactionStatus.completedAt": now,
+          cashfreePaymentId: paymentData.cf_payment_id || null,
+          paymentMethod: paymentData.payment_group || "unknown",
+          paymentCurrency: paymentData.payment_currency || "INR",
+          paymentMessage: paymentData.payment_message || "Success",
+          paymentTime: paymentData.payment_time || now
+        });
+      }
+
+      // ✅ Update Global Admin Metrics ONLY on Real Payments
+      const dateString = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const metricsRef = db.collection("system").doc("metrics");
+      await metricsRef.set({
+        totalRevenue: admin.firestore.FieldValue.increment(paidAmount),
+        totalOrders: admin.firestore.FieldValue.increment(1),
+        totalPagesPrinted: admin.firestore.FieldValue.increment(newTotalPages),
+        [`dailyRevenue.${dateString}`]: admin.firestore.FieldValue.increment(paidAmount),
+        lastUpdatedAt: now
+      }, { merge: true });
+
+      res.status(200).send("Webhook received");
+    }
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
+
+// ================= CHECK JOB STATUS =================
+app.post("/check-status", async (req, res) => {
+  try {
+    const { printCode } = req.body;
     if (!printCode) return res.status(400).json({ error: "printCode required" });
 
     const snapshot = await db.collection("print_jobs")
@@ -1823,6 +2084,86 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
 }
 
 // Export the main Express App
+
+// ================= NGROK HELPER =================
+const getNgrokUrl = async () => {
+  if (process.env.PI_BASE_URL && !process.env.PI_BASE_URL.includes('100.108') && !process.env.PI_BASE_URL.includes('tail2146')) {
+    return process.env.PI_BASE_URL;
+  }
+  return "https://splashed-giddily-populace.ngrok-free.dev";
+};
+
+// Helper: call the Pi print API for one file
+const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
+  const targetPiUrl = piUrl || await getNgrokUrl();
+  const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
+  const results = [];
+  for (let i = 0; i < copies; i++) {
+    const res = await fetch(`${targetPiUrl}/print`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+      body: JSON.stringify({ pdfUrl: fileUrl, file_url: fileUrl, printer_name: targetPrinter })
+    });
+    if (!res.ok) { const errText = await res.text(); throw new Error(`Pi HTTP error ${res.status}: ${errText}`); }
+    results.push(await res.json());
+  }
+  return results;
+};
+
+// ================= KIOSK: POLL JOB STATUS =================
+app.get("/kiosk/job-status", async (req, res) => {
+  try {
+    const { printCode } = req.query;
+    if (!printCode) return res.status(400).json({ error: "Print code required" });
+    const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).get();
+    if (snapshot.empty) return res.status(404).json({ error: "Job not found" });
+    const jobData = snapshot.docs[0].data();
+    res.json({ status: jobData.status || "pending", isPrinted: jobData.isPrinted || false });
+  } catch (err) {
+    console.error("❌ KIOSK JOB STATUS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch job status" });
+  }
+});
+
+// ================= KIOSK: TRIGGER PI PRINT =================
+app.post("/kiosk/print", async (req, res) => {
+  try {
+    const { printCode, kioskId = "KIOSK_1" } = req.body;
+    if (!printCode) return res.status(400).json({ error: "Print code required" });
+    const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).where("status", "==", "paid").get();
+    if (snapshot.empty) return res.status(400).json({ error: "No paid job found for this code" });
+    
+    const jobDoc = snapshot.docs[0];
+    const jobData = jobDoc.data();
+    
+    let finalKioskId = kioskId;
+    const directKioskId = jobData?.settings?.directKioskId || jobData?.printOptions?.directKioskId || jobData.kioskId;
+    if (directKioskId) {
+      if (directKioskId !== kioskId) {
+        console.warn(`Kiosk mismatch: job assigned to ${directKioskId}, requested from ${kioskId}`);
+      }
+      finalKioskId = directKioskId; // Prioritize the user's choice from the front end
+    }
+    
+    // Set status to printing so the Pi's firebase_listener.py picks it up
+    await jobDoc.ref.update({ 
+      status: "printing", 
+      printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
+      kioskId: finalKioskId 
+    });
+
+    // PULL ARCHITECTURE: We just return success immediately.
+    // The Pi's mimo-listener.service will poll this document, download the PDF, and print it.
+    // The Kiosk UI will poll /kiosk/job-status until the Pi updates it to 'completed'.
+    return res.json({ success: true, message: "Print job enqueued successfully", job: jobData });
+    
+  } catch (err) {
+    console.error("❌ KIOSK PRINT ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
 exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
 
 // ================= AUTO REFUND LISTENER =================

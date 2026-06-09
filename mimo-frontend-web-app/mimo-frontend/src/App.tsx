@@ -202,7 +202,7 @@ function App() {
         statusTitle={
           printStatus === 'completed'
             ? 'Print Completed ✅'
-            : jobData
+            : (jobData && jobData.userName)
             ? `Hello ${jobData.userName.split(' ')[0]}..!`
             : 'Printing in Progress'
         }
@@ -219,7 +219,9 @@ function App() {
           goToSummary();
         }}
         onError={() => {
-          setCurrentScreen('system-error-screen');
+          setPrintStatus('idle');
+          setCurrentScreen('code-entry-screen');
+          showToast('Printer reported an error processing your document.', true);
         }}
       />
 
