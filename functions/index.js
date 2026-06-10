@@ -704,6 +704,8 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       printOptions: printOptions || {},
       pricing: { pricePerPage, totalPages: actualPages, jobCost },
       orderId,
+      colorMode,
+      color: colorMode === "color",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
