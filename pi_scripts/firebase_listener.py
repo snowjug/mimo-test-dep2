@@ -237,6 +237,65 @@ def convert_image_to_pdf_fit(input_path, is_color=False):
         print(f"❌ Image fit conversion failed: {e}")
         return None
 
+def impose_nup(input_pdf, output_pdf, layout_num):
+    """Natively impose N-up pages onto an A4 canvas using PyPDF2."""
+    try:
+        from PyPDF2 import PdfReader, PdfWriter, PageObject, Transformation
+        reader = PdfReader(input_pdf)
+        writer = PdfWriter()
+        
+        A4_W, A4_H = 595.276, 841.890
+        
+        if str(layout_num) == "2":
+            cols, rows = 2, 1
+            canvas_w, canvas_h = A4_H, A4_W
+        elif str(layout_num) == "4":
+            cols, rows = 2, 2
+            canvas_w, canvas_h = A4_W, A4_H
+        elif str(layout_num) == "6":
+            cols, rows = 3, 2
+            canvas_w, canvas_h = A4_H, A4_W
+        elif str(layout_num) == "9":
+            cols, rows = 3, 3
+            canvas_w, canvas_h = A4_W, A4_H
+        else:
+            return False
+            
+        cell_w = canvas_w / cols
+        cell_h = canvas_h / rows
+        
+        pages = reader.pages
+        total_pages = len(pages)
+        
+        current_page_idx = 0
+        while current_page_idx < total_pages:
+            new_page = PageObject.create_blank_page(width=canvas_w, height=canvas_h)
+            for row in range(rows):
+                for col in range(cols):
+                    if current_page_idx >= total_pages:
+                        break
+                    p = pages[current_page_idx]
+                    p_w = float(p.mediabox.width)
+                    p_h = float(p.mediabox.height)
+                    
+                    scale = min(cell_w / p_w, cell_h / p_h)
+                    
+                    tx = (col * cell_w) + (cell_w - (p_w * scale)) / 2
+                    ty = ((rows - 1 - row) * cell_h) + (cell_h - (p_h * scale)) / 2
+                    
+                    op = Transformation().scale(sx=scale, sy=scale).translate(tx=tx, ty=ty)
+                    new_page.merge_page(p, op)
+                    
+                    current_page_idx += 1
+            writer.add_page(new_page)
+            
+        with open(output_pdf, "wb") as f:
+            writer.write(f)
+        return True
+    except Exception as e:
+        print(f"❌ PyPDF2 N-up Imposition failed: {e}")
+        return False
+
 def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
     try:
         total_size = sum(os.path.getsize(p) for p in file_paths)
@@ -427,9 +486,9 @@ def process_job(doc_snapshot):
             else:
                 pdf_paths.append(fp)
 
-        # Imposition with pdfjam for consistent N-up layouts
+        # Imposition with PyPDF2 for consistent N-up layouts
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
-            print(f"🖼️ Generating consistent {photo_layout}-per-page layout using pdfjam...")
+            print(f"🖼️ Generating consistent {photo_layout}-per-page layout using PyPDF2...")
             merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
             imposed_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_imposed_layout.pdf")
             
@@ -440,23 +499,18 @@ def process_job(doc_snapshot):
                 else:
                     merged_pdf = pdf_paths[0]
                     
-                # 2. Impose using pdfjam
-                nup_arg = ""
-                if str(photo_layout) == "2": nup_arg = "2x1"
-                elif str(photo_layout) == "4": nup_arg = "2x2"
-                elif str(photo_layout) == "6": nup_arg = "3x2"
-                elif str(photo_layout) == "9": nup_arg = "3x3"
+                # 2. Impose using PyPDF2
+                success_nup = impose_nup(merged_pdf, imposed_pdf, photo_layout)
                 
-                jam_cmd = ["pdfjam", merged_pdf, "--nup", nup_arg, "--a4paper", "--outfile", imposed_pdf]
-                if str(photo_layout) in ["2", "6"]:
-                    jam_cmd.insert(-2, "--landscape")
+                if success_nup:
+                    final_paths = [imposed_pdf]
+                    photo_layout = None # Clear it so CUPS doesn't impose again
+                    print(f"✅ Successfully imposed layout into {imposed_pdf}")
+                else:
+                    raise Exception("PyPDF2 N-up returned False")
                     
-                subprocess.run(jam_cmd, check=True, timeout=60)
-                final_paths = [imposed_pdf]
-                photo_layout = None # Clear it so CUPS doesn't impose again
-                print(f"✅ Successfully imposed layout into {imposed_pdf}")
             except Exception as jam_err:
-                print(f"❌ Failed to impose PDF: {jam_err}")
+                print(f"❌ Failed to impose PDF natively: {jam_err}")
                 raise Exception("Layout generation failed on Kiosk.")
         # Correct stale queue names on Kiosk 1 to point to the active USB interface
         if target_printer == "Brother_HL_L5210DN_series":
