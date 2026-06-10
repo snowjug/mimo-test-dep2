@@ -144,7 +144,7 @@ def process_image_custom(input_path, scale_pct):
         return None
 
 def slice_pdf_pages(input_pdf, page_range):
-    """(DEPRECATED) Uses Ghostscript to extract a specific page range from a PDF."""
+    """Uses Ghostscript to extract a specific page range from a PDF."""
     try:
         output_pdf = os.path.splitext(input_pdf)[0] + f"_sliced_{int(time.time())}.pdf"
         print(f"✂️  Slicing PDF pages {page_range} from {input_pdf}...")
@@ -186,14 +186,15 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         if "disabled" in status_cmd.stdout.lower() or "unplugged" in status_cmd.stdout.lower():
             raise Exception(f"Pre-flight failed: Printer {printer_name} is offline or unplugged.")
 
-        # We no longer use Ghostscript for slicing because it takes ~4 minutes on a Pi for complex PDFs.
-        # CUPS handles 'page-ranges' natively and instantly.
+        sliced_paths = []
+        if page_range:
+            for p in file_paths:
+                sliced = slice_pdf_pages(p, page_range)
+                sliced_paths.append(sliced)
+            file_paths = sliced_paths
 
-        print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_paths} ({copies} copies, pages: {page_range or 'all'})")
+        print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_paths} ({copies} copies, sliced pages: {page_range or 'all'})")
         cmd = ["lp", "-d", printer_name, "-n", str(copies)]
-
-        if page_range and str(page_range).lower() != "all":
-            cmd.extend(["-o", f"page-ranges={page_range}"])
 
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             cmd.extend(["-o", f"number-up={photo_layout}"])
