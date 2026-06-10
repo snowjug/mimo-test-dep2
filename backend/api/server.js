@@ -1099,7 +1099,7 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
 });
 
 // ================= CREATE BLANK JOB =================
-app.post("/create-blank-job", authMiddleware, async (req, res) => {
+app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
   try {
     const userId = req.user.userId || req.user.id;
     if (!userId) throw new Error("User ID is missing from token");
