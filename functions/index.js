@@ -706,6 +706,11 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       orderId,
       colorMode,
       color: colorMode === "color",
+      // Top-level fields for backward compat with older Pi listeners
+      copies: copies,
+      duplex: printOptions?.doubleSided === "double",
+      finalCost: jobCost,
+      totalCost: jobCost,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -957,15 +962,27 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       await jobsBatch.commit();
       
       // ✅ Call /payment-success internally to generate the print code
-      try {
-        const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
-        await axios.post(
-          `http://localhost:${process.env.PORT || 8080}/payment-success`,
-          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
-          { headers: { Authorization: `Bearer ${dummyToken}` } }
-        );
-      } catch (internalErr) {
-        console.error("[WEBHOOK] Failed to call internal /payment-success:", internalErr.message);
+      // Guard: only call if no print code exists yet on these jobs
+      const existingCodeCheck = await db.collection("print_jobs")
+        .where("userId", "==", userId)
+        .where("status", "==", "paid")
+        .where("printCode", "!=", null)
+        .limit(1)
+        .get();
+      
+      if (existingCodeCheck.empty) {
+        try {
+          const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+          await axios.post(
+            `http://localhost:${process.env.PORT || 8080}/payment-success`,
+            { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+            { headers: { Authorization: `Bearer ${dummyToken}` } }
+          );
+        } catch (internalErr) {
+          console.error("[WEBHOOK] Failed to call internal /payment-success:", internalErr.message);
+        }
+      } else {
+        console.log(`[WEBHOOK] Print code already exists for user ${userId}, skipping duplicate generation.`);
       }
       
       // Update User Statistics (V2 Schema)

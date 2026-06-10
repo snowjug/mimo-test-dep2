@@ -51,7 +51,7 @@ def convert_to_pdf(input_path):
         print(f"❌ Conversion failed: {e}")
         return None
 
-def process_image_fill(input_path, photo_layout=None):
+def process_image_fill(input_path, photo_layout=None, is_color=False):
     try:
         from PIL import Image
         print(f"⏳ Processing image for FILL/CROP to A4: {input_path}")
@@ -77,15 +77,13 @@ def process_image_fill(input_path, photo_layout=None):
                 top = (original_h - new_h) / 2
                 img = img.crop((0, top, original_w, top + new_h))
                 
-            dpi = 300.0
-            if photo_layout and str(photo_layout) in ["4", "6", "9"]:
-                dpi = 150.0
+            # Use 150 DPI for color (faster for Epson inkjet), 300 for BW laser
+            dpi = 150.0 if is_color else 300.0
                 
             # If the image is extremely large, resize it to match the target DPI to save memory
             target_w = int(8.27 * dpi)
             target_h = int(11.69 * dpi)
             if img.size[0] > target_w * 1.5:
-                # Need to use thumbnail to maintain aspect ratio and resize efficiently
                 img.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
                 
             pdf_path = os.path.splitext(input_path)[0] + "_filled.pdf"
@@ -97,23 +95,27 @@ def process_image_fill(input_path, photo_layout=None):
         print(f"❌ Image fill processing failed: {e}")
         return None
 
-def process_image_custom(input_path, scale_pct):
+def process_image_custom(input_path, scale_pct, is_color=False):
     try:
         from PIL import Image
         print(f"⏳ Processing image for CUSTOM scale ({scale_pct}%) to A4: {input_path}")
+        
+        # Use 150 DPI for color (faster for Epson), 300 for BW
+        dpi = 150.0 if is_color else 300.0
         
         with Image.open(input_path) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
                 
-            # A4 at 300 DPI is 2480x3508
-            canvas_w, canvas_h = 2480, 3508
+            # A4 at target DPI
+            canvas_w = int(8.27 * dpi)
+            canvas_h = int(11.69 * dpi)
             
             # Determine orientation
             original_w, original_h = img.size
             is_landscape = original_w > original_h
             if is_landscape:
-                canvas_w, canvas_h = 3508, 2480
+                canvas_w, canvas_h = canvas_h, canvas_w
                 
             canvas = Image.new('RGB', (canvas_w, canvas_h), (255, 255, 255))
             
@@ -135,7 +137,7 @@ def process_image_custom(input_path, scale_pct):
             canvas.paste(resized_img, (paste_x, paste_y))
             
             pdf_path = os.path.splitext(input_path)[0] + "_custom.pdf"
-            canvas.save(pdf_path, "PDF", resolution=300.0)
+            canvas.save(pdf_path, "PDF", resolution=dpi)
             
         print(f"✅ Image custom scale processing successful: {pdf_path}")
         return pdf_path
@@ -144,27 +146,96 @@ def process_image_custom(input_path, scale_pct):
         return None
 
 def slice_pdf_pages(input_pdf, page_range):
-    """Uses Ghostscript to extract a specific page range from a PDF."""
+    """Extract specific pages from a PDF using Ghostscript.
+    
+    Supports complex ranges like: '1-3,5,7-9'
+    """
     try:
         output_pdf = os.path.splitext(input_pdf)[0] + f"_sliced_{int(time.time())}.pdf"
-        print(f"✂️  Slicing PDF pages {page_range} from {input_pdf}...")
+        print(f"✂️  Slicing PDF pages [{page_range}] from {input_pdf}...")
         
-        # Parse page range (e.g. "4-5" or "3")
-        parts = str(page_range).split('-')
-        first_page = parts[0]
-        last_page = parts[1] if len(parts) > 1 else parts[0]
+        # Parse the complex range into individual page numbers
+        pages = []
+        for part in str(page_range).split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if "-" in part:
+                range_parts = part.split("-")
+                if len(range_parts) == 2:
+                    try:
+                        start = int(range_parts[0])
+                        end = int(range_parts[1])
+                        for p in range(start, end + 1):
+                            pages.append(p)
+                    except ValueError:
+                        continue
+            else:
+                try:
+                    pages.append(int(part))
+                except ValueError:
+                    continue
         
-        cmd = [
-            "gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
-            f"-dFirstPage={first_page}", f"-dLastPage={last_page}",
-            f"-sOutputFile={output_pdf}", input_pdf
-        ]
+        if not pages:
+            print("⚠️ No valid pages in range, returning original")
+            return input_pdf
         
-        subprocess.run(cmd, check=True, capture_output=True)
-        return output_pdf
+        pages = sorted(set(pages))
+        
+        # Extract each page individually and merge
+        temp_pages = []
+        for page_num in pages:
+            temp_page = os.path.join(TEMP_DIR, f"page_{page_num}_{int(time.time()*1000)}.pdf")
+            cmd = [
+                "gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
+                f"-dFirstPage={page_num}", f"-dLastPage={page_num}",
+                f"-sOutputFile={temp_page}", input_pdf
+            ]
+            result = subprocess.run(cmd, capture_output=True, timeout=30)
+            if result.returncode == 0 and os.path.exists(temp_page):
+                temp_pages.append(temp_page)
+        
+        if not temp_pages:
+            print("⚠️ Ghostscript failed to extract any pages")
+            return input_pdf
+        
+        if len(temp_pages) == 1:
+            os.rename(temp_pages[0], output_pdf)
+        else:
+            merge_cmd = ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
+                        f"-sOutputFile={output_pdf}"] + temp_pages
+            subprocess.run(merge_cmd, check=True, timeout=60)
+            for tp in temp_pages:
+                try:
+                    os.remove(tp)
+                except:
+                    pass
+        
+        if os.path.exists(output_pdf):
+            print(f"✅ Sliced {len(pages)} pages successfully: {output_pdf}")
+            return output_pdf
+        else:
+            return input_pdf
+            
     except Exception as e:
-        print(f"❌ Ghostscript page slicing failed: {e}")
+        print(f"❌ Page slicing failed: {e}")
         return input_pdf
+
+def convert_image_to_pdf_fit(input_path, is_color=False):
+    """Convert an image to PDF for 'fit' mode so CUPS number-up works reliably."""
+    try:
+        from PIL import Image
+        dpi = 150.0 if is_color else 300.0
+        pdf_path = os.path.splitext(input_path)[0] + "_fit.pdf"
+        with Image.open(input_path) as img:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            img.save(pdf_path, "PDF", resolution=dpi)
+        print(f"✅ Image fit → PDF: {pdf_path}")
+        return pdf_path
+    except Exception as e:
+        print(f"❌ Image fit conversion failed: {e}")
+        return None
 
 def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
     try:
@@ -193,8 +264,9 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                 sliced_paths.append(sliced)
             file_paths = sliced_paths
 
-        print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_paths} ({copies} copies, sliced pages: {page_range or 'all'})")
-        cmd = ["lp", "-d", printer_name, "-n", str(copies)]
+        print(f"🖨️  Sending to CUPS [{printer_name}]: {[os.path.basename(f) for f in file_paths]} "
+              f"({copies} copies, layout: {photo_layout or '1-up'}, sides: {double_sided})")
+        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4", "-o", "fit-to-page"]
 
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             cmd.extend(["-o", f"number-up={photo_layout}"])
@@ -260,7 +332,7 @@ def download_file(file_url, file_name):
             blob = bucket.blob(blob_path)
             blob.download_to_filename(local_path)
         else:
-            response = requests.get(file_url, stream=True, timeout=30)
+            response = requests.get(file_url, stream=True, timeout=120)
             response.raise_for_status()
             with open(local_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
@@ -279,10 +351,12 @@ def process_job(doc_snapshot):
     
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
-    copies = doc.get("copies", 1)
     color_mode = doc.get("colorMode", "monochrome")
+    is_color = color_mode.lower() == "color"
     
     print_options = doc.get("printOptions", {})
+    # Read copies from printOptions (where frontend stores it), fallback to top-level
+    copies = int(print_options.get("copies", doc.get("copies", 1)))
     image_scaling = print_options.get("imageScaling", "fit")
     custom_scale = int(print_options.get("customScale", 100))
     photo_layout = print_options.get("photoLayout")
@@ -318,10 +392,14 @@ def process_job(doc_snapshot):
             
             if ext in [".jpg", ".jpeg", ".png"]:
                 if image_scaling == "fill":
-                    pdf_path = process_image_fill(l_path, photo_layout)
+                    pdf_path = process_image_fill(l_path, photo_layout, is_color)
                     if pdf_path: f_final = pdf_path
                 elif image_scaling == "custom":
-                    pdf_path = process_image_custom(l_path, custom_scale)
+                    pdf_path = process_image_custom(l_path, custom_scale, is_color)
+                    if pdf_path: f_final = pdf_path
+                else:
+                    # FIT mode: still convert to PDF so CUPS number-up works reliably
+                    pdf_path = convert_image_to_pdf_fit(l_path, is_color)
                     if pdf_path: f_final = pdf_path
                     
             elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
@@ -349,26 +427,44 @@ def process_job(doc_snapshot):
             else:
                 pdf_paths.append(fp)
 
-        # Merge PDFs if doing an N-up layout, because CUPS number-up 
-        # only groups pages of a SINGLE document natively.
-        if photo_layout and str(photo_layout) in ["2", "4", "6", "9"] and len(pdf_paths) > 1:
-            print(f"🖼️ Merging {len(pdf_paths)} pages into a single PDF for {photo_layout}-per-page layout...")
+        # Imposition with pdfjam for consistent N-up layouts
+        if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
+            print(f"🖼️ Generating consistent {photo_layout}-per-page layout using pdfjam...")
             merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
+            imposed_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_imposed_layout.pdf")
+            
             try:
-                subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
-                final_paths = [merged_pdf]
-                print(f"✅ Successfully merged PDFs with Ghostscript into {merged_pdf}")
-            except Exception as merge_err:
-                print(f"❌ Failed to merge PDFs with Ghostscript: {merge_err}")
-                raise Exception(f"Ghostscript merge failed on Kiosk. Ink wastage prevented.")
+                # 1. Merge if multiple files
+                if len(pdf_paths) > 1:
+                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
+                else:
+                    merged_pdf = pdf_paths[0]
+                    
+                # 2. Impose using pdfjam
+                nup_arg = ""
+                if str(photo_layout) == "2": nup_arg = "2x1"
+                elif str(photo_layout) == "4": nup_arg = "2x2"
+                elif str(photo_layout) == "6": nup_arg = "3x2"
+                elif str(photo_layout) == "9": nup_arg = "3x3"
+                
+                jam_cmd = ["pdfjam", merged_pdf, "--nup", nup_arg, "--a4paper", "--outfile", imposed_pdf]
+                if str(photo_layout) in ["2", "6"]:
+                    jam_cmd.insert(-2, "--landscape")
+                    
+                subprocess.run(jam_cmd, check=True, timeout=60)
+                final_paths = [imposed_pdf]
+                photo_layout = None # Clear it so CUPS doesn't impose again
+                print(f"✅ Successfully imposed layout into {imposed_pdf}")
+            except Exception as jam_err:
+                print(f"❌ Failed to impose PDF: {jam_err}")
+                raise Exception("Layout generation failed on Kiosk.")
         # Correct stale queue names on Kiosk 1 to point to the active USB interface
         if target_printer == "Brother_HL_L5210DN_series":
             target_printer = "Brother_HL_L5210DN_series_USB"
 
-        if target_printer == COLOR_PRINTER_NAME:
-            print("🚀 Proactively waking up Epson Color Printer via ipp-usb...")
-            subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
-            time.sleep(2) # Give it a moment to reconnect
+        # NOTE: ipp-usb restart removed from here — it was causing multi-second delays
+        # on every color print. The watchdog thread handles ipp-usb restarts only when
+        # the printer is actually stuck/disabled.
 
         success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
         
@@ -382,10 +478,45 @@ def process_job(doc_snapshot):
             print(f"🎉 Job {doc_id} marked as completed.")
         else:
             doc_ref.update({"status": "failed", "printerStatus": "CUPS error on Pi"})
+            try:
+                user_id = doc.get("userId")
+                cost = doc.get("totalCost") or doc.get("finalCost")
+                if not cost:
+                    pricing = doc.get("pricing")
+                    if pricing:
+                        cost = pricing.get("jobCost") or pricing.get("finalAmount") or 0
+                
+                # 1 Mimo Coin = ₹0.50. So refund amount * 2 coins.
+                if cost and float(cost) > 0:
+                    coins_to_refund = int(float(cost) * 2)
+                    firestore_client = firestore.client()
+                    user_ref = firestore_client.collection("users").document(user_id)
+                    user_ref.update({
+                        "mimo_coins.balance": firestore.Increment(coins_to_refund)
+                    })
+                    print(f"💰 Refunded {coins_to_refund} coins to user {user_id} for failed print.")
+            except Exception as refund_err:
+                print(f"⚠️ Failed to process automated refund: {refund_err}")
             
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         doc_ref.update({"status": "failed", "printerStatus": f"Pi processing error: {str(e)[:50]}"})
+        try:
+            user_id = doc.get("userId")
+            cost = doc.get("totalCost") or doc.get("finalCost")
+            if not cost:
+                pricing = doc.get("pricing")
+                if pricing:
+                    cost = pricing.get("jobCost") or pricing.get("finalAmount") or 0
+            if cost and float(cost) > 0:
+                coins_to_refund = int(float(cost) * 2)
+                firestore_client = firestore.client()
+                firestore_client.collection("users").document(user_id).update({
+                    "mimo_coins.balance": firestore.Increment(coins_to_refund)
+                })
+                print(f"💰 Refunded {coins_to_refund} coins to user {user_id} after unexpected error.")
+        except Exception:
+            pass
     finally:
         try:
             for lp in local_paths:
