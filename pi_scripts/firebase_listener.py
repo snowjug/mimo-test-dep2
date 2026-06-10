@@ -534,45 +534,12 @@ def process_job(doc_snapshot):
             print(f"🎉 Job {doc_id} marked as completed.")
         else:
             doc_ref.update({"status": "failed", "printerStatus": "CUPS error on Pi"})
-            try:
-                user_id = doc.get("userId")
-                cost = doc.get("totalCost") or doc.get("finalCost")
-                if not cost:
-                    pricing = doc.get("pricing")
-                    if pricing:
-                        cost = pricing.get("jobCost") or pricing.get("finalAmount") or 0
-                
-                # 1 Mimo Coin = ₹0.50. So refund amount * 2 coins.
-                if cost and float(cost) > 0:
-                    coins_to_refund = int(float(cost) * 2)
-                    firestore_client = firestore.client()
-                    user_ref = firestore_client.collection("users").document(user_id)
-                    user_ref.update({
-                        "mimo_coins.balance": firestore.Increment(coins_to_refund)
-                    })
-                    print(f"💰 Refunded {coins_to_refund} coins to user {user_id} for failed print.")
-            except Exception as refund_err:
-                print(f"⚠️ Failed to process automated refund: {refund_err}")
+
             
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         doc_ref.update({"status": "failed", "printerStatus": f"Pi processing error: {str(e)[:50]}"})
-        try:
-            user_id = doc.get("userId")
-            cost = doc.get("totalCost") or doc.get("finalCost")
-            if not cost:
-                pricing = doc.get("pricing")
-                if pricing:
-                    cost = pricing.get("jobCost") or pricing.get("finalAmount") or 0
-            if cost and float(cost) > 0:
-                coins_to_refund = int(float(cost) * 2)
-                firestore_client = firestore.client()
-                firestore_client.collection("users").document(user_id).update({
-                    "mimo_coins.balance": firestore.Increment(coins_to_refund)
-                })
-                print(f"💰 Refunded {coins_to_refund} coins to user {user_id} after unexpected error.")
-        except Exception:
-            pass
+
     finally:
         try:
             for lp in local_paths:
