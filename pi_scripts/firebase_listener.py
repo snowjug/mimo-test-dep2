@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 import threading
 import requests
 
+active_jobs = set()
+
 # ================= CONFIGURATION =================
 BW_PRINTER_NAME = os.environ.get("BW_PRINTER_NAME", "Brother_HL_L2440DW_series")
 COLOR_PRINTER_NAME = os.environ.get("COLOR_PRINTER_NAME", "Epson_L3250")
@@ -49,7 +51,7 @@ def convert_to_pdf(input_path):
         print(f"❌ Conversion failed: {e}")
         return None
 
-def process_image_fill(input_path):
+def process_image_fill(input_path, photo_layout=None):
     try:
         from PIL import Image
         print(f"⏳ Processing image for FILL/CROP to A4: {input_path}")
@@ -57,7 +59,7 @@ def process_image_fill(input_path):
         with Image.open(input_path) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            
+                
             original_w, original_h = img.size
             if original_w > original_h:
                 target_ratio = 1.414  # landscape
@@ -75,8 +77,19 @@ def process_image_fill(input_path):
                 top = (original_h - new_h) / 2
                 img = img.crop((0, top, original_w, top + new_h))
                 
+            dpi = 300.0
+            if photo_layout and str(photo_layout) in ["4", "6", "9"]:
+                dpi = 150.0
+                
+            # If the image is extremely large, resize it to match the target DPI to save memory
+            target_w = int(8.27 * dpi)
+            target_h = int(11.69 * dpi)
+            if img.size[0] > target_w * 1.5:
+                # Need to use thumbnail to maintain aspect ratio and resize efficiently
+                img.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
+                
             pdf_path = os.path.splitext(input_path)[0] + "_filled.pdf"
-            img.save(pdf_path, "PDF", resolution=300.0)
+            img.save(pdf_path, "PDF", resolution=dpi)
             
         print(f"✅ Image fill processing successful: {pdf_path}")
         return pdf_path
@@ -130,6 +143,29 @@ def process_image_custom(input_path, scale_pct):
         print(f"❌ Image custom scale processing failed: {e}")
         return None
 
+def slice_pdf_pages(input_pdf, page_range):
+    """Uses Ghostscript to extract a specific page range from a PDF."""
+    try:
+        output_pdf = os.path.splitext(input_pdf)[0] + f"_sliced_{int(time.time())}.pdf"
+        print(f"✂️  Slicing PDF pages {page_range} from {input_pdf}...")
+        
+        # Parse page range (e.g. "4-5" or "3")
+        parts = str(page_range).split('-')
+        first_page = parts[0]
+        last_page = parts[1] if len(parts) > 1 else parts[0]
+        
+        cmd = [
+            "gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
+            f"-dFirstPage={first_page}", f"-dLastPage={last_page}",
+            f"-sOutputFile={output_pdf}", input_pdf
+        ]
+        
+        subprocess.run(cmd, check=True, capture_output=True)
+        return output_pdf
+    except Exception as e:
+        print(f"❌ Ghostscript page slicing failed: {e}")
+        return input_pdf
+
 def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
     try:
         total_size = sum(os.path.getsize(p) for p in file_paths)
@@ -150,10 +186,16 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         if "disabled" in status_cmd.stdout.lower() or "unplugged" in status_cmd.stdout.lower():
             raise Exception(f"Pre-flight failed: Printer {printer_name} is offline or unplugged.")
 
-        print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_paths} ({copies} copies, pages: {page_range or 'all'})")
-        cmd = ["lp", "-d", printer_name, "-n", str(copies)]
+        sliced_paths = []
         if page_range:
-            cmd.extend(["-P", str(page_range)])
+            for p in file_paths:
+                sliced = slice_pdf_pages(p, page_range)
+                sliced_paths.append(sliced)
+            file_paths = sliced_paths
+
+        print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_paths} ({copies} copies, sliced pages: {page_range or 'all'})")
+        cmd = ["lp", "-d", printer_name, "-n", str(copies)]
+
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             cmd.extend(["-o", f"number-up={photo_layout}"])
             
@@ -276,7 +318,7 @@ def process_job(doc_snapshot):
             
             if ext in [".jpg", ".jpeg", ".png"]:
                 if image_scaling == "fill":
-                    pdf_path = process_image_fill(l_path)
+                    pdf_path = process_image_fill(l_path, photo_layout)
                     if pdf_path: f_final = pdf_path
                 elif image_scaling == "custom":
                     pdf_path = process_image_custom(l_path, custom_scale)
@@ -347,8 +389,11 @@ def process_job(doc_snapshot):
                 if fp and fp not in local_paths and os.path.exists(fp): os.remove(fp)
         except Exception as e:
             print(f"⚠️ Cleanup failed: {e}")
+        finally:
+            active_jobs.discard(doc_id)
 
 def on_snapshot(col_snapshot, changes, read_time):
+    print(f"Snapshot fired! Changes: {len(changes)}")
     for change in changes:
         if change.type.name in ['ADDED', 'MODIFIED']:
             doc = change.document
@@ -363,8 +408,10 @@ def on_snapshot(col_snapshot, changes, read_time):
                     continue
             
             if data.get("status") == "printing" and not data.get("isPrinted", False):
-                print(f"\n🔔 New {data.get('colorMode', 'monochrome')} job detected: {doc.id}")
-                threading.Thread(target=process_job, args=(doc,), daemon=True).start()
+                if doc.id not in active_jobs:
+                    active_jobs.add(doc.id)
+                    print(f"\n🔔 New {data.get('colorMode', 'monochrome')} job detected: {doc.id}")
+                    threading.Thread(target=process_job, args=(doc,), daemon=True).start()
 
 def heartbeat_loop():
     while True:
@@ -414,6 +461,21 @@ def watchdog_loop():
                         stuck_cycles[printer] = 0
                 else:
                     stuck_cycles[printer] = 0
+            
+            # Fallback polling for silent grpc disconnects
+            docs = db.collection('print_jobs').where('status', '==', 'printing').where('kioskId', '==', KIOSK_ID).stream()
+            for doc in docs:
+                if doc.id not in active_jobs:
+                    data = doc.to_dict()
+                    updated_at = data.get("updatedAt")
+                    if updated_at:
+                        now = datetime.now(updated_at.tzinfo)
+                        if (now - updated_at) > timedelta(minutes=15):
+                            continue
+                    print(f"\n⚠️ Fallback detected stuck job: {doc.id}")
+                    active_jobs.add(doc.id)
+                    threading.Thread(target=process_job, args=(doc,), daemon=True).start()
+                    
         except Exception as e:
             print(f"⚠️ Watchdog failed: {e}")
         time.sleep(15)

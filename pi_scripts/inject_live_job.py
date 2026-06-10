@@ -1,39 +1,41 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 import uuid
+import sys
 
-# Initialize Firebase exactly like the listener does
-cred = credentials.Certificate("mimo-firebase-adminsdk.json")
-firebase_admin.initialize_app(cred)
+cred = credentials.Certificate("../serviceAccountKey.json")
+try:
+    firebase_admin.initialize_app(cred)
+except ValueError:
+    pass # Already initialized
 db = firestore.client()
 
-print("🚀 Injecting a live unified 4-per-page print job into Firestore for Kiosk 1...")
+kiosk_id = sys.argv[1] if len(sys.argv) > 1 else "CV-001"
+color_mode = sys.argv[2] if len(sys.argv) > 2 else "bw"
 
-# We will use dummy images from Firebase Storage or any public URL
-# It's better to use an actual image URL so CUPS doesn't fail parsing.
-# The user already uploaded images to the bucket, but we can just use a placeholder image.
-dummy_url = "https://picsum.photos/800/1200"
+print(f"🚀 Injecting a live unified 4-per-page print job for {kiosk_id} ({color_mode})...")
 
 files = [
-    {"name": "test_image_1.jpg", "url": "https://picsum.photos/id/10/800/1200", "type": "image/jpeg", "pageCount": 1},
-    {"name": "test_image_2.jpg", "url": "https://picsum.photos/id/20/800/1200", "type": "image/jpeg", "pageCount": 1},
-    {"name": "test_image_3.jpg", "url": "https://picsum.photos/id/30/800/1200", "type": "image/jpeg", "pageCount": 1},
-    {"name": "test_image_4.jpg", "url": "https://picsum.photos/id/40/800/1200", "type": "image/jpeg", "pageCount": 1}
+    {"name": "test_1.jpg", "url": "https://raw.githubusercontent.com/madhans7/mimo-test-dep2/main/mimo-website/public/images/logo.png", "type": "image/png", "pageCount": 1},
+    {"name": "test_2.jpg", "url": "https://raw.githubusercontent.com/madhans7/mimo-test-dep2/main/mimo-website/public/images/logo.png", "type": "image/png", "pageCount": 1},
+    {"name": "test_3.jpg", "url": "https://raw.githubusercontent.com/madhans7/mimo-test-dep2/main/mimo-website/public/images/logo.png", "type": "image/png", "pageCount": 1},
+    {"name": "test_4.jpg", "url": "https://raw.githubusercontent.com/madhans7/mimo-test-dep2/main/mimo-website/public/images/logo.png", "type": "image/png", "pageCount": 1}
 ]
 
 doc_ref = db.collection("print_jobs").document()
 doc_ref.set({
     "userId": "system_test_user",
-    "fileName": "4_Images_Unified",
-    "fileUrl": files[0]["url"], # legacy support
-    "mimetype": "image/jpeg",
+    "fileName": f"4_Images_Unified_{kiosk_id}_{color_mode}",
+    "fileUrl": files[0]["url"],
+    "mimetype": "image/png",
     "files": files,
-    "status": "printing",       # Instantly triggers the listener
-    "kioskId": "MIMO-001",      # Instantly triggers Kiosk 1 listener
+    "status": "printing",
+    "kioskId": kiosk_id,
     "pageCount": 4,
+    "colorMode": color_mode,
     "printOptions": {
         "photoLayout": "4",
-        "colorMode": "bw",
+        "colorMode": color_mode,
         "copies": 1
     },
     "createdAt": firestore.SERVER_TIMESTAMP,
@@ -41,4 +43,4 @@ doc_ref.set({
 })
 
 print(f"✅ Live job {doc_ref.id} injected successfully!")
-print("The Raspberry Pi should pick it up within 1 second and physically print the combined sheet.")
+
