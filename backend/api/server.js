@@ -1075,10 +1075,14 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
   }
 });
 
-app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
+// ================= CREATE BLANK JOB =================
+app.post("/create-blank-job", authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.userId || req.user.id;
+    if (!userId) throw new Error("User ID is missing from token");
+    
     const { type, pageCount } = req.body; // "a4" or "graph"
+    const parsedPageCount = Number(pageCount) || 1;
     
     // 1. Clear abandoned jobs to prevent overcharging
     const existingJobs = await db.collection("print_jobs")
@@ -1115,10 +1119,10 @@ app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
       createdAt: now,
       updatedAt: now,
       status: "pending",
-      pageCount: Number(pageCount) || 1,
+      pageCount: parsedPageCount, // Used for stats and logic
       files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
-      printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
-      pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
+      printOptions: { copies: parsedPageCount, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
+      pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: parsedPageCount },
       paymentStatus: { status: "pending" },
       printStatus: { status: "pending" }
     });

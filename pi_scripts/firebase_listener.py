@@ -318,6 +318,7 @@ def process_job(doc_snapshot):
                 print(f"✅ Successfully merged PDFs with Ghostscript into {merged_pdf}")
             except Exception as merge_err:
                 print(f"❌ Failed to merge PDFs with Ghostscript: {merge_err}")
+                raise Exception(f"Ghostscript merge failed on Kiosk. Ink wastage prevented.")
         # Correct stale queue names on Kiosk 1 to point to the active USB interface
         if target_printer == "Brother_HL_L5210DN_series":
             target_printer = "Brother_HL_L5210DN_series_USB"
