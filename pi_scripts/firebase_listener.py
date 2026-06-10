@@ -462,9 +462,11 @@ def process_job(doc_snapshot):
         if target_printer == "Brother_HL_L5210DN_series":
             target_printer = "Brother_HL_L5210DN_series_USB"
 
-        # NOTE: ipp-usb restart removed from here — it was causing multi-second delays
-        # on every color print. The watchdog thread handles ipp-usb restarts only when
-        # the printer is actually stuck/disabled.
+        # Pre-wake Epson printer to prevent 5-minute deep sleep stalls
+        if "Epson" in target_printer or "Color" in target_printer or "L3250" in target_printer:
+            print("🚀 Pre-waking Epson color printer via ipp-usb restart...")
+            subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
+            time.sleep(1.5) # Give CUPS a moment to reconnect
 
         success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
         
