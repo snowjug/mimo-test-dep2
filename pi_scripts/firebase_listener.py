@@ -365,6 +365,11 @@ def process_job(doc_snapshot):
         if target_printer == "Brother_HL_L5210DN_series":
             target_printer = "Brother_HL_L5210DN_series_USB"
 
+        if target_printer == COLOR_PRINTER_NAME:
+            print("🚀 Proactively waking up Epson Color Printer via ipp-usb...")
+            subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
+            time.sleep(2) # Give it a moment to reconnect
+
         success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
         
         if success:
