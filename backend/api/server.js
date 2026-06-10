@@ -163,6 +163,29 @@ const getPageCount = async (file) => {
 };
 
 // ================= STORAGE =================
+function extractFilePath(fileUrl, bucketName) {
+  if (!fileUrl) return null;
+  if (fileUrl.startsWith("gs://")) {
+    return fileUrl.replace(`gs://${bucketName}/`, "");
+  } else if (fileUrl.includes("firebasestorage.googleapis.com")) {
+    try {
+      const urlObj = new URL(fileUrl);
+      const pathParts = urlObj.pathname.split("/o/");
+      if (pathParts.length > 1) {
+        return decodeURIComponent(pathParts[1].split("?")[0]);
+      }
+    } catch (e) {
+      console.error("URL parsing error:", e);
+    }
+  } else if (fileUrl.includes("storage.googleapis.com")) {
+    const parts = fileUrl.split(`${bucketName}/`);
+    if (parts.length > 1) {
+      return decodeURIComponent(parts[1].split("?")[0]);
+    }
+  }
+  return null;
+}
+
 const uploadToStorage = async (file) => {
   const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
   const fileName = `files/${Date.now()}_${safeFileName}`;
@@ -1736,7 +1759,12 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       // ❌ Already printed
       if (data.isPrinted) continue;
 
-      const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
+      const filePath = extractFilePath(data.fileUrl, bucket.name);
+      if (!filePath) {
+        console.error("Invalid file URL format:", data.fileUrl);
+        continue;
+      }
+
       const file = bucket.file(filePath);
       const [signedUrl] = await file.getSignedUrl({
         action: 'read',
@@ -1911,7 +1939,8 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         let isBlankSheet = data.isBlankSheet === true;
         
         if (!isBlankSheet) {
-          const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
+          const filePath = extractFilePath(data.fileUrl, bucket.name);
+          if (!filePath) throw new Error("Invalid file URL: " + data.fileUrl);
           const file = bucket.file(filePath);
           const [generatedUrl] = await file.getSignedUrl({
             action: 'read',
@@ -2042,7 +2071,9 @@ setInterval(async () => {
     let finalFileUrl = data.fileUrl;
     
     // Download to get page count or convert
-    const bucketFile = bucket.file(data.fileUrl.split(`${bucket.name}/`)[1]);
+    const filePath = extractFilePath(data.fileUrl, bucket.name);
+    if (!filePath) throw new Error("Invalid fileUrl for background processor");
+    const bucketFile = bucket.file(filePath);
     const [buffer] = await bucketFile.download();
     
     if (data.mimetype === "application/pdf") {
@@ -2125,10 +2156,8 @@ app.get("/cron/cleanup-files", async (req, res) => {
       
       if (data.fileUrl) {
         try {
-          const bucketStr = bucket.name + "/";
-          const parts = data.fileUrl.split(bucketStr);
-          if (parts.length > 1) {
-            const filePath = parts[1];
+          const filePath = extractFilePath(data.fileUrl, bucket.name);
+          if (filePath) {
             await bucket.file(filePath).delete();
           }
         } catch (bucketErr) {
