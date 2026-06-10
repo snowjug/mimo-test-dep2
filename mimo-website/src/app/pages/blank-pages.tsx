@@ -160,16 +160,13 @@ export function BlankPages() {
           {/* Print Destination Selection */}
           <Card className="border-0 shadow-xl bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
             <CardHeader className="px-4 pt-4 pb-2 flex flex-row items-start gap-3 space-y-0">
-              <div className="p-2 bg-blue-50/80 rounded-xl shrink-0">
+              <div className="p-2 bg-blue-50/80 rounded-xl shrink-0 -mt-0.5">
                 <MapPin className="w-5 h-5 text-blue-600" />
               </div>
               <div className="flex flex-col gap-0.5">
                 <CardTitle className="text-lg font-extrabold text-slate-900">
-                  Print Destination
-                </CardTitle>
-                <CardDescription className="text-sm font-medium text-slate-500">
                   Where do you want to print this?
-                </CardDescription>
+                </CardTitle>
               </div>
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-3">
@@ -178,7 +175,7 @@ export function BlankPages() {
                 className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
                   directKioskId === 'CV-001' 
                     ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]' 
-                    : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+                    : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
                 } active:scale-[0.99]`}
               >
                 <div className="flex items-center gap-3">
@@ -191,12 +188,12 @@ export function BlankPages() {
                     <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
                       directKioskId === 'CV-001' ? 'text-[#093765]' : 'text-slate-700'
                     }`}>
-                      KIOSK-001-CV 
+                      MIMO 1.0
                       <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
                         B&W
                       </Badge>
                     </p>
-                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at C.V Raman Block in Black & White.</p>
+                    <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">C. V. Raman Block</p>
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
@@ -213,7 +210,7 @@ export function BlankPages() {
                 className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
                   directKioskId === 'SV-002' 
                     ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]'
-                    : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+                    : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
                 } active:scale-[0.99]`}
               >
                 <div className="flex items-center gap-3">
@@ -230,14 +227,14 @@ export function BlankPages() {
                         ? 'text-[#093765]' 
                         : 'text-slate-700'
                     }`}>
-                      KIOSK-002-SV 
+                      MIMO 2.0
                       <span className="flex gap-1">
                         <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
                           B&W
                         </Badge>
                       </span>
                     </p>
-                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at Swami Vivekananda Block in B&W.</p>
+                    <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">Swami Vivekananda Block</p>
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${

@@ -110,7 +110,7 @@ export function UserProfile() {
         .profile-page { font-family: 'Inter', sans-serif; }
         .nav-item-active { background: linear-gradient(135deg, #093765 0%, #1d4ed8 100%); color: white; box-shadow: 0 4px 14px rgba(9,55,101,0.25); }
         .nav-item-active svg { color: white !important; }
-        .coin-card { background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); }
+        .coin-card { background: linear-gradient(135deg, #093765 0%, #1e40af 60%, #1d4ed8 100%); }
         .profile-hero { background: linear-gradient(135deg, #093765 0%, #1e40af 60%, #1d4ed8 100%); }
         @keyframes float { 0%,100% { transform: translateY(0px) rotate(12deg); } 50% { transform: translateY(-8px) rotate(12deg); } }
         .float-anim { animation: float 4s ease-in-out infinite; }
@@ -162,18 +162,18 @@ export function UserProfile() {
               <p className="text-blue-200 text-sm sm:text-base font-medium mt-0.5 mb-4">{email}</p>
 
               {/* Stats row */}
-              <div className="flex flex-wrap justify-center sm:justify-start gap-3">
-                <div className="glass-card rounded-xl px-4 py-2 text-center">
-                  <div className="text-lg font-black text-white">{mimoCoinsInfo.balance}</div>
-                  <div className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">Mimo Coins</div>
+              <div className="flex justify-center sm:justify-start gap-2 sm:gap-3 w-full">
+                <div className="glass-card rounded-xl px-2 sm:px-4 py-2 text-center flex-1 sm:flex-none min-w-0">
+                  <div className="text-lg sm:text-xl font-black text-white truncate">{mimoCoinsInfo.balance}</div>
+                  <div className="text-[9px] sm:text-[10px] text-blue-200 font-semibold uppercase tracking-wider truncate">Mimo Coins</div>
                 </div>
-                <div className="glass-card rounded-xl px-4 py-2 text-center">
-                  <div className="text-lg font-black text-white">{printHistory.length}</div>
-                  <div className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">Print Jobs</div>
+                <div className="glass-card rounded-xl px-2 sm:px-4 py-2 text-center flex-1 sm:flex-none min-w-0">
+                  <div className="text-lg sm:text-xl font-black text-white truncate">{printHistory.length}</div>
+                  <div className="text-[9px] sm:text-[10px] text-blue-200 font-semibold uppercase tracking-wider truncate">Print Jobs</div>
                 </div>
-                <div className="glass-card rounded-xl px-4 py-2 text-center">
-                  <div className="text-lg font-black text-white">₹{(mimoCoinsInfo.balance * 0.5).toFixed(0)}</div>
-                  <div className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">Coin Value</div>
+                <div className="glass-card rounded-xl px-2 sm:px-4 py-2 text-center flex-1 sm:flex-none min-w-0">
+                  <div className="text-lg sm:text-xl font-black text-white truncate">₹{(mimoCoinsInfo.balance * 0.5).toFixed(0)}</div>
+                  <div className="text-[9px] sm:text-[10px] text-blue-200 font-semibold uppercase tracking-wider truncate">Coin Value</div>
                 </div>
               </div>
             </div>
