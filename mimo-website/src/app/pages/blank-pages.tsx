@@ -93,20 +93,18 @@ export function BlankPages() {
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full hover:bg-white hover:shadow-sm"
+        {/* ── Page Header ── */}
+        <div className="flex items-center gap-2 py-2">
+          <button
             onClick={() => navigate("/upload")}
+            className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-200/40 -ml-1"
+            aria-label="Back"
           >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent">
-              {label}
-            </h1>
-          </div>
+            <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
+          </button>
+          <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent tracking-tight leading-tight py-1">
+            {label}
+          </h1>
         </div>
 
         <div className="max-w-md mx-auto w-full space-y-4 sm:space-y-6">

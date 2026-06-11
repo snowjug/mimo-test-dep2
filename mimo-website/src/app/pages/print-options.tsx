@@ -564,11 +564,6 @@ export function PrintOptions() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-800">Do you prefer B&W or color prints?</p>
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                    {directKioskId === "CV-001" 
-                      ? `₹${pricePerPageBW.toFixed(2)}/page • B&W Only` 
-                      : `₹${pricePerPageBW.toFixed(2)}/page B&W • ₹${pricePerPageColor.toFixed(2)}/page Color`}
-                  </p>
                 </div>
                 <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
                   <button
