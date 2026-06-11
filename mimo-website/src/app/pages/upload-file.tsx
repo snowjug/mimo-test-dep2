@@ -631,7 +631,7 @@ export function UploadFile() {
                     </div>
                     <div className="text-left">
                       <h3 className="text-sm sm:text-base font-bold text-slate-700 group-hover:text-[#093765] transition-colors">Add more files</h3>
-                      <p className="text-xs text-slate-400">PDF, DOCX, Images, TXT, PPTX, Excel</p>
+                      <p className="text-xs text-slate-400">PDF, DOCX, Images, TXT, PPTX, &amp; more</p>
                     </div>
                   </div>
                   <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx" onChange={(e) => handleFileSelect(e.target.files)} />
@@ -653,7 +653,7 @@ export function UploadFile() {
                     {isDragging ? "Release to upload!" : "Click or drag files here to print"}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-400 mb-1 max-w-xs mx-auto">
-                    PDF, DOCX, JPG, PNG, TXT, PPTX, Excel
+                    PDF, DOCX, JPG, PNG, TXT, PPTX, &amp; more
                   </p>
                   <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx" onChange={(e) => handleFileSelect(e.target.files)} />
                 </>
