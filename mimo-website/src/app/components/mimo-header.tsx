@@ -35,11 +35,11 @@ export function MimoHeader() {
 
   return (
     <>
-      <div className="flex items-end justify-between border-b-[5px] border-[#194059] mb-0 pt-0.5 pb-0">
+      <div className="flex items-end justify-between border-b-[14px] border-[#194059] mb-0 pt-0.5 pb-0">
         <div className="flex items-end gap-2 cursor-pointer group overflow-hidden" onClick={() => navigate("/upload")}>
           <h1 
             className="text-4xl sm:text-5xl font-black text-[#194059] select-none m-0 translate-y-[3px] sm:translate-y-[4px]"
-            style={{ fontFamily: "'Lovelo', sans-serif", lineHeight: "0.8" }}
+            style={{ fontFamily: "'Lovelo', sans-serif", lineHeight: "0.8", WebkitTextStroke: "1px #194059" }}
           >
             MIMO
           </h1>

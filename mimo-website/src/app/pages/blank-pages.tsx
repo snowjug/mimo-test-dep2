@@ -106,11 +106,6 @@ export function BlankPages() {
             <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent">
               {label}
             </h1>
-            <p className="text-slate-500">
-              {isGraph
-                ? "Get graph paper sheets printed for your needs"
-                : "Get blank A4 sheets printed"}
-            </p>
           </div>
         </div>
 
@@ -147,11 +142,6 @@ export function BlankPages() {
                   >
                     {label}
                   </h3>
-                  <p className="text-sm text-slate-500 mt-1">
-                    {isGraph
-                      ? "Standard graph paper with grid lines"
-                      : "Plain white A4 sheet"}
-                  </p>
                 </div>
               </div>
             </CardContent>
@@ -250,14 +240,11 @@ export function BlankPages() {
 
           {/* Page Count Selector */}
           <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Number of Pages</CardTitle>
-              <CardDescription>
-                Select how many {isGraph ? "graph" : "blank"} sheets you need
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center gap-4 py-4">
+            <CardContent className="p-4 sm:p-5">
+              <p className="text-sm font-bold text-slate-800 mb-2">
+                How many {isGraph ? "graph" : "blank"} sheets do you need?
+              </p>
+              <div className="flex items-center justify-center gap-4 py-3">
                 <Button
                   variant="outline"
                   size="icon"

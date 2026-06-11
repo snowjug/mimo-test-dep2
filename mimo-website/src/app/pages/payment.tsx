@@ -245,23 +245,38 @@ export function Payment() {
 
   return (
     <div className="min-h-[100dvh] w-full bg-slate-50/50 px-2 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4">
+      <style>{`
+        .receipt-card, .receipt-card *:not(.keep-color):not(.keep-color *) {
+          color: #000000 !important;
+        }
+        .receipt-card *::placeholder {
+          color: #a1a1aa !important;
+        }
+      `}</style>
       <div className="mx-auto max-w-5xl space-y-1 sm:space-y-2">
 
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-center gap-1.5 mb-1.5 pt-1.5">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 text-slate-500 hover:text-slate-800 h-9 w-9 -ml-1 shrink-0" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-5 h-5" strokeWidth={2} />
-          </Button>
-          <h2 className="font-bold text-slate-700 text-xl sm:text-2xl tracking-tight leading-none">Secure Checkout</h2>
+        {/* ── Page Header ── */}
+        <div className="flex items-center gap-2 py-2">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-200/40 -ml-1"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
+          </button>
+          <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent tracking-tight leading-tight py-1">
+            Secure Checkout
+          </h1>
         </div>
 
         <div className="max-w-md mx-auto w-full group">
           <div className="relative mb-2.5" style={{ filter: 'drop-shadow(0 15px 25px rgba(0, 0, 0, 0.08))' }}>
             {/* Order Summary - Torn Receipt Style */}
             <Card 
-              className="border-0 bg-[#fefdfb] text-slate-900 overflow-hidden animate-in fade-in duration-500 rounded-none pt-8 pb-5 px-4 sm:pt-10 sm:pb-6 sm:px-5 font-mono relative border-x border-slate-200/40"
+              className="receipt-card border-0 bg-[#fefdfb] text-slate-900 overflow-hidden animate-in fade-in duration-500 rounded-none pt-8 pb-5 px-4 sm:pt-10 sm:pb-6 sm:px-5 font-mono relative border-x border-slate-200/40"
               style={{
                 clipPath: 'polygon(0% 12px, 2.5% 0px, 5% 12px, 7.5% 0px, 10% 12px, 12.5% 0px, 15% 12px, 17.5% 0px, 20% 12px, 22.5% 0px, 25% 12px, 27.5% 0px, 30% 12px, 32.5% 0px, 35% 12px, 37.5% 0px, 40% 12px, 42.5% 0px, 45% 12px, 47.5% 0px, 50% 12px, 52.5% 0px, 55% 12px, 57.5% 0px, 60% 12px, 62.5% 0px, 65% 12px, 67.5% 0px, 70% 12px, 72.5% 0px, 75% 12px, 77.5% 0px, 80% 12px, 82.5% 0px, 85% 12px, 87.5% 0px, 90% 12px, 92.5% 0px, 95% 12px, 97.5% 0px, 100% 12px, 100% calc(100% - 12px), 97.5% 100%, 95% calc(100% - 12px), 92.5% 100%, 90% calc(100% - 12px), 87.5% 100%, 85% calc(100% - 12px), 82.5% 100%, 80% calc(100% - 12px), 77.5% 100%, 75% calc(100% - 12px), 72.5% 100%, 70% calc(100% - 12px), 67.5% 100%, 65% calc(100% - 12px), 62.5% 100%, 60% calc(100% - 12px), 57.5% 100%, 55% calc(100% - 12px), 52.5% 100%, 50% calc(100% - 12px), 47.5% 100%, 45% calc(100% - 12px), 42.5% 100%, 40% calc(100% - 12px), 37.5% 100%, 35% calc(100% - 12px), 32.5% 100%, 30% calc(100% - 12px), 27.5% 100%, 25% calc(100% - 12px), 22.5% 100%, 20% calc(100% - 12px), 17.5% 100%, 15% calc(100% - 12px), 12.5% 100%, 10% calc(100% - 12px), 7.5% 100%, 5% calc(100% - 12px), 2.5% 100%, 0% calc(100% - 12px))',
                 fontFamily: "'Courier New', Courier, monospace"
@@ -272,7 +287,7 @@ export function Payment() {
               {/* Brand Header */}
               <div className="text-center mb-0 mt-2 relative z-10">
                 <p className="font-extrabold text-lg sm:text-2xl uppercase tracking-[0.2em] text-slate-800 mb-1.5">
-                  <span className="font-black text-[#194059]" style={{ fontFamily: "'Lovelo', sans-serif" }}>MIMO</span> RECEIPT
+                  <span className="font-black text-black" style={{ fontFamily: "'Lovelo', sans-serif" }}>MIMO</span> RECEIPT
                 </p>
                 <div className="text-xs text-slate-500 mt-1.5 uppercase leading-relaxed font-bold">
                   <p>ADD: Yelahanka, Bangalore, Karnataka, 560064</p>
@@ -364,13 +379,13 @@ export function Payment() {
                   <span>₹{totalCost.toFixed(2)}</span>
                 </div>
                 {discountAmount > 0 && (
-                  <div className="flex justify-between pl-3 text-xs text-blue-700 font-medium">
+                  <div className="keep-color flex justify-between pl-3 text-xs text-blue-700 font-medium">
                     <span>Coins Offset</span>
                     <span>-₹{discountAmount.toFixed(2)}</span>
                   </div>
                 )}
                 {promoDiscount > 0 && (
-                  <div className="flex justify-between pl-3 text-xs text-green-700 font-medium">
+                  <div className="keep-color flex justify-between pl-3 text-xs text-green-700 font-medium">
                     <span>Promo Discount ({appliedPromo})</span>
                     <span>-₹{promoDiscount.toFixed(2)}</span>
                   </div>
@@ -402,7 +417,7 @@ export function Payment() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between p-2 mx-1 bg-green-50/60 rounded border border-dashed border-green-400/60">
+                  <div className="keep-color flex items-center justify-between p-2 mx-1 bg-green-50/60 rounded border border-dashed border-green-400/60">
                     <div className="flex flex-col">
                       <span className="text-xs text-green-600 uppercase font-bold tracking-wider mb-0.5">Promo Applied</span>
                       <span className="text-sm font-black text-green-900 tracking-wide">{appliedPromo}</span>
@@ -423,7 +438,7 @@ export function Payment() {
               {mimoCoinsBalance > 0 && (
                 <>
                   <div className="border-t border-dotted border-slate-200 w-full my-1.5 relative z-10" />
-                  <div className="flex flex-col gap-1.5 p-3 bg-purple-50/30 rounded border border-dashed border-purple-300/60 relative z-10">
+                  <div className="keep-color flex flex-col gap-1.5 p-3 bg-purple-50/30 rounded border border-dashed border-purple-300/60 relative z-10">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <Gift className="w-4 h-4 text-purple-600" />

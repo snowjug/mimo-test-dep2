@@ -110,7 +110,7 @@ export function UserProfile() {
         .profile-page { font-family: 'Inter', sans-serif; }
         .nav-item-active { background: linear-gradient(135deg, #093765 0%, #1d4ed8 100%); color: white; box-shadow: 0 4px 14px rgba(9,55,101,0.25); }
         .nav-item-active svg { color: white !important; }
-        .coin-card { background: linear-gradient(135deg, #093765 0%, #1e40af 60%, #1d4ed8 100%); }
+        .coin-card { background: linear-gradient(135deg, #3b0764 0%, #6d28d9 60%, #8b5cf6 100%); }
         .profile-hero { background: linear-gradient(135deg, #093765 0%, #1e40af 60%, #1d4ed8 100%); }
         @keyframes float { 0%,100% { transform: translateY(0px) rotate(12deg); } 50% { transform: translateY(-8px) rotate(12deg); } }
         .float-anim { animation: float 4s ease-in-out infinite; }
@@ -120,7 +120,7 @@ export function UserProfile() {
       <div className="profile-page mx-auto max-w-5xl">
 
         {/* ── Page Header ── */}
-        <div className="flex items-center gap-2 pt-6 pb-6">
+        <div className="flex items-center gap-2 py-2">
           <button
             onClick={() => navigate("/upload")}
             className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-200/40 -ml-1"
@@ -158,7 +158,7 @@ export function UserProfile() {
 
             {/* Info */}
             <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow">{name || "—"}</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight drop-shadow" style={{ fontFamily: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif" }}>{name || "—"}</h2>
               <p className="text-blue-200 text-sm sm:text-base font-medium mt-0.5 mb-4">{email}</p>
 
               {/* Stats row */}

@@ -104,8 +104,6 @@ export function PrintOptions() {
   const gridLayouts = [
     { id: "2", label: "2 per page", cols: 1, rows: 2, desc: "1×2 grid" },
     { id: "4", label: "4 per page", cols: 2, rows: 2, desc: "2×2 grid" },
-    { id: "6", label: "6 per page", cols: 2, rows: 3, desc: "2×3 grid" },
-    { id: "9", label: "9 per page", cols: 3, rows: 3, desc: "3×3 grid" },
   ];
 
   useEffect(() => {
@@ -493,21 +491,18 @@ export function PrintOptions() {
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-center gap-1 lg:hidden mb-1.5 pt-1">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 text-slate-500 hover:text-slate-800 h-9 w-9 -ml-1 shrink-0" onClick={() => navigate("/upload")}>
-            <ArrowLeft className="w-5 h-5" strokeWidth={2} />
-          </Button>
-          <span className="font-bold text-slate-700 text-xl tracking-tight">Print Settings</span>
-        </div>
-
-        <div className="hidden lg:flex items-center gap-2.5 mb-2.5 pt-1.5">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 text-slate-500 hover:text-slate-800 flex-shrink-0 h-9 w-9 -ml-1" onClick={() => navigate("/upload")}>
-            <ArrowLeft className="w-5 h-5" strokeWidth={2} />
-          </Button>
-          <div className="min-w-0 flex flex-col">
-            <h2 className="text-2xl font-bold text-slate-700 tracking-tight leading-none">Print Settings</h2>
-            <p className="text-xs text-slate-400 font-medium mt-1">Customize how you want your documents to look</p>
-          </div>
+        {/* ── Page Header ── */}
+        <div className="flex items-center gap-2 py-2">
+          <button
+            onClick={() => navigate("/upload")}
+            className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-200/40 -ml-1"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
+          </button>
+          <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent tracking-tight leading-tight py-1">
+            Print Settings
+          </h1>
         </div>
 
         {/* Mobile Print Destination (Visible only on mobile) */}
@@ -523,7 +518,7 @@ export function PrintOptions() {
             <Card className="border-0 shadow-sm bg-white/80 backdrop-blur hover:shadow-md transition-all duration-300 overflow-hidden">
               <CardHeader className="px-4 pt-4 pb-0 flex flex-row items-start gap-3 space-y-0">
                 <div className="p-2 bg-blue-50/80 rounded-xl shrink-0 -mt-0.5">
-                  <Settings className="w-5 h-5 text-blue-600" />
+                  <Sliders className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <CardTitle className="text-lg font-extrabold text-slate-900">
@@ -1040,7 +1035,7 @@ export function PrintOptions() {
                         )}
                         <p className="text-sm font-bold text-slate-800 mb-3">Layout</p>
 
-                        <div key={`grid-${orientation}`} className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        <div key={`grid-${orientation}`} className="grid grid-cols-3 gap-3 sm:gap-4">
                     {[
                       { id: "1", label: "1 per page", cols: 1, rows: 1, desc: "Full page" },
                       ...gridLayouts,
@@ -1304,18 +1299,45 @@ export function PrintOptions() {
                           </div>
                         );
                       } else if (isImage) {
+                        const layoutId = photoLayout;
+                        const cols = layoutId === "1" ? 1 : (orientation === "landscape" ? (gridLayouts.find((l) => l.id === layoutId)?.rows ?? 1) : (gridLayouts.find((l) => l.id === layoutId)?.cols ?? 1));
+                        const rows = layoutId === "1" ? 1 : (orientation === "landscape" ? (gridLayouts.find((l) => l.id === layoutId)?.cols ?? 1) : (gridLayouts.find((l) => l.id === layoutId)?.rows ?? 1));
+                        const totalCells = layoutId === "1" ? 1 : (gridLayouts.find((l) => l.id === layoutId)?.cols ?? 1) * (gridLayouts.find((l) => l.id === layoutId)?.rows ?? 1);
+
                         return (
-                          <div className="w-full h-full flex items-center justify-center overflow-hidden bg-slate-200/50 rounded-md">
-                            <img 
-                              src={previewDataUrl} 
-                              alt="Preview" 
-                              className="max-w-full max-h-full object-contain transition-all duration-300"
+                          <div className="w-full h-full flex items-center justify-center p-2 bg-slate-200/50 rounded-md overflow-hidden">
+                            <div 
+                              className="bg-white shadow-lg p-3 transition-all duration-300 flex items-center justify-center overflow-hidden"
                               style={{ 
-                                filter: filterStyle,
-                                transform: transformStyle,
-                                transformOrigin: "center center"
+                                aspectRatio: orientation === "landscape" ? "1.414 / 1" : "1 / 1.414",
+                                maxHeight: "100%",
+                                maxWidth: "100%"
                               }}
-                            />
+                            >
+                              <div
+                                className="w-full h-full"
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                                  gridTemplateRows: `repeat(${rows}, 1fr)`,
+                                  gap: "6px",
+                                }}
+                              >
+                                {Array.from({ length: totalCells }).map((_, i) => (
+                                  <div key={i} className="overflow-hidden rounded-sm bg-slate-50 flex items-center justify-center h-full w-full relative">
+                                    <img
+                                      src={previewDataUrl}
+                                      alt="Preview"
+                                      className={`w-full h-full transition-all duration-300 ${imageScaling === "fill" ? "object-cover" : "object-contain"}`}
+                                      style={{
+                                        filter: filterStyle,
+                                        ...(imageScaling === "custom" ? { transform: `scale(${customScale / 100})`, transformOrigin: "center center" } : {})
+                                      }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         );
                       }
