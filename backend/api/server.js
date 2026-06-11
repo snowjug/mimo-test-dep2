@@ -1359,8 +1359,8 @@ app.post("/create-order", authenticateToken, async (req, res) => {
       console.log(`[CREATE-ORDER] 100% discount — skipping Cashfree, generating print code directly`);
       const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
       const internalRes = await axios.post(
-        `http://localhost:${process.env.PORT || 3000}/payment-success`,
-        { isFreeBypass: true },
+        `http://127.0.0.1:${process.env.PORT || 3000}/payment-success`,
+        { isFreeBypass: true, printOptions },
         { headers: { Authorization: `Bearer ${dummyToken}` } }
       );
       return res.json({ orderId, free: true, printCode: internalRes.data.printCode });
@@ -1479,7 +1479,7 @@ app.get("/verify-payment/:orderId", async (req, res) => {
       try {
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         const internalRes = await axios.post(
-          `http://localhost:${process.env.PORT || 3000}/payment-success`,
+          `http://127.0.0.1:${process.env.PORT || 3000}/payment-success`,
           { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
