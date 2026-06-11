@@ -41,7 +41,7 @@ def convert_to_pdf(input_path):
         subprocess.run([
             "libreoffice", "--headless", "--convert-to", "pdf",
             "--outdir", TEMP_DIR, input_path
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
         
         pdf_path = os.path.splitext(input_path)[0] + ".pdf"
         if os.path.exists(pdf_path):
@@ -406,9 +406,8 @@ def download_file(file_url, file_name):
 
 
 def safe_update(doc_ref, data):
-    import time
     try:
-        safe_update(doc_ref, data, timeout=5)
+        doc_ref.update(data, timeout=5)
     except Exception as e:
         print(f"⚠️ safe_update retry after error: {e}")
         try:
