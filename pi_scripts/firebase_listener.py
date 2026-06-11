@@ -1,5 +1,7 @@
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
+from google.cloud.firestore_v1.base_query import FieldFilter
+
 import time
 import subprocess
 import os
@@ -311,10 +313,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                     print(f"❌ File not a valid PDF")
                     return False
 
-        # Pre-flight check
-        status_cmd = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True)
-        if "disabled" in status_cmd.stdout.lower() or "unplugged" in status_cmd.stdout.lower():
-            raise Exception(f"Pre-flight failed: Printer {printer_name} is offline or unplugged.")
+
 
         sliced_paths = []
         if page_range:
@@ -342,26 +341,6 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         lp_output = result.stdout.strip()
         print(f"CUPS: {lp_output}")
         
-        import re
-        job_id_match = re.search(r'request id is (\S+)', lp_output)
-        if job_id_match:
-            job_id = job_id_match.group(1)
-            print(f"⏳ STRICT MODE: Validating hardware acceptance for job {job_id}...")
-            for _ in range(45):
-                time.sleep(1)
-                q_status = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True).stdout
-                if job_id not in q_status:
-                    print("✅ Job successfully passed to hardware!")
-                    return True
-                
-                p_status = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True).stdout.lower()
-                if "unplugged" in p_status or "turned off" in p_status:
-                    subprocess.run(["cancel", job_id])
-                    raise Exception("Printer hardware is unplugged or turned off.")
-                if "waiting for printer" in p_status:
-                    subprocess.run(["cancel", job_id])
-                    raise Exception("Printer hardware is unreachable (waiting for printer to become available).")
-            print("⏳ Job is large and still printing, assuming success.")
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Print failed: {e.stderr.strip() if e.stderr else str(e)}")
@@ -403,6 +382,20 @@ def download_file(file_url, file_name):
         print(f"❌ Download failed: {e}")
         return None
 
+
+def safe_update(doc_ref, data):
+    import time
+    try:
+        safe_update(doc_ref, data, timeout=5)
+    except Exception as e:
+        print(f"⚠️ safe_update retry after error: {e}")
+        try:
+            # Refresh connection by using a new document reference
+            new_ref = db.collection('print_jobs').document(doc_ref.id)
+            new_ref.update(data, timeout=10)
+        except Exception as e2:
+            print(f"❌ safe_update final failure: {e2}")
+
 def process_job(doc_snapshot):
     doc = doc_snapshot.to_dict()
     doc_id = doc_snapshot.id
@@ -442,7 +435,7 @@ def process_job(doc_snapshot):
             f_name = f.get("name", "document.pdf")
             l_path = download_file(f_url, f_name)
             if not l_path:
-                doc_ref.update({"status": "failed", "printerStatus": f"Failed to download {f_name}"})
+                safe_update(doc_ref, {"status": "failed", "printerStatus": f"Failed to download {f_name}"})
                 return
             local_paths.append(l_path)
             
@@ -465,7 +458,7 @@ def process_job(doc_snapshot):
                 pdf_path = convert_to_pdf(l_path)
                 if pdf_path: f_final = pdf_path
                 else:
-                    doc_ref.update({"status": "failed", "printerStatus": f"LibreOffice failed for {f_name}"})
+                    safe_update(doc_ref, {"status": "failed", "printerStatus": f"LibreOffice failed for {f_name}"})
                     return
             
             final_paths.append(f_final)
@@ -516,11 +509,6 @@ def process_job(doc_snapshot):
         if target_printer == "Brother_HL_L5210DN_series":
             target_printer = "Brother_HL_L5210DN_series_USB"
 
-        # Pre-wake Epson printer to prevent 5-minute deep sleep stalls
-        if "Epson" in target_printer or "Color" in target_printer or "L3250" in target_printer:
-            print("🚀 Pre-waking Epson color printer via ipp-usb restart...")
-            subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
-            time.sleep(1.5) # Give CUPS a moment to reconnect
 
         success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
         
@@ -533,12 +521,12 @@ def process_job(doc_snapshot):
             })
             print(f"🎉 Job {doc_id} marked as completed.")
         else:
-            doc_ref.update({"status": "failed", "printerStatus": "CUPS error on Pi"})
+            safe_update(doc_ref, {"status": "failed", "printerStatus": "CUPS error on Pi"})
 
             
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
-        doc_ref.update({"status": "failed", "printerStatus": f"Pi processing error: {str(e)[:50]}"})
+        safe_update(doc_ref, {"status": "failed", "printerStatus": f"Pi processing error: {str(e)[:50]}"})
 
     finally:
         try:
@@ -622,7 +610,7 @@ def watchdog_loop():
                     stuck_cycles[printer] = 0
             
             # Fallback polling for silent grpc disconnects
-            docs = db.collection('print_jobs').where('status', '==', 'printing').where('kioskId', '==', KIOSK_ID).stream()
+            docs = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID)).stream()
             for doc in docs:
                 if doc.id not in active_jobs:
                     data = doc.to_dict()
@@ -656,7 +644,7 @@ print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
 print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")
 print(f"📡 Waiting for jobs (status: 'printing', kioskId: '{KIOSK_ID}')...")
 
-query = db.collection('print_jobs').where('status', '==', 'printing').where('kioskId', '==', KIOSK_ID)
+query = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
 query_watch = query.on_snapshot(on_snapshot)
 
 try:
