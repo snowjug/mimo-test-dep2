@@ -124,6 +124,110 @@ const estimateDocxPages = async (file: File): Promise<number> => {
   return file.size > 2000000 ? Math.max(1, Math.floor(file.size / 500000)) : 1;
 };
 
+/**
+ * Count actual slides in a PPTX file by scanning the ZIP central directory
+ * for entries matching ppt/slides/slide{N}.xml
+ */
+const estimatePptxSlides = async (file: File): Promise<number> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+    const view = new DataView(arrayBuffer);
+
+    // Find End of Central Directory (EOCD) signature: 0x06054b50
+    let eocdOffset = -1;
+    for (let i = buffer.length - 22; i >= 0; i--) {
+      if (view.getUint32(i, true) === 0x06054b50) {
+        eocdOffset = i;
+        break;
+      }
+    }
+    if (eocdOffset === -1) return 1;
+
+    const cdCount = view.getUint16(eocdOffset + 10, true);
+    const cdStartOffset = view.getUint32(eocdOffset + 16, true);
+
+    let slideCount = 0;
+    let cdOffset = cdStartOffset;
+
+    for (let i = 0; i < cdCount; i++) {
+      if (cdOffset + 46 > buffer.length) break;
+      const sig = view.getUint32(cdOffset, true);
+      if (sig !== 0x02014b50) break;
+
+      const fileNameLen = view.getUint16(cdOffset + 28, true);
+      const extraFieldLen = view.getUint16(cdOffset + 30, true);
+      const commentLen = view.getUint16(cdOffset + 32, true);
+
+      const fileNameBytes = buffer.slice(cdOffset + 46, cdOffset + 46 + fileNameLen);
+      const fileName = new TextDecoder("utf-8").decode(fileNameBytes);
+
+      // Match ppt/slides/slide1.xml, ppt/slides/slide2.xml, etc.
+      if (/^ppt\/slides\/slide\d+\.xml$/.test(fileName)) {
+        slideCount++;
+      }
+
+      cdOffset += 46 + fileNameLen + extraFieldLen + commentLen;
+    }
+
+    return Math.max(1, slideCount);
+  } catch (err) {
+    console.error("Error reading PPTX slides:", err);
+    return 1;
+  }
+};
+
+/**
+ * Count worksheets in an XLSX file by scanning the ZIP central directory
+ * for entries matching xl/worksheets/sheet{N}.xml
+ */
+const estimateXlsxSheets = async (file: File): Promise<number> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+    const view = new DataView(arrayBuffer);
+
+    let eocdOffset = -1;
+    for (let i = buffer.length - 22; i >= 0; i--) {
+      if (view.getUint32(i, true) === 0x06054b50) {
+        eocdOffset = i;
+        break;
+      }
+    }
+    if (eocdOffset === -1) return 1;
+
+    const cdCount = view.getUint16(eocdOffset + 10, true);
+    const cdStartOffset = view.getUint32(eocdOffset + 16, true);
+
+    let sheetCount = 0;
+    let cdOffset = cdStartOffset;
+
+    for (let i = 0; i < cdCount; i++) {
+      if (cdOffset + 46 > buffer.length) break;
+      const sig = view.getUint32(cdOffset, true);
+      if (sig !== 0x02014b50) break;
+
+      const fileNameLen = view.getUint16(cdOffset + 28, true);
+      const extraFieldLen = view.getUint16(cdOffset + 30, true);
+      const commentLen = view.getUint16(cdOffset + 32, true);
+
+      const fileNameBytes = buffer.slice(cdOffset + 46, cdOffset + 46 + fileNameLen);
+      const fileName = new TextDecoder("utf-8").decode(fileNameBytes);
+
+      if (/^xl\/worksheets\/sheet\d+\.xml$/.test(fileName)) {
+        sheetCount++;
+      }
+
+      cdOffset += 46 + fileNameLen + extraFieldLen + commentLen;
+    }
+
+    return Math.max(1, sheetCount);
+  } catch (err) {
+    console.error("Error reading XLSX sheets:", err);
+    return 1;
+  }
+};
+
 export function UploadFile() {
   const navigate = useNavigate();
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -202,7 +306,10 @@ export function UploadFile() {
       // 1. Parse PDFs locally for page counts
       const filesMeta = await Promise.all(fileArray.map(async (f) => {
         let pageCount = 1;
-        const isDocx = f.name.toLowerCase().endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        const nameLower = f.name.toLowerCase();
+        const isDocx = nameLower.endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        const isPptx = nameLower.endsWith(".pptx") || f.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        const isXlsx = nameLower.endsWith(".xlsx") || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         if (f.type === "application/pdf") {
           try {
             const arrayBuffer = await f.arrayBuffer();
@@ -213,9 +320,13 @@ export function UploadFile() {
           }
         } else if (isDocx) {
           pageCount = await estimateDocxPages(f);
+        } else if (isPptx) {
+          pageCount = await estimatePptxSlides(f);
+        } else if (isXlsx) {
+          pageCount = await estimateXlsxSheets(f);
         } else if (!f.type.startsWith("image/")) {
-            // Rough estimation for other files (e.g. pptx, xlsx) based on file size
-            pageCount = f.size > 2000000 ? Math.floor(f.size / 500000) : 1;
+          // Fallback for legacy .doc, .ppt, .xls, .txt — 1 page estimate
+          pageCount = 1;
         }
         return { name: f.name, type: f.type, size: f.size, pageCount };
       }));
@@ -520,10 +631,10 @@ export function UploadFile() {
                     </div>
                     <div className="text-left">
                       <h3 className="text-sm sm:text-base font-bold text-slate-700 group-hover:text-[#093765] transition-colors">Add more files</h3>
-                      <p className="text-xs text-slate-400">PDF, DOCX, Images, TXT, PPTX</p>
+                      <p className="text-xs text-slate-400">PDF, DOCX, Images, TXT, PPTX, Excel</p>
                     </div>
                   </div>
-                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.ppt,.pptx" onChange={(e) => handleFileSelect(e.target.files)} />
+                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx" onChange={(e) => handleFileSelect(e.target.files)} />
                 </>
               ) : (
                 <>
@@ -542,9 +653,9 @@ export function UploadFile() {
                     {isDragging ? "Release to upload!" : "Click or drag files here to print"}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-400 mb-1 max-w-xs mx-auto">
-                    PDF, DOCX, JPG, PNG, TXT, PPTX
+                    PDF, DOCX, JPG, PNG, TXT, PPTX, Excel
                   </p>
-                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.ppt,.pptx" onChange={(e) => handleFileSelect(e.target.files)} />
+                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx" onChange={(e) => handleFileSelect(e.target.files)} />
                 </>
               )}
             </div>

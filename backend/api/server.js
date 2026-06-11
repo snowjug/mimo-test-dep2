@@ -1047,7 +1047,9 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
     }
 
     for (const file of files) {
-      const fileUrl = `https://storage.googleapis.com/${bucket.name}/${file.storagePath}`;
+      // Use the Firebase download URL the frontend sends (file.url)
+      // Fall back to constructing from storagePath only if url is missing
+      const fileUrl = file.url || `https://storage.googleapis.com/${bucket.name}/${file.storagePath}`;
       
       const baseJobData = {
         userId,
@@ -1077,14 +1079,17 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
         metadata: { ipAddress: req.ip || "", userAgent: req.get("user-agent") || "", tags: [] }
       };
 
-      if (file.type.startsWith("image/") || (file.type === "application/pdf" && file.pageCount > 0)) {
+      // If the client already computed a valid pageCount (PDF, PPTX, DOCX, XLSX, images),
+      // skip slow server-side LibreOffice conversion and go straight to "pending"
+      const clientPageCount = file.pageCount || 0;
+      if (file.type.startsWith("image/") || clientPageCount > 0) {
         await db.collection("print_jobs").add({
           ...baseJobData,
           status: "pending",
-          pageCount: file.type.startsWith("image/") ? 1 : file.pageCount,
+          pageCount: file.type.startsWith("image/") ? 1 : clientPageCount,
         });
       } else {
-        // Office docs (and PDFs that failed client parsing) get queued for background processing
+        // Only fall back to server-side conversion if client couldn't determine page count
         await db.collection("print_jobs").add({
           ...baseJobData,
           status: "pending_conversion",
