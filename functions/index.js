@@ -942,8 +942,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       // Update Print Jobs (V1 + V2 Schema)
       const jobs = await db
         .collection("print_jobs")
-        .where("userId", "==", userId)
-        .where("status", "==", "pending")
+        .where("orderId", "==", orderId)
         .get();
         
       const jobsBatch = db.batch();
