@@ -665,7 +665,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
         name: data.fileName,
         url: data.fileUrl,
         type: data.mimetype,
-        size: data.size,
+        size: data.size || data.fileSize || 0,
         pageCount: numPages
       });
       
@@ -747,7 +747,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       await db.collection("orders").add({
         orderId, userId, amount: 0, totalPages: totalRawPages, totalDocs: mergedFiles.length,
         status: "PAID", orderStatus: "completed", printJobs: [newJobRef.id],
-        createdAt: now, couponCode, discountPercentage,
+        createdAt: now, couponCode: couponCode || null, discountPercentage,
         coinsUsed: coinsToUse || 0
       });
 
