@@ -493,20 +493,20 @@ export function PrintOptions() {
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-center gap-0 lg:hidden">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 hover:text-[#093765] h-10 w-10 -ml-2 shrink-0" onClick={() => navigate("/upload")}>
-            <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
+        <div className="flex items-center gap-1 lg:hidden mb-1.5 pt-1">
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 text-slate-500 hover:text-slate-800 h-9 w-9 -ml-1 shrink-0" onClick={() => navigate("/upload")}>
+            <ArrowLeft className="w-5 h-5" strokeWidth={2} />
           </Button>
-          <span className="font-extrabold text-[#093765] text-2xl tracking-tight">Print Settings</span>
+          <span className="font-bold text-slate-700 text-xl tracking-tight">Print Settings</span>
         </div>
 
-        <div className="hidden lg:flex items-start gap-3 mb-2">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 hover:text-[#093765] flex-shrink-0 h-11 w-11 mt-0.5 -ml-2" onClick={() => navigate("/upload")}>
-            <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
+        <div className="hidden lg:flex items-center gap-2.5 mb-2.5 pt-1.5">
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 text-slate-500 hover:text-slate-800 flex-shrink-0 h-9 w-9 -ml-1" onClick={() => navigate("/upload")}>
+            <ArrowLeft className="w-5 h-5" strokeWidth={2} />
           </Button>
-          <div className="min-w-0 pt-1.5 flex flex-col">
-            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-700 bg-clip-text text-transparent tracking-tight leading-tight mb-0.5">Print Settings</h1>
-            <p className="text-sm text-slate-500 font-medium">Customize how you want your documents to look</p>
+          <div className="min-w-0 flex flex-col">
+            <h2 className="text-2xl font-bold text-slate-700 tracking-tight leading-none">Print Settings</h2>
+            <p className="text-xs text-slate-400 font-medium mt-1">Customize how you want your documents to look</p>
           </div>
         </div>
 
@@ -1147,16 +1147,15 @@ export function PrintOptions() {
 
       {/* File Preview */}
             <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
-              <CardHeader className="px-4 pt-4 pb-1 gap-1">
-                <CardTitle className="text-base">Document Preview</CardTitle>
-                <CardDescription className="text-xs">Files ready to print</CardDescription>
-              </CardHeader>
-              <CardContent className="px-4 pb-4">
+              <div className="px-4 pt-2 pb-2 flex flex-col gap-1">
+                <CardTitle className="text-base">Do you want a preview?</CardTitle>
+              </div>
+              <div className="px-4 pb-3">
                 <div className="space-y-3">
                   {files.map((file, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 border border-slate-100 rounded-xl hover:bg-slate-50/50 hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5 hover:-translate-y-0.5 active:scale-[0.98] active:bg-blue-50/40 active:border-blue-200/60 transition-all duration-300 cursor-pointer group/row"
+                      className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-white border-2 border-slate-300 rounded-2xl hover:bg-slate-50/50 hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] active:bg-blue-50/40 active:border-blue-400/60 transition-all duration-300 cursor-pointer group/row shadow-sm"
                       onClick={() => setSelectedPreview(index)}
                     >
                       <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors group-hover/row:bg-blue-100">
@@ -1171,13 +1170,13 @@ export function PrintOptions() {
                         size="sm"
                         className="bg-blue-50/50 border-blue-200 hover:bg-blue-100 hover:border-blue-300 text-blue-700 hover:text-[#093765] shadow-xs transition-all duration-200 rounded-lg cursor-pointer active:scale-95"
                       >
-                        <Eye className="w-4 h-4 mr-2 text-blue-600 transition-colors animate-eye-blink" />
+                        <Eye className="w-4 h-4 mr-2 text-blue-600 transition-colors" />
                         Preview
                       </Button>
                     </div>
                   ))}
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </div>
 
@@ -1193,10 +1192,9 @@ export function PrintOptions() {
               <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <Printer className="w-32 h-32 rotate-12" />
               </div>
-              <CardHeader className="border-b border-white/5 pb-3 sm:pb-3.5 bg-white/[0.02] px-4 sm:px-5 pt-3.5 sm:pt-4 relative z-10">
-                <CardTitle className="text-lg sm:text-xl font-bold tracking-tight">Cost Summary</CardTitle>
-                <CardDescription className="text-blue-100/70 text-xs">Final printing breakdown</CardDescription>
-              </CardHeader>
+              <div className="border-b border-white/5 py-3 sm:py-3.5 bg-white/[0.02] px-4 sm:px-5 relative z-10 flex items-center justify-center">
+                <CardTitle className="text-lg sm:text-xl font-bold tracking-tight w-full text-left">Cost Summary</CardTitle>
+              </div>
               <CardContent className="space-y-3 sm:space-y-3.5 p-4 sm:p-5 relative z-10">
                 <div className="space-y-3 sm:space-y-4 font-medium text-xs">
                   <div className="flex justify-between items-center text-blue-100/90">

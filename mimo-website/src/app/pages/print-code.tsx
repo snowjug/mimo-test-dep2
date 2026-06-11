@@ -248,15 +248,15 @@ export function PrintCode() {
                     ? "Printed Successfully!"
                     : "Payment Successful!"}
             </h2>
-            <p className="text-[10px] sm:text-xs text-gray-500 transition-all max-w-md mx-auto mb-2">
-              {isProcessing 
-                ? "Securely preparing your documents..." 
-                : printStatus === "printing"
-                  ? "Currently printing at the kiosk..."
-                  : printStatus === "completed"
-                    ? "Your document has been printed."
-                    : "Your print job has been confirmed."}
-            </p>
+            {(isProcessing || printStatus === "printing" || printStatus === "completed") && (
+              <p className="text-[10px] sm:text-xs text-gray-500 transition-all max-w-md mx-auto mb-2">
+                {isProcessing 
+                  ? "Securely preparing your documents..." 
+                  : printStatus === "printing"
+                    ? "Currently printing at the kiosk..."
+                    : "Your document has been printed."}
+              </p>
+            )}
 
             {/* Status Progress Bar */}
             <div className="flex items-center justify-between w-full max-w-[240px] mx-auto mt-1 mb-0.5">
@@ -299,11 +299,11 @@ export function PrintCode() {
               <div className="absolute top-0 right-0 p-2 opacity-5 pointer-events-none">
                 <Printer className="w-20 h-20 rotate-[-15deg]" />
               </div>
-              <p className="text-center text-[9px] sm:text-[10px] font-semibold text-gray-600 mb-0.5">
+              <p className="text-center text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-widest mb-1">
                 Your Print Code
               </p>
               <div className="text-center">
-                <p className="text-3xl sm:text-4xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-[#093765] to-blue-600 font-mono mb-1.5 drop-shadow-xs">
+                <p className="text-5xl sm:text-6xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-[#093765] to-blue-600 font-mono mb-2 drop-shadow-sm">
                   {printCode}
                 </p>
                 <Button
