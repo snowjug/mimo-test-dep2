@@ -267,6 +267,9 @@ def impose_nup(input_pdf, output_pdf, layout_num):
         cell_h = canvas_h / rows
         
         pages = reader.pages
+        # If the user uploaded a single image/page and wants N-up, duplicate it to fill the sheet
+        if len(pages) == 1:
+            pages = [pages[0]] * int(layout_num)
         total_pages = len(pages)
         
         current_page_idx = 0
@@ -324,7 +327,10 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         print(f"🖨️  Sending to CUPS [{printer_name}]: {[os.path.basename(f) for f in file_paths]} "
               f"({copies} copies, layout: {photo_layout or '1-up'}, sides: {double_sided})")
-        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4", "-o", "fit-to-page"]
+        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4"]
+        
+        if not is_blank_sheet:
+            cmd.extend(["-o", "fit-to-page"])
 
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             cmd.extend(["-o", f"number-up={photo_layout}"])
