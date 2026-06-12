@@ -341,6 +341,17 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         lp_output = result.stdout.strip()
         print(f"CUPS: {lp_output}")
         
+        total_pages = 0
+        try:
+            from PyPDF2 import PdfReader
+            for f in file_paths:
+                reader = PdfReader(f)
+                total_pages += len(reader.pages)
+        except Exception:
+            total_pages = 1
+            
+        total_physical_pages = total_pages * copies
+        
         import re
         match = re.search(r'request id is (\S+)', lp_output)
         if match:
@@ -354,7 +365,10 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                         # Job is out of the queue, now ensure the physical printer is idle
                         status_res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True).stdout.lower()
                         if "printing" not in status_res:
-                            print(f"✅ CUPS job {job_id} completed and physical printer is idle!")
+                            eject_delay = 3.0 + (total_physical_pages * 1.5)
+                            print(f"✅ CUPS job {job_id} completed. Waiting {eject_delay:.1f}s for physical paper ejection...")
+                            time.sleep(eject_delay)
+                            print(f"✅ Physical print considered fully ejected!")
                             break
                 except Exception as e:
                     print(f"⚠️ lpstat check failed: {e}")
