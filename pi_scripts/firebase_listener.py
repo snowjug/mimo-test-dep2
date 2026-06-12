@@ -243,7 +243,10 @@ def impose_nup(input_pdf, output_pdf, layout_num):
     """Natively impose N-up pages onto an A4 canvas using PyPDF2."""
     try:
         from PyPDF2 import PdfReader, PdfWriter, PageObject, Transformation
-        reader = PdfReader(input_pdf)
+        import io
+        with open(input_pdf, "rb") as f:
+            pdf_bytes = f.read()
+            
         writer = PdfWriter()
         
         A4_W, A4_H = 595.276, 841.890
@@ -266,11 +269,14 @@ def impose_nup(input_pdf, output_pdf, layout_num):
         cell_w = canvas_w / cols
         cell_h = canvas_h / rows
         
-        pages = reader.pages
-        # If the user uploaded a single image/page and wants N-up, duplicate it to fill the sheet
-        if len(pages) == 1:
-            pages = [pages[0]] * int(layout_num)
-        total_pages = len(pages)
+        base_reader = PdfReader(io.BytesIO(pdf_bytes))
+        total_pages = len(base_reader.pages)
+        
+        if total_pages == 1:
+            total_pages = int(layout_num)
+            is_single = True
+        else:
+            is_single = False
         
         current_page_idx = 0
         while current_page_idx < total_pages:
@@ -279,7 +285,10 @@ def impose_nup(input_pdf, output_pdf, layout_num):
                 for col in range(cols):
                     if current_page_idx >= total_pages:
                         break
-                    p = pages[current_page_idx]
+                    
+                    fresh_reader = PdfReader(io.BytesIO(pdf_bytes))
+                    p = fresh_reader.pages[0 if is_single else current_page_idx]
+                    
                     p_w = float(p.mediabox.width)
                     p_h = float(p.mediabox.height)
                     

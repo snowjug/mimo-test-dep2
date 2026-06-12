@@ -146,6 +146,19 @@ export function Payment() {
       return;
     }
 
+    // Dismiss virtual keyboard and snap zoom back to 100% (reset zoom for iOS Safari)
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+      const originalContent = viewport.getAttribute('content') || "width=device-width, initial-scale=1.0";
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0');
+      setTimeout(() => {
+        viewport.setAttribute('content', originalContent);
+      }, 500);
+    }
+
     try {
       const response = await api.get(`/validate-coupon/${promoCode}`);
       const discountPercentage = response.data.discountPercentage;
@@ -153,21 +166,6 @@ export function Payment() {
       setPromoDiscount(discountAmount);
       setAppliedPromo(promoCode.toUpperCase());
       toast.success(`Promo code applied: ${discountPercentage}% discount!`);
-
-      // Dismiss virtual keyboard
-      if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
-      }
-
-      // Snap the viewport scale back to 100% (reset zoom)
-      const viewport = document.querySelector('meta[name="viewport"]');
-      if (viewport) {
-        const originalContent = viewport.getAttribute('content') || "width=device-width, initial-scale=1.0";
-        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0');
-        setTimeout(() => {
-          viewport.setAttribute('content', originalContent);
-        }, 500);
-      }
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Invalid promo code");
       setPromoError(true);
