@@ -545,14 +545,17 @@ def process_job(doc_snapshot):
                 print(f"⚠️ Native PyPDF2 imposition failed, falling back to CUPS number-up: {jam_err}")
                 try:
                     layout_num = int(photo_layout)
-                    p_info = subprocess.run(["pdfinfo", merged_pdf], capture_output=True, text=True)
                     total_p = 1
-                    for line in p_info.stdout.split('\n'):
-                        if "Pages:" in line:
-                            try:
-                                total_p = int(line.split(":")[1].strip())
-                            except:
-                                pass
+                    try:
+                        p_info = subprocess.run(["pdfinfo", merged_pdf], capture_output=True, text=True)
+                        for line in p_info.stdout.split('\n'):
+                            if "Pages:" in line:
+                                try:
+                                    total_p = int(line.split(":")[1].strip())
+                                except:
+                                    pass
+                    except Exception as pdfinfo_err:
+                        print(f"⚠️ pdfinfo failed ({pdfinfo_err}), assuming 1 page.")
                     
                     if total_p == 1:
                         dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_layout.pdf")
