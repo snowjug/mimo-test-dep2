@@ -324,7 +324,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         print(f"🖨️  Sending to CUPS [{printer_name}]: {[os.path.basename(f) for f in file_paths]} "
               f"({copies} copies, layout: {photo_layout or '1-up'}, sides: {double_sided})")
-        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4", "-o", "print-scaling=auto"]
+        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4", "-o", "fit-to-page"]
 
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             cmd.extend(["-o", f"number-up={photo_layout}"])
