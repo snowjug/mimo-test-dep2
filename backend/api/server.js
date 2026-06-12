@@ -612,13 +612,19 @@ app.get("/print-history", authenticateToken, async (req, res) => {
       .orderBy("createdAt", "desc")
       .get();
       
-    const history = snapshot.docs.map(doc => {
+    const history = snapshot.docs
+      .filter(doc => !!doc.data().printCode)
+      .map(doc => {
       const data = doc.data();
       const opts = data.printOptions || {};
+      const pricing = data.pricing || {};
       const colorMode = opts.colorMode || data.colorMode || "bw";
       const copies = opts.copies || data.copies || 1;
+      
+      const actualPageCount = data.pageCount || opts.totalPages || pricing.totalPages || 0;
+      
       const pricePerPage = colorMode === "color" ? 9.2 : 2.3;
-      const cost = (data.pageCount || 0) * copies * pricePerPage;
+      const cost = actualPageCount * copies * pricePerPage;
 
       let printerStatus = data.printerStatus || "Pending";
       if (!data.printerStatus) {
@@ -628,7 +634,7 @@ app.get("/print-history", authenticateToken, async (req, res) => {
         else if (data.status === "expired") printerStatus = "Expired";
       }
 
-      let details = `${data.pageCount || 0} pages • ${colorMode === 'bw' ? 'B&W' : 'Color'}`;
+      let details = `${actualPageCount} pages • ${colorMode === 'bw' ? 'B&W' : 'Color'}`;
       if (opts.doubleSided === 'double') details += ' • 2-Sided';
       else details += ' • 1-Sided';
 
@@ -645,8 +651,8 @@ app.get("/print-history", authenticateToken, async (req, res) => {
         copies,
         details,
         date: data.createdAt?.toDate
-          ? new Date(data.createdAt.toDate()).toLocaleString()
-          : new Date().toLocaleString(),
+          ? new Date(data.createdAt.toDate()).toISOString()
+          : new Date().toISOString(),
       };
     });
     

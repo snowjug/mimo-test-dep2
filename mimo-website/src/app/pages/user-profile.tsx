@@ -49,7 +49,23 @@ export function UserProfile() {
         setPhotoUrl(profileRes.data.photoUrl || null);
 
         const historyRes = await api.get("/print-history");
-        setPrintHistory(historyRes.data);
+        const validHistory = historyRes.data.filter((job: any) => job.printCode && job.printCode !== "-");
+        const mappedHistory = validHistory.map((job: any) => {
+           if (job.details && job.details.startsWith("0 pages")) {
+             const costNum = parseFloat(job.cost.replace('₹', ''));
+             const isColor = job.details.includes("Color");
+             const pricePerPage = isColor ? 9.2 : 2.3;
+             const copies = job.copies || 1;
+             if (costNum > 0) {
+               const calculatedPages = Math.round(costNum / (copies * pricePerPage));
+               if (calculatedPages > 0) {
+                 job.details = job.details.replace("0 pages", `${calculatedPages} pages`);
+               }
+             }
+           }
+           return job;
+        });
+        setPrintHistory(mappedHistory);
 
         const coinsRes = await api.get("/mimo/coins");
         const coinsData = {
@@ -419,7 +435,7 @@ export function UserProfile() {
                     </div>
                   </div>
                 </div>
-                <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 -mt-2.5 space-y-3">
+                <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-4">
                   {printHistory.length === 0 ? (
                     <div className="text-center py-12">
                       <Printer className="w-12 h-12 mx-auto text-slate-200 mb-3" />
@@ -427,7 +443,7 @@ export function UserProfile() {
                     </div>
                   ) : (
                     printHistory.map((job) => (
-                      <div key={job.id} className="border border-slate-100 rounded-xl p-4 hover:border-blue-200 hover:bg-blue-50/20 transition-all duration-200">
+                      <div key={job.id} className="border border-slate-200 bg-slate-50/30 shadow-sm rounded-xl p-4 hover:border-blue-200 hover:bg-blue-50/20 transition-all duration-200">
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex items-center gap-2.5 flex-wrap">
                             <div className="w-8 h-8 bg-emerald-50 rounded-full flex items-center justify-center shrink-0">
@@ -451,7 +467,9 @@ export function UserProfile() {
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
                           <span>{job.copies || 1} {job.copies === 1 ? 'copy' : 'copies'}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
-                          <span>{job.date}</span>
+                          <span>{new Date(job.date).toLocaleDateString(undefined, {
+                            day: 'numeric', month: 'short', year: 'numeric'
+                          })}</span>
                         </div>
                       </div>
                     ))
@@ -462,38 +480,32 @@ export function UserProfile() {
 
             {/* ─ Notifications ─ */}
             {activeTab === "notifications" && (
-              <Card className="border-0 shadow-sm bg-white rounded-2xl overflow-hidden">
-                <div className="px-6 pt-6 pb-0 border-b border-slate-100">
+              <Card className="border border-slate-200 shadow-sm bg-white rounded-2xl overflow-hidden">
+                <div className="px-6 py-3 border-b border-slate-200">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
                       <Bell className="w-5 h-5 text-amber-600" />
                     </div>
-                    <div>
-                      <h2 className="text-base font-bold text-slate-900">Notification Settings</h2>
-                      <p className="text-xs text-slate-500 mt-0.5">Choose how you want to be notified</p>
-                    </div>
+                    <h2 className="text-base font-bold text-slate-900">Notification Settings</h2>
                   </div>
                 </div>
-                <CardContent className="p-6 pt-0 -mt-2.5 space-y-1">
+                <CardContent className="px-6 pb-6 pt-0">
 
                   {/* Notification Row Component */}
                   {[
-                    { label: "Email Notifications", desc: "Receive updates and alerts via email", checked: emailNotifications, onChange: setEmailNotifications },
+                    { label: "Email Notifications", checked: emailNotifications, onChange: setEmailNotifications },
                     ...(emailNotifications ? [
-                      { label: "Print Job Completed", desc: "Get notified when your print is ready", checked: printCompleteNotif, onChange: setPrintCompleteNotif },
+                      { label: "Print Job Completed", checked: printCompleteNotif, onChange: setPrintCompleteNotif },
                     ] : []),
-                    { label: "SMS Notifications", desc: "Receive text messages for important updates", checked: smsNotifications, onChange: setSmsNotifications },
-                    { label: "Marketing Emails", desc: "Receive news and promotional offers", checked: marketingEmails, onChange: setMarketingEmails },
+                    { label: "SMS Notifications", checked: smsNotifications, onChange: setSmsNotifications },
+                    { label: "Marketing Emails", checked: marketingEmails, onChange: setMarketingEmails },
                   ].map((item, i, arr) => (
                     <div key={i}>
-                      <div className="flex items-center justify-between py-4">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
-                        </div>
+                      <div className={`flex items-center justify-between pb-3 ${i === 0 ? 'pt-0' : 'pt-3'}`}>
+                        <p className="text-sm font-semibold text-slate-900">{item.label}</p>
                         <Switch checked={item.checked} onCheckedChange={item.onChange} className="data-[state=checked]:bg-[#093765]" />
                       </div>
-                      {i < arr.length - 1 && <Separator className="opacity-60" />}
+                      {i < arr.length - 1 && <Separator className="bg-slate-200" />}
                     </div>
                   ))}
 

@@ -66,6 +66,7 @@ export function Payment() {
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem("mimo_user_email") || null);
   const [applyCoins, setApplyCoins] = useState(false);
   const [promoCode, setPromoCode] = useState("");
+  const [promoError, setPromoError] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
 
@@ -169,6 +170,7 @@ export function Payment() {
       }
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Invalid promo code");
+      setPromoError(true);
     }
   };
 
@@ -285,25 +287,30 @@ export function Payment() {
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] opacity-25 pointer-events-none"></div>
               
               {/* Brand Header */}
-              <div className="text-center mb-0 mt-2 relative z-10">
-                <p className="font-extrabold text-lg sm:text-2xl uppercase tracking-[0.2em] text-slate-800 mb-1.5">
-                  <span className="font-black text-black" style={{ fontFamily: "'Lovelo', sans-serif" }}>MIMO</span> RECEIPT
+              <div className="text-center mb-0 mt-0 sm:-mt-2 relative z-10">
+                <p className="font-extrabold text-lg sm:text-2xl uppercase tracking-[0.2em] text-slate-800 mb-1">
+                  <span className="font-black text-black text-2xl sm:text-4xl align-middle" style={{ fontFamily: "'Lovelo', sans-serif" }}>MIMO</span> <span className="align-middle">RECEIPT</span>
                 </p>
-                <div className="text-xs text-slate-500 mt-1.5 uppercase leading-relaxed font-bold">
+                <p 
+                  className="font-black text-[15px] sm:text-[17px] text-slate-800 uppercase tracking-widest mb-2"
+                  style={{ fontFamily: "'Lovelo', sans-serif" }}
+                >
+                  REVA UNIVERSITY
+                </p>
+                <div className="text-xs text-slate-500 mt-1.5 uppercase leading-relaxed font-bold mb-3">
                   <p>ADD: Yelahanka, Bangalore, Karnataka, 560064</p>
-                  <p>Date: {getFormattedDate()}</p>
                 </div>
               </div>
 
               {/* Date, Time, and Identifiers */}
-              <div className="space-y-1.5 text-sm text-slate-700 font-bold px-1 relative z-10 mt-2">
+              <div className="space-y-1.5 text-sm text-slate-700 font-bold px-1 relative z-10">
                 <div className="flex justify-between items-center">
-                  <span>Time:</span>
-                  <span>{getFormattedTime()}</span>
+                  <span>Date: {getFormattedDate()}</span>
+                  <span>Time: {getFormattedTime()}</span>
                 </div>
                 {userName && (
                   <div className="flex justify-between items-center">
-                    <span>User:</span>
+                    <span>Name:</span>
                     <span className="truncate max-w-[200px] text-right">{userName}</span>
                   </div>
                 )}
@@ -404,8 +411,15 @@ export function Payment() {
                       id="promo"
                       placeholder="ENTER PROMO CODE"
                       value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value)}
-                      className="h-10 pl-3 pr-20 bg-slate-100/50 border border-dashed border-slate-400 focus:border-slate-600 focus:bg-white transition-all rounded font-mono text-xs uppercase text-slate-900 placeholder:text-slate-400 font-bold shadow-none"
+                      onChange={(e) => {
+                        setPromoCode(e.target.value);
+                        setPromoError(false);
+                      }}
+                      className={`h-10 pl-3 pr-20 bg-slate-100/50 border border-dashed transition-all rounded font-mono text-xs uppercase font-bold shadow-none ${
+                        promoError
+                          ? "border-red-500 text-red-600 focus:border-red-600 focus:bg-red-50/50 placeholder:text-red-300"
+                          : "border-slate-400 focus:border-slate-600 focus:bg-white text-slate-900 placeholder:text-slate-400"
+                      }`}
                     />
                     <Button
                       type="button"

@@ -338,12 +338,12 @@ export function PrintCode() {
           </div>
 
           {/* Watermark on background */}
-          <div className="w-full mt-1 flex flex-col select-none pointer-events-none opacity-40 animate-in fade-in duration-700 delay-200 px-1">
+          <div className="w-full mt-1 flex flex-col select-none pointer-events-none opacity-60 animate-in fade-in duration-700 delay-200 px-1">
             <h2 className="text-3xl sm:text-4xl font-black text-slate-400/90 leading-[1.05] tracking-tight mb-2.5 text-left w-full">
               Your friendly campus<br />printer ❤️
             </h2>
             <div className="w-full h-[1px] bg-slate-300 mb-2"></div>
-            <h1 className="text-base sm:text-lg font-black text-slate-300 tracking-wider text-left w-full" style={{ fontFamily: "'Lovelo', sans-serif" }}>
+            <h1 className="text-base sm:text-lg font-black text-slate-400 tracking-wider text-left w-full" style={{ fontFamily: "'Lovelo', sans-serif" }}>
               MIMO
             </h1>
           </div>
