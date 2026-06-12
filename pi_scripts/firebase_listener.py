@@ -542,8 +542,29 @@ def process_job(doc_snapshot):
                     raise Exception("PyPDF2 N-up returned False")
                     
             except Exception as jam_err:
-                print(f"❌ Failed to impose PDF natively: {jam_err}")
-                raise Exception("Layout generation failed on Kiosk.")
+                print(f"⚠️ Native PyPDF2 imposition failed, falling back to CUPS number-up: {jam_err}")
+                try:
+                    layout_num = int(photo_layout)
+                    p_info = subprocess.run(["pdfinfo", merged_pdf], capture_output=True, text=True)
+                    total_p = 1
+                    for line in p_info.stdout.split('\n'):
+                        if "Pages:" in line:
+                            try:
+                                total_p = int(line.split(":")[1].strip())
+                            except:
+                                pass
+                    
+                    if total_p == 1:
+                        dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_layout.pdf")
+                        subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [merged_pdf] * layout_num, check=True)
+                        final_paths = [dup_pdf]
+                    else:
+                        final_paths = [merged_pdf]
+                    # DO NOT clear photo_layout, so CUPS will use '-o number-up=X'
+                    print(f"✅ Fallback successful")
+                except Exception as fallback_err:
+                    print(f"❌ Fallback failed: {fallback_err}")
+                    raise Exception("Layout generation failed on Kiosk.")
         # Correct stale queue names on Kiosk 1 to point to the active USB interface
         if target_printer == "Brother_HL_L5210DN_series":
             target_printer = "Brother_HL_L5210DN_series_USB"

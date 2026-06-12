@@ -1959,10 +1959,14 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
           });
           signedUrl = generatedUrl;
         } else {
-          // Point the Pi to the public templates hosted on the frontend
-          const frontendUrl = process.env.FRONTEND_URL || "https://mimo-test-dep2.vercel.app";
-          const templateName = data.sheetType === "graph" ? "mimo_graph.pdf" : "blank_a4.pdf";
-          signedUrl = `${frontendUrl}/${templateName}`;
+          // Point the Pi to the templates hosted on Firebase Storage
+          const templateName = data.sheetType === "graph" ? "templates/mimo_graph.pdf" : "templates/blank_a4.pdf";
+          const file = bucket.file(templateName);
+          const [generatedUrl] = await file.getSignedUrl({
+            action: 'read',
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+          });
+          signedUrl = generatedUrl;
         }
 
         // --- OLD PI COMPATIBILITY (PULL ARCHITECTURE) ---
