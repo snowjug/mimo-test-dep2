@@ -724,7 +724,7 @@ export function UploadFile() {
                   return (
                   <div
                     key={index}
-                    className="flex items-center gap-3 p-3 sm:p-4 border border-slate-100 rounded-2xl bg-white hover:shadow-md hover:border-[#093765]/20 transition-all duration-200 group animate-in slide-in-from-left-2 fade-in duration-300"
+                    className="flex items-center gap-3 p-3 sm:p-4 border border-slate-200 rounded-2xl bg-white hover:shadow-md hover:border-[#093765]/20 transition-all duration-200 group animate-in slide-in-from-left-2 fade-in duration-300"
                   >
                     <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
                       file.status === 'completed'
@@ -780,9 +780,9 @@ export function UploadFile() {
                   );
                 })}
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 mt-4 w-full">
+              <div className="flex flex-col sm:flex-row gap-3 mt-5 pt-4 border-t border-slate-200 w-full">
                 <Button
-                  className="flex-[1.5] h-12 text-sm sm:text-base font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl w-full sm:w-auto"
+                  className="flex-1 h-12 text-sm sm:text-base font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl w-full sm:w-auto"
                   disabled={files.length === 0 || files.some((f) => f.status === "uploading")}
                   onClick={handlePrint}
                 >

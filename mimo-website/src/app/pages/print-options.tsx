@@ -623,12 +623,11 @@ export function PrintOptions() {
 
                 {hasImages && (
                   <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">How should the image fit on A4?</p>
-                  </div>
-                  
-                  <div className="flex flex-col items-center gap-3 w-full sm:w-auto">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">How should the image fit on A4?</p>
+                    </div>
                     <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-72 h-11 sm:h-12 select-none">
                       <button
                         onClick={() => setImageScaling("fit")}
@@ -666,7 +665,9 @@ export function PrintOptions() {
                         }`}
                       />
                     </div>
-                    
+                  </div>
+                  
+                  <div className="flex flex-col items-center gap-3 w-full">
                     {/* Custom Scale Slider */}
                     {imageScaling === "custom" && (
                       <div className="w-full flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm mt-1 mb-1">
@@ -965,15 +966,14 @@ export function PrintOptions() {
                 </div>
 
                 {/* Orientation & Layout */}
-                <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm flex flex-col gap-3">
-                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 lg:gap-6">
-                    <div className="lg:w-[35%]">
-                      <p className="text-sm font-bold text-slate-800">
-                        {hasImages ? "How do you want your image arranged?" : "How do you want your content arranged?"}
-                      </p>
-                    </div>
-                    
-                    <div className="lg:w-[65%] flex flex-col gap-5">
+                <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm flex flex-col gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 mb-1">
+                      {hasImages ? "How do you want your image arranged?" : "How do you want your content arranged?"}
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col gap-5 border-t border-slate-100 pt-3 mt-1">
                       {/* Orientation Toggle */}
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                         <div>
@@ -1130,7 +1130,6 @@ export function PrintOptions() {
                   )}
                 </div>
               </div>
-            </div>
           </div>
         </CardContent>
       </Card>
