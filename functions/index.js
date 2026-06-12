@@ -388,14 +388,16 @@ app.get("/print-history", authMiddleware, async (req, res) => {
       const colorMode = opts.colorMode || "bw";
       const copies = opts.copies || 1;
       const cost = (data.pageCount || 0) * copies * (colorMode === "color" ? 9.2 : 2.3);
+      const createdAtTime = data.createdAt?.toDate ? data.createdAt.toDate().getTime() : 0;
       return {
         id: doc.id, printCode: data.printCode || "-", status: data.status,
         printerStatus: data.printerStatus || "Pending", file: data.fileName,
-        cost: `₹${cost.toFixed(2)}`, colorMode, copies,
+        cost: `₹${cost.toFixed(2)}`, colorMode, copies, pageCount: data.pageCount || 1,
         date: data.createdAt?.toDate ? new Date(data.createdAt.toDate()).toLocaleString() : "N/A",
+        createdAtTime,
       };
     }).filter(j => ["paid","printing","completed","printed","failed"].includes(j.status))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => b.createdAtTime - a.createdAtTime);
     res.json(history);
   } catch (err) {
     console.error(err);
