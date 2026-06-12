@@ -4,7 +4,7 @@ import sys
 c = paramiko.SSHClient()
 c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 try:
-    c.connect('100.70.107.44', username='printpi', password='printpi')
+    c.connect('printpi', username='printpi', password='printpi')
     
     print("Stopping mimo-listener service...")
     c.exec_command('sudo systemctl stop mimo-listener')
