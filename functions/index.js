@@ -2263,7 +2263,38 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
 
   // Trigger ONLY if status changes to "completed"
   if (beforeData.status !== "completed" && afterData.status === "completed") {
-    console.log(`[STORAGE] Print job ${event.params.jobId} completed. Cleaning up file...`);
+    console.log(`[STORAGE] Print job ${event.params.jobId} completed. Cleaning up file and sending email...`);
+
+    // --- SEND PRINT SUCCESS EMAIL ---
+    try {
+      const userId = afterData.userId;
+      if (userId) {
+        const userDoc = await db.collection("users").doc(userId).get();
+        const userEmail = userDoc.exists ? userDoc.data().email : null;
+        if (userEmail && process.env.GMAIL_APP_PASSWORD) {
+          const mailOptions = {
+            from: '"Mimo Printing" <visionprintt@gmail.com>',
+            to: userEmail,
+            subject: "Your Document is Printed! 🎉",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px; text-align: center;">
+                <h2 style="color: #093765;">Print Successful!</h2>
+                <p style="color: #666; font-size: 16px;">Your document <strong>${afterData.fileName || 'Multiple Files'}</strong> has been successfully printed.</p>
+                <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin: 0; color: #0f172a; font-size: 16px;">You can collect it from the respective Mimo Kiosk now.</p>
+                </div>
+                <p style="color: #666; font-size: 14px;">Thank you for using Mimo!</p>
+              </div>
+            `
+          };
+          await transporter.sendMail(mailOptions);
+          console.log(`[EMAIL] Print success email sent to ${userEmail} for job ${event.params.jobId}`);
+        }
+      }
+    } catch (err) {
+      console.error("[EMAIL ERROR] Failed to send print success email:", err);
+    }
+    // --------------------------------
     
     if (!afterData.fileUrl) {
       console.log(`[STORAGE] No fileUrl found for job ${event.params.jobId}.`);

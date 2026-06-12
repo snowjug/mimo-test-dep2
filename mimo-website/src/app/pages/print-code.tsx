@@ -34,7 +34,35 @@ export function PrintCode() {
   useEffect(() => {
     if (!printCode) {
       navigate("/");
+      return;
     }
+
+    // Push a state so that we have an extra entry to "pop" when they press back
+    window.history.pushState({ isPrintCodePage: true }, "", window.location.href);
+
+    const handlePopState = (e: PopStateEvent) => {
+      // User pressed back button
+      toast.success("Your code has been sent to your mail.");
+      
+      // Clear session storage just like handleDone
+      sessionStorage.removeItem("printCode");
+      sessionStorage.removeItem("printFiles");
+      sessionStorage.removeItem("printOptions");
+      sessionStorage.removeItem("uploadedImages");
+      sessionStorage.removeItem("uploadAmount");
+      sessionStorage.removeItem("uploadTotalPages");
+      sessionStorage.removeItem("totalPages");
+      sessionStorage.removeItem("printStatus");
+      
+      setTimeout(() => {
+        navigate("/upload", { replace: true });
+      }, 100);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
   }, [printCode, navigate]);
 
   useEffect(() => {
