@@ -61,7 +61,7 @@ export function BlankPages() {
         JSON.stringify([
           {
             name: fileName,
-            size: isGraph ? 1806 : 583,
+            size: isGraph ? 1172734 : 9198,
             type: "application/pdf"
           }
         ])

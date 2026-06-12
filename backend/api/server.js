@@ -1138,7 +1138,7 @@ app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
       : "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fblank_a4.pdf";
     
     // Determine exact size based on uploaded files
-    const fileSize = isGraph ? 1806 : 583;
+    const fileSize = isGraph ? 1172734 : 9198;
     const now = admin.firestore.FieldValue.serverTimestamp();
 
     await db.collection("print_jobs").add({
