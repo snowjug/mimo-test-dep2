@@ -22,6 +22,16 @@ const NAV_ITEMS = [
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
+const getStatusColor = (status: string) => {
+  switch(status.toLowerCase()) {
+    case 'completed': return 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100';
+    case 'paid': return 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100';
+    case 'printing': return 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100';
+    case 'failed': return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-100';
+    default: return 'bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-100';
+  }
+};
+
 export function UserProfile() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -447,13 +457,13 @@ export function UserProfile() {
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex items-center gap-2.5 flex-wrap">
                             <div className="w-8 h-8 bg-emerald-50 rounded-full flex items-center justify-center shrink-0">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              <CheckCircle2 className={`w-4 h-4 ${job.status === 'failed' ? 'text-red-500' : 'text-emerald-500'}`} />
                             </div>
                             <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-0.5 text-xs font-mono font-semibold gap-1.5">
                               Code: {job.printCode || "----"}
                               <Copy className="w-3 h-3 cursor-pointer hover:text-blue-900 transition-colors" />
                             </Badge>
-                            <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                            <Badge className={`${getStatusColor(job.status)} rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider`}>
                               {job.status}
                             </Badge>
                           </div>
@@ -461,9 +471,9 @@ export function UserProfile() {
                         </div>
                         <p className="text-sm text-slate-700 font-medium ml-10 mb-1 truncate">{job.file}</p>
                         <div className="ml-10 flex items-center gap-3 text-xs text-slate-400 flex-wrap">
-                          <span>{job.details?.split('•')[0]?.trim() || "0 pages"}</span>
+                          <span>{job.pageCount || 1} {job.pageCount === 1 ? 'page' : 'pages'}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
-                          <span>{job.details?.split('•')[1]?.trim() || "B&W"}</span>
+                          <span>{job.colorMode === "color" ? "Color" : "B&W"}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
                           <span>{job.copies || 1} {job.copies === 1 ? 'copy' : 'copies'}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300" />

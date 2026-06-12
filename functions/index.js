@@ -388,14 +388,16 @@ app.get("/print-history", authMiddleware, async (req, res) => {
       const colorMode = opts.colorMode || "bw";
       const copies = opts.copies || 1;
       const cost = (data.pageCount || 0) * copies * (colorMode === "color" ? 9.2 : 2.3);
+      const createdAtTime = data.createdAt?.toDate ? data.createdAt.toDate().getTime() : 0;
       return {
         id: doc.id, printCode: data.printCode || "-", status: data.status,
         printerStatus: data.printerStatus || "Pending", file: data.fileName,
-        cost: `₹${cost.toFixed(2)}`, colorMode, copies,
+        cost: `₹${cost.toFixed(2)}`, colorMode, copies, pageCount: data.pageCount || 1,
         date: data.createdAt?.toDate ? new Date(data.createdAt.toDate()).toLocaleString() : "N/A",
+        createdAtTime,
       };
     }).filter(j => ["paid","printing","completed","printed","failed"].includes(j.status))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => b.createdAtTime - a.createdAtTime);
     res.json(history);
   } catch (err) {
     console.error(err);
@@ -754,7 +756,18 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       // Trigger Email Receipt via Nodemailer for free orders
       try {
         const userDoc = await db.collection("users").doc(userId).get();
-        const userEmail = userDoc.exists ? userDoc.data().email : null;
+        let userEmail = (userDoc.exists ? userDoc.data().email : null) || req.user?.email || req.user?.email_id;
+        if (!userEmail) {
+          try {
+            const authUser = await admin.auth().getUser(userId);
+            userEmail = authUser.email;
+          } catch (e) {
+            console.log("Could not fetch user email from admin auth:", e.message);
+          }
+        }
+        
+        console.log(`[EMAIL-DEBUG] Preparing to send FREE OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
+        
         if (userEmail && process.env.GMAIL_APP_PASSWORD) {
           const mailOptions = {
             from: '"Mimo Printing" <visionprintt@gmail.com>',
@@ -1172,7 +1185,18 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
     try {
       // Use Firestore (not Firebase Auth) to get user email - avoids admin.auth() errors
       const userDoc = await db.collection("users").doc(userId).get();
-      const userEmail = userDoc.exists ? userDoc.data().email : null;
+      let userEmail = (userDoc.exists ? userDoc.data().email : null) || req.user?.email || req.user?.email_id;
+      if (!userEmail) {
+        try {
+          const authUser = await admin.auth().getUser(userId);
+          userEmail = authUser.email;
+        } catch (e) {
+          console.log("Could not fetch user email from admin auth:", e.message);
+        }
+      }
+      
+      console.log(`[EMAIL-DEBUG] Preparing to send OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
+      
       if (userEmail && process.env.GMAIL_APP_PASSWORD) {
         const mailOptions = {
           from: '"Mimo Printing" <visionprintt@gmail.com>',
@@ -2134,7 +2158,14 @@ app.get("/kiosk/job-status", async (req, res) => {
     if (!printCode) return res.status(400).json({ error: "Print code required" });
     const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).get();
     if (snapshot.empty) return res.status(404).json({ error: "Job not found" });
-    const jobData = snapshot.docs[0].data();
+    
+    // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
+    const sortedDocs = snapshot.docs.sort((a, b) => {
+      const timeA = a.data().createdAt?.toDate().getTime() || 0;
+      const timeB = b.data().createdAt?.toDate().getTime() || 0;
+      return timeB - timeA;
+    });
+    const jobData = sortedDocs[0].data();
     res.json({ status: jobData.status || "pending", isPrinted: jobData.isPrinted || false });
   } catch (err) {
     console.error("❌ KIOSK JOB STATUS ERROR:", err);
@@ -2150,7 +2181,14 @@ app.post("/kiosk/print", async (req, res) => {
     const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).where("status", "==", "paid").get();
     if (snapshot.empty) return res.status(400).json({ error: "No paid job found for this code" });
     
-    const jobDoc = snapshot.docs[0];
+    // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
+    const sortedDocs = snapshot.docs.sort((a, b) => {
+      const timeA = a.data().createdAt?.toDate().getTime() || 0;
+      const timeB = b.data().createdAt?.toDate().getTime() || 0;
+      return timeB - timeA;
+    });
+    
+    const jobDoc = sortedDocs[0];
     const jobData = jobDoc.data();
     
     let finalKioskId = kioskId;
