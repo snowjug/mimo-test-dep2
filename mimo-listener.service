@@ -6,11 +6,16 @@ After=network.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/mimo
-Environment="PRINTER_NAME=Brother_HL_L2440DW_series"
-# Assuming the script will be put here
+Environment="PYTHONUNBUFFERED=1"
+Environment="BW_PRINTER_NAME=Brother_HL_L2440DW_series"
+Environment="COLOR_PRINTER_NAME=Epson_L3250"
+Environment="KIOSK_ID=SV-002"
+Environment="GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/etc/ssl/certs/ca-certificates.crt"
 ExecStart=/home/pi/mimo/venv/bin/python /home/pi/mimo/firebase_listener.py
 Restart=always
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
