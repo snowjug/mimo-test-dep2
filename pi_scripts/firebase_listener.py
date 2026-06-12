@@ -332,8 +332,6 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         if double_sided == "double":
             cmd.extend(["-o", "sides=two-sided-long-edge"])
         
-        if is_blank_sheet:
-            cmd.extend(["-o", "print-scaling=none"])
         
         cmd.extend(file_paths)
         
