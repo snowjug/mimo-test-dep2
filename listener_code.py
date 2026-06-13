@@ -155,9 +155,9 @@ def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAM
             cmd.extend(["-o", "landscape"])
         # Apply duplex/double-sided printing
         if duplex == "double":
-            cmd.extend(["-o", "sides=two-sided-long-edge"])
+            cmd.extend(["-o", "sides=two-sided-long-edge", "-o", "Duplex=DuplexNoTumble", "-o", "BRDuplex=DuplexNoTumble"])
         else:
-            cmd.extend(["-o", "sides=one-sided"])
+            cmd.extend(["-o", "sides=one-sided", "-o", "Duplex=None", "-o", "BRDuplex=None"])
         cmd.append(file_path)
         
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
