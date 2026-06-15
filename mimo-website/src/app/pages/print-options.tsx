@@ -470,13 +470,16 @@ export function PrintOptions() {
   );
 
   const isSinglePageDocument = files.reduce((sum, f) => sum + (f.pageCount || 1), 0) <= 1;
+  const isDuplexSupported = directKioskId === "SV-002" && colorMode === "bw";
 
   useEffect(() => {
-    if (isSinglePageDocument) {
+    if (isSinglePageDocument || !isDuplexSupported) {
       if (doubleSided === "double") setDoubleSided("single");
+    }
+    if (isSinglePageDocument) {
       if (pageSelection === "custom") setPageSelection("all");
     }
-  }, [isSinglePageDocument, doubleSided, pageSelection]);
+  }, [isSinglePageDocument, isDuplexSupported, doubleSided, pageSelection]);
 
   return (
     <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4" style={{ fontFamily: "'Outfit', sans-serif" }}>
@@ -734,21 +737,17 @@ export function PrintOptions() {
                   </button>
                   <button
                     onClick={() => {
-                      if (isSinglePageDocument) return;
-                      if (!(directKioskId === "SV-002" && colorMode === "color")) {
-                        setDoubleSided("double");
-                      } else {
-                        // Toast alert or just do nothing since button is disabled
-                      }
+                      if (isSinglePageDocument || !isDuplexSupported) return;
+                      setDoubleSided("double");
                     }}
-                    disabled={isSinglePageDocument || (directKioskId === "SV-002" && colorMode === "color")}
+                    disabled={isSinglePageDocument || !isDuplexSupported}
                     type="button"
                     className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
                       doubleSided === "double"
                         ? "text-[#093765]"
                         : "text-slate-500 hover:text-slate-700"
                     } ${
-                      isSinglePageDocument || (directKioskId === "SV-002" && colorMode === "color") ? "opacity-40 cursor-not-allowed bg-slate-100" : ""
+                      isSinglePageDocument || !isDuplexSupported ? "opacity-40 cursor-not-allowed bg-slate-100" : ""
                     }`}
                   >
                     <Files className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${

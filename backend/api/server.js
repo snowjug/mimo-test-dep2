@@ -215,7 +215,7 @@ const getNgrokUrl = async () => {
 };
 
 // Helper: call the Pi print API for one file
-const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
+const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null, options = {}) => {
   const targetPiUrl = piUrl || await getNgrokUrl();
   const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
 
@@ -231,7 +231,14 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
       body: JSON.stringify({
         pdfUrl: fileUrl,
         file_url: fileUrl,
-        printer_name: targetPrinter
+        printer_name: targetPrinter,
+        doubleSided: options.doubleSided || "single",
+        duplex: options.doubleSided === "double",
+        orientation: options.orientation || "portrait",
+        photoLayout: options.photoLayout || "1",
+        imageScaling: options.imageScaling || "fit",
+        customScale: options.customScale || 100,
+        pageRange: options.pageRange || null
       })
     });
     
@@ -1977,7 +1984,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         }
 
         console.log(`🖨️ Sending to ${kioskId} Pi: ${fileName} | copies: ${copies} | printer: ${targetPrinterName}`);
-        const piResults = await triggerPiPrint(signedUrl, copies, targetPiUrl, targetPrinterName);
+        const piResults = await triggerPiPrint(signedUrl, copies, targetPiUrl, targetPrinterName, opts);
         console.log(`✅ Pi response for ${fileName}:`, piResults);
 
         await doc.ref.update({

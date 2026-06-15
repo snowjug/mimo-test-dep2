@@ -2135,7 +2135,7 @@ const getNgrokUrl = async () => {
 };
 
 // Helper: call the Pi print API for one file
-const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
+const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null, options = {}) => {
   const targetPiUrl = piUrl || await getNgrokUrl();
   const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
   const results = [];
@@ -2143,7 +2143,18 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
     const res = await fetch(`${targetPiUrl}/print`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
-      body: JSON.stringify({ pdfUrl: fileUrl, file_url: fileUrl, printer_name: targetPrinter })
+      body: JSON.stringify({
+        pdfUrl: fileUrl,
+        file_url: fileUrl,
+        printer_name: targetPrinter,
+        doubleSided: options.doubleSided || "single",
+        duplex: options.doubleSided === "double",
+        orientation: options.orientation || "portrait",
+        photoLayout: options.photoLayout || "1",
+        imageScaling: options.imageScaling || "fit",
+        customScale: options.customScale || 100,
+        pageRange: options.pageRange || null
+      })
     });
     if (!res.ok) { const errText = await res.text(); throw new Error(`Pi HTTP error ${res.status}: ${errText}`); }
     results.push(await res.json());

@@ -345,8 +345,9 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             cmd.extend(["-o", f"number-up={photo_layout}"])
             
         if double_sided == "double":
-            cmd.extend(["-o", "sides=two-sided-long-edge"])
-        
+            cmd.extend(["-o", "sides=two-sided-long-edge", "-o", "Duplex=DuplexNoTumble", "-o", "BRDuplex=DuplexNoTumble"])
+        else:
+            cmd.extend(["-o", "sides=one-sided", "-o", "Duplex=None", "-o", "BRDuplex=None"])
         
         cmd.extend(file_paths)
         
