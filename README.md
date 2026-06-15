@@ -48,30 +48,17 @@ Key backend responsibilities include:
 - **Permanent Pi Tunnel (ngrok):** Replaced unreliable temporary tunnels and Tailscale conflicts with a permanent ngrok static domain configuration, auto-starting via systemd on the Pi for 100% uptime.
 - **E2E Stability:** Fixed frontend React crashes on payment failure and implemented strict error handling in the background PDF processor to prevent infinite retry loops on corrupted uploads.
 - **Production Payments:** Fully integrated Cashfree Production APIs for live order creation and automatic refunds on hardware failure.
-- **Android Kiosk App (REVAUTSAV):** Native Android kiosk app added as an isolated `revautsav-android` branch. Includes Device Admin lock/unlock support and ADB management scripts.
 
 ## Folder Structure
 
 ```text
-# main branch
 backend/
 mimo-website/
 mimo-frontend-web-app/mimo-frontend/
 docs/
-
-# revautsav-android branch (separate orphan branch)
-app/                     ← Android Kotlin source
-gradle/
-kiosk_lock.bat
-kiosk_unlock.bat
-kiosk_remove_admin.bat
-ADB_Commands.md
-KIOSK_GUIDE.md
 ```
 
 ## Local Setup
-
-> **Note:** The sections below apply to the `main` branch. For the Android kiosk app, see the [Android Kiosk App](#android-kiosk-app-revautsav) section.
 
 ### Backend
 
@@ -161,4 +148,3 @@ firebase deploy --only firestore:rules,firestore:indexes --config firebase.json 
 
 - The main website uses SPA routing, so direct route reloads should be handled by Vercel rewrites.
 - Firestore seeding requires a service account with write permissions for the `mimo-v2-11868` project.
-- The `revautsav-android` branch is an **orphan branch** — it shares no git history with `main` and contains only the Android kiosk app.
