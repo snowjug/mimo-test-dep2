@@ -473,7 +473,7 @@ export function PrintOptions() {
   const isDuplexSupported = directKioskId === "SV-002" && colorMode === "bw";
 
   useEffect(() => {
-    if (isSinglePageDocument || !isDuplexSupported) {
+    if (!isDuplexSupported) {
       if (doubleSided === "double") setDoubleSided("single");
     }
     if (isSinglePageDocument) {
@@ -737,17 +737,17 @@ export function PrintOptions() {
                   </button>
                   <button
                     onClick={() => {
-                      if (isSinglePageDocument || !isDuplexSupported) return;
+                      if (!isDuplexSupported) return;
                       setDoubleSided("double");
                     }}
-                    disabled={isSinglePageDocument || !isDuplexSupported}
+                    disabled={!isDuplexSupported}
                     type="button"
                     className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
                       doubleSided === "double"
                         ? "text-[#093765]"
                         : "text-slate-500 hover:text-slate-700"
                     } ${
-                      isSinglePageDocument || !isDuplexSupported ? "opacity-40 cursor-not-allowed bg-slate-100" : ""
+                      !isDuplexSupported ? "opacity-40 cursor-not-allowed bg-slate-100" : ""
                     }`}
                   >
                     <Files className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
