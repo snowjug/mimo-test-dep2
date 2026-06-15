@@ -546,25 +546,33 @@ def watchdog_loop():
     stuck_cycles = {BW_PRINTER_NAME: 0, COLOR_PRINTER_NAME: 0}
     while True:
         try:
+            printer_active = {}
             for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
                 # Only re-enable if the printer is currently disabled
                 status_res = subprocess.run(["lpstat", "-p", printer], capture_output=True, text=True)
-                if "disabled" in status_res.stdout.lower():
+                status_out = status_res.stdout.lower()
+                if "disabled" in status_out:
                     print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
                     subprocess.run(["sudo", "cupsenable", printer], capture_output=True)
+                
+                # Check if printer is currently printing
+                printer_active[printer] = "printing" in status_out
 
             result = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True)
 
             for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
                 if printer in result.stdout:
-                    stuck_cycles[printer] += 1
-                    print(f"⚠️ Watchdog: Stuck job on {printer} (Cycle {stuck_cycles[printer]})")
-
-                    if stuck_cycles[printer] >= 2:
-                        print(f"🔧 Watchdog: Restarting ipp-usb for {printer}...")
-                        subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
-                        subprocess.run(["sudo", "cupsenable", printer], capture_output=True)
+                    if printer_active.get(printer, False):
                         stuck_cycles[printer] = 0
+                    else:
+                        stuck_cycles[printer] += 1
+                        print(f"⚠️ Watchdog: Stuck job detected on {printer} (Cycle {stuck_cycles[printer]} - Printer Idle but Job in Queue)")
+
+                        if stuck_cycles[printer] >= 3:
+                            print(f"🔧 Watchdog: Restarting ipp-usb for {printer}...")
+                            subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
+                            subprocess.run(["sudo", "cupsenable", printer], capture_output=True)
+                            stuck_cycles[printer] = 0
                 else:
                     stuck_cycles[printer] = 0
             
@@ -584,7 +592,7 @@ def watchdog_loop():
                     
         except Exception as e:
             print(f"⚠️ Watchdog failed: {e}")
-        time.sleep(30)
+        time.sleep(60)
 
 def keep_warm_loop():
     while True:
