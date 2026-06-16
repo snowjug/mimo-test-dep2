@@ -35,22 +35,35 @@ export function MimoHeader() {
 
   return (
     <>
-      <div className="flex items-end justify-between border-b-[5px] border-[#194059] mb-0 pt-0.5 pb-0">
+      <div className="flex items-end justify-between border-b-[14px] border-[#194059] mb-0 pt-0.5 pb-0">
         <div className="flex items-end gap-2 cursor-pointer group overflow-hidden" onClick={() => navigate("/upload")}>
           <h1 
             className="text-4xl sm:text-5xl font-black text-[#194059] select-none m-0 translate-y-[3px] sm:translate-y-[4px]"
-            style={{ fontFamily: "'Lovelo', sans-serif", lineHeight: "0.8" }}
+            style={{ fontFamily: "'Lovelo', sans-serif", lineHeight: "0.8", WebkitTextStroke: "1px #194059" }}
           >
             MIMO
           </h1>
         </div>
-      <div className="flex items-center gap-1 sm:gap-3 pb-1">
+      <div className="flex items-center gap-3 sm:gap-4 pb-1.5">
         
         <Dialog>
           <DialogTrigger asChild>
-            <button className="flex items-center gap-1.5 cursor-pointer px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-full transition-all text-blue-800 border border-blue-200 shadow-sm mr-1 sm:mr-2">
-              <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-              <span className="font-bold text-xs sm:text-sm whitespace-nowrap">How to print?</span>
+            <button 
+              className="flex items-center justify-center w-10 h-10 cursor-pointer bg-blue-50 hover:bg-blue-100 rounded-full transition-all border border-blue-200 shadow-sm shrink-0"
+              title="How to print?"
+            >
+              <svg 
+                className="w-5 h-5 text-blue-600" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="3.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
             </button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">

@@ -6,6 +6,15 @@ This repository contains the MIMO printing platform split into three parts:
 - `mimo-website/` - Main Vite + React web app for the customer experience.
 - `mimo-frontend-web-app/mimo-frontend/` - Kiosk-style Vite + React app for printing and device flows.
 
+## Branch Overview
+
+| Branch | Description |
+|---|---|
+| `main` | Production branch — MIMO web platform (backend + frontend + Pi listeners) |
+| `atharv-changes` | Feature branch synced with main |
+| `madhan` | Feature branch synced with main |
+| `revautsav-android` | **Android kiosk app (REVAUTSAV)** — isolated orphan branch, no shared history with `main` |
+
 ## Project Overview
 
 The system supports user login, payment verification, print job creation, and kiosk-based printing workflows.
@@ -91,6 +100,18 @@ Build:
 ```bash
 npm run build
 ```
+
+### Android Kiosk App (REVAUTSAV)
+
+The Android app lives on the `revautsav-android` branch (orphan — no shared history with `main`).
+
+```bash
+# Switch to the Android branch
+git checkout revautsav-android
+```
+
+Open the project in **Android Studio** and build/deploy to the kiosk device.
+Refer to `KIOSK_GUIDE.md` and `ADB_Commands.md` in that branch for full setup and ADB commands.
 
 ## Environment Variables
 

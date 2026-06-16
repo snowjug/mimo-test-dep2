@@ -1,16 +1,21 @@
 [Unit]
-Description=Mimo Firebase Print Listener
+Description=Mimo Firebase Print Listener (CV-001 / printpi)
 After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/mimo
-Environment="PRINTER_NAME=Brother_HL_L2440DW_series"
-Environment="KIOSK_ID=KIOSK_2"
-ExecStart=/home/pi/mimo/venv/bin/python /home/pi/mimo/firebase_listener.py
+User=printpi
+WorkingDirectory=/home/printpi
+Environment="PYTHONUNBUFFERED=1"
+Environment="BW_PRINTER_NAME=Brother_HL_L5210DN_series_USB"
+Environment="COLOR_PRINTER_NAME=Brother_IPP"
+Environment="KIOSK_ID=CV-001"
+Environment="GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/etc/ssl/certs/ca-certificates.crt"
+ExecStart=/usr/bin/python3 /home/printpi/firebase_listener.py
 Restart=always
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

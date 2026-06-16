@@ -388,14 +388,16 @@ app.get("/print-history", authMiddleware, async (req, res) => {
       const colorMode = opts.colorMode || "bw";
       const copies = opts.copies || 1;
       const cost = (data.pageCount || 0) * copies * (colorMode === "color" ? 9.2 : 2.3);
+      const createdAtTime = data.createdAt?.toDate ? data.createdAt.toDate().getTime() : 0;
       return {
         id: doc.id, printCode: data.printCode || "-", status: data.status,
         printerStatus: data.printerStatus || "Pending", file: data.fileName,
-        cost: `₹${cost.toFixed(2)}`, colorMode, copies,
+        cost: `₹${cost.toFixed(2)}`, colorMode, copies, pageCount: data.pageCount || 1,
         date: data.createdAt?.toDate ? new Date(data.createdAt.toDate()).toLocaleString() : "N/A",
+        createdAtTime,
       };
     }).filter(j => ["paid","printing","completed","printed","failed"].includes(j.status))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => b.createdAtTime - a.createdAtTime);
     res.json(history);
   } catch (err) {
     console.error(err);
@@ -520,9 +522,9 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
       createdAt: now,
       updatedAt: now,
       status: "pending",
-      pageCount: Number(pageCount) || 1,
+      pageCount: 1, // The physical PDF template is exactly 1 page. The quantity is controlled purely by 'copies'.
       files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
-      printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
+      printOptions: { copies: Number(pageCount) || 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
       pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
       paymentStatus: { status: "pending" },
       printStatus: { status: "pending" }
@@ -618,10 +620,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     }
 
     let totalAmount = 0;
-    let totalPages = 0;
-    const jobIds = [];
-
-    const isBlankSheet = printOptions?.blankSheet === true;
+    const isBlankSheet = printOptions?.isBlankSheet === true || printOptions?.blankSheet === true;
     const sheetType = printOptions?.sheetType || "a4";
     const colorMode = printOptions?.colorMode || "bw";
     
@@ -634,10 +633,15 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     const copies = Number(printOptions?.copies || 1);
 
     const batchUpdate = db.batch();
+    
+    // Group all pending jobs into a single unified job for the printer
+    const mergedFiles = [];
+    let totalRawPages = 0;
+
     jobsSnapshot.forEach((doc) => {
-      jobIds.push(doc.id);
-      const fileConfig = printOptions?.fileConfigs?.[doc.data().fileName];
-      let numPages = fileConfig?.pageCount || doc.data().pageCount || 1;
+      const data = doc.data();
+      const fileConfig = printOptions?.fileConfigs?.[data.fileName];
+      let numPages = fileConfig?.pageCount || data.pageCount || 1;
       const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
       const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
 
@@ -658,78 +662,82 @@ app.post("/create-order", authMiddleware, async (req, res) => {
         if (customCount > 0) numPages = customCount;
       }
 
-      // Handle N-up photo layouts
-      let divisor = 1;
-      if (printOptions?.photoLayout === "2") divisor = 2;
-      if (printOptions?.photoLayout === "4") divisor = 4;
-      if (printOptions?.photoLayout === "6") divisor = 6;
-      if (printOptions?.photoLayout === "9") divisor = 9;
-      
-      let actualPages = Math.ceil(numPages / divisor);
-
-      // Handle double-sided
-      if (printOptions?.doubleSided === "double") {
-        actualPages = Math.ceil(actualPages / 2);
-      }
-
-      const jobCost = actualPages * copies * pricePerPage;
-      
-      totalPages += actualPages; // Total physical sheets used
-      totalAmount += jobCost;
-
-      batchUpdate.update(doc.ref, { 
-        printOptions: {
-          ...printOptions,
-          pageSelection: jobPageSelection,
-          pagesToPrint: jobPageSelection,
-          pageRange: jobPageRange,
-          customPageRange: jobPageRange,
-        },
-        orderId,
-        pageCount: numPages,
-        totalCost: jobCost,
-        finalCost: jobCost,
-        merchantTransactionId: orderId,
-        colorMode,
-        color: colorMode === "color",
-        copies,
-        duplex: printOptions?.doubleSided === "double",
-        orientation: printOptions?.orientation || "portrait",
-        paperSize: "A4",
-        settings: printOptions || {}
+      totalRawPages += numPages;
+      mergedFiles.push({
+        name: data.fileName,
+        url: data.fileUrl,
+        type: data.mimetype,
+        size: data.size || data.fileSize || 0,
+        pageCount: numPages
       });
+      
+      // Delete the individual pending jobs so we can replace them with the merged group
+      batchUpdate.delete(doc.ref);
     });
+
+    // Handle N-up photo layouts on the grouped total
+    let divisor = 1;
+    if (printOptions?.photoLayout === "2") divisor = 2;
+    if (printOptions?.photoLayout === "4") divisor = 4;
+    if (printOptions?.photoLayout === "6") divisor = 6;
+    if (printOptions?.photoLayout === "9") divisor = 9;
+    
+    let actualPages = Math.ceil(totalRawPages / divisor);
+
+    // Handle double-sided
+    if (printOptions?.doubleSided === "double") {
+      actualPages = Math.ceil(actualPages / 2);
+    }
+
+    const jobCost = actualPages * copies * pricePerPage;
+    totalAmount += jobCost;
+
+    // Create the unified merged job
+    const newJobRef = db.collection("print_jobs").doc();
+    batchUpdate.set(newJobRef, { 
+      userId,
+      fileName: mergedFiles.length > 1 ? `Multiple Files (${mergedFiles.length})` : mergedFiles[0].name,
+      fileUrl: mergedFiles[0].url, // legacy support for older apps
+      mimetype: mergedFiles[0].type, // legacy support
+      files: mergedFiles, // The full array of files to print
+      size: mergedFiles.reduce((acc, f) => acc + (f.size || 0), 0),
+      status: "paid",
+      pageCount: totalRawPages,
+      printOptions: printOptions || {},
+      pricing: { pricePerPage, totalPages: actualPages, jobCost },
+      orderId,
+      colorMode,
+      color: colorMode === "color",
+      // Top-level fields for backward compat with older Pi listeners
+      copies: copies,
+      duplex: printOptions?.doubleSided === "double",
+      finalCost: jobCost,
+      totalCost: jobCost,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    const finalAmountToPay = Math.max(0, totalAmount - coinsDiscount);
+
     await batchUpdate.commit();
 
-    let amount = Number(totalAmount.toFixed(2));
+    let amount = Number(finalAmountToPay.toFixed(2));
     if (discountPercentage > 0) {
       amount = Number((amount - (amount * (discountPercentage / 100))).toFixed(2));
     }
-    // Apply Mimo Coins discount (securely re-calculated on backend)
-    if (coinsDiscount > 0) {
-      amount = Number(Math.max(0, amount - coinsDiscount).toFixed(2));
-    }
-
+    
     // ─── FREE ORDER BYPASS ──────────────────────────────────────────────────────
-    // Treat amount <= 0 OR amount < ₹1 (Cashfree minimum) as fully free.
-    // Previously the ₹1 minimum silently overrode discount, causing UI/Cashfree mismatch.
     if (amount <= 0 || amount < 1.00) {
       const printCode = Math.floor(1000 + Math.random() * 9000).toString();
       const now = admin.firestore.FieldValue.serverTimestamp();
-      const freeBatch = db.batch();
-      jobsSnapshot.forEach((doc) => {
-        freeBatch.update(doc.ref, {
-          status: "paid",
-          printCode,
-          paymentTime: now,
-          isPrinted: false,
-          printOptions: printOptions || {},
-          colorMode,
-          copies,
-        });
+      
+      await newJobRef.update({
+        status: "paid",
+        printCode,
+        paymentTime: now,
+        isPrinted: false
       });
-      await freeBatch.commit();
-
+      
       // Deduct coins from user balance if coins were used
       if (coinsToUse && coinsToUse > 0) {
         await db.collection("users").doc(userId).update({
@@ -739,16 +747,27 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       }
 
       await db.collection("orders").add({
-        orderId, userId, amount: 0, totalPages, totalDocs: jobsSnapshot.size,
-        status: "PAID", orderStatus: "completed", jobIds,
-        createdAt: now, couponCode, discountPercentage,
+        orderId, userId, amount: 0, totalPages: totalRawPages, totalDocs: mergedFiles.length,
+        status: "PAID", orderStatus: "completed", printJobs: [newJobRef.id],
+        createdAt: now, couponCode: couponCode || null, discountPercentage,
         coinsUsed: coinsToUse || 0
       });
 
       // Trigger Email Receipt via Nodemailer for free orders
       try {
         const userDoc = await db.collection("users").doc(userId).get();
-        const userEmail = userDoc.exists ? userDoc.data().email : null;
+        let userEmail = (userDoc.exists ? userDoc.data().email : null) || req.user?.email || req.user?.email_id;
+        if (!userEmail) {
+          try {
+            const authUser = await admin.auth().getUser(userId);
+            userEmail = authUser.email;
+          } catch (e) {
+            console.log("Could not fetch user email from admin auth:", e.message);
+          }
+        }
+        
+        console.log(`[EMAIL-DEBUG] Preparing to send FREE OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
+        
         if (userEmail && process.env.GMAIL_APP_PASSWORD) {
           const mailOptions = {
             from: '"Mimo Printing" <visionprintt@gmail.com>',
@@ -936,8 +955,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       // Update Print Jobs (V1 + V2 Schema)
       const jobs = await db
         .collection("print_jobs")
-        .where("userId", "==", userId)
-        .where("status", "==", "pending")
+        .where("orderId", "==", orderId)
         .get();
         
       const jobsBatch = db.batch();
@@ -956,15 +974,27 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       await jobsBatch.commit();
       
       // ✅ Call /payment-success internally to generate the print code
-      try {
-        const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
-        await axios.post(
-          `http://localhost:${process.env.PORT || 8080}/payment-success`,
-          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
-          { headers: { Authorization: `Bearer ${dummyToken}` } }
-        );
-      } catch (internalErr) {
-        console.error("[WEBHOOK] Failed to call internal /payment-success:", internalErr.message);
+      // Guard: only call if no print code exists yet on these jobs
+      const existingCodeCheck = await db.collection("print_jobs")
+        .where("userId", "==", userId)
+        .where("status", "==", "paid")
+        .where("printCode", "!=", null)
+        .limit(1)
+        .get();
+      
+      if (existingCodeCheck.empty) {
+        try {
+          const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+          await axios.post(
+            `http://localhost:${process.env.PORT || 8080}/payment-success`,
+            { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+            { headers: { Authorization: `Bearer ${dummyToken}` } }
+          );
+        } catch (internalErr) {
+          console.error("[WEBHOOK] Failed to call internal /payment-success:", internalErr.message);
+        }
+      } else {
+        console.log(`[WEBHOOK] Print code already exists for user ${userId}, skipping duplicate generation.`);
       }
       
       // Update User Statistics (V2 Schema)
@@ -1155,7 +1185,18 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
     try {
       // Use Firestore (not Firebase Auth) to get user email - avoids admin.auth() errors
       const userDoc = await db.collection("users").doc(userId).get();
-      const userEmail = userDoc.exists ? userDoc.data().email : null;
+      let userEmail = (userDoc.exists ? userDoc.data().email : null) || req.user?.email || req.user?.email_id;
+      if (!userEmail) {
+        try {
+          const authUser = await admin.auth().getUser(userId);
+          userEmail = authUser.email;
+        } catch (e) {
+          console.log("Could not fetch user email from admin auth:", e.message);
+        }
+      }
+      
+      console.log(`[EMAIL-DEBUG] Preparing to send OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
+      
       if (userEmail && process.env.GMAIL_APP_PASSWORD) {
         const mailOptions = {
           from: '"Mimo Printing" <visionprintt@gmail.com>',
@@ -2094,7 +2135,7 @@ const getNgrokUrl = async () => {
 };
 
 // Helper: call the Pi print API for one file
-const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
+const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null, options = {}) => {
   const targetPiUrl = piUrl || await getNgrokUrl();
   const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
   const results = [];
@@ -2102,7 +2143,18 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
     const res = await fetch(`${targetPiUrl}/print`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
-      body: JSON.stringify({ pdfUrl: fileUrl, file_url: fileUrl, printer_name: targetPrinter })
+      body: JSON.stringify({
+        pdfUrl: fileUrl,
+        file_url: fileUrl,
+        printer_name: targetPrinter,
+        doubleSided: options.doubleSided || "single",
+        duplex: options.doubleSided === "double",
+        orientation: options.orientation || "portrait",
+        photoLayout: options.photoLayout || "1",
+        imageScaling: options.imageScaling || "fit",
+        customScale: options.customScale || 100,
+        pageRange: options.pageRange || null
+      })
     });
     if (!res.ok) { const errText = await res.text(); throw new Error(`Pi HTTP error ${res.status}: ${errText}`); }
     results.push(await res.json());
@@ -2117,7 +2169,14 @@ app.get("/kiosk/job-status", async (req, res) => {
     if (!printCode) return res.status(400).json({ error: "Print code required" });
     const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).get();
     if (snapshot.empty) return res.status(404).json({ error: "Job not found" });
-    const jobData = snapshot.docs[0].data();
+    
+    // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
+    const sortedDocs = snapshot.docs.sort((a, b) => {
+      const timeA = a.data().createdAt?.toDate().getTime() || 0;
+      const timeB = b.data().createdAt?.toDate().getTime() || 0;
+      return timeB - timeA;
+    });
+    const jobData = sortedDocs[0].data();
     res.json({ status: jobData.status || "pending", isPrinted: jobData.isPrinted || false });
   } catch (err) {
     console.error("❌ KIOSK JOB STATUS ERROR:", err);
@@ -2133,7 +2192,14 @@ app.post("/kiosk/print", async (req, res) => {
     const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).where("status", "==", "paid").get();
     if (snapshot.empty) return res.status(400).json({ error: "No paid job found for this code" });
     
-    const jobDoc = snapshot.docs[0];
+    // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
+    const sortedDocs = snapshot.docs.sort((a, b) => {
+      const timeA = a.data().createdAt?.toDate().getTime() || 0;
+      const timeB = b.data().createdAt?.toDate().getTime() || 0;
+      return timeB - timeA;
+    });
+    
+    const jobDoc = sortedDocs[0];
     const jobData = jobDoc.data();
     
     let finalKioskId = kioskId;

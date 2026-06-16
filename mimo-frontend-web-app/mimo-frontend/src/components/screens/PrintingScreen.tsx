@@ -153,15 +153,15 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     const totalSheets = Math.max(1, pages * copies);
 
     // ── Target total time for the 0→99% animation ─────────────────────────────
-    // Based on a real laser printer: ~10s warmup + ~3s per page (≈20 ppm B&W)
-    // This keeps 1-sheet jobs snappy (~18s) and multi-sheet jobs proportional.
-    //   1 sheet  → 13 000 ms → ~131 ms/step → clamped to 200 ms → ~20 s
-    //   3 sheets → 19 000 ms → ~192 ms/step →               200 ms → ~20 s
-    //   5 sheets → 25 000 ms → ~252 ms/step →               252 ms → ~25 s
-    //   10 sheets→ 40 000 ms → ~404 ms/step →               404 ms → ~40 s
-    //   20 sheets→ 70 000 ms → ~707 ms/step →               707 ms → ~70 s
-    const totalAnimMs  = 10000 + totalSheets * 3000;  // total 0→99 window (ms)
-    const baseDelay    = Math.max(200, totalAnimMs / 99); // ms per 1% step
+    // Based on optimized proactive wakeup: ~3s warmup + ~1.5s per page
+    // This keeps 1-sheet jobs lightning fast (~4.5s) and multi-sheet jobs proportional.
+    //   1 sheet  → 4 500 ms
+    //   3 sheets → 7 500 ms
+    //   5 sheets → 10 500 ms
+    //   10 sheets→ 18 000 ms
+    //   20 sheets→ 33 000 ms
+    const totalAnimMs  = 3000 + totalSheets * 1500;  // total 0→99 window (ms)
+    const baseDelay    = Math.max(50, totalAnimMs / 99); // ms per 1% step
 
     const tick = () => {
       if (isCompletingRef.current) return;

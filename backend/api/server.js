@@ -163,6 +163,29 @@ const getPageCount = async (file) => {
 };
 
 // ================= STORAGE =================
+function extractFilePath(fileUrl, bucketName) {
+  if (!fileUrl) return null;
+  if (fileUrl.startsWith("gs://")) {
+    return fileUrl.replace(`gs://${bucketName}/`, "");
+  } else if (fileUrl.includes("firebasestorage.googleapis.com")) {
+    try {
+      const urlObj = new URL(fileUrl);
+      const pathParts = urlObj.pathname.split("/o/");
+      if (pathParts.length > 1) {
+        return decodeURIComponent(pathParts[1].split("?")[0]);
+      }
+    } catch (e) {
+      console.error("URL parsing error:", e);
+    }
+  } else if (fileUrl.includes("storage.googleapis.com")) {
+    const parts = fileUrl.split(`${bucketName}/`);
+    if (parts.length > 1) {
+      return decodeURIComponent(parts[1].split("?")[0]);
+    }
+  }
+  return null;
+}
+
 const uploadToStorage = async (file) => {
   const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
   const fileName = `files/${Date.now()}_${safeFileName}`;
@@ -192,7 +215,7 @@ const getNgrokUrl = async () => {
 };
 
 // Helper: call the Pi print API for one file
-const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null) => {
+const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = null, options = {}) => {
   const targetPiUrl = piUrl || await getNgrokUrl();
   const targetPrinter = printerName || process.env.PRINTER_NAME || "Brother_HL_L5210DN_series";
 
@@ -208,7 +231,14 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
       body: JSON.stringify({
         pdfUrl: fileUrl,
         file_url: fileUrl,
-        printer_name: targetPrinter
+        printer_name: targetPrinter,
+        doubleSided: options.doubleSided || "single",
+        duplex: options.doubleSided === "double",
+        orientation: options.orientation || "portrait",
+        photoLayout: options.photoLayout || "1",
+        imageScaling: options.imageScaling || "fit",
+        customScale: options.customScale || 100,
+        pageRange: options.pageRange || null
       })
     });
     
@@ -589,13 +619,19 @@ app.get("/print-history", authenticateToken, async (req, res) => {
       .orderBy("createdAt", "desc")
       .get();
       
-    const history = snapshot.docs.map(doc => {
+    const history = snapshot.docs
+      .filter(doc => !!doc.data().printCode)
+      .map(doc => {
       const data = doc.data();
       const opts = data.printOptions || {};
+      const pricing = data.pricing || {};
       const colorMode = opts.colorMode || data.colorMode || "bw";
       const copies = opts.copies || data.copies || 1;
+      
+      const actualPageCount = data.pageCount || opts.totalPages || pricing.totalPages || 0;
+      
       const pricePerPage = colorMode === "color" ? 9.2 : 2.3;
-      const cost = (data.pageCount || 0) * copies * pricePerPage;
+      const cost = actualPageCount * copies * pricePerPage;
 
       let printerStatus = data.printerStatus || "Pending";
       if (!data.printerStatus) {
@@ -605,7 +641,7 @@ app.get("/print-history", authenticateToken, async (req, res) => {
         else if (data.status === "expired") printerStatus = "Expired";
       }
 
-      let details = `${data.pageCount || 0} pages • ${colorMode === 'bw' ? 'B&W' : 'Color'}`;
+      let details = `${actualPageCount} pages • ${colorMode === 'bw' ? 'B&W' : 'Color'}`;
       if (opts.doubleSided === 'double') details += ' • 2-Sided';
       else details += ' • 1-Sided';
 
@@ -622,8 +658,8 @@ app.get("/print-history", authenticateToken, async (req, res) => {
         copies,
         details,
         date: data.createdAt?.toDate
-          ? new Date(data.createdAt.toDate()).toLocaleString()
-          : new Date().toLocaleString(),
+          ? new Date(data.createdAt.toDate()).toISOString()
+          : new Date().toISOString(),
       };
     });
     
@@ -1024,7 +1060,9 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
     }
 
     for (const file of files) {
-      const fileUrl = `https://storage.googleapis.com/${bucket.name}/${file.storagePath}`;
+      // Use the Firebase download URL the frontend sends (file.url)
+      // Fall back to constructing from storagePath only if url is missing
+      const fileUrl = file.url || `https://storage.googleapis.com/${bucket.name}/${file.storagePath}`;
       
       const baseJobData = {
         userId,
@@ -1054,14 +1092,17 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
         metadata: { ipAddress: req.ip || "", userAgent: req.get("user-agent") || "", tags: [] }
       };
 
-      if (file.type.startsWith("image/") || (file.type === "application/pdf" && file.pageCount > 0)) {
+      // If the client already computed a valid pageCount (PDF, PPTX, DOCX, XLSX, images),
+      // skip slow server-side LibreOffice conversion and go straight to "pending"
+      const clientPageCount = file.pageCount || 0;
+      if (file.type.startsWith("image/") || clientPageCount > 0) {
         await db.collection("print_jobs").add({
           ...baseJobData,
           status: "pending",
-          pageCount: file.type.startsWith("image/") ? 1 : file.pageCount,
+          pageCount: file.type.startsWith("image/") ? 1 : clientPageCount,
         });
       } else {
-        // Office docs (and PDFs that failed client parsing) get queued for background processing
+        // Only fall back to server-side conversion if client couldn't determine page count
         await db.collection("print_jobs").add({
           ...baseJobData,
           status: "pending_conversion",
@@ -1075,10 +1116,14 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
   }
 });
 
+// ================= CREATE BLANK JOB =================
 app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.userId || req.user.id;
+    if (!userId) throw new Error("User ID is missing from token");
+    
     const { type, pageCount } = req.body; // "a4" or "graph"
+    const parsedPageCount = Number(pageCount) || 1;
     
     // 1. Clear abandoned jobs to prevent overcharging
     const existingJobs = await db.collection("print_jobs")
@@ -1100,7 +1145,7 @@ app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
       : "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fblank_a4.pdf";
     
     // Determine exact size based on uploaded files
-    const fileSize = isGraph ? 1806 : 583;
+    const fileSize = isGraph ? 1172734 : 9198;
     const now = admin.firestore.FieldValue.serverTimestamp();
 
     await db.collection("print_jobs").add({
@@ -1115,10 +1160,10 @@ app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
       createdAt: now,
       updatedAt: now,
       status: "pending",
-      pageCount: Number(pageCount) || 1,
+      pageCount: parsedPageCount, // Used for stats and logic
       files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
-      printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
-      pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
+      printOptions: { copies: parsedPageCount, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
+      pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: parsedPageCount },
       paymentStatus: { status: "pending" },
       printStatus: { status: "pending" }
     });
@@ -1332,8 +1377,8 @@ app.post("/create-order", authenticateToken, async (req, res) => {
       console.log(`[CREATE-ORDER] 100% discount — skipping Cashfree, generating print code directly`);
       const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
       const internalRes = await axios.post(
-        `http://localhost:${process.env.PORT || 8080}/payment-success`,
-        { isFreeBypass: true },
+        `http://127.0.0.1:${process.env.PORT || 3000}/payment-success`,
+        { isFreeBypass: true, printOptions },
         { headers: { Authorization: `Bearer ${dummyToken}` } }
       );
       return res.json({ orderId, free: true, printCode: internalRes.data.printCode });
@@ -1452,7 +1497,7 @@ app.get("/verify-payment/:orderId", async (req, res) => {
       try {
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         const internalRes = await axios.post(
-          `http://localhost:${process.env.PORT || 8080}/payment-success`,
+          `http://127.0.0.1:${process.env.PORT || 3000}/payment-success`,
           { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
@@ -1544,7 +1589,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       try {
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         await axios.post(
-          `http://localhost:${process.env.PORT || 8080}/payment-success`,
+          `http://localhost:${process.env.PORT || 3000}/payment-success`,
           { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
@@ -1732,7 +1777,12 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       // ❌ Already printed
       if (data.isPrinted) continue;
 
-      const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
+      const filePath = extractFilePath(data.fileUrl, bucket.name);
+      if (!filePath) {
+        console.error("Invalid file URL format:", data.fileUrl);
+        continue;
+      }
+
       const file = bucket.file(filePath);
       const [signedUrl] = await file.getSignedUrl({
         action: 'read',
@@ -1907,7 +1957,8 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         let isBlankSheet = data.isBlankSheet === true;
         
         if (!isBlankSheet) {
-          const filePath = data.fileUrl.split(`${bucket.name}/`)[1];
+          const filePath = extractFilePath(data.fileUrl, bucket.name);
+          if (!filePath) throw new Error("Invalid file URL: " + data.fileUrl);
           const file = bucket.file(filePath);
           const [generatedUrl] = await file.getSignedUrl({
             action: 'read',
@@ -1915,10 +1966,14 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
           });
           signedUrl = generatedUrl;
         } else {
-          // Point the Pi to the public templates hosted on the frontend
-          const frontendUrl = process.env.FRONTEND_URL || "https://mimo-test-dep2.vercel.app";
-          const templateName = data.sheetType === "graph" ? "mimo_graph.pdf" : "blank_a4.pdf";
-          signedUrl = `${frontendUrl}/${templateName}`;
+          // Point the Pi to the templates hosted on Firebase Storage
+          const templateName = data.sheetType === "graph" ? "templates/mimo_graph.pdf" : "templates/blank_a4.pdf";
+          const file = bucket.file(templateName);
+          const [generatedUrl] = await file.getSignedUrl({
+            action: 'read',
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+          });
+          signedUrl = generatedUrl;
         }
 
         // --- OLD PI COMPATIBILITY (PULL ARCHITECTURE) ---
@@ -1929,7 +1984,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         }
 
         console.log(`🖨️ Sending to ${kioskId} Pi: ${fileName} | copies: ${copies} | printer: ${targetPrinterName}`);
-        const piResults = await triggerPiPrint(signedUrl, copies, targetPiUrl, targetPrinterName);
+        const piResults = await triggerPiPrint(signedUrl, copies, targetPiUrl, targetPrinterName, opts);
         console.log(`✅ Pi response for ${fileName}:`, piResults);
 
         await doc.ref.update({
@@ -2038,7 +2093,9 @@ setInterval(async () => {
     let finalFileUrl = data.fileUrl;
     
     // Download to get page count or convert
-    const bucketFile = bucket.file(data.fileUrl.split(`${bucket.name}/`)[1]);
+    const filePath = extractFilePath(data.fileUrl, bucket.name);
+    if (!filePath) throw new Error("Invalid fileUrl for background processor");
+    const bucketFile = bucket.file(filePath);
     const [buffer] = await bucketFile.download();
     
     if (data.mimetype === "application/pdf") {
@@ -2121,10 +2178,8 @@ app.get("/cron/cleanup-files", async (req, res) => {
       
       if (data.fileUrl) {
         try {
-          const bucketStr = bucket.name + "/";
-          const parts = data.fileUrl.split(bucketStr);
-          if (parts.length > 1) {
-            const filePath = parts[1];
+          const filePath = extractFilePath(data.fileUrl, bucket.name);
+          if (filePath) {
             await bucket.file(filePath).delete();
           }
         } catch (bucketErr) {

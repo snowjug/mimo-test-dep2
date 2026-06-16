@@ -14,7 +14,6 @@
     "multer": "^2.1.1",
     "path": "^0.12.7",
     "pdf-lib": "^1.17.1",
-    "razorpay": "^2.9.6",
     "uuid": "^9.0.0",
     "@sentry/node": "^8.0.0",
     "@sentry/profiling-node": "^8.0.0"

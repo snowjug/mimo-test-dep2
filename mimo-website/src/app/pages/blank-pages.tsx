@@ -42,7 +42,7 @@ export function BlankPages() {
       sessionStorage.setItem(
         "printOptions",
         JSON.stringify({
-          copies: 1,
+          copies: pageCount,
           colorMode: "bw",
           doubleSided: "single",
           pageSelection: "all",
@@ -61,7 +61,7 @@ export function BlankPages() {
         JSON.stringify([
           {
             name: fileName,
-            size: isGraph ? 1806 : 583,
+            size: isGraph ? 1172734 : 9198,
             type: "application/pdf"
           }
         ])
@@ -93,25 +93,18 @@ export function BlankPages() {
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full hover:bg-white hover:shadow-sm"
+        {/* ── Page Header ── */}
+        <div className="flex items-center gap-2 py-2">
+          <button
             onClick={() => navigate("/upload")}
+            className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-200/40 -ml-1"
+            aria-label="Back"
           >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent">
-              {label}
-            </h1>
-            <p className="text-slate-500">
-              {isGraph
-                ? "Get graph paper sheets printed for your needs"
-                : "Get blank A4 sheets printed"}
-            </p>
-          </div>
+            <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
+          </button>
+          <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent tracking-tight leading-tight py-1">
+            {label}
+          </h1>
         </div>
 
         <div className="max-w-md mx-auto w-full space-y-4 sm:space-y-6">
@@ -147,11 +140,6 @@ export function BlankPages() {
                   >
                     {label}
                   </h3>
-                  <p className="text-sm text-slate-500 mt-1">
-                    {isGraph
-                      ? "Standard graph paper with grid lines"
-                      : "Plain white A4 sheet"}
-                  </p>
                 </div>
               </div>
             </CardContent>
@@ -160,16 +148,13 @@ export function BlankPages() {
           {/* Print Destination Selection */}
           <Card className="border-0 shadow-xl bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
             <CardHeader className="px-4 pt-4 pb-2 flex flex-row items-start gap-3 space-y-0">
-              <div className="p-2 bg-blue-50/80 rounded-xl shrink-0">
+              <div className="p-2 bg-blue-50/80 rounded-xl shrink-0 -mt-0.5">
                 <MapPin className="w-5 h-5 text-blue-600" />
               </div>
               <div className="flex flex-col gap-0.5">
                 <CardTitle className="text-lg font-extrabold text-slate-900">
-                  Print Destination
-                </CardTitle>
-                <CardDescription className="text-sm font-medium text-slate-500">
                   Where do you want to print this?
-                </CardDescription>
+                </CardTitle>
               </div>
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-3">
@@ -178,7 +163,7 @@ export function BlankPages() {
                 className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
                   directKioskId === 'CV-001' 
                     ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]' 
-                    : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+                    : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
                 } active:scale-[0.99]`}
               >
                 <div className="flex items-center gap-3">
@@ -191,12 +176,12 @@ export function BlankPages() {
                     <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
                       directKioskId === 'CV-001' ? 'text-[#093765]' : 'text-slate-700'
                     }`}>
-                      KIOSK-001-CV 
+                      MIMO 1.0
                       <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
                         B&W
                       </Badge>
                     </p>
-                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at C.V Raman Block in Black & White.</p>
+                    <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">C. V. Raman Block</p>
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
@@ -213,7 +198,7 @@ export function BlankPages() {
                 className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
                   directKioskId === 'SV-002' 
                     ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]'
-                    : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+                    : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
                 } active:scale-[0.99]`}
               >
                 <div className="flex items-center gap-3">
@@ -230,14 +215,14 @@ export function BlankPages() {
                         ? 'text-[#093765]' 
                         : 'text-slate-700'
                     }`}>
-                      KIOSK-002-SV 
+                      MIMO 2.0
                       <span className="flex gap-1">
                         <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
                           B&W
                         </Badge>
                       </span>
                     </p>
-                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at Swami Vivekananda Block in B&W.</p>
+                    <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">Swami Vivekananda Block</p>
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
@@ -253,14 +238,11 @@ export function BlankPages() {
 
           {/* Page Count Selector */}
           <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Number of Pages</CardTitle>
-              <CardDescription>
-                Select how many {isGraph ? "graph" : "blank"} sheets you need
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center gap-4 py-4">
+            <CardContent className="p-4 sm:p-5">
+              <p className="text-sm font-bold text-slate-800 mb-2">
+                How many {isGraph ? "graph" : "blank"} sheets do you need?
+              </p>
+              <div className="flex items-center justify-center gap-4 py-3">
                 <Button
                   variant="outline"
                   size="icon"

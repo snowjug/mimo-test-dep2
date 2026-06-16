@@ -124,6 +124,13 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    font-size: var(--font-size);
+    /* Ensure scroll is never blocked at the root level */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     background-color: #f8fafc;
@@ -132,7 +139,9 @@
       radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
       radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%),
       radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.15) 0px, transparent 50%);
-    background-attachment: fixed;
+    /* Removed background-attachment: fixed — causes scroll lock on mobile/certain viewports */
+    min-height: 100dvh;
+    overflow-x: hidden;
   }
 
   .dark body {
@@ -142,7 +151,7 @@
       radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
       radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%),
       radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
-    background-attachment: fixed;
+    /* Removed background-attachment: fixed — causes scroll lock on mobile/certain viewports */
   }
 
   /**

@@ -5,7 +5,8 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
-import { Upload, FileText, X, Printer, CheckCircle, AlertCircle, ImageIcon, History, Layers, Wallet, FileIcon, Grid3X3, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
+import { Upload, FileText, X, Printer, CheckCircle, AlertCircle, ImageIcon, History, Layers, Wallet, FileIcon, Grid3X3, Loader2, QrCode, FileCheck } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { PDFDocument } from "pdf-lib";
@@ -123,6 +124,110 @@ const estimateDocxPages = async (file: File): Promise<number> => {
   return file.size > 2000000 ? Math.max(1, Math.floor(file.size / 500000)) : 1;
 };
 
+/**
+ * Count actual slides in a PPTX file by scanning the ZIP central directory
+ * for entries matching ppt/slides/slide{N}.xml
+ */
+const estimatePptxSlides = async (file: File): Promise<number> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+    const view = new DataView(arrayBuffer);
+
+    // Find End of Central Directory (EOCD) signature: 0x06054b50
+    let eocdOffset = -1;
+    for (let i = buffer.length - 22; i >= 0; i--) {
+      if (view.getUint32(i, true) === 0x06054b50) {
+        eocdOffset = i;
+        break;
+      }
+    }
+    if (eocdOffset === -1) return 1;
+
+    const cdCount = view.getUint16(eocdOffset + 10, true);
+    const cdStartOffset = view.getUint32(eocdOffset + 16, true);
+
+    let slideCount = 0;
+    let cdOffset = cdStartOffset;
+
+    for (let i = 0; i < cdCount; i++) {
+      if (cdOffset + 46 > buffer.length) break;
+      const sig = view.getUint32(cdOffset, true);
+      if (sig !== 0x02014b50) break;
+
+      const fileNameLen = view.getUint16(cdOffset + 28, true);
+      const extraFieldLen = view.getUint16(cdOffset + 30, true);
+      const commentLen = view.getUint16(cdOffset + 32, true);
+
+      const fileNameBytes = buffer.slice(cdOffset + 46, cdOffset + 46 + fileNameLen);
+      const fileName = new TextDecoder("utf-8").decode(fileNameBytes);
+
+      // Match ppt/slides/slide1.xml, ppt/slides/slide2.xml, etc.
+      if (/^ppt\/slides\/slide\d+\.xml$/.test(fileName)) {
+        slideCount++;
+      }
+
+      cdOffset += 46 + fileNameLen + extraFieldLen + commentLen;
+    }
+
+    return Math.max(1, slideCount);
+  } catch (err) {
+    console.error("Error reading PPTX slides:", err);
+    return 1;
+  }
+};
+
+/**
+ * Count worksheets in an XLSX file by scanning the ZIP central directory
+ * for entries matching xl/worksheets/sheet{N}.xml
+ */
+const estimateXlsxSheets = async (file: File): Promise<number> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+    const view = new DataView(arrayBuffer);
+
+    let eocdOffset = -1;
+    for (let i = buffer.length - 22; i >= 0; i--) {
+      if (view.getUint32(i, true) === 0x06054b50) {
+        eocdOffset = i;
+        break;
+      }
+    }
+    if (eocdOffset === -1) return 1;
+
+    const cdCount = view.getUint16(eocdOffset + 10, true);
+    const cdStartOffset = view.getUint32(eocdOffset + 16, true);
+
+    let sheetCount = 0;
+    let cdOffset = cdStartOffset;
+
+    for (let i = 0; i < cdCount; i++) {
+      if (cdOffset + 46 > buffer.length) break;
+      const sig = view.getUint32(cdOffset, true);
+      if (sig !== 0x02014b50) break;
+
+      const fileNameLen = view.getUint16(cdOffset + 28, true);
+      const extraFieldLen = view.getUint16(cdOffset + 30, true);
+      const commentLen = view.getUint16(cdOffset + 32, true);
+
+      const fileNameBytes = buffer.slice(cdOffset + 46, cdOffset + 46 + fileNameLen);
+      const fileName = new TextDecoder("utf-8").decode(fileNameBytes);
+
+      if (/^xl\/worksheets\/sheet\d+\.xml$/.test(fileName)) {
+        sheetCount++;
+      }
+
+      cdOffset += 46 + fileNameLen + extraFieldLen + commentLen;
+    }
+
+    return Math.max(1, sheetCount);
+  } catch (err) {
+    console.error("Error reading XLSX sheets:", err);
+    return 1;
+  }
+};
+
 export function UploadFile() {
   const navigate = useNavigate();
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -201,7 +306,10 @@ export function UploadFile() {
       // 1. Parse PDFs locally for page counts
       const filesMeta = await Promise.all(fileArray.map(async (f) => {
         let pageCount = 1;
-        const isDocx = f.name.toLowerCase().endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        const nameLower = f.name.toLowerCase();
+        const isDocx = nameLower.endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        const isPptx = nameLower.endsWith(".pptx") || f.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        const isXlsx = nameLower.endsWith(".xlsx") || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         if (f.type === "application/pdf") {
           try {
             const arrayBuffer = await f.arrayBuffer();
@@ -212,9 +320,13 @@ export function UploadFile() {
           }
         } else if (isDocx) {
           pageCount = await estimateDocxPages(f);
+        } else if (isPptx) {
+          pageCount = await estimatePptxSlides(f);
+        } else if (isXlsx) {
+          pageCount = await estimateXlsxSheets(f);
         } else if (!f.type.startsWith("image/")) {
-            // Rough estimation for other files (e.g. pptx, xlsx) based on file size
-            pageCount = f.size > 2000000 ? Math.floor(f.size / 500000) : 1;
+          // Fallback for legacy .doc, .ppt, .xls, .txt — 1 page estimate
+          pageCount = 1;
         }
         return { name: f.name, type: f.type, size: f.size, pageCount };
       }));
@@ -362,7 +474,7 @@ export function UploadFile() {
         </style>
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-3 sm:pt-5">
           <div className="flex flex-col items-start cursor-pointer group select-none ml-2 pt-1">
             <div className="z-20 -mb-2 relative animate-[float-hey_3s_ease-in-out_infinite] hover:rotate-0 hover:scale-[1.15] transition-all duration-300">
               <span
@@ -373,13 +485,75 @@ export function UploadFile() {
               </span>
             </div>
             <h1
-              className="text-2xl sm:text-5xl font-normal text-gray-900 tracking-tight z-10 -mt-1"
-              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="text-2xl sm:text-5xl font-bold text-gray-900 tracking-tight z-10 -mt-1"
+              style={{ fontFamily: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif" }}
             >
               {userName}
             </h1>
           </div>
-          <div className="flex items-center gap-1 sm:gap-3">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Dialog>
+              <DialogTrigger asChild>
+                <button 
+                  className="flex items-center justify-center w-10 h-10 cursor-pointer bg-blue-50 hover:bg-blue-100 rounded-full transition-all border border-blue-200 shadow-sm shrink-0"
+                  title="How to print?"
+                >
+                  <svg 
+                    className="w-5 h-5 text-blue-600" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="3.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                    <Printer className="w-6 h-6 text-blue-600" />
+                    How to use MIMO
+                  </DialogTitle>
+                  <DialogDescription className="text-base">
+                    Follow these simple steps to print your documents easily.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="flex gap-4 items-start">
+                    <div className="bg-blue-100 p-2 rounded-full shrink-0"><Upload className="w-5 h-5 text-blue-600" /></div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">1. Upload Files</h4>
+                      <p className="text-sm text-gray-600">Select and upload the PDF or Image files you wish to print.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 items-start">
+                    <div className="bg-blue-100 p-2 rounded-full shrink-0"><FileCheck className="w-5 h-5 text-blue-600" /></div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">2. Configure Options</h4>
+                      <p className="text-sm text-gray-600">Choose your print destination, color mode, sides, layout, and number of copies.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 items-start">
+                    <div className="bg-blue-100 p-2 rounded-full shrink-0"><QrCode className="w-5 h-5 text-blue-600" /></div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">3. Get Your Print Code</h4>
+                      <p className="text-sm text-gray-600">After payment, a secure 4-digit code will be generated for your print job.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 items-start">
+                    <div className="bg-blue-100 p-2 rounded-full shrink-0"><Printer className="w-5 h-5 text-blue-600" /></div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">4. Print at Kiosk</h4>
+                      <p className="text-sm text-gray-600">Go to the selected MIMO printer kiosk, enter your 4-digit code on the keypad, and collect your printed document!</p>
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
             <MimoCoinsDisplay />
             <div className="flex items-center gap-1 sm:gap-3 cursor-pointer p-1 sm:p-2 hover:bg-white/50 rounded-xl transition-colors" onClick={() => navigate("/user-profile")}>
               <div className="text-right hidden sm:block">
@@ -397,7 +571,6 @@ export function UploadFile() {
 
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent animate-in fade-in slide-in-from-left-4 duration-500">Upload Documents</h1>
-          <p className="text-base sm:text-lg text-slate-500">Prepare your files for the MIMO printer</p>
         </div>
 
         {/* Printer Status */}
@@ -434,7 +607,7 @@ export function UploadFile() {
 
         {/* Upload Area */}
         <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-xl">
-          <CardContent className={files.length > 0 ? "p-3 sm:p-5" : "p-3 sm:p-5"}>
+          <div className="p-3 sm:p-5">
             <div
               className={`border-2 border-dashed transition-all duration-300 ease-in-out group cursor-pointer ${
                 isDragging
@@ -458,10 +631,10 @@ export function UploadFile() {
                     </div>
                     <div className="text-left">
                       <h3 className="text-sm sm:text-base font-bold text-slate-700 group-hover:text-[#093765] transition-colors">Add more files</h3>
-                      <p className="text-xs text-slate-400">PDF, DOCX, TXT, Images</p>
+                      <p className="text-xs text-slate-400">PDF, DOCX, Images, TXT, PPTX, &amp; more</p>
                     </div>
                   </div>
-                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png" onChange={(e) => handleFileSelect(e.target.files)} />
+                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx" onChange={(e) => handleFileSelect(e.target.files)} />
                 </>
               ) : (
                 <>
@@ -477,19 +650,16 @@ export function UploadFile() {
                     </div>
                   </div>
                   <h3 className="text-base sm:text-xl font-extrabold mb-1.5 text-slate-700 group-hover:text-[#093765] transition-colors duration-200">
-                    {isDragging ? "Release to upload!" : "Drop files here to print"}
+                    {isDragging ? "Release to upload!" : "Click or drag files here to print"}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-400 mb-1 max-w-xs mx-auto">
-                    PDF, DOCX, TXT, JPG, PNG
+                    PDF, DOCX, JPG, PNG, TXT, PPTX, &amp; more
                   </p>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#093765]/60 border border-[#093765]/20 rounded-full px-3 py-1 mt-3 bg-blue-50/50">
-                    <Upload className="w-3 h-3" /> Browse files
-                  </span>
-                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png" onChange={(e) => handleFileSelect(e.target.files)} />
+                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx" onChange={(e) => handleFileSelect(e.target.files)} />
                 </>
               )}
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         {/* Quick Print - A4 Sheet & Mimo Graph */}
@@ -505,8 +675,7 @@ export function UploadFile() {
                   <FileIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-400 group-hover:text-[#093765] transition-colors duration-300" />
                 </div>
                 <div className="text-center sm:text-left">
-                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-[#093765] transition-colors">A4 Sheet</h3>
-                  <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Blank white pages</p>
+                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-[#093765] transition-colors">Blank A4 Sheet</h3>
                 </div>
               </div>
               <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-blue-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
@@ -528,8 +697,7 @@ export function UploadFile() {
                   <Grid3X3 className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-400 group-hover:text-emerald-600 transition-colors duration-300" />
                 </div>
                 <div className="text-center sm:text-left">
-                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-emerald-700 transition-colors">Mimo Graph</h3>
-                  <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Graph paper sheets</p>
+                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-emerald-700 transition-colors">MIMO Graph</h3>
                 </div>
               </div>
               <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-emerald-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
@@ -544,9 +712,6 @@ export function UploadFile() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <CardTitle>Uploaded Files</CardTitle>
-                  <CardDescription>
-                    {files.filter((f) => f.status === "completed").length} of {files.length} file(s) ready
-                  </CardDescription>
                 </div>
 
               </div>
@@ -559,7 +724,7 @@ export function UploadFile() {
                   return (
                   <div
                     key={index}
-                    className="flex items-center gap-3 p-3 sm:p-4 border border-slate-100 rounded-2xl bg-white hover:shadow-md hover:border-[#093765]/20 transition-all duration-200 group animate-in slide-in-from-left-2 fade-in duration-300"
+                    className="flex items-center gap-3 p-3 sm:p-4 border border-slate-200 rounded-2xl bg-white hover:shadow-md hover:border-[#093765]/20 transition-all duration-200 group animate-in slide-in-from-left-2 fade-in duration-300"
                   >
                     <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
                       file.status === 'completed'
@@ -615,16 +780,18 @@ export function UploadFile() {
                   );
                 })}
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 mt-4">
+              <div className="flex flex-col sm:flex-row gap-3 mt-5 pt-4 border-t border-slate-200 w-full">
                 <Button
-                  className="flex-1 h-12 text-sm sm:text-base font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl"
+                  className="flex-1 h-12 text-sm sm:text-base font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl w-full sm:w-auto"
                   disabled={files.length === 0 || files.some((f) => f.status === "uploading")}
                   onClick={handlePrint}
                 >
-                  <Printer className="w-4 h-4 mr-2" />
-                  Continue to Print · {files.filter((f) => f.status === "completed").length} file{files.filter((f) => f.status === "completed").length !== 1 ? "s" : ""}
+                  Continue to Print
                 </Button>
-                <Button variant="outline" className="h-12 px-6 rounded-xl hover:bg-gray-100" onClick={() => {
+                <Button 
+                  variant="outline"
+                  className="flex-1 h-12 text-sm font-bold uppercase tracking-wider border-slate-200 hover:border-red-200 text-slate-600 hover:text-red-600 bg-white hover:bg-red-50/30 rounded-xl transition-all duration-300 w-full sm:w-auto shadow-xs cursor-pointer" 
+                  onClick={() => {
                   setFiles([]);
                   setUploadedFilesData([]);
                   setBackendTotalPages(0);

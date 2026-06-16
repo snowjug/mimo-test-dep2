@@ -7,7 +7,7 @@ import { Separator } from "../components/ui/separator";
 import { Badge } from "../components/ui/badge";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { MimoHeader } from "../components/mimo-header";
-import { ArrowLeft, FileText, Minus, Plus, Eye, Printer, Palette, Contrast, File, Files, Copy, Sliders, MapPin, Grid3X3, MonitorSmartphone, Check } from "lucide-react";
+import { ArrowLeft, FileText, Minus, Plus, Eye, Printer, Palette, Contrast, File, Files, Copy, Sliders, MapPin, Grid3X3, MonitorSmartphone, Check, Settings } from "lucide-react";
 
 interface UploadedFile {
   name: string;
@@ -104,8 +104,6 @@ export function PrintOptions() {
   const gridLayouts = [
     { id: "2", label: "2 per page", cols: 1, rows: 2, desc: "1×2 grid" },
     { id: "4", label: "4 per page", cols: 2, rows: 2, desc: "2×2 grid" },
-    { id: "6", label: "6 per page", cols: 2, rows: 3, desc: "2×3 grid" },
-    { id: "9", label: "9 per page", cols: 3, rows: 3, desc: "3×3 grid" },
   ];
 
   useEffect(() => {
@@ -342,6 +340,7 @@ export function PrintOptions() {
       copies,
       colorMode,
       doubleSided,
+      orientation,
       pageSelection,
       imageScaling,
       customScale,
@@ -367,16 +366,13 @@ export function PrintOptions() {
   const printDestinationCard = (
     <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
       <CardHeader className="px-4 pt-4 pb-2 flex flex-row items-start gap-3 space-y-0">
-        <div className="p-2 bg-blue-50/80 rounded-xl shrink-0">
+        <div className="p-2 bg-blue-50/80 rounded-xl shrink-0 -mt-0.5">
           <MapPin className="w-5 h-5 text-blue-600" />
         </div>
         <div className="flex flex-col gap-0.5">
           <CardTitle className="text-lg font-extrabold text-slate-900">
-            Print Destination
-          </CardTitle>
-          <CardDescription className="text-sm font-medium text-slate-500">
             Where do you want to print this?
-          </CardDescription>
+          </CardTitle>
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-3">
@@ -385,7 +381,7 @@ export function PrintOptions() {
           className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
             directKioskId === 'CV-001' 
               ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]' 
-              : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+              : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
           } active:scale-[0.99]`}
         >
           <div className="flex items-center gap-3">
@@ -398,12 +394,12 @@ export function PrintOptions() {
               <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
                 directKioskId === 'CV-001' ? 'text-[#093765]' : 'text-slate-700'
               }`}>
-                KIOSK-001-CV 
+                MIMO 1.0
                 <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
                   B&W
                 </Badge>
               </p>
-              <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at C.V Raman Block in Black & White.</p>
+              <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">C. V. Raman Block</p>
             </div>
           </div>
           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
@@ -424,18 +420,18 @@ export function PrintOptions() {
           }}
           className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
             directKioskId === 'SV-002' 
-              ? (colorMode === 'color' 
-                  ? 'border-pink-500 bg-gradient-to-r from-indigo-50/20 via-pink-50/10 to-blue-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]' 
+              ? (colorMode === 'color'
+                  ? 'border-blue-400 bg-gradient-to-r from-cyan-50/40 via-blue-50/20 to-indigo-50/30 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]'
                   : 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]')
-              : 'border-slate-100 hover:border-slate-300 bg-white/50 hover:bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+              : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
           } active:scale-[0.99]`}
         >
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-xl transition-all duration-300 ${
               directKioskId === 'SV-002' 
-                ? (colorMode === 'color' 
-                    ? 'bg-gradient-to-br from-indigo-500 to-pink-500 text-white shadow-sm scale-105' 
-                    : 'bg-[#093765] text-white shadow-sm scale-105') 
+                ? (colorMode === 'color'
+                    ? 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white shadow-sm scale-105'
+                    : 'bg-[#093765] text-white shadow-sm scale-105')
                 : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
             }`}>
               <Printer className="w-4.5 h-4.5" />
@@ -443,27 +439,27 @@ export function PrintOptions() {
             <div>
               <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
                 directKioskId === 'SV-002' 
-                  ? (colorMode === 'color' ? 'text-pink-900' : 'text-[#093765]') 
+                  ? (colorMode === 'color' ? 'text-blue-800' : 'text-[#093765]') 
                   : 'text-slate-700'
               }`}>
-                KIOSK-002-SV 
+                MIMO 2.0
                 <span className="flex gap-1">
                   <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
                     B&W
                   </Badge>
-                  <Badge className="bg-gradient-to-r from-yellow-400 via-pink-500 to-blue-500 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
+                  <Badge className="bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
                     COLOR
                   </Badge>
                 </span>
               </p>
-              <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Print at Swami Vivekananda Block in B&W or vibrant Color.</p>
+              <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">Swami Vivekananda Block</p>
             </div>
           </div>
           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
             directKioskId === 'SV-002' 
-              ? (colorMode === 'color' 
-                  ? 'bg-gradient-to-r from-indigo-500 to-pink-500 border-pink-500 text-white scale-110 shadow-xs' 
-                  : 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs') 
+              ? (colorMode === 'color'
+                  ? 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 border-blue-500 text-white scale-110 shadow-xs'
+                  : 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs')
               : 'border-slate-200 bg-transparent'
           }`}>
             {directKioskId === 'SV-002' && <Check className="w-3 h-3" strokeWidth={3} />}
@@ -472,6 +468,18 @@ export function PrintOptions() {
       </CardContent>
     </Card>
   );
+
+  const isSinglePageDocument = files.reduce((sum, f) => sum + (f.pageCount || 1), 0) <= 1;
+  const isDuplexSupported = directKioskId === "SV-002" && colorMode === "bw";
+
+  useEffect(() => {
+    if (!isDuplexSupported) {
+      if (doubleSided === "double") setDoubleSided("single");
+    }
+    if (isSinglePageDocument) {
+      if (pageSelection === "custom") setPageSelection("all");
+    }
+  }, [isSinglePageDocument, isDuplexSupported, doubleSided, pageSelection]);
 
   return (
     <div className="min-h-[100dvh] w-full bg-slate-50/50 px-3 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4" style={{ fontFamily: "'Outfit', sans-serif" }}>
@@ -486,21 +494,18 @@ export function PrintOptions() {
         {/* Header */}
         <MimoHeader />
 
-        <div className="flex items-center gap-2 mb-1 lg:hidden">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 hover:text-[#093765] h-10 w-10 -ml-2 shrink-0" onClick={() => navigate("/upload")}>
-            <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
-          </Button>
-          <span className="font-extrabold text-[#093765] text-lg">Print Settings</span>
-        </div>
-
-        <div className="hidden lg:flex items-start gap-3 mb-2">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 hover:text-[#093765] flex-shrink-0 h-11 w-11 mt-0.5 -ml-2" onClick={() => navigate("/upload")}>
+        {/* ── Page Header ── */}
+        <div className="flex items-center gap-2 py-2">
+          <button
+            onClick={() => navigate("/upload")}
+            className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-200/40 -ml-1"
+            aria-label="Back"
+          >
             <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
-          </Button>
-          <div className="min-w-0 pt-1.5 flex flex-col">
-            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-700 bg-clip-text text-transparent tracking-tight leading-tight mb-0.5">Print Configuration</h1>
-            <p className="text-sm text-slate-500 font-medium">Customize how you want your documents to look</p>
-          </div>
+          </button>
+          <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent tracking-tight leading-tight py-1">
+            Print Settings
+          </h1>
         </div>
 
         {/* Mobile Print Destination (Visible only on mobile) */}
@@ -508,21 +513,28 @@ export function PrintOptions() {
           {printDestinationCard}
         </div>
 
-        {/* Mobile Print Configuration Heading */}
-        <div className="flex flex-col lg:hidden mt-2">
-          <h2 className="text-xl font-extrabold text-[#093765] tracking-tight mb-0.5">Print Configuration</h2>
-          <p className="text-xs text-slate-500 font-medium">Customize how you want your documents to look</p>
-        </div>
+        {/* Mobile Print Configuration Heading Removed */}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Options Panel */}
           <div className="lg:col-span-2 space-y-3 sm:space-y-4">
-            {/* Number of Copies - Responsive & Interactive */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
+            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur hover:shadow-md transition-all duration-300 overflow-hidden">
+              <CardHeader className="px-4 pt-4 pb-0 flex flex-row items-start gap-3 space-y-0">
+                <div className="p-2 bg-blue-50/80 rounded-xl shrink-0 -mt-0.5">
+                  <Sliders className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <CardTitle className="text-lg font-extrabold text-slate-900">
+                    Print Configuration
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 pb-4 space-y-3 -mt-4">
+                {/* Number of Copies - Responsive & Interactive */}
+                <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
-                  <p className="text-sm font-bold text-slate-800">Number of Copies</p>
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium">Select print quantity</p>
+                  <p className="text-sm font-bold text-slate-800">How many copies do you want?</p>
                 </div>
                 <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100 w-full sm:w-auto">
                   <Button
@@ -548,18 +560,13 @@ export function PrintOptions() {
                   </Button>
                 </div>
               </div>
-            </Card>
+                </div>
 
-            {/* Color Mode - Coming Soon for Color only */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
+                {/* Color Mode - Coming Soon for Color only */}
+                <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
-                  <p className="text-sm font-bold text-slate-800">Color Mode</p>
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                    {directKioskId === "CV-001" 
-                      ? `₹${pricePerPageBW.toFixed(2)}/page • B&W Only` 
-                      : `₹${pricePerPageBW.toFixed(2)}/page B&W • ₹${pricePerPageColor.toFixed(2)}/page Color`}
-                  </p>
+                  <p className="text-sm font-bold text-slate-800">Do you prefer B&W or color prints?</p>
                 </div>
                 <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
                   <button
@@ -615,22 +622,15 @@ export function PrintOptions() {
                   />
                 </div>
               </div>
-            </Card>
+                </div>
 
-            {hasImages && (
-              <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold text-slate-800">Image Scaling</p>
-                      <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 px-1.5 py-0 text-[8px] sm:text-[9px] uppercase tracking-wider font-bold">
-                        Images Only
-                      </Badge>
+                {hasImages && (
+                  <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">How should the image fit on A4?</p>
                     </div>
-                    <p className="text-xs sm:text-sm text-slate-500 font-medium">How should the image fit on A4?</p>
-                  </div>
-                  
-                  <div className="flex flex-col items-center gap-3 w-full sm:w-auto">
                     <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-72 h-11 sm:h-12 select-none">
                       <button
                         onClick={() => setImageScaling("fit")}
@@ -668,7 +668,9 @@ export function PrintOptions() {
                         }`}
                       />
                     </div>
-                    
+                  </div>
+                  
+                  <div className="flex flex-col items-center gap-3 w-full">
                     {/* Custom Scale Slider */}
                     {imageScaling === "custom" && (
                       <div className="w-full flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm mt-1 mb-1">
@@ -709,20 +711,14 @@ export function PrintOptions() {
                     </div>
                   </div>
                 </div>
-              </Card>
-            )}
+                  </div>
+                )}
 
-            {/* Print Layout - Responsive & Interactive Segmented Control */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
+                {/* Print Layout - Responsive & Interactive Segmented Control */}
+                <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-slate-800">Print Layout</p>
-                    <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-200 px-1.5 py-0 text-[8px] sm:text-[9px] uppercase tracking-wider font-bold">
-                      Eco
-                    </Badge>
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium">Single or double-sided</p>
+                  <p className="text-sm font-bold text-slate-800">How do you want to print?</p>
                 </div>
                 <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
                   <button
@@ -741,20 +737,17 @@ export function PrintOptions() {
                   </button>
                   <button
                     onClick={() => {
-                      if (!(directKioskId === "SV-002" && colorMode === "color")) {
-                        setDoubleSided("double");
-                      } else {
-                        // Toast alert or just do nothing since button is disabled
-                      }
+                      if (!isDuplexSupported) return;
+                      setDoubleSided("double");
                     }}
-                    disabled={directKioskId === "SV-002" && colorMode === "color"}
+                    disabled={!isDuplexSupported}
                     type="button"
                     className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
                       doubleSided === "double"
                         ? "text-[#093765]"
                         : "text-slate-500 hover:text-slate-700"
                     } ${
-                      directKioskId === "SV-002" && colorMode === "color" ? "opacity-40 cursor-not-allowed bg-slate-100" : ""
+                      !isDuplexSupported ? "opacity-40 cursor-not-allowed bg-slate-100" : ""
                     }`}
                   >
                     <Files className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
@@ -770,14 +763,13 @@ export function PrintOptions() {
                   />
                 </div>
               </div>
-            </Card>
+                </div>
 
-            {/* Page Selection - Responsive & Interactive Segmented Control */}
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur p-4 sm:p-5 hover:shadow-md transition-all duration-300">
+                {/* Page Selection - Responsive & Interactive Segmented Control */}
+                <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
-                  <p className="text-sm font-bold text-slate-800">Pages to Print</p>
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium">{pageSelection === "all" ? "All pages" : "Custom range"}</p>
+                  <p className="text-sm font-bold text-slate-800">Which pages do you want to print?</p>
                 </div>
                 <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
                   <button
@@ -795,13 +787,17 @@ export function PrintOptions() {
                     <span>All Pages</span>
                   </button>
                   <button
-                    onClick={() => handlePageSelectionChange("custom")}
+                    onClick={() => {
+                      if (isSinglePageDocument) return;
+                      handlePageSelectionChange("custom");
+                    }}
+                    disabled={isSinglePageDocument}
                     type="button"
                     className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
                       pageSelection === "custom"
                         ? "text-[#093765]"
                         : "text-slate-500 hover:text-slate-700"
-                    }`}
+                    } ${isSinglePageDocument ? "opacity-40 cursor-not-allowed bg-slate-100" : ""}`}
                   >
                     <Sliders className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
                       pageSelection === "custom" ? "scale-110 text-[#093765] rotate-90" : "scale-100 text-slate-400"
@@ -966,80 +962,82 @@ export function PrintOptions() {
                   })()}
                 </div>
               )}
-            </Card>
-
-            {/* Orientation & Layout */}
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
-              <CardHeader className="px-4 pt-4 pb-1 gap-1">
-                <CardTitle className="text-base">Layout & Orientation</CardTitle>
-                <CardDescription className="text-xs">Set page orientation and how content is arranged</CardDescription>
-              </CardHeader>
-              <CardContent className="px-4 pb-4 space-y-4">
-                {/* Orientation Toggle */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Orientation</p>
-                    <p className="text-xs sm:text-sm text-slate-500 font-medium">Page direction</p>
-                  </div>
-                  <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-60 h-11 sm:h-12 select-none">
-                    <button
-                      onClick={() => setOrientation("portrait")}
-                      type="button"
-                      className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
-                        orientation === "portrait"
-                          ? "text-[#093765]"
-                          : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      <div className={`w-3 h-4 rounded-[2px] border-2 transition-all duration-300 group-hover:scale-110 ${
-                        orientation === "portrait" ? "scale-110 border-[#093765] bg-[#093765]/10" : "scale-100 border-slate-400"
-                      }`} />
-                      Portrait
-                    </button>
-                    <button
-                      onClick={() => setOrientation("landscape")}
-                      type="button"
-                      className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
-                        orientation === "landscape"
-                          ? "text-[#093765]"
-                          : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      <div className={`w-4 h-3 rounded-[2px] border-2 transition-all duration-300 group-hover:scale-110 ${
-                        orientation === "landscape" ? "scale-110 border-[#093765] bg-[#093765]/10" : "scale-100 border-slate-400"
-                      }`} />
-                      Landscape
-                    </button>
-                    {/* Sliding Background Pill */}
-                    <div
-                      className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
-                        orientation === "portrait" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
-                      }`}
-                    />
-                  </div>
                 </div>
 
-                <Separator className="opacity-50" />
+                {/* Orientation & Layout */}
+                <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm flex flex-col gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 mb-1">
+                      {hasImages ? "How do you want your image arranged?" : "How do you want your content arranged?"}
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col gap-5 border-t border-slate-100 pt-3 mt-1">
+                      {/* Orientation Toggle */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">
+                            Orientation <span className="text-xs font-medium text-slate-500 ml-1">(page direction)</span>
+                          </p>
+                        </div>
+                        <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-60 h-11 sm:h-12 select-none">
+                          <button
+                            onClick={() => setOrientation("portrait")}
+                            type="button"
+                            className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
+                              orientation === "portrait"
+                                ? "text-[#093765]"
+                                : "text-slate-500 hover:text-slate-700"
+                            }`}
+                          >
+                            <div className={`w-3 h-4 rounded-[2px] border-2 transition-all duration-300 group-hover:scale-110 ${
+                              orientation === "portrait" ? "scale-110 border-[#093765] bg-[#093765]/10" : "scale-100 border-slate-400"
+                            }`} />
+                            Portrait
+                          </button>
+                          <button
+                            onClick={() => setOrientation("landscape")}
+                            type="button"
+                            className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
+                              orientation === "landscape"
+                                ? "text-[#093765]"
+                                : "text-slate-500 hover:text-slate-700"
+                            }`}
+                          >
+                            <div className={`w-4 h-3 rounded-[2px] border-2 transition-all duration-300 group-hover:scale-110 ${
+                              orientation === "landscape" ? "scale-110 border-[#093765] bg-[#093765]/10" : "scale-100 border-slate-400"
+                            }`} />
+                            Landscape
+                          </button>
+                          {/* Sliding Background Pill */}
+                          <div
+                            className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
+                              orientation === "portrait" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                            }`}
+                          />
+                        </div>
+                      </div>
 
-                {/* Grid Layout - Image preview for images, placeholder grid for docs */}
-                <div className={!hasImages ? "opacity-30 pointer-events-none grayscale blur-[1px] relative select-none" : "relative"}>
-                  {!hasImages && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center">
-                      <Badge variant="secondary" className="bg-slate-800 text-white shadow-xl px-4 py-1 text-sm rounded-full pointer-events-auto">Layout only available for Images</Badge>
-                    </div>
-                  )}
-                  <p className="text-sm font-bold text-slate-800 mb-1">Layout</p>
-                  <p className="text-[10px] text-slate-500 mb-3 font-medium">
-                    {hasImages ? "Arrange your photos on a single sheet" : "Photo layout only available for images"}
-                  </p>
+                      <Separator className="opacity-50" />
 
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                      {/* Grid Layout - Image preview for images, placeholder grid for docs */}
+                      <div className={!hasImages ? "opacity-30 pointer-events-none grayscale blur-[1px] relative select-none" : "relative"}>
+                        {!hasImages && (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center">
+                            <Badge variant="secondary" className="bg-slate-800 text-white shadow-xl px-4 py-1 text-sm rounded-full pointer-events-auto">Layout only available for Images</Badge>
+                          </div>
+                        )}
+                        <p className="text-sm font-bold text-slate-800 mb-3">Layout</p>
+
+                        <div key={`grid-${orientation}`} className="grid grid-cols-3 gap-3 sm:gap-4">
                     {[
                       { id: "1", label: "1 per page", cols: 1, rows: 1, desc: "Full page" },
                       ...gridLayouts,
                     ].map((layout) => {
                       const isSelected = photoLayout === layout.id;
-                      const cellCount = layout.cols * layout.rows;
+                      const effectiveCols = orientation === "landscape" ? layout.rows : layout.cols;
+                      const effectiveRows = orientation === "landscape" ? layout.cols : layout.rows;
+                      const cellCount = effectiveCols * effectiveRows;
                       return (
                         <button
                           key={layout.id}
@@ -1051,13 +1049,16 @@ export function PrintOptions() {
                           }`}
                         >
                           <div
-                            className={`w-8 h-10 rounded border-2 p-[3px] overflow-hidden ${
-                              isSelected ? "border-blue-400" : "border-slate-300"
+                            key={`${layout.id}-${orientation}`}
+                            className={`rounded border-2 p-[3px] overflow-hidden ${
+                              orientation === "landscape" ? "w-12 h-8" : "w-8 h-12"
+                            } ${
+                              isSelected ? "border-blue-400 bg-blue-100/50" : "border-slate-300 bg-white"
                             }`}
                             style={{
                               display: "grid",
-                              gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
-                              gridTemplateRows: `repeat(${layout.rows}, 1fr)`,
+                              gridTemplateColumns: `repeat(${effectiveCols}, 1fr)`,
+                              gridTemplateRows: `repeat(${effectiveRows}, 1fr)`,
                               gap: "2px",
                             }}
                           >
@@ -1088,21 +1089,22 @@ export function PrintOptions() {
                     })}
                   </div>
 
-                  {/* Live image layout preview */}
-                  {hasImages && photoLayout !== "1" && (
+                  {/* Live image layout preview - always show for images */}
+                  {hasImages && (
                     <div
-                      className="mt-4 rounded-xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm"
-                      style={{ aspectRatio: "3/4" }}
+                      key={`preview-${orientation}-${photoLayout}`}
+                      className="mt-3 rounded-xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm"
+                      style={{ aspectRatio: orientation === "landscape" ? "4/3" : "3/4" }}
                     >
                       <div
                         className="w-full h-full p-2"
                         style={{
                           display: "grid",
                           gridTemplateColumns: `repeat(${
-                            photoLayout === "1" ? 1 : gridLayouts.find((l) => l.id === photoLayout)?.cols ?? 1
+                            photoLayout === "1" ? 1 : (orientation === "landscape" ? (gridLayouts.find((l) => l.id === photoLayout)?.rows ?? 1) : (gridLayouts.find((l) => l.id === photoLayout)?.cols ?? 1))
                           }, 1fr)`,
                           gridTemplateRows: `repeat(${
-                            photoLayout === "1" ? 1 : gridLayouts.find((l) => l.id === photoLayout)?.rows ?? 1
+                            photoLayout === "1" ? 1 : (orientation === "landscape" ? (gridLayouts.find((l) => l.id === photoLayout)?.cols ?? 1) : (gridLayouts.find((l) => l.id === photoLayout)?.rows ?? 1))
                           }, 1fr)`,
                           gap: "4px",
                         }}
@@ -1126,21 +1128,22 @@ export function PrintOptions() {
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            {/* File Preview */}
+      {/* File Preview */}
             <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
-              <CardHeader className="px-4 pt-4 pb-1 gap-1">
-                <CardTitle className="text-base">Document Preview</CardTitle>
-                <CardDescription className="text-xs">Files ready to print</CardDescription>
-              </CardHeader>
-              <CardContent className="px-4 pb-4">
+              <div className="px-4 pt-2 pb-2 flex flex-col gap-1">
+                <CardTitle className="text-base">Do you want a preview?</CardTitle>
+              </div>
+              <div className="px-4 pb-3">
                 <div className="space-y-3">
                   {files.map((file, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 border border-slate-100 rounded-xl hover:bg-slate-50/50 hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5 hover:-translate-y-0.5 active:scale-[0.98] active:bg-blue-50/40 active:border-blue-200/60 transition-all duration-300 cursor-pointer group/row"
+                      className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-white border-2 border-slate-300 rounded-2xl hover:bg-slate-50/50 hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] active:bg-blue-50/40 active:border-blue-400/60 transition-all duration-300 cursor-pointer group/row shadow-sm"
                       onClick={() => setSelectedPreview(index)}
                     >
                       <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors group-hover/row:bg-blue-100">
@@ -1155,13 +1158,13 @@ export function PrintOptions() {
                         size="sm"
                         className="bg-blue-50/50 border-blue-200 hover:bg-blue-100 hover:border-blue-300 text-blue-700 hover:text-[#093765] shadow-xs transition-all duration-200 rounded-lg cursor-pointer active:scale-95"
                       >
-                        <Eye className="w-4 h-4 mr-2 text-blue-600 transition-colors animate-eye-blink" />
+                        <Eye className="w-4 h-4 mr-2 text-blue-600 transition-colors" />
                         Preview
                       </Button>
                     </div>
                   ))}
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </div>
 
@@ -1177,10 +1180,9 @@ export function PrintOptions() {
               <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <Printer className="w-32 h-32 rotate-12" />
               </div>
-              <CardHeader className="border-b border-white/5 pb-3 sm:pb-3.5 bg-white/[0.02] px-4 sm:px-5 pt-3.5 sm:pt-4 relative z-10">
-                <CardTitle className="text-lg sm:text-xl font-bold tracking-tight">Cost Summary</CardTitle>
-                <CardDescription className="text-blue-100/70 text-xs">Final printing breakdown</CardDescription>
-              </CardHeader>
+              <div className="border-b border-white/5 py-3 sm:py-3.5 bg-white/[0.02] px-4 sm:px-5 relative z-10 flex items-center justify-center">
+                <CardTitle className="text-lg sm:text-xl font-bold tracking-tight w-full text-left">Cost Summary</CardTitle>
+              </div>
               <CardContent className="space-y-3 sm:space-y-3.5 p-4 sm:p-5 relative z-10">
                 <div className="space-y-3 sm:space-y-4 font-medium text-xs">
                   <div className="flex justify-between items-center text-blue-100/90">
@@ -1290,18 +1292,45 @@ export function PrintOptions() {
                           </div>
                         );
                       } else if (isImage) {
+                        const layoutId = photoLayout;
+                        const cols = layoutId === "1" ? 1 : (orientation === "landscape" ? (gridLayouts.find((l) => l.id === layoutId)?.rows ?? 1) : (gridLayouts.find((l) => l.id === layoutId)?.cols ?? 1));
+                        const rows = layoutId === "1" ? 1 : (orientation === "landscape" ? (gridLayouts.find((l) => l.id === layoutId)?.cols ?? 1) : (gridLayouts.find((l) => l.id === layoutId)?.rows ?? 1));
+                        const totalCells = layoutId === "1" ? 1 : (gridLayouts.find((l) => l.id === layoutId)?.cols ?? 1) * (gridLayouts.find((l) => l.id === layoutId)?.rows ?? 1);
+
                         return (
-                          <div className="w-full h-full flex items-center justify-center overflow-hidden bg-slate-200/50 rounded-md">
-                            <img 
-                              src={previewDataUrl} 
-                              alt="Preview" 
-                              className="max-w-full max-h-full object-contain transition-all duration-300"
+                          <div className="w-full h-full flex items-center justify-center p-2 bg-slate-200/50 rounded-md overflow-hidden">
+                            <div 
+                              className="bg-white shadow-lg p-3 transition-all duration-300 flex items-center justify-center overflow-hidden"
                               style={{ 
-                                filter: filterStyle,
-                                transform: transformStyle,
-                                transformOrigin: "center center"
+                                aspectRatio: orientation === "landscape" ? "1.414 / 1" : "1 / 1.414",
+                                maxHeight: "100%",
+                                maxWidth: "100%"
                               }}
-                            />
+                            >
+                              <div
+                                className="w-full h-full"
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                                  gridTemplateRows: `repeat(${rows}, 1fr)`,
+                                  gap: "6px",
+                                }}
+                              >
+                                {Array.from({ length: totalCells }).map((_, i) => (
+                                  <div key={i} className="overflow-hidden rounded-sm bg-slate-50 flex items-center justify-center h-full w-full relative">
+                                    <img
+                                      src={previewDataUrl}
+                                      alt="Preview"
+                                      className={`w-full h-full transition-all duration-300 ${imageScaling === "fill" ? "object-cover" : "object-contain"}`}
+                                      style={{
+                                        filter: filterStyle,
+                                        ...(imageScaling === "custom" ? { transform: `scale(${customScale / 100})`, transformOrigin: "center center" } : {})
+                                      }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         );
                       }
