@@ -861,23 +861,6 @@
       position: relative;
       z-index: 5;
     }
-    .marquee-container::before,
-    .marquee-container::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 100px;
-      z-index: 2;
-    }
-    .marquee-container::before {
-      left: 0;
-      background: linear-gradient(to right, white, transparent);
-    }
-    .marquee-container::after {
-      right: 0;
-      background: linear-gradient(to left, white, transparent);
-    }
     .marquee-content {
       display: inline-flex;
       align-items: center;
