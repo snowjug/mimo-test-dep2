@@ -240,74 +240,128 @@ def convert_image_to_pdf_fit(input_path, is_color=False):
         return None
 
 def impose_nup(input_pdf, output_pdf, layout_num):
-    """Natively impose N-up pages onto an A4 canvas using PyPDF2."""
+    """
+    Impose N-up pages onto an A4 canvas using Ghostscript + Pillow.
+    Works on both Pi nodes (neither has PyPDF2 installed).
+    GS rasterizes each PDF page → PNG; Pillow composites them onto A4 canvas.
+    """
     try:
-        from PyPDF2 import PdfReader, PdfWriter, PageObject, Transformation
-        import io
-        with open(input_pdf, "rb") as f:
-            pdf_bytes = f.read()
-            
-        writer = PdfWriter()
-        
-        A4_W, A4_H = 595.276, 841.890
-        
-        if str(layout_num) == "2":
-            cols, rows = 2, 1
-            canvas_w, canvas_h = A4_H, A4_W
-        elif str(layout_num) == "4":
-            cols, rows = 2, 2
-            canvas_w, canvas_h = A4_W, A4_H
-        elif str(layout_num) == "6":
-            cols, rows = 3, 2
-            canvas_w, canvas_h = A4_H, A4_W
-        elif str(layout_num) == "9":
-            cols, rows = 3, 3
-            canvas_w, canvas_h = A4_W, A4_H
-        else:
+        from PIL import Image
+        import math
+
+        n = int(layout_num)
+        if n not in (2, 4, 6, 9):
+            print(f"❌ impose_nup: unsupported layout {n}")
             return False
-            
-        cell_w = canvas_w / cols
-        cell_h = canvas_h / rows
+
+        # Layout grid + canvas orientation
+        if n == 2:
+            cols, rows = 2, 1
+            canvas_w_px, canvas_h_px = 3508, 2480  # A4 landscape @ 300dpi
+            is_landscape = True
+        elif n == 4:
+            cols, rows = 2, 2
+            canvas_w_px, canvas_h_px = 2480, 3508  # A4 portrait @ 300dpi
+            is_landscape = False
+        elif n == 6:
+            cols, rows = 3, 2
+            canvas_w_px, canvas_h_px = 3508, 2480  # A4 landscape @ 300dpi
+            is_landscape = True
+        else:  # 9
+            cols, rows = 3, 3
+            canvas_w_px, canvas_h_px = 2480, 3508  # A4 portrait @ 300dpi
+            is_landscape = False
+
+        cell_w = canvas_w_px // cols
+        cell_h = canvas_h_px // rows
+
+        # Get total page count via pdfinfo (or GS fallback)
+        total_pages = 1
+        try:
+            pi_res = subprocess.run(["pdfinfo", input_pdf], capture_output=True, text=True, timeout=10)
+            for line in pi_res.stdout.split("\n"):
+                if "Pages:" in line:
+                    total_pages = int(line.split(":")[1].strip())
+        except Exception:
+            pass
+        print(f"📄 impose_nup: {total_pages} source pages → {n}-up layout ({cols}×{rows})")
+
+        # Rasterize each PDF page to a temp PNG at 150 DPI (fast, good quality)
+        DPI = 150
+        scale_factor = DPI / 300.0
+        cell_w_s = int(cell_w * scale_factor)
+        cell_h_s = int(cell_h * scale_factor)
+        canvas_w_s = int(canvas_w_px * scale_factor)
+        canvas_h_s = int(canvas_h_px * scale_factor)
+
+        page_imgs = []
+        # If single-page source, replicate it n times (e.g. photo printing)
+        pages_to_render = list(range(1, total_pages + 1)) if total_pages > 1 else [1] * n
         
-        base_reader = PdfReader(io.BytesIO(pdf_bytes))
-        total_pages = len(base_reader.pages)
-        
-        if total_pages == 1:
-            total_pages = int(layout_num)
-            is_single = True
-        else:
-            is_single = False
-        
-        current_page_idx = 0
-        while current_page_idx < total_pages:
-            new_page = PageObject.create_blank_page(width=canvas_w, height=canvas_h)
+        for pg in pages_to_render:
+            tmp_img = os.path.join(TEMP_DIR, f"_nup_pg{pg}_{int(time.time()*1000)}.png")
+            gs_cmd = [
+                "gs", "-dNOPAUSE", "-dBATCH", "-q",
+                "-sDEVICE=png16m", f"-r{DPI}",
+                f"-dFirstPage={pg}", f"-dLastPage={pg}",
+                f"-sOutputFile={tmp_img}", input_pdf
+            ]
+            result = subprocess.run(gs_cmd, capture_output=True, timeout=30)
+            if result.returncode == 0 and os.path.exists(tmp_img):
+                page_imgs.append(tmp_img)
+            else:
+                print(f"⚠️ GS rasterize failed for page {pg}: {result.stderr.decode()[:100]}")
+
+        if not page_imgs:
+            print("❌ impose_nup: no pages could be rasterized")
+            return False
+
+        # Build output PDF — one canvas sheet per N pages
+        output_sheets = []
+        idx = 0
+        while idx < len(page_imgs):
+            canvas_img = Image.new("RGB", (canvas_w_s, canvas_h_s), (255, 255, 255))
             for row in range(rows):
                 for col in range(cols):
-                    if current_page_idx >= total_pages:
+                    if idx >= len(page_imgs):
                         break
-                    
-                    fresh_reader = PdfReader(io.BytesIO(pdf_bytes))
-                    p = fresh_reader.pages[0 if is_single else current_page_idx]
-                    
-                    p_w = float(p.mediabox.width)
-                    p_h = float(p.mediabox.height)
-                    
-                    scale = min(cell_w / p_w, cell_h / p_h)
-                    
-                    tx = (col * cell_w) + (cell_w - (p_w * scale)) / 2
-                    ty = ((rows - 1 - row) * cell_h) + (cell_h - (p_h * scale)) / 2
-                    
-                    op = Transformation().scale(sx=scale, sy=scale).translate(tx=tx, ty=ty)
-                    new_page.merge_page(p, op)
-                    
-                    current_page_idx += 1
-            writer.add_page(new_page)
-            
-        with open(output_pdf, "wb") as f:
-            writer.write(f)
+                    with Image.open(page_imgs[idx]) as pg_img:
+                        pg_img.thumbnail((cell_w_s, cell_h_s), Image.Resampling.LANCZOS)
+                        paste_x = col * cell_w_s + (cell_w_s - pg_img.width) // 2
+                        paste_y = row * cell_h_s + (cell_h_s - pg_img.height) // 2
+                        canvas_img.paste(pg_img, (paste_x, paste_y))
+                    idx += 1
+            sheet_path = os.path.join(TEMP_DIR, f"_nup_sheet_{idx}_{int(time.time()*1000)}.pdf")
+            canvas_img.save(sheet_path, "PDF", resolution=DPI)
+            output_sheets.append(sheet_path)
+
+        # Merge all sheets into final output PDF
+        if len(output_sheets) == 1:
+            os.rename(output_sheets[0], output_pdf)
+        else:
+            merge_cmd = [
+                "gs", "-dBATCH", "-dNOPAUSE", "-q",
+                "-sDEVICE=pdfwrite", f"-sOutputFile={output_pdf}"
+            ] + output_sheets
+            subprocess.run(merge_cmd, check=True, timeout=120)
+            for s in output_sheets:
+                try:
+                    os.remove(s)
+                except Exception:
+                    pass
+
+        # Clean up temp page images
+        for p in page_imgs:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+
+        print(f"✅ impose_nup: successfully created {len(output_sheets)}-sheet {n}-up PDF → {output_pdf}")
         return True
+
     except Exception as e:
-        print(f"❌ PyPDF2 N-up Imposition failed: {e}")
+        print(f"❌ impose_nup (GS+Pillow) failed: {e}")
         return False
 
 def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
@@ -341,7 +395,10 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         if not is_blank_sheet:
             cmd.extend(["-o", "fit-to-page"])
 
+        # NOTE: N-up layout is always pre-imposed by impose_nup() before reaching here.
+        # photo_layout is cleared to None after imposition, so this block is a safety guard only.
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
+            print(f"⚠️ photo_layout={photo_layout} still set at print_file — N-up was not pre-imposed. Passing to CUPS as fallback.")
             cmd.extend(["-o", f"number-up={photo_layout}"])
             
         if double_sided == "double":
@@ -357,12 +414,13 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         
         total_pages = 0
         try:
-            from PyPDF2 import PdfReader
             for f in file_paths:
-                reader = PdfReader(f)
-                total_pages += len(reader.pages)
+                pi_info = subprocess.run(["pdfinfo", f], capture_output=True, text=True, timeout=10)
+                for line in pi_info.stdout.split("\n"):
+                    if "Pages:" in line:
+                        total_pages += int(line.split(":")[1].strip())
         except Exception:
-            total_pages = 1
+            total_pages = max(1, total_pages)
             
         total_physical_pages = total_pages * copies
         
