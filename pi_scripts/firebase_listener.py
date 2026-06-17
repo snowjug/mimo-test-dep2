@@ -643,8 +643,34 @@ def process_job(doc_snapshot):
                 except Exception as fallback_err:
                     print(f"❌ Fallback failed: {fallback_err}")
                     raise Exception("Layout generation failed on Kiosk.")
-        # Use native USB queue directly on Kiosk 1
 
+        # Ensure final_paths is synced with pdf_paths if layout imposition did not run
+        if not (photo_layout and str(photo_layout) in ["2", "4", "6", "9"]):
+            final_paths = pdf_paths
+
+        # Check if duplex is requested for a single-page document and copies > 1
+        if double_sided == "double" and copies > 1:
+            total_pages = 0
+            try:
+                if len(final_paths) == 1:
+                    pi_info = subprocess.run(["pdfinfo", final_paths[0]], capture_output=True, text=True, timeout=10)
+                    for line in pi_info.stdout.split("\n"):
+                        if "Pages:" in line:
+                            total_pages = int(line.split(":")[1].strip())
+            except Exception as e:
+                print(f"⚠️ Failed to check pages for duplex: {e}")
+            
+            if total_pages == 1:
+                print(f"📄 Duplicating single-page PDF {copies} times to enable double-sided printing...")
+                dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
+                try:
+                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * copies, check=True, timeout=60)
+                    if os.path.exists(dup_pdf):
+                        final_paths = [dup_pdf]
+                        copies = 1
+                        print(f"✅ Successfully duplicated single-page PDF to {dup_pdf} with copies=1")
+                except Exception as dup_err:
+                    print(f"❌ Failed to duplicate single-page PDF for duplex: {dup_err}")
 
         success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
         
