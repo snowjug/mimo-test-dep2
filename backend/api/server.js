@@ -1976,14 +1976,16 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
           signedUrl = generatedUrl;
         }
 
-        // --- OLD PI COMPATIBILITY (PULL ARCHITECTURE) ---
-        if (process.env.PI_ARCHITECTURE === "pull") {
-          console.log(`[PULL ARCHITECTURE] Job ${fileName} marked as printing. Waiting for old Pi to pull...`);
-          results.push({ file: fileName, status: "pull_mode_active" });
-          continue; // Skip the FastAPI Push call!
+        // --- PI ARCHITECTURE: Firebase Listener (PULL) is the DEFAULT ---
+        // The Pi runs firebase_listener.py which watches Firestore for status="printing".
+        // Only use HTTP push (FastAPI) if PI_ARCHITECTURE is explicitly set to "push".
+        if (process.env.PI_ARCHITECTURE !== "push") {
+          console.log(`[FIREBASE LISTENER] Job ${fileName} queued for kiosk ${finalKioskId}. Pi listener will pick it up.`);
+          results.push({ file: fileName, status: "pull_mode_active", kioskId: finalKioskId });
+          continue; // Pi firebase_listener.py handles the rest!
         }
 
-        console.log(`🖨️ Sending to ${kioskId} Pi: ${fileName} | copies: ${copies} | printer: ${targetPrinterName}`);
+        console.log(`🖨️ [PUSH MODE] Sending to ${kioskId} Pi: ${fileName} | copies: ${copies} | printer: ${targetPrinterName}`);
         const piResults = await triggerPiPrint(signedUrl, copies, targetPiUrl, targetPrinterName, opts);
         console.log(`✅ Pi response for ${fileName}:`, piResults);
 

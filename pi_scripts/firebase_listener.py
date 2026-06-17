@@ -714,6 +714,64 @@ def heartbeat_loop():
             print(f"⚠️ Heartbeat failed: {e}")
         time.sleep(30)
 
+# Mapping of CUPS printer names to their USB Vendor/Product IDs
+PRINTER_USB_IDS = {
+    # SV-002 / pi
+    "Brother_HL_L2440DW_series": "04f9:0587",
+    "Epson_L3250": "04b8:118a",
+    "L3250-Series": "04b8:118a",
+    
+    # CV-001 / printpi
+    "Brother_HL_L5210DN_series_USB": "04f9:0503",
+    "Brother_HL_L5210DN_series": "04f9:0503",
+    "Brother_IPP": "04f9:0503",
+    "Brother": "04f9:0503"
+}
+
+def reset_printer_usb(printer_name):
+    usb_id = PRINTER_USB_IDS.get(printer_name)
+    if not usb_id:
+        # Fallback: scan lsusb dynamically to find any Brother or Epson printer
+        try:
+            lsusb_out = subprocess.run(["lsusb"], capture_output=True, text=True).stdout
+            for line in lsusb_out.split("\n"):
+                if "Brother" in line and "Brother" in printer_name:
+                    parts = line.split("ID ")
+                    if len(parts) > 1:
+                        usb_id = parts[1].split()[0]
+                        break
+                elif "Epson" in line and "Epson" in printer_name:
+                    parts = line.split("ID ")
+                    if len(parts) > 1:
+                        usb_id = parts[1].split()[0]
+                        break
+        except Exception as e:
+            print(f"⚠️ Dynamic USB scan failed: {e}")
+
+    if usb_id:
+        print(f"🔌 Waking up printer {printer_name} via hardware USB reset ({usb_id})...")
+        # Run usbreset with piped password
+        res = subprocess.run(f"echo 'printpi' | sudo -S usbreset {usb_id}", shell=True, capture_output=True, text=True)
+        print(f"USB reset output: {res.stdout.strip()} | Error: {res.stderr.strip()}")
+        return True
+    else:
+        print(f"⚠️ No USB ID found for printer {printer_name}")
+        return False
+
+def resume_printer_jobs(printer_name):
+    try:
+        res = subprocess.run(["lpstat", "-o"], capture_output=True, text=True)
+        for line in res.stdout.splitlines():
+            if line.startswith(printer_name + "-"):
+                parts = line.split()
+                if parts:
+                    job_id = parts[0]
+                    print(f"🔓 Watchdog: Resuming job {job_id} on {printer_name}...")
+                    subprocess.run(["lp", "-i", job_id, "-H", "resume"], capture_output=True)
+    except Exception as e:
+        print(f"⚠️ Failed to resume jobs for {printer_name}: {e}")
+
+
 def watchdog_loop():
     stuck_cycles = {BW_PRINTER_NAME: 0, COLOR_PRINTER_NAME: 0}
     while True:
@@ -725,7 +783,8 @@ def watchdog_loop():
                 status_out = status_res.stdout.lower()
                 if "disabled" in status_out:
                     print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
-                    subprocess.run(["sudo", "cupsenable", printer], capture_output=True)
+                    subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                    resume_printer_jobs(printer)
                 
                 # Check if printer is currently printing
                 printer_active[printer] = "printing" in status_out
@@ -741,15 +800,23 @@ def watchdog_loop():
                         print(f"⚠️ Watchdog: Stuck job detected on {printer} (Cycle {stuck_cycles[printer]} - Printer Idle but Job in Queue)")
 
                         if stuck_cycles[printer] >= 3:
-                            print(f"🔧 Watchdog: Kicking ipp-usb to wake up sleeping printer {printer}...")
-                            subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
-                            subprocess.run(["sudo", "cupsenable", printer], capture_output=True)
+                            print(f"🔧 Watchdog: Waking up sleeping printer {printer}...")
+                            reset_printer_usb(printer)
+                            
+                            # Restart ipp-usb if it's a Brother printer
+                            if "Brother" in printer:
+                                print("Restarting ipp-usb...")
+                                subprocess.run(f"echo 'printpi' | sudo -S systemctl restart ipp-usb", shell=True, capture_output=True)
+                            
+                            # Re-enable CUPS queue
+                            subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                            resume_printer_jobs(printer)
                             stuck_cycles[printer] = 0
                 else:
                     stuck_cycles[printer] = 0
             
-            # Fallback polling for silent grpc disconnects
-            docs = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID)).stream()
+            # Fallback polling for silent grpc disconnects with a 30s timeout
+            docs = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID)).stream(timeout=30)
             for doc in docs:
                 if doc.id not in active_jobs:
                     data = doc.to_dict()
@@ -765,6 +832,7 @@ def watchdog_loop():
         except Exception as e:
             print(f"⚠️ Watchdog failed: {e}")
         time.sleep(60)
+
 
 def keep_warm_loop():
     while True:
