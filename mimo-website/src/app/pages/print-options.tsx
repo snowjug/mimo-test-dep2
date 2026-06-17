@@ -470,7 +470,7 @@ export function PrintOptions() {
   );
 
   const isSinglePageDocument = files.reduce((sum, f) => sum + (f.pageCount || 1), 0) <= 1;
-  const isDuplexSupported = directKioskId === "SV-002" && colorMode === "bw";
+  const isDuplexSupported = (directKioskId === "SV-002" || directKioskId === "CV-001") && colorMode === "bw";
 
   useEffect(() => {
     if (!isDuplexSupported) {

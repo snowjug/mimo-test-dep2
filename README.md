@@ -19,6 +19,24 @@ This repository contains the MIMO printing platform split into three parts:
 
 The system supports user login, payment verification, print job creation, and kiosk-based printing workflows.
 
+## Hardware Topology & Kiosk Configurations
+
+The platform coordinates printing operations across two physical Kiosk stations:
+
+### 1. Kiosk CV-001 (MIMO 1.0)
+- **Configuration Host:** `printpi@printpi`
+- **Supported Printers:**
+  - `Brother_HL_L5210DN_series_USB` (Monochrome, supports Duplex/double-sided printing)
+- **Key Details:** Served as a high-speed black and white print kiosk.
+
+### 2. Kiosk SV-002 (MIMO 2.0)
+- **Configuration Host:** `pi@pi`
+- **Supported Printers:**
+  - `Brother_HL_L2440DW_series` (Monochrome, supports Duplex/double-sided printing)
+  - `Epson_L3250` (Color printing)
+- **Key Details:** All color print jobs in the system are automatically routed by the backend to this kiosk (`SV-002`) to print on the Epson color printer.
+
+
 ## Live Deployments
 
 - **Main Frontend URL**: https://printmimo.tech (or https://www.printmimo.tech)
