@@ -12,7 +12,7 @@ const db = admin.firestore();
 async function checkRecentJobs() {
   const snapshot = await db.collection("print_jobs")
     .orderBy("createdAt", "desc")
-    .limit(50)
+    .limit(5)
     .get();
 
   if (snapshot.empty) {

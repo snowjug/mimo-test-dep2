@@ -240,74 +240,128 @@ def convert_image_to_pdf_fit(input_path, is_color=False):
         return None
 
 def impose_nup(input_pdf, output_pdf, layout_num):
-    """Natively impose N-up pages onto an A4 canvas using PyPDF2."""
+    """
+    Impose N-up pages onto an A4 canvas using Ghostscript + Pillow.
+    Works on both Pi nodes (neither has PyPDF2 installed).
+    GS rasterizes each PDF page → PNG; Pillow composites them onto A4 canvas.
+    """
     try:
-        from PyPDF2 import PdfReader, PdfWriter, PageObject, Transformation
-        import io
-        with open(input_pdf, "rb") as f:
-            pdf_bytes = f.read()
-            
-        writer = PdfWriter()
-        
-        A4_W, A4_H = 595.276, 841.890
-        
-        if str(layout_num) == "2":
-            cols, rows = 2, 1
-            canvas_w, canvas_h = A4_H, A4_W
-        elif str(layout_num) == "4":
-            cols, rows = 2, 2
-            canvas_w, canvas_h = A4_W, A4_H
-        elif str(layout_num) == "6":
-            cols, rows = 3, 2
-            canvas_w, canvas_h = A4_H, A4_W
-        elif str(layout_num) == "9":
-            cols, rows = 3, 3
-            canvas_w, canvas_h = A4_W, A4_H
-        else:
+        from PIL import Image
+        import math
+
+        n = int(layout_num)
+        if n not in (2, 4, 6, 9):
+            print(f"❌ impose_nup: unsupported layout {n}")
             return False
-            
-        cell_w = canvas_w / cols
-        cell_h = canvas_h / rows
+
+        # Layout grid + canvas orientation
+        if n == 2:
+            cols, rows = 2, 1
+            canvas_w_px, canvas_h_px = 3508, 2480  # A4 landscape @ 300dpi
+            is_landscape = True
+        elif n == 4:
+            cols, rows = 2, 2
+            canvas_w_px, canvas_h_px = 2480, 3508  # A4 portrait @ 300dpi
+            is_landscape = False
+        elif n == 6:
+            cols, rows = 3, 2
+            canvas_w_px, canvas_h_px = 3508, 2480  # A4 landscape @ 300dpi
+            is_landscape = True
+        else:  # 9
+            cols, rows = 3, 3
+            canvas_w_px, canvas_h_px = 2480, 3508  # A4 portrait @ 300dpi
+            is_landscape = False
+
+        cell_w = canvas_w_px // cols
+        cell_h = canvas_h_px // rows
+
+        # Get total page count via pdfinfo (or GS fallback)
+        total_pages = 1
+        try:
+            pi_res = subprocess.run(["pdfinfo", input_pdf], capture_output=True, text=True, timeout=10)
+            for line in pi_res.stdout.split("\n"):
+                if "Pages:" in line:
+                    total_pages = int(line.split(":")[1].strip())
+        except Exception:
+            pass
+        print(f"📄 impose_nup: {total_pages} source pages → {n}-up layout ({cols}×{rows})")
+
+        # Rasterize each PDF page to a temp PNG at 150 DPI (fast, good quality)
+        DPI = 150
+        scale_factor = DPI / 300.0
+        cell_w_s = int(cell_w * scale_factor)
+        cell_h_s = int(cell_h * scale_factor)
+        canvas_w_s = int(canvas_w_px * scale_factor)
+        canvas_h_s = int(canvas_h_px * scale_factor)
+
+        page_imgs = []
+        # If single-page source, replicate it n times (e.g. photo printing)
+        pages_to_render = list(range(1, total_pages + 1)) if total_pages > 1 else [1] * n
         
-        base_reader = PdfReader(io.BytesIO(pdf_bytes))
-        total_pages = len(base_reader.pages)
-        
-        if total_pages == 1:
-            total_pages = int(layout_num)
-            is_single = True
-        else:
-            is_single = False
-        
-        current_page_idx = 0
-        while current_page_idx < total_pages:
-            new_page = PageObject.create_blank_page(width=canvas_w, height=canvas_h)
+        for pg in pages_to_render:
+            tmp_img = os.path.join(TEMP_DIR, f"_nup_pg{pg}_{int(time.time()*1000)}.png")
+            gs_cmd = [
+                "gs", "-dNOPAUSE", "-dBATCH", "-q",
+                "-sDEVICE=png16m", f"-r{DPI}",
+                f"-dFirstPage={pg}", f"-dLastPage={pg}",
+                f"-sOutputFile={tmp_img}", input_pdf
+            ]
+            result = subprocess.run(gs_cmd, capture_output=True, timeout=30)
+            if result.returncode == 0 and os.path.exists(tmp_img):
+                page_imgs.append(tmp_img)
+            else:
+                print(f"⚠️ GS rasterize failed for page {pg}: {result.stderr.decode()[:100]}")
+
+        if not page_imgs:
+            print("❌ impose_nup: no pages could be rasterized")
+            return False
+
+        # Build output PDF — one canvas sheet per N pages
+        output_sheets = []
+        idx = 0
+        while idx < len(page_imgs):
+            canvas_img = Image.new("RGB", (canvas_w_s, canvas_h_s), (255, 255, 255))
             for row in range(rows):
                 for col in range(cols):
-                    if current_page_idx >= total_pages:
+                    if idx >= len(page_imgs):
                         break
-                    
-                    fresh_reader = PdfReader(io.BytesIO(pdf_bytes))
-                    p = fresh_reader.pages[0 if is_single else current_page_idx]
-                    
-                    p_w = float(p.mediabox.width)
-                    p_h = float(p.mediabox.height)
-                    
-                    scale = min(cell_w / p_w, cell_h / p_h)
-                    
-                    tx = (col * cell_w) + (cell_w - (p_w * scale)) / 2
-                    ty = ((rows - 1 - row) * cell_h) + (cell_h - (p_h * scale)) / 2
-                    
-                    op = Transformation().scale(sx=scale, sy=scale).translate(tx=tx, ty=ty)
-                    new_page.merge_page(p, op)
-                    
-                    current_page_idx += 1
-            writer.add_page(new_page)
-            
-        with open(output_pdf, "wb") as f:
-            writer.write(f)
+                    with Image.open(page_imgs[idx]) as pg_img:
+                        pg_img.thumbnail((cell_w_s, cell_h_s), Image.Resampling.LANCZOS)
+                        paste_x = col * cell_w_s + (cell_w_s - pg_img.width) // 2
+                        paste_y = row * cell_h_s + (cell_h_s - pg_img.height) // 2
+                        canvas_img.paste(pg_img, (paste_x, paste_y))
+                    idx += 1
+            sheet_path = os.path.join(TEMP_DIR, f"_nup_sheet_{idx}_{int(time.time()*1000)}.pdf")
+            canvas_img.save(sheet_path, "PDF", resolution=DPI)
+            output_sheets.append(sheet_path)
+
+        # Merge all sheets into final output PDF
+        if len(output_sheets) == 1:
+            os.rename(output_sheets[0], output_pdf)
+        else:
+            merge_cmd = [
+                "gs", "-dBATCH", "-dNOPAUSE", "-q",
+                "-sDEVICE=pdfwrite", f"-sOutputFile={output_pdf}"
+            ] + output_sheets
+            subprocess.run(merge_cmd, check=True, timeout=120)
+            for s in output_sheets:
+                try:
+                    os.remove(s)
+                except Exception:
+                    pass
+
+        # Clean up temp page images
+        for p in page_imgs:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+
+        print(f"✅ impose_nup: successfully created {len(output_sheets)}-sheet {n}-up PDF → {output_pdf}")
         return True
+
     except Exception as e:
-        print(f"❌ PyPDF2 N-up Imposition failed: {e}")
+        print(f"❌ impose_nup (GS+Pillow) failed: {e}")
         return False
 
 def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
@@ -341,7 +395,10 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         if not is_blank_sheet:
             cmd.extend(["-o", "fit-to-page"])
 
+        # NOTE: N-up layout is always pre-imposed by impose_nup() before reaching here.
+        # photo_layout is cleared to None after imposition, so this block is a safety guard only.
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
+            print(f"⚠️ photo_layout={photo_layout} still set at print_file — N-up was not pre-imposed. Passing to CUPS as fallback.")
             cmd.extend(["-o", f"number-up={photo_layout}"])
             
         if double_sided == "double":
@@ -357,12 +414,13 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         
         total_pages = 0
         try:
-            from PyPDF2 import PdfReader
             for f in file_paths:
-                reader = PdfReader(f)
-                total_pages += len(reader.pages)
+                pi_info = subprocess.run(["pdfinfo", f], capture_output=True, text=True, timeout=10)
+                for line in pi_info.stdout.split("\n"):
+                    if "Pages:" in line:
+                        total_pages += int(line.split(":")[1].strip())
         except Exception:
-            total_pages = 1
+            total_pages = max(1, total_pages)
             
         total_physical_pages = total_pages * copies
         
@@ -379,10 +437,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                         # Job is out of the queue, now ensure the physical printer is idle
                         status_res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True).stdout.lower()
                         if "printing" not in status_res:
-                            eject_delay = 3.0 + (total_physical_pages * 1.5)
-                            print(f"✅ CUPS job {job_id} completed. Waiting {eject_delay:.1f}s for physical paper ejection...")
-                            time.sleep(eject_delay)
-                            print(f"✅ Physical print considered fully ejected!")
+                            print(f"✅ CUPS job {job_id} completed and printer is idle.")
                             break
                 except Exception as e:
                     print(f"⚠️ lpstat check failed: {e}")
@@ -528,6 +583,16 @@ def process_job(doc_snapshot):
             else:
                 pdf_paths.append(fp)
 
+        # Merge all PDF files into a single PDF if there are multiple documents
+        if len(pdf_paths) > 1:
+            merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_all.pdf")
+            try:
+                print(f"🔗 Merging {len(pdf_paths)} documents into a single PDF using Ghostscript...")
+                subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
+                pdf_paths = [merged_pdf]
+            except Exception as merge_err:
+                print(f"❌ Failed to merge PDF files: {merge_err}")
+
         # Imposition with PyPDF2 for consistent N-up layouts
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             print(f"🖼️ Generating consistent {photo_layout}-per-page layout using PyPDF2...")
@@ -578,10 +643,34 @@ def process_job(doc_snapshot):
                 except Exception as fallback_err:
                     print(f"❌ Fallback failed: {fallback_err}")
                     raise Exception("Layout generation failed on Kiosk.")
-        # Correct stale queue names on Kiosk 1 to point to the active USB interface
-        if target_printer == "Brother_HL_L5210DN_series":
-            target_printer = "Brother_HL_L5210DN_series_USB"
 
+        # Ensure final_paths is synced with pdf_paths if layout imposition did not run
+        if not (photo_layout and str(photo_layout) in ["2", "4", "6", "9"]):
+            final_paths = pdf_paths
+
+        # Check if duplex is requested for a single-page document and copies > 1
+        if double_sided == "double" and copies > 1:
+            total_pages = 0
+            try:
+                if len(final_paths) == 1:
+                    pi_info = subprocess.run(["pdfinfo", final_paths[0]], capture_output=True, text=True, timeout=10)
+                    for line in pi_info.stdout.split("\n"):
+                        if "Pages:" in line:
+                            total_pages = int(line.split(":")[1].strip())
+            except Exception as e:
+                print(f"⚠️ Failed to check pages for duplex: {e}")
+            
+            if total_pages == 1:
+                print(f"📄 Duplicating single-page PDF {copies} times to enable double-sided printing...")
+                dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
+                try:
+                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * copies, check=True, timeout=60)
+                    if os.path.exists(dup_pdf):
+                        final_paths = [dup_pdf]
+                        copies = 1
+                        print(f"✅ Successfully duplicated single-page PDF to {dup_pdf} with copies=1")
+                except Exception as dup_err:
+                    print(f"❌ Failed to duplicate single-page PDF for duplex: {dup_err}")
 
         success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
         
@@ -656,6 +745,64 @@ def heartbeat_loop():
             print(f"⚠️ Heartbeat failed: {e}")
         time.sleep(30)
 
+# Mapping of CUPS printer names to their USB Vendor/Product IDs
+PRINTER_USB_IDS = {
+    # SV-002 / pi
+    "Brother_HL_L2440DW_series": "04f9:0587",
+    "Epson_L3250": "04b8:118a",
+    "L3250-Series": "04b8:118a",
+    
+    # CV-001 / printpi
+    "Brother_HL_L5210DN_series_USB": "04f9:0503",
+    "Brother_HL_L5210DN_series": "04f9:0503",
+    "Brother_IPP": "04f9:0503",
+    "Brother": "04f9:0503"
+}
+
+def reset_printer_usb(printer_name):
+    usb_id = PRINTER_USB_IDS.get(printer_name)
+    if not usb_id:
+        # Fallback: scan lsusb dynamically to find any Brother or Epson printer
+        try:
+            lsusb_out = subprocess.run(["lsusb"], capture_output=True, text=True).stdout
+            for line in lsusb_out.split("\n"):
+                if "Brother" in line and "Brother" in printer_name:
+                    parts = line.split("ID ")
+                    if len(parts) > 1:
+                        usb_id = parts[1].split()[0]
+                        break
+                elif "Epson" in line and "Epson" in printer_name:
+                    parts = line.split("ID ")
+                    if len(parts) > 1:
+                        usb_id = parts[1].split()[0]
+                        break
+        except Exception as e:
+            print(f"⚠️ Dynamic USB scan failed: {e}")
+
+    if usb_id:
+        print(f"🔌 Waking up printer {printer_name} via hardware USB reset ({usb_id})...")
+        # Run usbreset with piped password
+        res = subprocess.run(f"echo 'printpi' | sudo -S usbreset {usb_id}", shell=True, capture_output=True, text=True)
+        print(f"USB reset output: {res.stdout.strip()} | Error: {res.stderr.strip()}")
+        return True
+    else:
+        print(f"⚠️ No USB ID found for printer {printer_name}")
+        return False
+
+def resume_printer_jobs(printer_name):
+    try:
+        res = subprocess.run(["lpstat", "-o"], capture_output=True, text=True)
+        for line in res.stdout.splitlines():
+            if line.startswith(printer_name + "-"):
+                parts = line.split()
+                if parts:
+                    job_id = parts[0]
+                    print(f"🔓 Watchdog: Resuming job {job_id} on {printer_name}...")
+                    subprocess.run(["lp", "-i", job_id, "-H", "resume"], capture_output=True)
+    except Exception as e:
+        print(f"⚠️ Failed to resume jobs for {printer_name}: {e}")
+
+
 def watchdog_loop():
     stuck_cycles = {BW_PRINTER_NAME: 0, COLOR_PRINTER_NAME: 0}
     while True:
@@ -667,7 +814,8 @@ def watchdog_loop():
                 status_out = status_res.stdout.lower()
                 if "disabled" in status_out:
                     print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
-                    subprocess.run(["sudo", "cupsenable", printer], capture_output=True)
+                    subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                    resume_printer_jobs(printer)
                 
                 # Check if printer is currently printing
                 printer_active[printer] = "printing" in status_out
@@ -683,15 +831,23 @@ def watchdog_loop():
                         print(f"⚠️ Watchdog: Stuck job detected on {printer} (Cycle {stuck_cycles[printer]} - Printer Idle but Job in Queue)")
 
                         if stuck_cycles[printer] >= 3:
-                            print(f"🔧 Watchdog: Kicking ipp-usb to wake up sleeping printer {printer}...")
-                            subprocess.run(["sudo", "systemctl", "restart", "ipp-usb"], capture_output=True)
-                            subprocess.run(["sudo", "cupsenable", printer], capture_output=True)
+                            print(f"🔧 Watchdog: Waking up sleeping printer {printer}...")
+                            reset_printer_usb(printer)
+                            
+                            # Restart ipp-usb if it's a Brother printer
+                            if "Brother" in printer:
+                                print("Restarting ipp-usb...")
+                                subprocess.run(f"echo 'printpi' | sudo -S systemctl restart ipp-usb", shell=True, capture_output=True)
+                            
+                            # Re-enable CUPS queue
+                            subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                            resume_printer_jobs(printer)
                             stuck_cycles[printer] = 0
                 else:
                     stuck_cycles[printer] = 0
             
-            # Fallback polling for silent grpc disconnects
-            docs = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID)).stream()
+            # Fallback polling for silent grpc disconnects with a 30s timeout
+            docs = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID)).stream(timeout=30)
             for doc in docs:
                 if doc.id not in active_jobs:
                     data = doc.to_dict()
@@ -707,6 +863,7 @@ def watchdog_loop():
         except Exception as e:
             print(f"⚠️ Watchdog failed: {e}")
         time.sleep(60)
+
 
 def keep_warm_loop():
     while True:

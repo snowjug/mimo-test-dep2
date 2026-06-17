@@ -308,7 +308,7 @@ export function PrintOptions() {
   const pricePerPageColor = 10.00; // Updated as per requirements
   const basePrice = colorMode === "bw" ? pricePerPageBW : pricePerPageColor;
   
-  const totalCost = actualPages * copies * basePrice;
+  const totalCost = actualPages * (Number(copies) || 1) * basePrice;
 
   // Check if any file configured for "custom" has 0 pages selected
   let hasSelectionError = false;
@@ -337,7 +337,7 @@ export function PrintOptions() {
 
     // Store print options for payment page
     sessionStorage.setItem("printOptions", JSON.stringify({
-      copies,
+      copies: Number(copies) || 1,
       colorMode,
       doubleSided,
       orientation,
@@ -470,7 +470,7 @@ export function PrintOptions() {
   );
 
   const isSinglePageDocument = files.reduce((sum, f) => sum + (f.pageCount || 1), 0) <= 1;
-  const isDuplexSupported = directKioskId === "SV-002" && colorMode === "bw";
+  const isDuplexSupported = (directKioskId === "SV-002" || directKioskId === "CV-001") && colorMode === "bw";
 
   useEffect(() => {
     if (!isDuplexSupported) {
@@ -547,7 +547,26 @@ export function PrintOptions() {
                   >
                     <Minus className="w-3 h-3" />
                   </Button>
-                  <span key={copies} className="w-12 text-center text-sm font-black text-slate-800 animate-pop-in">{copies}</span>
+                  <input
+                    type="number"
+                    value={copies}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 1 && val <= 99) {
+                        setCopies(val);
+                      } else if (e.target.value === "") {
+                        setCopies("" as any);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (copies === "" || isNaN(copies) || copies < 1) {
+                        setCopies(1);
+                      } else if (copies > 99) {
+                        setCopies(99);
+                      }
+                    }}
+                    className="w-12 text-center text-sm font-black text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1195,7 +1214,7 @@ export function PrintOptions() {
                   </div>
                   <div className="flex justify-between items-center text-blue-100/90">
                     <span>Copies</span>
-                    <span className="text-blue-400 font-bold">{copies}x</span>
+                    <span className="text-blue-400 font-bold">{Number(copies) || 1}x</span>
                   </div>
                 </div>
 
@@ -1208,7 +1227,7 @@ export function PrintOptions() {
                   </div>
                   <div className="flex justify-between items-center text-blue-100/90">
                     <span>Total Sheets</span>
-                    <span className="text-white font-bold">{actualPages * copies}</span>
+                    <span className="text-white font-bold">{actualPages * (Number(copies) || 1)}</span>
                   </div>
                 </div>
 

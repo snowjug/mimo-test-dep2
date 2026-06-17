@@ -1688,13 +1688,29 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
       return res.status(404).json({ error: "No jobs found for this code" });
     }
 
-    // Check across all docs for this code — all must be completed to call it done
+    // Group and sort docs by latest session in-memory to handle code collisions correctly
+    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Sort latest first
+    docs.sort((a, b) => {
+      const timeA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()) : 0;
+      const timeB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
+      return timeB - timeA;
+    });
+
+    const latestTime = docs[0].createdAt ? (docs[0].createdAt.toDate ? docs[0].createdAt.toDate().getTime() : new Date(docs[0].createdAt).getTime()) : 0;
+
+    // Get all docs belonging to this latest checkout session (within 5 seconds threshold)
+    const currentSessionDocs = docs.filter(d => {
+      const t = d.createdAt ? (d.createdAt.toDate ? d.createdAt.toDate().getTime() : new Date(d.createdAt).getTime()) : 0;
+      return Math.abs(t - latestTime) < 5000;
+    });
+
     let allCompleted = true;
     let anyFailed = false;
     let anyPrinting = false;
 
-    snapshot.forEach((doc) => {
-      const data = doc.data();
+    currentSessionDocs.forEach((data) => {
       if (data.status === "failed") anyFailed = true;
       if (data.status === "printing") anyPrinting = true;
       if (!["completed", "printed"].includes(data.status) && data.isPrinted !== true) {
@@ -1976,14 +1992,16 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
           signedUrl = generatedUrl;
         }
 
-        // --- OLD PI COMPATIBILITY (PULL ARCHITECTURE) ---
-        if (process.env.PI_ARCHITECTURE === "pull") {
-          console.log(`[PULL ARCHITECTURE] Job ${fileName} marked as printing. Waiting for old Pi to pull...`);
-          results.push({ file: fileName, status: "pull_mode_active" });
-          continue; // Skip the FastAPI Push call!
+        // --- PI ARCHITECTURE: Firebase Listener (PULL) is the DEFAULT ---
+        // The Pi runs firebase_listener.py which watches Firestore for status="printing".
+        // Only use HTTP push (FastAPI) if PI_ARCHITECTURE is explicitly set to "push".
+        if (process.env.PI_ARCHITECTURE !== "push") {
+          console.log(`[FIREBASE LISTENER] Job ${fileName} queued for kiosk ${finalKioskId}. Pi listener will pick it up.`);
+          results.push({ file: fileName, status: "pull_mode_active", kioskId: finalKioskId });
+          continue; // Pi firebase_listener.py handles the rest!
         }
 
-        console.log(`🖨️ Sending to ${kioskId} Pi: ${fileName} | copies: ${copies} | printer: ${targetPrinterName}`);
+        console.log(`🖨️ [PUSH MODE] Sending to ${kioskId} Pi: ${fileName} | copies: ${copies} | printer: ${targetPrinterName}`);
         const piResults = await triggerPiPrint(signedUrl, copies, targetPiUrl, targetPrinterName, opts);
         console.log(`✅ Pi response for ${fileName}:`, piResults);
 

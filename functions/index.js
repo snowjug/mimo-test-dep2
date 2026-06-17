@@ -701,7 +701,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       mimetype: mergedFiles[0].type, // legacy support
       files: mergedFiles, // The full array of files to print
       size: mergedFiles.reduce((acc, f) => acc + (f.size || 0), 0),
-      status: "paid",
+      status: "pending",
       pageCount: totalRawPages,
       printOptions: printOptions || {},
       pricing: { pricePerPage, totalPages: actualPages, jobCost },
@@ -2209,6 +2209,11 @@ app.post("/kiosk/print", async (req, res) => {
         console.warn(`Kiosk mismatch: job assigned to ${directKioskId}, requested from ${kioskId}`);
       }
       finalKioskId = directKioskId; // Prioritize the user's choice from the front end
+    } else {
+      // Fallback: Route by color mode since there is only one kiosk URL
+      const isColor = jobData?.color === true || jobData?.colorMode === "color" || jobData?.printOptions?.colorMode === "color";
+      finalKioskId = isColor ? "SV-002" : "CV-001";
+      console.log(`No directKioskId found. Routing by color mode (isColor=${isColor}) to ${finalKioskId}`);
     }
     
     // Set status to printing so the Pi's firebase_listener.py picks it up
