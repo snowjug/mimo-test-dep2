@@ -231,6 +231,7 @@
       transform: scale(1.05) translateY(-0.5rem) translateX(0.5rem);
       transform-origin: bottom right;
       animation: mascotFloat 6s ease-in-out infinite;
+      filter: saturate(1.75) hue-rotate(-20deg);
     }
 
     /* ═══════════════════════════════════════════
@@ -241,7 +242,21 @@
       display: flex; flex-direction: column; gap: 1rem;
       z-index: 30; position: relative;
       margin-top: calc(-1 * var(--cards-overlap));
-      background: linear-gradient(to bottom, rgba(238,242,255,0) 0, #EEF2FF 2.5rem);
+      background: #EEF2FF;
+    }
+    /* Single gradient overlay: handles full fade from hero into cards — no seam */
+    .cards::before {
+      content: '';
+      position: absolute;
+      top: -4rem;
+      left: 0; right: 0;
+      height: 4rem;
+      background: linear-gradient(to bottom,
+        rgba(238,242,255,0) 0%,
+        #EEF2FF 100%
+      );
+      pointer-events: none;
+      z-index: 5;
     }
 
     /* ── Action Cards Custom Premium Styling ── */
@@ -388,15 +403,14 @@
     ═══════════════════════════════════════════ */
     .section {
       padding: 2.5rem 1.5rem;
-      border-top: 1px solid rgba(70, 102, 246, 0.08);
       position: relative;
       overflow: hidden;
     }
     .bg-subtle-white {
-      background-color: #f8fafc !important;
+      background-color: #ffffff !important;
     }
     .bg-subtle-brand {
-      background-color: #f5f7ff !important;
+      background-color: #EEF2FF !important;
     }
     /* Ambient Glow Blobs for Depth */
     .section-glow-1 {
@@ -479,7 +493,7 @@
       align-items: center;
       gap: 1.125rem;
       box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      border: 1px solid rgba(74, 107, 255, 0.14);
+      border: 2px solid rgba(74, 107, 255, 0.18);
       position: relative;
       z-index: 2;
       cursor: default !important;
@@ -546,7 +560,7 @@
       padding: 1.5rem 1rem;
       text-align: center;
       box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      border: 1px solid rgba(74, 107, 255, 0.14);
+      border: 2px solid rgba(74, 107, 255, 0.18);
       position: relative;
       z-index: 2;
       cursor: default !important;
@@ -691,12 +705,12 @@
       background: #fff;
       border-radius: 1.25rem;
       margin-bottom: 0.875rem;
-      box-shadow: 0 8px 24px -4px rgba(74, 107, 255, 0.06), 0 4px 12px rgba(0, 0, 0, 0.02);
-      border: 1px solid rgba(74, 107, 255, 0.12);
+      box-shadow: 0 12px 30px -4px rgba(74, 107, 255, 0.1), 0 6px 16px rgba(0, 0, 0, 0.04);
+      border: 2px solid rgba(74, 107, 255, 0.15);
       overflow: hidden;
       transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .faq-item:hover { box-shadow: 0 14px 28px rgba(74, 107, 255, 0.12); border-color: rgba(74, 107, 255, 0.25); transform: translateY(-2px); }
+    .faq-item:hover { box-shadow: 0 20px 40px rgba(74, 107, 255, 0.15); border-color: rgba(74, 107, 255, 0.3); transform: translateY(-3px); }
     .faq-question {
       display: flex;
       align-items: center;
@@ -749,7 +763,7 @@
       border-radius: 1.25rem;
       padding: 1.25rem;
       box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      border: 1px solid rgba(74, 107, 255, 0.14);
+      border: 2px solid rgba(74, 107, 255, 0.18);
       position: relative;
       z-index: 2;
       cursor: default !important;
@@ -816,10 +830,7 @@
       font-size: 1.75rem; font-weight: 900;
       margin-bottom: 0;
       letter-spacing: -.03em;
-      background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: #174A87;
     }
     .footer-brand .tagline { font-size: 0.875rem; color: #6B7280; line-height: 1.5; margin-bottom: 1rem; }
     .footer-address { font-size: 0.8125rem; color: #6B7280; line-height: 1.6; }
@@ -1141,7 +1152,7 @@
       }
       .desktop-feature-tile {
         background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
-        border: 1px solid rgba(74, 107, 255, 0.14);
+        border: 2px solid rgba(74, 107, 255, 0.18);
         border-radius: 1.25rem;
         padding: 1.25rem;
         display: flex;
@@ -1212,8 +1223,7 @@
   <!-- ── HEADER ── -->
   <header class="flex items-center justify-between px-6 pt-6 pb-2 z-50 bg-transparent" data-purpose="navigation-header" style="font-family:'Inter',sans-serif;">
     <div class="flex flex-col">
-      <h1 class="text-2xl font-black tracking-tight leading-none text-slate-900" style="font-family:'Lovelo',sans-serif;">MIMO</h1>
-      <p class="text-[10px] font-medium text-slate-500 mt-0.5" style="font-family:'Inter',sans-serif;">Printing Made Easy</p>
+      <h1 class="text-3xl font-black tracking-tight leading-none text-slate-900" style="font-family:'Lovelo',sans-serif;">MIMO</h1>
     </div>
     <div class="flex items-center gap-3">
       <a href="https://printmimo.tech" id="header-cta"
@@ -1336,15 +1346,15 @@
   <!-- ── STATS BAR ── -->
   <div class="stats-bar reveal" style="margin-bottom: 2rem;">
     <div class="stat-item">
-      <div class="stat-num" data-target="5000">0</div>
+      <div class="stat-num" data-target="1600">0</div>
       <div class="stat-label">Happy Students</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num" data-target="12">0</div>
+      <div class="stat-num" data-target="2">0</div>
       <div class="stat-label">Campus Kiosks</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num">99%</div>
+      <div class="stat-num">90%</div>
       <div class="stat-label">Uptime</div>
     </div>
   </div>
@@ -1356,7 +1366,7 @@
     <div class="section-glow-2"></div>
     <div class="section-header reveal">
       <div class="section-pill">✦ The Problem</div>
-      <h2 class="section-title">Printing, Finally Fixed</h2>
+      <h2 class="section-title">Printing, Finally Fixed.</h2>
       <p class="section-subtitle">Tired of long queues, exact change, and unhelpful shopkeepers? We were too. MIMO is here to change printing for students, forever.</p>
     </div>
 
@@ -1399,14 +1409,14 @@
         <div class="step-num">1</div>
         <div class="step-text">
           <h4>Upload Your Files</h4>
-          <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload your documents from any device.</p>
+          <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload your documents from anywhere.</p>
         </div>
       </div>
       <div class="step-card reveal reveal-delay-2">
         <div class="step-num">2</div>
         <div class="step-text">
           <h4>Customise Your Print</h4>
-          <p>Select copies, B&amp;W or color, paper size, and print layout directly on your phone — no app needed.</p>
+          <p>Select copies, B&amp;W or color, and paper size directly on your phone — no app needed.</p>
         </div>
       </div>
       <div class="step-card reveal reveal-delay-3">
@@ -1445,7 +1455,7 @@
           </svg>
         </div>
         <h4>Cloud Ready</h4>
-        <p>Upload from Drive, WhatsApp, or local storage.</p>
+        <p>Upload from Drive or local storage.</p>
       </div>
       <div class="feature-card reveal reveal-delay-2">
         <div class="feature-icon">
@@ -1467,8 +1477,8 @@
       </div>
       <div class="feature-card reveal reveal-delay-2">
         <div class="feature-icon">🕒</div>
-        <h4>Always Online</h4>
-        <p>Our kiosks are available 24/7, even on weekends.</p>
+        <h4>Convenient Access</h4>
+        <p>Kiosks are available throughout regular campus hours.</p>
       </div>
       <div class="feature-card reveal reveal-delay-1">
         <div class="feature-icon">💵</div>
@@ -1478,7 +1488,7 @@
       <div class="feature-card reveal reveal-delay-2">
         <div class="feature-icon">🎓</div>
         <h4>Campus First</h4>
-        <p>Placed strategically in hostels &amp; student zones.</p>
+        <p>Placed strategically in student zones.</p>
       </div>
     </div>
   </section>
@@ -1539,7 +1549,7 @@
 
       <div class="faq-item" id="faq-4">
         <div class="faq-question" onclick="toggleFaq('faq-4')">
-          Is my document data safe and private?
+          Is my document data private and safe?
           <div class="faq-icon">
             <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
               <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1595,8 +1605,8 @@
           </svg>
         </div>
         <div class="trust-row-text">
-          <h4>24/7 Availability</h4>
-          <p>Kiosks are online round the clock. Print whenever you need.</p>
+          <h4>Convenient Access</h4>
+          <p>Kiosks are available throughout regular campus hours.</p>
         </div>
       </div>
     </div>
@@ -1682,15 +1692,15 @@
 
     <div class="desktop-stats-strip">
       <div class="desktop-stat-tile">
-        <div class="desktop-stat-num">5,000+</div>
+        <div class="desktop-stat-num">1,600+</div>
         <div class="desktop-stat-label">Happy Students</div>
       </div>
       <div class="desktop-stat-tile">
-        <div class="desktop-stat-num">12</div>
+        <div class="desktop-stat-num">2</div>
         <div class="desktop-stat-label">Campus Kiosks</div>
       </div>
       <div class="desktop-stat-tile">
-        <div class="desktop-stat-num">99%</div>
+        <div class="desktop-stat-num">90%</div>
         <div class="desktop-stat-label">Kiosk Uptime</div>
       </div>
     </div>
@@ -1704,7 +1714,7 @@
         </div>
         <div class="desktop-tile-text">
           <h4>Cloud Ready</h4>
-          <p>Upload from Google Drive, WhatsApp, or your local device.</p>
+          <p>Upload from Google Drive or your local device.</p>
         </div>
       </div>
       <div class="desktop-feature-tile">
@@ -1736,8 +1746,8 @@
           </svg>
         </div>
         <div class="desktop-tile-text">
-          <h4>Always Available</h4>
-          <p>Kiosks run 24/7 — print even on weekends or late nights.</p>
+          <h4>Convenient Access</h4>
+          <p>Kiosks are available throughout regular campus hours.</p>
         </div>
       </div>
       <div class="desktop-feature-tile">
