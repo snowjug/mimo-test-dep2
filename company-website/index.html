@@ -1271,26 +1271,6 @@
           <path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </a>
-      <button id="menu-btn" aria-label="Menu"
-              class="w-11 h-11 bg-slate-50 flex flex-col items-center justify-center rounded-2xl border border-slate-100 relative z-50">
-        <div class="w-6 flex flex-col gap-1.5 items-start">
-          <span class="w-6 h-0.5 bg-slate-800 block transition-all duration-300 origin-center"></span>
-          <span class="w-6 h-0.5 bg-slate-800 block transition-all duration-300"></span>
-          <span class="w-4 h-0.5 bg-slate-800 block transition-all duration-300 origin-center"></span>
-        </div>
-      </button>
-    </div>
-  </header>
-
-  <!-- ── MOBILE MENU ── -->
-  <div id="mobile-menu" class="absolute inset-0 bg-white z-40 hidden flex-col pt-[6rem] px-6 pb-6 overflow-y-auto opacity-0 transition-opacity duration-300" style="min-height: 100vh;">
-    <div class="flex flex-col gap-8 text-2xl font-bold font-['Outfit'] mt-4">
-      <a href="#problems" class="mobile-link text-slate-800 transition-colors hover:text-[#4666F6]">The Problem</a>
-      <a href="#how-it-works" class="mobile-link text-slate-800 transition-colors hover:text-[#4666F6]">How It Works</a>
-      <a href="#features" class="mobile-link text-slate-800 transition-colors hover:text-[#4666F6]">Features</a>
-      <a href="#faq" class="mobile-link text-slate-800 transition-colors hover:text-[#4666F6]">FAQ</a>
-    </div>
-  </div>
 
   <!-- ── HERO ── -->
   <section class="hero" data-purpose="hero-character">
@@ -1880,47 +1860,7 @@
       answer.classList.add('open');
     }
   }
-  /* ── Mobile Menu Toggle ── */
-  const menuBtn = document.getElementById('menu-btn');
-  const mobileMenu = document.getElementById('mobile-menu');
-  const menuLines = menuBtn.querySelectorAll('span');
-  
-  function toggleMobileMenu() {
-    const isHidden = mobileMenu.classList.contains('hidden');
-    if (isHidden) {
-      mobileMenu.classList.remove('hidden');
-      mobileMenu.classList.add('flex');
-      setTimeout(() => {
-        mobileMenu.classList.remove('opacity-0');
-        mobileMenu.classList.add('opacity-100');
-      }, 10);
-      document.body.style.overflow = 'hidden'; 
-      // Animate hamburger to X
-      menuLines[0].style.transform = 'translateY(8px) rotate(45deg)';
-      menuLines[1].style.opacity = '0';
-      menuLines[2].style.transform = 'translateY(-8px) rotate(-45deg)';
-      menuLines[2].style.width = '1.5rem';
-    } else {
-      mobileMenu.classList.remove('opacity-100');
-      mobileMenu.classList.add('opacity-0');
-      setTimeout(() => {
-        mobileMenu.classList.add('hidden');
-        mobileMenu.classList.remove('flex');
-      }, 300);
-      document.body.style.overflow = '';
-      // Revert hamburger
-      menuLines[0].style.transform = 'none';
-      menuLines[1].style.opacity = '1';
-      menuLines[2].style.transform = 'none';
-      menuLines[2].style.width = '1rem';
-    }
-  }
 
-  menuBtn.addEventListener('click', toggleMobileMenu);
-
-  document.querySelectorAll('.mobile-link').forEach(link => {
-    link.addEventListener('click', toggleMobileMenu);
-  });
 </script>
 </body>
 </html>
