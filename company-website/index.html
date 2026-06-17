@@ -406,11 +406,26 @@
       position: relative;
       overflow: hidden;
     }
+    /* Seamless gradient blends — no hard seam between sections */
     .bg-subtle-white {
-      background-color: #ffffff !important;
+      background: linear-gradient(to bottom,
+        #EEF2FF 0%,
+        #f8f9ff 8%,
+        #ffffff 20%,
+        #ffffff 80%,
+        #f8f9ff 92%,
+        #EEF2FF 100%
+      ) !important;
     }
     .bg-subtle-brand {
-      background-color: #EEF2FF !important;
+      background: linear-gradient(to bottom,
+        #ffffff 0%,
+        #f4f6ff 8%,
+        #EEF2FF 20%,
+        #EEF2FF 80%,
+        #f4f6ff 92%,
+        #ffffff 100%
+      ) !important;
     }
     /* Ambient Glow Blobs for Depth */
     .section-glow-1 {
@@ -808,7 +823,7 @@
        FOOTER
     ═══════════════════════════════════════════ */
     .footer-main {
-      background: #fff;
+      background: linear-gradient(to bottom, #EEF2FF 0%, #f8f9ff 6%, #fff 16%);
       color: #111827;
       padding: 2.5rem 1.5rem 2rem;
       z-index: 20;
@@ -1372,7 +1387,7 @@
   </div>
 
   <!-- ── PROBLEM SOLVED ── -->
-  <section class="section bg-subtle-white" style="border-top: none;" id="problems">
+  <section class="section bg-subtle-white" id="problems">
     <!-- Section-level ambient background glows -->
     <div class="section-glow-1"></div>
     <div class="section-glow-2"></div>
@@ -1406,7 +1421,7 @@
   </section>
 
   <!-- ── HOW IT WORKS ── -->
-  <section class="section bg-subtle-brand" style="border-top: none;" id="how-it-works">
+  <section class="section bg-subtle-brand" id="how-it-works">
     <!-- Section-level ambient background glows -->
     <div class="section-glow-1"></div>
     <div class="section-glow-2"></div>
@@ -1576,7 +1591,7 @@
   </section>
 
   <!-- ── TRUST BADGES ── -->
-  <section class="section bg-subtle-white" style="border-top: none;" id="trust">
+  <section class="section bg-subtle-white" id="trust">
     <!-- Section-level ambient background glows -->
     <div class="section-glow-1"></div>
     <div class="section-glow-2"></div>
