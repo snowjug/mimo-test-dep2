@@ -837,10 +837,16 @@
        FOOTER
     ═══════════════════════════════════════════ */
     .footer-main {
-      /* Sit above any section ::before bleed from adjacent white sections */
+      /* Transparent at the top so the last (white) section's ::before bleed
+         shows through — both fade toward white, creating a seamless join.
+         Footer reaches solid white by the time content begins.              */
       position: relative;
       z-index: 5;
-      background: linear-gradient(to bottom, #EEF2FF 0%, #f4f7ff 10%, #fff 22%);
+      background: linear-gradient(to bottom,
+        rgba(255,255,255,0) 0rem,
+        rgba(255,255,255,0.92) 3rem,
+        #ffffff 5.5rem
+      );
       color: #111827;
       padding: 2.5rem 1.5rem 2rem;
     }
