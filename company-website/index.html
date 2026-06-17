@@ -834,6 +834,65 @@
     .btn-primary svg { width: 1.125rem; height: 1.125rem; }
 
     /* ═══════════════════════════════════════════
+       SUPPORTED BY (MARQUEE)
+    ═══════════════════════════════════════════ */
+    .supported-by-section {
+      padding: 4rem 0 2rem;
+      text-align: center;
+      background: #ffffff;
+      overflow: hidden;
+      /* Place above footer but below problems */
+      position: relative;
+      z-index: 10;
+    }
+    .supported-by-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #0d3b66;
+      margin-bottom: 2.5rem;
+      font-family: 'Inter', sans-serif;
+    }
+    .marquee-container {
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+    }
+    .marquee-container::before,
+    .marquee-container::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100px;
+      z-index: 2;
+    }
+    .marquee-container::before {
+      left: 0;
+      background: linear-gradient(to right, white, transparent);
+    }
+    .marquee-container::after {
+      right: 0;
+      background: linear-gradient(to left, white, transparent);
+    }
+    .marquee-content {
+      display: inline-flex;
+      align-items: center;
+      gap: 4rem;
+      /* Animation duration needs to be long enough for smooth scroll */
+      animation: marquee 25s linear infinite;
+    }
+    .marquee-content img {
+      height: 80px;
+      width: auto;
+      object-fit: contain;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(calc(-50% - 2rem)); }
+    }
+
+    /* ═══════════════════════════════════════════
        FOOTER
     ═══════════════════════════════════════════ */
     .footer-main {
@@ -1639,6 +1698,25 @@
           <h4>Convenient Access</h4>
           <p>Kiosks are available throughout regular campus hours.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SUPPORTED BY ── -->
+  <section class="supported-by-section">
+    <h3 class="supported-by-title">Supported by</h3>
+    <div class="marquee-container">
+      <div class="marquee-content">
+        <!-- Set 1 -->
+        <img src="Brands/IMG_3075.PNG" alt="Raajply">
+        <img src="Brands/logo1.png" alt="REVA NEST">
+        <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+        <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        <!-- Set 2 (for seamless loop) -->
+        <img src="Brands/IMG_3075.PNG" alt="Raajply">
+        <img src="Brands/logo1.png" alt="REVA NEST">
+        <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+        <img src="Brands/Vasavi.jpg" alt="Vasavi">
       </div>
     </div>
   </section>
