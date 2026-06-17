@@ -437,10 +437,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                         # Job is out of the queue, now ensure the physical printer is idle
                         status_res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True).stdout.lower()
                         if "printing" not in status_res:
-                            eject_delay = 3.0 + (total_physical_pages * 1.5)
-                            print(f"✅ CUPS job {job_id} completed. Waiting {eject_delay:.1f}s for physical paper ejection...")
-                            time.sleep(eject_delay)
-                            print(f"✅ Physical print considered fully ejected!")
+                            print(f"✅ CUPS job {job_id} completed and printer is idle.")
                             break
                 except Exception as e:
                     print(f"⚠️ lpstat check failed: {e}")
@@ -585,6 +582,16 @@ def process_job(doc_snapshot):
                     pdf_paths.append(fp)
             else:
                 pdf_paths.append(fp)
+
+        # Merge all PDF files into a single PDF if there are multiple documents
+        if len(pdf_paths) > 1:
+            merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_all.pdf")
+            try:
+                print(f"🔗 Merging {len(pdf_paths)} documents into a single PDF using Ghostscript...")
+                subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
+                pdf_paths = [merged_pdf]
+            except Exception as merge_err:
+                print(f"❌ Failed to merge PDF files: {merge_err}")
 
         # Imposition with PyPDF2 for consistent N-up layouts
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
