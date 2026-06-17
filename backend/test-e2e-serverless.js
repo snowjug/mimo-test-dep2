@@ -2,7 +2,7 @@ const axios = require("axios");
 const admin = require("firebase-admin");
 
 // Initialize Firebase Admin with the service account
-const serviceAccount = require("./mimo-v2-11868-firebase-adminsdk-fbsvc-f4edf52a06.json");
+const serviceAccount = require("../serviceAccountKey.json");
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -11,7 +11,7 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-const API_BASE = "https://us-central1-mimo-v2-11868.cloudfunctions.net/api";
+const API_BASE = "https://api-upqxuj7evq-uc.a.run.app";
 
 async function runE2E() {
   console.log("======================================");
@@ -22,6 +22,11 @@ async function runE2E() {
     // 1. Create a dummy user session in the DB directly
     const userId = "test_e2e_user_" + Date.now();
     console.log(`[1] Created Test User: ${userId}`);
+    await db.collection("users").doc(userId).set({
+      id: userId,
+      email: "test@example.com",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     // Generate a valid JWT token to authenticate to our Cloud Functions
     const jwt = require("jsonwebtoken");
@@ -30,11 +35,22 @@ async function runE2E() {
     const authHeaders = { Authorization: `Bearer ${token}` };
 
     // 2. Simulate Frontend File Upload (direct to storage)
-    console.log(`[2] Uploading dummy.pdf to Firebase Storage...`);
+    console.log(`[2] Dynamically generating valid PDF via pdf-lib...`);
+    const { PDFDocument, rgb } = require("pdf-lib");
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595.276, 841.89]); // A4 Size in points
+    page.drawText("Mimo E2E Smoke Test", { x: 50, y: 700, size: 24, color: rgb(0.03, 0.21, 0.4) });
+    page.drawText(`User ID: ${userId}`, { x: 50, y: 650, size: 14 });
+    page.drawText(`Timestamp: ${new Date().toISOString()}`, { x: 50, y: 620, size: 14 });
+    page.drawText("This is a dynamically generated, corruption-free PDF.", { x: 50, y: 550, size: 12 });
+    const pdfBytes = await pdfDoc.save();
+    const pdfBuffer = Buffer.from(pdfBytes);
+
+    console.log(`[2b] Uploading PDF buffer directly to Firebase Storage...`);
     const bucket = admin.storage().bucket();
     const storagePath = `uploads/${userId}_dummy.pdf`;
-    await bucket.upload(__dirname + "/dummy.pdf", {
-      destination: storagePath,
+    const file = bucket.file(storagePath);
+    await file.save(pdfBuffer, {
       metadata: { contentType: "application/pdf" }
     });
     const fileUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
@@ -68,7 +84,7 @@ async function runE2E() {
     console.log(`[5] Monitoring job status... (Waiting for Pi to finish)`);
     let isPrinted = false;
     let attempts = 0;
-    while (!isPrinted && attempts < 15) {
+    while (!isPrinted && attempts < 35) {
       await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2s
       const statusRes = await axios.get(`${API_BASE}/kiosk/job-status?printCode=${printCode}`);
       const status = statusRes.data.status;
