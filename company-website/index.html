@@ -882,18 +882,12 @@
        FOOTER
     ═══════════════════════════════════════════ */
     .footer-main {
-      /* Transparent at the top so the last (white) section's ::before bleed
-         shows through — both fade toward white, creating a seamless join.
-         Footer reaches solid white by the time content begins.              */
       position: relative;
-      z-index: 5;
-      background: linear-gradient(to bottom,
-        rgba(255,255,255,0) 0rem,
-        rgba(255,255,255,0.92) 3rem,
-        #ffffff 5.5rem
-      );
+      z-index: 15;
+      background: #f4f7fb;
       color: #111827;
-      padding: 2.5rem 1.5rem 2rem;
+      padding: 3.5rem 1.5rem 2rem;
+      margin-top: 2rem;
     }
     .footer-brand { margin-bottom: 2rem; }
     .footer-brand-title {
