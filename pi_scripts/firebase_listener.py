@@ -636,9 +636,7 @@ def process_job(doc_snapshot):
                 except Exception as fallback_err:
                     print(f"❌ Fallback failed: {fallback_err}")
                     raise Exception("Layout generation failed on Kiosk.")
-        # Correct stale queue names on Kiosk 1 to point to the active USB interface
-        if target_printer == "Brother_HL_L5210DN_series":
-            target_printer = "Brother_HL_L5210DN_series_USB"
+        # Use native USB queue directly on Kiosk 1
 
 
         success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
