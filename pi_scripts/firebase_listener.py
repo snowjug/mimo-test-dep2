@@ -391,32 +391,36 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
     import re
     start = time.time()
     print(f"⏳ [SYNC] Waiting for CUPS job {job_id} to physically finish printing...")
-    while time.time() - start < timeout:
-        try:
-            res = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True, timeout=10)
-            if job_id not in res.stdout:
-                # Job finished (printed or error)
-                # Check if it ended in an error by looking at completed jobs
-                res2 = subprocess.run(["lpstat", "-W", "completed"], capture_output=True, text=True, timeout=10)
-                job_ok = job_id in res2.stdout
-                if job_ok:
-                    print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
-                    safe_update(doc_ref, {
-                        "status": "completed",
-                        "isPrinted": True,
-                        "printerStatus": "Printed",
-                        "printedAt": firestore.SERVER_TIMESTAMP
-                    })
-                else:
-                    print(f"❌ [SYNC] CUPS job {job_id} ended in error. Marking Firestore failed.")
-                    safe_update(doc_ref, {"status": "failed", "printerStatus": "CUPS print error"})
-                return
-        except Exception as e:
-            print(f"⚠️ [SYNC] lpstat poll error: {e}")
-        time.sleep(5)
-    # Timeout — mark failed
-    print(f"❌ [SYNC] Timed out waiting for CUPS job {job_id}. Marking failed.")
-    safe_update(doc_ref, {"status": "failed", "printerStatus": "Print timeout — no response from printer"})
+    try:
+        while time.time() - start < timeout:
+            try:
+                res = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True, timeout=10)
+                if job_id not in res.stdout:
+                    # Job finished (printed or error)
+                    # Check if it ended in an error by looking at completed jobs
+                    res2 = subprocess.run(["lpstat", "-W", "completed"], capture_output=True, text=True, timeout=10)
+                    job_ok = job_id in res2.stdout
+                    if job_ok:
+                        print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
+                        safe_update(doc_ref, {
+                            "status": "completed",
+                            "isPrinted": True,
+                            "printerStatus": "Printed",
+                            "printedAt": firestore.SERVER_TIMESTAMP
+                        })
+                    else:
+                        print(f"❌ [SYNC] CUPS job {job_id} ended in error. Marking Firestore failed.")
+                        safe_update(doc_ref, {"status": "failed", "printerStatus": "CUPS print error"})
+                    return
+            except Exception as e:
+                print(f"⚠️ [SYNC] lpstat poll error: {e}")
+            time.sleep(5)
+        # Timeout — mark failed
+        print(f"❌ [SYNC] Timed out waiting for CUPS job {job_id}. Marking failed.")
+        safe_update(doc_ref, {"status": "failed", "printerStatus": "Print timeout — no response from printer"})
+    finally:
+        active_jobs.discard(doc_ref.id)
+        print(f"ℹ️ [SYNC] Job {doc_ref.id} removed from active jobs list.")
 
 def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME,
                photo_layout=None, double_sided="single", is_blank_sheet=False,
@@ -560,6 +564,7 @@ def safe_update(doc_ref, data):
             print(f"❌ safe_update final failure: {e2}")
 
 def process_job(doc_snapshot):
+    async_spawned = False
     doc = doc_snapshot.to_dict()
     doc_id = doc_snapshot.id
     doc_ref = db.collection('print_jobs').document(doc_id)
@@ -760,10 +765,12 @@ def process_job(doc_snapshot):
 
         # ── Submit to CUPS ──
         # Pass doc_ref so print_file can spawn the background sync thread
+        async_spawned = False
         result = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet, doc_ref=doc_ref)
 
         if result is None:
             # Async path: background thread (wait_for_cups_job) will update Firestore when done.
+            async_spawned = True
             print(f"⏳ Job {doc_id} submitted. Firestore will be updated after physical print completes.")
         elif result is True:
             # Sync fallback (no job ID extracted): mark completed now
@@ -791,7 +798,8 @@ def process_job(doc_snapshot):
         except Exception as e:
             print(f"⚠️ Cleanup failed: {e}")
         finally:
-            active_jobs.discard(doc_id)
+            if not async_spawned:
+                active_jobs.discard(doc_id)
 
 def on_snapshot(col_snapshot, changes, read_time):
     print(f"Snapshot fired! Changes: {len(changes)}")
@@ -897,49 +905,52 @@ def resume_printer_jobs(printer_name):
 
 def watchdog_loop():
     stuck_cycles = {BW_PRINTER_NAME: 0, COLOR_PRINTER_NAME: 0}
+    counter = 0
     while True:
         try:
-            printer_active = {}
-            for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
-                # Only re-enable if the printer is currently disabled
-                status_res = subprocess.run(["lpstat", "-p", printer], capture_output=True, text=True)
-                status_out = status_res.stdout.lower()
-                if "disabled" in status_out:
-                    print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
-                    subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
-                    resume_printer_jobs(printer)
-                
-                # Check if printer is currently printing
-                printer_active[printer] = "printing" in status_out
+            # 1. Run CUPS and printer checks every 60 seconds (every 6 iterations of 10s sleep)
+            if counter % 6 == 0:
+                printer_active = {}
+                for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
+                    # Only re-enable if the printer is currently disabled
+                    status_res = subprocess.run(["lpstat", "-p", printer], capture_output=True, text=True)
+                    status_out = status_res.stdout.lower()
+                    if "disabled" in status_out:
+                        print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
+                        subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                        resume_printer_jobs(printer)
+                    
+                    # Check if printer is currently printing
+                    printer_active[printer] = "printing" in status_out
 
-            result = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True)
+                result = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True)
 
-            for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
-                if printer in result.stdout:
-                    if printer_active.get(printer, False):
-                        stuck_cycles[printer] = 0
-                    else:
-                        stuck_cycles[printer] += 1
-                        print(f"⚠️ Watchdog: Stuck job detected on {printer} (Cycle {stuck_cycles[printer]} - Printer Idle but Job in Queue)")
-
-                        if stuck_cycles[printer] >= 3:
-                            print(f"🔧 Watchdog: Waking up sleeping printer {printer}...")
-                            reset_printer_usb(printer)
-                            
-                            # Ensure ipp-usb is stopped and disabled so direct USB works
-                            if "Brother" in printer:
-                                print("Ensuring ipp-usb is stopped...")
-                                subprocess.run(f"echo 'printpi' | sudo -S systemctl stop ipp-usb", shell=True, capture_output=True)
-                                subprocess.run(f"echo 'printpi' | sudo -S systemctl disable ipp-usb", shell=True, capture_output=True)
-                            
-                            # Re-enable CUPS queue
-                            subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
-                            resume_printer_jobs(printer)
+                for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
+                    if printer in result.stdout:
+                        if printer_active.get(printer, False):
                             stuck_cycles[printer] = 0
-                else:
-                    stuck_cycles[printer] = 0
+                        else:
+                            stuck_cycles[printer] += 1
+                            print(f"⚠️ Watchdog: Stuck job detected on {printer} (Cycle {stuck_cycles[printer]} - Printer Idle but Job in Queue)")
+
+                            if stuck_cycles[printer] >= 5: # 5 minutes threshold
+                                print(f"🔧 Watchdog: Waking up sleeping printer {printer}...")
+                                reset_printer_usb(printer)
+                                
+                                # Ensure ipp-usb is stopped and disabled so direct USB works
+                                if "Brother" in printer:
+                                    print("Ensuring ipp-usb is stopped...")
+                                    subprocess.run(f"echo 'printpi' | sudo -S systemctl stop ipp-usb", shell=True, capture_output=True)
+                                    subprocess.run(f"echo 'printpi' | sudo -S systemctl disable ipp-usb", shell=True, capture_output=True)
+                                
+                                # Re-enable CUPS queue
+                                subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                                resume_printer_jobs(printer)
+                                stuck_cycles[printer] = 0
+                    else:
+                        stuck_cycles[printer] = 0
             
-            # Fallback polling for silent grpc disconnects with a 30s timeout
+            # 2. Run Firestore polling every 10 seconds (every iteration)
             docs = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID)).stream(timeout=30)
             for doc in docs:
                 if doc.id not in active_jobs:
@@ -955,7 +966,9 @@ def watchdog_loop():
                     
         except Exception as e:
             print(f"⚠️ Watchdog failed: {e}")
-        time.sleep(60)
+        
+        counter += 1
+        time.sleep(10)
 
 
 def keep_warm_loop():

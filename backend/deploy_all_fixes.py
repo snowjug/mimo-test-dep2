@@ -31,80 +31,60 @@ def run_ssh(client, cmd, label=""):
     return out, err
 
 def deploy_sv002():
-    """Deploy to SV-002 (pi@100.107.95.16) — uses base64 chunked upload."""
+    """Deploy to SV-002 (pi@192.168.8.197) via CV-001 (printpi@100.70.107.44) jump."""
     print("\n" + "="*60)
-    print("=== DEPLOYING TO SV-002 (pi@100.107.95.16) ===")
+    print("=== DEPLOYING TO SV-002 (pi@192.168.8.197) VIA CV-001 ===")
     print("="*60)
 
-    with open(LOCAL_LISTENER_PATH, 'rb') as f:
-        file_content = f.read()
-    b64_content = base64.b64encode(file_content).decode('utf-8')
-    print(f"File: {len(file_content):,} bytes (b64: {len(b64_content):,} chars)")
-
-    REMOTE_B64_PATH = "/home/pi/mimo/firebase_listener.py.b64"
-    REMOTE_PY_PATH  = "/home/pi/mimo/firebase_listener.py"
-
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    cv_client = paramiko.SSHClient()
+    cv_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
-        client.connect('100.107.95.16', username='pi', password='printpi', timeout=15)
-        print("✅ SSH connected")
+        print("Connecting to CV-001 (100.70.107.44)...")
+        cv_client.connect('100.70.107.44', username='printpi', password='printpi', timeout=15)
+        print("✅ SSH connected to CV-001")
+
+        print("Uploading listener to CV-001 temporary path...")
+        sftp = cv_client.open_sftp()
+        with sftp.open('/home/printpi/firebase_listener.py.sv002', 'w') as f:
+            with open(LOCAL_LISTENER_PATH, 'r', encoding='utf-8') as lf:
+                f.write(lf.read())
+        sftp.close()
+        print("✅ Uploaded to CV-001")
 
         print("Stopping and disabling ipp-usb service on SV-002...")
-        run_ssh(client, "echo 'printpi' | sudo -S systemctl stop ipp-usb")
-        run_ssh(client, "echo 'printpi' | sudo -S systemctl disable ipp-usb")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S systemctl stop ipp-usb\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S systemctl disable ipp-usb\"")
 
         print("Enabling printers on SV-002...")
-        run_ssh(client, "echo 'printpi' | sudo -S cupsenable Brother_HL_L2440DW_series")
-        run_ssh(client, "echo 'printpi' | sudo -S cupsaccept Brother_HL_L2440DW_series")
-        run_ssh(client, "echo 'printpi' | sudo -S cupsenable Epson_L3250")
-        run_ssh(client, "echo 'printpi' | sudo -S cupsaccept Epson_L3250")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S cupsenable Brother_HL_L2440DW_series\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S cupsaccept Brother_HL_L2440DW_series\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S cupsenable Epson_L3250\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S cupsaccept Epson_L3250\"")
 
-        print("Stopping mimo-listener...")
-        run_ssh(client, "echo 'printpi' | sudo -S systemctl stop mimo-listener")
+        print("Stopping mimo-listener on SV-002...")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S systemctl stop mimo-listener\"")
         time.sleep(2)
 
-        print("Clearing remote temp file...")
-        run_ssh(client, f"cat /dev/null > {REMOTE_B64_PATH}")
+        print("Copying listener from CV-001 to SV-002...")
+        run_ssh(cv_client, "scp -o StrictHostKeyChecking=no /home/printpi/firebase_listener.py.sv002 pi@192.168.8.197:/home/pi/mimo/firebase_listener.py")
 
-        print(f"Uploading in 1000-char chunks...")
-        chunk_size = 1000
-        total_chunks = (len(b64_content) + chunk_size - 1) // chunk_size
-        for i in range(total_chunks):
-            start = i * chunk_size
-            end   = min(start + chunk_size, len(b64_content))
-            chunk = b64_content[start:end]
-            cmd = f"echo -n '{chunk}' >> {REMOTE_B64_PATH}"
-            stdin, stdout, stderr = client.exec_command(cmd)
-            err = stderr.read().decode('utf-8')
-            if err:
-                raise Exception(f"Chunk {i+1} failed: {err}")
-            if (i + 1) % 100 == 0 or i + 1 == total_chunks:
-                print(f"  Sent {i+1}/{total_chunks} chunks...")
-            time.sleep(0.003)
-
-        print("Decoding on remote...")
-        run_ssh(client, f"base64 -d {REMOTE_B64_PATH} > {REMOTE_PY_PATH}")
-        run_ssh(client, f"rm -f {REMOTE_B64_PATH}")
-
-        # Verify size
-        out, _ = run_ssh(client, f"wc -c {REMOTE_PY_PATH}")
-        print(f"Remote file: {out}")
-
-        print("Starting mimo-listener...")
-        run_ssh(client, "echo 'printpi' | sudo -S systemctl start mimo-listener")
+        print("Starting mimo-listener on SV-002...")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S systemctl start mimo-listener\"")
         time.sleep(3)
 
-        print("Service status:")
-        out, _ = run_ssh(client, "systemctl status mimo-listener --no-pager | head -20")
+        print("Service status on SV-002:")
+        out, _ = run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"systemctl status mimo-listener --no-pager | head -20\"")
         print(out)
+
+        print("Cleaning up temporary file on CV-001...")
+        run_ssh(cv_client, "rm -f /home/printpi/firebase_listener.py.sv002")
 
         print("\n✅ SV-002 deployment successful!")
 
     except Exception as e:
         print(f"❌ SV-002 deployment failed: {e}")
     finally:
-        client.close()
+        cv_client.close()
 
 
 def deploy_cv001():
