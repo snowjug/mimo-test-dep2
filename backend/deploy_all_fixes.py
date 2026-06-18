@@ -50,6 +50,16 @@ def deploy_sv002():
         client.connect('100.107.95.16', username='pi', password='printpi', timeout=15)
         print("✅ SSH connected")
 
+        print("Stopping and disabling ipp-usb service on SV-002...")
+        run_ssh(client, "echo 'printpi' | sudo -S systemctl stop ipp-usb")
+        run_ssh(client, "echo 'printpi' | sudo -S systemctl disable ipp-usb")
+
+        print("Enabling printers on SV-002...")
+        run_ssh(client, "echo 'printpi' | sudo -S cupsenable Brother_HL_L2440DW_series")
+        run_ssh(client, "echo 'printpi' | sudo -S cupsaccept Brother_HL_L2440DW_series")
+        run_ssh(client, "echo 'printpi' | sudo -S cupsenable Epson_L3250")
+        run_ssh(client, "echo 'printpi' | sudo -S cupsaccept Epson_L3250")
+
         print("Stopping mimo-listener...")
         run_ssh(client, "echo 'printpi' | sudo -S systemctl stop mimo-listener")
         time.sleep(2)
@@ -115,8 +125,8 @@ Type=simple
 User=printpi
 WorkingDirectory=/home/printpi
 Environment= PYTHONUNBUFFERED=1
-Environment=BW_PRINTER_NAME=Brother_IPP
-Environment=COLOR_PRINTER_NAME=Brother_IPP
+Environment=BW_PRINTER_NAME=Brother_HL_L5210DN_series
+Environment=COLOR_PRINTER_NAME=Brother_HL_L5210DN_series
 Environment=IS_MONOCHROME_ONLY=true
 Environment=KIOSK_ID=CV-001
 Environment=GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/etc/ssl/certs/ca-certificates.crt
@@ -135,6 +145,10 @@ WantedBy=multi-user.target
     try:
         client.connect('100.70.107.44', username='printpi', password='printpi', timeout=15)
         print("✅ SSH connected")
+
+        print("Stopping and disabling ipp-usb service on CV-001...")
+        run_ssh(client, "echo 'printpi' | sudo -S systemctl stop ipp-usb")
+        run_ssh(client, "echo 'printpi' | sudo -S systemctl disable ipp-usb")
 
         print("Stopping mimo-listener...")
         run_ssh(client, "echo 'printpi' | sudo -S systemctl stop mimo-listener")

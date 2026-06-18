@@ -926,10 +926,11 @@ def watchdog_loop():
                             print(f"🔧 Watchdog: Waking up sleeping printer {printer}...")
                             reset_printer_usb(printer)
                             
-                            # Restart ipp-usb if it's a Brother printer
+                            # Ensure ipp-usb is stopped and disabled so direct USB works
                             if "Brother" in printer:
-                                print("Restarting ipp-usb...")
-                                subprocess.run(f"echo 'printpi' | sudo -S systemctl restart ipp-usb", shell=True, capture_output=True)
+                                print("Ensuring ipp-usb is stopped...")
+                                subprocess.run(f"echo 'printpi' | sudo -S systemctl stop ipp-usb", shell=True, capture_output=True)
+                                subprocess.run(f"echo 'printpi' | sudo -S systemctl disable ipp-usb", shell=True, capture_output=True)
                             
                             # Re-enable CUPS queue
                             subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
