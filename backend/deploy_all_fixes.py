@@ -115,8 +115,8 @@ Type=simple
 User=printpi
 WorkingDirectory=/home/printpi
 Environment= PYTHONUNBUFFERED=1
-Environment=BW_PRINTER_NAME=Brother_HL_L5210DN_series
-Environment=COLOR_PRINTER_NAME=Brother_HL_L5210DN_series
+Environment=BW_PRINTER_NAME=Brother_IPP
+Environment=COLOR_PRINTER_NAME=Brother_IPP
 Environment=IS_MONOCHROME_ONLY=true
 Environment=KIOSK_ID=CV-001
 Environment=GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/etc/ssl/certs/ca-certificates.crt
