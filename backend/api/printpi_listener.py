@@ -622,8 +622,8 @@ def process_job(doc_snapshot):
         if not (photo_layout and str(photo_layout) in ["2", "4", "6", "9"]):
             final_paths = pdf_paths
 
-        # Check if duplex is requested for a single-page document and copies > 1
-        if double_sided == "double" and copies > 1:
+        # Check if duplex is requested for a single-page document
+        if double_sided == "double":
             total_pages = 0
             try:
                 if len(final_paths) == 1:
@@ -638,7 +638,7 @@ def process_job(doc_snapshot):
                 print(f"📄 Duplicating single-page PDF {copies} times to enable double-sided printing...")
                 dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
                 try:
-                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * copies, check=True, timeout=60)
+                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * (copies * 2), check=True, timeout=60)
                     if os.path.exists(dup_pdf):
                         final_paths = [dup_pdf]
                         copies = 1

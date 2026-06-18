@@ -743,7 +743,7 @@ def process_job(doc_snapshot):
             except Exception as e:
                 print(f"⚠️ Failed to check pages for duplex: {e}")
 
-            if total_pages == 1 and copies > 1:
+            if total_pages == 1:
                 # Single-page doc: duplicate copies times so each copy has page+blank for 2-sided
                 print(f"📄 Duplex: Duplicating single-page PDF {copies}× to pair front/back...")
                 dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
