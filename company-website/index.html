@@ -361,6 +361,8 @@
        STATS BAR
     ═══════════════════════════════════════════ */
     .stats-bar {
+      position: relative;
+      z-index: 20;
       background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
       margin: 0 1.5rem;
       border-radius: 1.5rem;
@@ -398,19 +400,49 @@
     /* ═══════════════════════════════════════════
        SECTIONS — SHARED
     ═══════════════════════════════════════════ */
-    /* ═══════════════════════════════════════════
-       SECTIONS — SHARED
-    ═══════════════════════════════════════════ */
     .section {
       padding: 2.5rem 1.5rem;
       position: relative;
-      overflow: hidden;
+      /* overflow: visible so ::before can bleed into adjacent sections,
+         creating a true cross-boundary gradient blend */
+      overflow: visible;
+    }
+
+    /* ── True Cross-Section Blending ───────────────────────────────────────
+       Both bg classes are TRANSPARENT — the phone-card's solid #EEF2FF
+       shows through everywhere as the base.
+
+       White sections get a ::before that extends 5rem OUTSIDE their own
+       boundaries in both directions. It uses rgba(white) fading from
+       transparent→white→transparent so it physically bleeds into the
+       adjacent brand sections above and below, producing a genuine
+       cross-element gradient instead of two clipped halves.            */
+
+    .bg-subtle-brand {
+      background: transparent !important;
+      z-index: 20 !important;
     }
     .bg-subtle-white {
-      background-color: #ffffff !important;
+      background: transparent !important;
     }
-    .bg-subtle-brand {
-      background-color: #EEF2FF !important;
+    .bg-subtle-white::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      top: -5rem;    /* bleeds 5rem UP into previous brand section */
+      bottom: -5rem; /* bleeds 5rem DOWN into next brand section  */
+      background: linear-gradient(to bottom,
+        rgba(255,255,255,0)    0%,
+        rgba(255,255,255,0.45) 8%,
+        rgba(255,255,255,0.85) 18%,
+        rgba(255,255,255,1)    28%,
+        rgba(255,255,255,1)    72%,
+        rgba(255,255,255,0.85) 82%,
+        rgba(255,255,255,0.45) 92%,
+        rgba(255,255,255,0)    100%
+      );
+      z-index: 0;
+      pointer-events: none;
     }
     /* Ambient Glow Blobs for Depth */
     .section-glow-1 {
@@ -805,13 +837,62 @@
     .btn-primary svg { width: 1.125rem; height: 1.125rem; }
 
     /* ═══════════════════════════════════════════
+       SUPPORTED BY (MARQUEE)
+    ═══════════════════════════════════════════ */
+    .supported-by-section {
+      padding: 1.5rem 0 2rem;
+      text-align: center;
+      background: #ffffff;
+      border-top: 1px solid #cbd5e1;
+      overflow: hidden;
+      /* Place above footer but below problems */
+      position: relative;
+      z-index: 10;
+    }
+    .supported-by-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #0d3b66;
+      margin-top: 0;
+      margin-bottom: 2rem;
+      font-family: 'Inter', sans-serif;
+      position: relative;
+      z-index: 5;
+    }
+    .marquee-container {
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+      z-index: 5;
+    }
+    .marquee-content {
+      display: inline-flex;
+      align-items: center;
+      gap: 5rem;
+      /* Animation duration needs to be long enough for smooth scroll */
+      animation: marquee 30s linear infinite;
+    }
+    .marquee-content img {
+      height: 110px;
+      width: auto;
+      object-fit: contain;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(calc(-50% - 2.5rem)); }
+    }
+
+    /* ═══════════════════════════════════════════
        FOOTER
     ═══════════════════════════════════════════ */
     .footer-main {
-      background: #fff;
+      position: relative;
+      z-index: 15;
+      background: #f4f7fb;
       color: #111827;
-      padding: 2.5rem 1.5rem 2rem;
-      z-index: 20;
+      padding: 2rem 1.5rem 2rem;
+      border-top: 1px solid #cbd5e1; /* Clear separation line */
     }
     .footer-brand { margin-bottom: 2rem; }
     .footer-brand-title {
@@ -1221,7 +1302,7 @@
 <div class="phone-card">
 
   <!-- ── HEADER ── -->
-  <header class="flex items-center justify-between px-6 pt-6 pb-2 z-50 bg-transparent" data-purpose="navigation-header" style="font-family:'Inter',sans-serif;">
+  <header class="flex items-center justify-between px-6 pt-6 pb-2 z-50 bg-transparent relative" data-purpose="navigation-header" style="font-family:'Inter',sans-serif;">
     <div class="flex flex-col">
       <h1 class="text-3xl font-black tracking-tight leading-none text-slate-900" style="font-family:'Lovelo',sans-serif;">MIMO</h1>
     </div>
@@ -1234,12 +1315,6 @@
           <path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </a>
-      <button id="menu-btn" aria-label="Menu"
-              class="w-11 h-11 bg-slate-50 flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-100">
-        <span class="w-6 h-0.5 bg-slate-800 block"></span>
-        <span class="w-6 h-0.5 bg-slate-800 block"></span>
-        <span class="w-4 h-0.5 bg-slate-800 block self-start ml-2.5"></span>
-      </button>
     </div>
   </header>
 
@@ -1329,7 +1404,7 @@
 
     <!-- ── TRUST CARD (Secure. Private. Reliable.) ── -->
     <div id="trust-card"
-         class="bg-white p-5 rounded-3xl flex items-center gap-5 border border-slate-100 animate-fade-in-up delay-400"
+         class="bg-white p-5 rounded-3xl flex items-center gap-5 border border-slate-100 animate-fade-in-up delay-400 mt-4"
          style="box-shadow:0 10px 30px -5px rgba(0,0,0,0.07);font-family:'Inter',sans-serif;" data-purpose="card-trust-badge">
       <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
         <svg class="h-6 w-6 text-[#4666F6]" fill="currentColor" viewBox="0 0 24 24">
@@ -1360,7 +1435,7 @@
   </div>
 
   <!-- ── PROBLEM SOLVED ── -->
-  <section class="section bg-subtle-white" style="border-top: none;" id="problems">
+  <section class="section bg-subtle-white" id="problems">
     <!-- Section-level ambient background glows -->
     <div class="section-glow-1"></div>
     <div class="section-glow-2"></div>
@@ -1394,7 +1469,7 @@
   </section>
 
   <!-- ── HOW IT WORKS ── -->
-  <section class="section bg-subtle-brand" style="border-top: none;" id="how-it-works">
+  <section class="section bg-subtle-brand" id="how-it-works">
     <!-- Section-level ambient background glows -->
     <div class="section-glow-1"></div>
     <div class="section-glow-2"></div>
@@ -1564,7 +1639,7 @@
   </section>
 
   <!-- ── TRUST BADGES ── -->
-  <section class="section bg-subtle-white" style="border-top: none;" id="trust">
+  <section class="section bg-subtle-white" id="trust">
     <!-- Section-level ambient background glows -->
     <div class="section-glow-1"></div>
     <div class="section-glow-2"></div>
@@ -1608,6 +1683,25 @@
           <h4>Convenient Access</h4>
           <p>Kiosks are available throughout regular campus hours.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SUPPORTED BY ── -->
+  <section class="supported-by-section">
+    <h3 class="supported-by-title">Supported by</h3>
+    <div class="marquee-container">
+      <div class="marquee-content">
+        <!-- Set 1 -->
+        <img src="Brands/IMG_3075.PNG" alt="Raajply">
+        <img src="Brands/logo1.png" alt="REVA NEST">
+        <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+        <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        <!-- Set 2 (for seamless loop) -->
+        <img src="Brands/IMG_3075.PNG" alt="Raajply">
+        <img src="Brands/logo1.png" alt="REVA NEST">
+        <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+        <img src="Brands/Vasavi.jpg" alt="Vasavi">
       </div>
     </div>
   </section>
@@ -1831,6 +1925,7 @@
       answer.classList.add('open');
     }
   }
+
 </script>
 </body>
 </html>

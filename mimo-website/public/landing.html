@@ -26,13 +26,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-
+  <meta name="google-adsense-account" content="ca-pub-6488030243565665">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6488030243565665" crossorigin="anonymous"></script>
   <style>
     @font-face {
       font-family: 'Lovelo';
-      src: url('./lovelo_black-webfont.woff2') format('woff2'),
-           url('./lovelo_black-webfont.woff') format('woff'),
-           url('./lovelo_black-webfont.ttf') format('truetype');
+      src: url('./fonts/lovelo_black-webfont.woff2') format('woff2'),
+           url('./fonts/lovelo_black-webfont.woff') format('woff'),
+           url('./fonts/lovelo_black-webfont.ttf') format('truetype');
       font-weight: 900;
       font-style: normal;
       font-display: swap;
@@ -230,6 +231,7 @@
       transform: scale(1.05) translateY(-0.5rem) translateX(0.5rem);
       transform-origin: bottom right;
       animation: mascotFloat 6s ease-in-out infinite;
+      filter: saturate(1.75) hue-rotate(-20deg);
     }
 
     /* ═══════════════════════════════════════════
@@ -240,7 +242,21 @@
       display: flex; flex-direction: column; gap: 1rem;
       z-index: 30; position: relative;
       margin-top: calc(-1 * var(--cards-overlap));
-      background: linear-gradient(to bottom, rgba(238,242,255,0) 0, #EEF2FF 2.5rem);
+      background: #EEF2FF;
+    }
+    /* Single gradient overlay: handles full fade from hero into cards — no seam */
+    .cards::before {
+      content: '';
+      position: absolute;
+      top: -4rem;
+      left: 0; right: 0;
+      height: 4rem;
+      background: linear-gradient(to bottom,
+        rgba(238,242,255,0) 0%,
+        #EEF2FF 100%
+      );
+      pointer-events: none;
+      z-index: 5;
     }
 
     /* ── Action Cards Custom Premium Styling ── */
@@ -345,6 +361,8 @@
        STATS BAR
     ═══════════════════════════════════════════ */
     .stats-bar {
+      position: relative;
+      z-index: 20;
       background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
       margin: 0 1.5rem;
       border-radius: 1.5rem;
@@ -384,9 +402,88 @@
     ═══════════════════════════════════════════ */
     .section {
       padding: 2.5rem 1.5rem;
-      border-top: 1px solid rgba(70, 102, 246, 0.08);
+      position: relative;
+      /* overflow: visible so ::before can bleed into adjacent sections,
+         creating a true cross-boundary gradient blend */
+      overflow: visible;
     }
-    .section-header { margin-bottom: 1.75rem; }
+
+    /* ── True Cross-Section Blending ───────────────────────────────────────
+       Both bg classes are TRANSPARENT — the phone-card's solid #EEF2FF
+       shows through everywhere as the base.
+
+       White sections get a ::before that extends 5rem OUTSIDE their own
+       boundaries in both directions. It uses rgba(white) fading from
+       transparent→white→transparent so it physically bleeds into the
+       adjacent brand sections above and below, producing a genuine
+       cross-element gradient instead of two clipped halves.            */
+
+    .bg-subtle-brand {
+      background: transparent !important;
+      z-index: 20 !important;
+    }
+    .bg-subtle-white {
+      background: transparent !important;
+    }
+    .bg-subtle-white::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      top: -5rem;    /* bleeds 5rem UP into previous brand section */
+      bottom: -5rem; /* bleeds 5rem DOWN into next brand section  */
+      background: linear-gradient(to bottom,
+        rgba(255,255,255,0)    0%,
+        rgba(255,255,255,0.45) 8%,
+        rgba(255,255,255,0.85) 18%,
+        rgba(255,255,255,1)    28%,
+        rgba(255,255,255,1)    72%,
+        rgba(255,255,255,0.85) 82%,
+        rgba(255,255,255,0.45) 92%,
+        rgba(255,255,255,0)    100%
+      );
+      z-index: 0;
+      pointer-events: none;
+    }
+    /* Ambient Glow Blobs for Depth */
+    .section-glow-1 {
+      position: absolute;
+      top: -15%; left: -20%;
+      width: 75%; height: 50%;
+      background: radial-gradient(circle, rgba(70, 102, 246, 0.07) 0%, rgba(70, 102, 246, 0) 70%);
+      filter: blur(50px);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .section-glow-2 {
+      position: absolute;
+      bottom: -15%; right: -20%;
+      width: 75%; height: 50%;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.05) 0%, rgba(124, 58, 237, 0) 70%);
+      filter: blur(50px);
+      pointer-events: none;
+      z-index: 1;
+    }
+    /* Page Ambient Glows */
+    .page-glow-1 {
+      position: fixed;
+      top: -20%; right: -10%;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(74, 107, 255, 0.1) 0%, rgba(74, 107, 255, 0) 70%);
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .page-glow-2 {
+      position: fixed;
+      bottom: -10%; left: -10%;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.06) 0%, rgba(124, 58, 237, 0) 70%);
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .section-header { margin-bottom: 1.75rem; position: relative; z-index: 5; }
     .section-pill {
       display: inline-flex;
       align-items: center;
@@ -420,17 +517,21 @@
        PROBLEM CARDS
     ═══════════════════════════════════════════ */
     .list-card {
-      background: #fff;
+      background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
       border-radius: 1.25rem;
       padding: 1.25rem;
       margin-bottom: 0.875rem;
       display: flex;
-      gap: 1rem;
-      box-shadow: 0 8px 24px -4px rgba(74, 107, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.02);
-      border: 1px solid rgba(74, 107, 255, 0.12);
-      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      align-items: center;
+      gap: 1.125rem;
+      box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      border: 2px solid rgba(74, 107, 255, 0.18);
+      position: relative;
+      z-index: 2;
+      cursor: default !important;
+      user-select: text;
+      -webkit-tap-highlight-color: transparent;
     }
-    .list-card:hover { border-color: rgba(74, 107, 255, 0.3); box-shadow: 0 16px 36px -6px rgba(74, 107, 255, 0.16); transform: translateY(-3px); }
     .list-icon {
       width: 2.75rem; height: 2.75rem;
       background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
@@ -439,31 +540,32 @@
       font-size: 1.25rem;
       color: #4A6BFF;
       font-weight: 700;
+      border: 1.5px solid rgba(74, 107, 255, 0.18);
     }
-    .list-text h4 { font-size: 1.0625rem; font-weight: 700; color: #111827; margin-bottom: 0.25rem; }
-    .list-text p { font-size: 0.8125rem; color: #6B7280; line-height: 1.5; }
+    .list-text h4 { font-family: 'Outfit', sans-serif; font-size: 1.125rem; font-weight: 750; color: #0f172a; margin-bottom: 0.35rem; letter-spacing: -0.015em; }
+    .list-text p { font-family: 'Inter', sans-serif; font-size: 0.875rem; color: #334155; line-height: 1.625; font-weight: 500; }
 
     /* ═══════════════════════════════════════════
        STEPS — HOW IT WORKS
     ═══════════════════════════════════════════ */
     .steps-wrap { position: relative; margin-top: 1rem; }
     .step-card {
-      background: #fff;
+      background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
       border-radius: 1.25rem;
       padding: 1.25rem 1.25rem 1.25rem 1rem;
       margin-bottom: 1rem;
       display: flex;
+      align-items: center;
       gap: 1.125rem;
-      box-shadow: 0 8px 24px -4px rgba(74, 107, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.02);
-      border: 1px solid rgba(74, 107, 255, 0.12);
-      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), left 0.3s ease;
+      box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(74, 107, 255, 0.14);
       position: relative;
       left: 0;
-      cursor: pointer;
       z-index: 2;
+      cursor: default !important;
+      user-select: text;
+      -webkit-tap-highlight-color: transparent;
     }
-    .step-card:hover { box-shadow: 0 16px 36px -6px rgba(74, 107, 255, 0.16); left: 6px; transform: translateY(-2px); border-color: rgba(74, 107, 255, 0.3); }
-    .step-card:active { left: 3px; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.05); }
     .step-num {
       min-width: 2.75rem; height: 2.75rem;
       background: linear-gradient(135deg, #4A6BFF, #7C3AED);
@@ -474,30 +576,29 @@
       color: #fff;
       box-shadow: 0 4px 12px rgba(74,107,255,.35);
       flex-shrink: 0;
-      transition: all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
       position: relative;
       z-index: 3;
     }
-    .step-card:hover .step-num {
-      animation: stepGlowBreathHover 1.5s ease-in-out infinite alternate;
-    }
-    .step-text h4 { font-size: 1.0625rem; font-weight: 700; color: #111827; margin-bottom: 0.25rem; }
-    .step-text p { font-size: 0.8125rem; color: #6B7280; line-height: 1.5; }
+    .step-text h4 { font-family: 'Outfit', sans-serif; font-size: 1.125rem; font-weight: 750; color: #0f172a; margin-bottom: 0.35rem; letter-spacing: -0.015em; }
+    .step-text p { font-family: 'Inter', sans-serif; font-size: 0.875rem; color: #334155; line-height: 1.625; font-weight: 500; }
 
     /* ═══════════════════════════════════════════
        FEATURES GRID
     ═══════════════════════════════════════════ */
     .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
     .feature-card {
-      background: #fff;
+      background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
       border-radius: 1.5rem;
       padding: 1.5rem 1rem;
       text-align: center;
-      box-shadow: 0 8px 24px -4px rgba(74, 107, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.02);
-      border: 1px solid rgba(74, 107, 255, 0.12);
-      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      border: 2px solid rgba(74, 107, 255, 0.18);
+      position: relative;
+      z-index: 2;
+      cursor: default !important;
+      user-select: text;
+      -webkit-tap-highlight-color: transparent;
     }
-    .feature-card:hover { border-color: rgba(74, 107, 255, 0.35); box-shadow: 0 16px 36px -6px rgba(74, 107, 255, 0.18); transform: translateY(-5px); }
     .feature-icon {
       width: 2.75rem; height: 2.75rem;
       background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
@@ -505,11 +606,10 @@
       display: flex; align-items: center; justify-content: center;
       margin: 0 auto 0.75rem auto;
       font-size: 1.25rem;
-      transition: transform .3s ease;
+      border: 1.5px solid rgba(74, 107, 255, 0.18);
     }
-    .feature-card:hover .feature-icon { transform: rotate(10deg) scale(1.15); }
-    .feature-card h4 { font-size: 0.875rem; font-weight: 700; color: #111827; margin-bottom: 0.25rem; }
-    .feature-card p { font-size: 0.75rem; color: #6B7280; line-height: 1.4; }
+    .feature-card h4 { font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 750; color: #0f172a; margin-bottom: 0.35rem; letter-spacing: -0.01em; }
+    .feature-card p { font-family: 'Inter', sans-serif; font-size: 0.8125rem; color: #334155; line-height: 1.55; font-weight: 500; }
 
     /* ═══════════════════════════════════════════
        TESTIMONIALS
@@ -637,12 +737,12 @@
       background: #fff;
       border-radius: 1.25rem;
       margin-bottom: 0.875rem;
-      box-shadow: 0 8px 24px -4px rgba(74, 107, 255, 0.06), 0 4px 12px rgba(0, 0, 0, 0.02);
-      border: 1px solid rgba(74, 107, 255, 0.12);
+      box-shadow: 0 12px 30px -4px rgba(74, 107, 255, 0.1), 0 6px 16px rgba(0, 0, 0, 0.04);
+      border: 2px solid rgba(74, 107, 255, 0.15);
       overflow: hidden;
       transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .faq-item:hover { box-shadow: 0 14px 28px rgba(74, 107, 255, 0.12); border-color: rgba(74, 107, 255, 0.25); transform: translateY(-2px); }
+    .faq-item:hover { box-shadow: 0 20px 40px rgba(74, 107, 255, 0.15); border-color: rgba(74, 107, 255, 0.3); transform: translateY(-3px); }
     .faq-question {
       display: flex;
       align-items: center;
@@ -691,27 +791,27 @@
       display: flex;
       align-items: center;
       gap: 1.125rem;
-      background: #fff;
+      background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
       border-radius: 1.25rem;
       padding: 1.25rem;
-      box-shadow: 0 8px 24px -4px rgba(74, 107, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.02);
-      border: 1px solid rgba(74, 107, 255, 0.12);
-      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .trust-row:hover {
-      transform: translateY(-3px) translateX(4px);
-      box-shadow: 0 16px 32px -6px rgba(74, 107, 255, 0.16);
-      border-color: rgba(74, 107, 255, 0.3);
+      box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      border: 2px solid rgba(74, 107, 255, 0.18);
+      position: relative;
+      z-index: 2;
+      cursor: default !important;
+      user-select: text;
+      -webkit-tap-highlight-color: transparent;
     }
     .trust-icon-wrap {
       width: 2.75rem; height: 2.75rem;
       background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      border: 1.5px solid rgba(74, 107, 255, 0.18);
     }
     .trust-icon-wrap svg { width: 1.25rem; height: 1.25rem; color: #4A6BFF; }
-    .trust-row-text h4 { font-size: 0.9375rem; font-weight: 700; color: #111827; }
-    .trust-row-text p { font-size: 0.8125rem; color: #6B7280; margin-top: 0.1rem; }
+    .trust-row-text h4 { font-family: 'Outfit', sans-serif; font-size: 1.0625rem; font-weight: 750; color: #0f172a; margin-bottom: 0.35rem; letter-spacing: -0.01em; }
+    .trust-row-text p { font-family: 'Inter', sans-serif; font-size: 0.875rem; color: #334155; line-height: 1.6; font-weight: 500; }
 
     /* ═══════════════════════════════════════════
        BUTTONS
@@ -737,26 +837,81 @@
     .btn-primary svg { width: 1.125rem; height: 1.125rem; }
 
     /* ═══════════════════════════════════════════
+       SUPPORTED BY (MARQUEE)
+    ═══════════════════════════════════════════ */
+    .supported-by-section {
+      padding: 1.5rem 0 2rem;
+      text-align: center;
+      background: #ffffff;
+      border-top: 1px solid #cbd5e1;
+      overflow: hidden;
+      /* Place above footer but below problems */
+      position: relative;
+      z-index: 10;
+    }
+    .supported-by-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #0d3b66;
+      margin-top: 0;
+      margin-bottom: 2rem;
+      font-family: 'Inter', sans-serif;
+      position: relative;
+      z-index: 5;
+    }
+    .marquee-container {
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+      z-index: 5;
+    }
+    .marquee-content {
+      display: inline-flex;
+      align-items: center;
+      gap: 5rem;
+      /* Animation duration needs to be long enough for smooth scroll */
+      animation: marquee 30s linear infinite;
+    }
+    .marquee-content img {
+      height: 110px;
+      width: auto;
+      object-fit: contain;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(calc(-50% - 2.5rem)); }
+    }
+
+    /* ═══════════════════════════════════════════
        FOOTER
     ═══════════════════════════════════════════ */
     .footer-main {
-      background: #fff;
+      position: relative;
+      z-index: 15;
+      background: #f4f7fb;
       color: #111827;
-      padding: 2.5rem 1.5rem 2rem;
-      border-top-left-radius: 1.5rem;
-      border-top-right-radius: 1.5rem;
-      z-index: 20;
-      box-shadow: 0 -4px 20px rgba(0,0,0,.04);
+      padding: 2rem 1.5rem 2rem;
+      border-top: 1px solid #cbd5e1; /* Clear separation line */
     }
     .footer-brand { margin-bottom: 2rem; }
+    .footer-brand-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .footer-logo {
+      width: 2.5rem;
+      height: 2.5rem;
+      object-fit: contain;
+      border-radius: 0.5rem;
+    }
     .footer-brand h2 {
       font-size: 1.75rem; font-weight: 900;
-      margin-bottom: 0.35rem;
+      margin-bottom: 0;
       letter-spacing: -.03em;
-      background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: #174A87;
     }
     .footer-brand .tagline { font-size: 0.875rem; color: #6B7280; line-height: 1.5; margin-bottom: 1rem; }
     .footer-address { font-size: 0.8125rem; color: #6B7280; line-height: 1.6; }
@@ -987,6 +1142,8 @@
         border-radius: 2.5rem;
         box-shadow: 0 30px 60px rgba(9, 55, 101, 0.05), 0 10px 20px rgba(9, 55, 101, 0.02);
         animation: slideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        position: relative;
+        overflow: hidden;
       }
       .desktop-hero-text {
         /* animated via parent container */
@@ -1075,23 +1232,22 @@
         animation: slideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
       }
       .desktop-feature-tile {
-        background: #ffffff;
-        border: 1px solid rgba(74, 107, 255, 0.14);
+        background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
+        border: 2px solid rgba(74, 107, 255, 0.18);
         border-radius: 1.25rem;
         padding: 1.25rem;
         display: flex;
         gap: 0.875rem;
         align-items: flex-start;
-        box-shadow: 0 8px 24px -4px rgba(74, 107, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.02);
-        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        transition: border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        cursor: default !important;
+        user-select: text;
+        -webkit-tap-highlight-color: transparent;
       }
       .desktop-feature-tile:hover {
-        border-color: rgba(74, 107, 255, 0.35);
-        box-shadow: 0 16px 36px rgba(74, 107, 255, 0.18);
-        transform: translateY(-4px) scale(1.01);
-      }
-      .desktop-feature-tile:hover .desktop-tile-icon {
-        transform: scale(1.1) rotate(5deg);
+        border-color: rgba(74, 107, 255, 0.25);
+        box-shadow: 0 20px 40px -8px rgba(74, 107, 255, 0.12);
       }
       .desktop-tile-icon {
         width: 2.75rem; height: 2.75rem;
@@ -1100,10 +1256,10 @@
         display: flex; align-items: center; justify-content: center;
         flex-shrink: 0;
         font-size: 1.25rem;
-        transition: transform 0.3s ease;
+        border: 1.5px solid rgba(74, 107, 255, 0.18);
       }
-      .desktop-tile-text h4 { font-size: 0.9375rem; font-weight: 700; color: #111827; margin-bottom: 0.25rem; }
-      .desktop-tile-text p { font-size: 0.8125rem; color: #6B7280; line-height: 1.5; }
+      .desktop-tile-text h4 { font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 750; color: #0f172a; margin-bottom: 0.25rem; }
+      .desktop-tile-text p { font-family: 'Inter', sans-serif; font-size: 0.8125rem; color: #334155; line-height: 1.5; font-weight: 500; }
 
       .desktop-stats-strip {
         display: grid;
@@ -1112,18 +1268,20 @@
         animation: slideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both;
       }
       .desktop-stat-tile {
-        background: #ffffff;
+        background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
         border: 1px solid rgba(74, 107, 255, 0.14);
         border-radius: 1.25rem;
         padding: 1.25rem;
         text-align: center;
-        box-shadow: 0 8px 24px -4px rgba(74, 107, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.02);
-        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        transition: border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        cursor: default !important;
+        user-select: text;
+        -webkit-tap-highlight-color: transparent;
       }
       .desktop-stat-tile:hover {
-        transform: translateY(-3px) scale(1.02);
-        box-shadow: 0 16px 32px rgba(74, 107, 255, 0.16);
-        border-color: rgba(74, 107, 255, 0.3);
+        border-color: rgba(74, 107, 255, 0.25);
+        box-shadow: 0 20px 40px -8px rgba(74, 107, 255, 0.12);
       }
       .desktop-stat-num {
         font-size: 1.75rem;
@@ -1138,13 +1296,15 @@
 </head>
 <body>
 <div class="page-wrap">
+  <!-- Page-level ambient background glows -->
+  <div class="page-glow-1"></div>
+  <div class="page-glow-2"></div>
 <div class="phone-card">
 
   <!-- ── HEADER ── -->
-  <header class="flex items-center justify-between px-6 pt-6 pb-2 z-50 bg-transparent" data-purpose="navigation-header" style="font-family:'Inter',sans-serif;">
+  <header class="flex items-center justify-between px-6 pt-6 pb-2 z-50 bg-transparent relative" data-purpose="navigation-header" style="font-family:'Inter',sans-serif;">
     <div class="flex flex-col">
-      <h1 class="text-2xl font-black tracking-tight leading-none text-slate-900" style="font-family:'Lovelo',sans-serif;">MIMO</h1>
-      <p class="text-[10px] font-medium text-slate-500 mt-0.5" style="font-family:'Inter',sans-serif;">Printing Made Easy</p>
+      <h1 class="text-3xl font-black tracking-tight leading-none text-slate-900" style="font-family:'Lovelo',sans-serif;">MIMO</h1>
     </div>
     <div class="flex items-center gap-3">
       <a href="https://printmimo.tech" id="header-cta"
@@ -1155,12 +1315,6 @@
           <path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </a>
-      <button id="menu-btn" aria-label="Menu"
-              class="w-11 h-11 bg-slate-50 flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-100">
-        <span class="w-6 h-0.5 bg-slate-800 block"></span>
-        <span class="w-6 h-0.5 bg-slate-800 block"></span>
-        <span class="w-4 h-0.5 bg-slate-800 block self-start ml-2.5"></span>
-      </button>
     </div>
   </header>
 
@@ -1250,7 +1404,7 @@
 
     <!-- ── TRUST CARD (Secure. Private. Reliable.) ── -->
     <div id="trust-card"
-         class="bg-white p-5 rounded-3xl flex items-center gap-5 border border-slate-100 animate-fade-in-up delay-400"
+         class="bg-white p-5 rounded-3xl flex items-center gap-5 border border-slate-100 animate-fade-in-up delay-400 mt-4"
          style="box-shadow:0 10px 30px -5px rgba(0,0,0,0.07);font-family:'Inter',sans-serif;" data-purpose="card-trust-badge">
       <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
         <svg class="h-6 w-6 text-[#4666F6]" fill="currentColor" viewBox="0 0 24 24">
@@ -1267,24 +1421,27 @@
   <!-- ── STATS BAR ── -->
   <div class="stats-bar reveal" style="margin-bottom: 2rem;">
     <div class="stat-item">
-      <div class="stat-num" data-target="5000">0</div>
+      <div class="stat-num" data-target="1600">0</div>
       <div class="stat-label">Happy Students</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num" data-target="12">0</div>
+      <div class="stat-num" data-target="2">0</div>
       <div class="stat-label">Campus Kiosks</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num">99%</div>
+      <div class="stat-num">90%</div>
       <div class="stat-label">Uptime</div>
     </div>
   </div>
 
   <!-- ── PROBLEM SOLVED ── -->
-  <section class="section" style="border-top: none; padding-top: 0;" id="problems">
+  <section class="section bg-subtle-white" id="problems">
+    <!-- Section-level ambient background glows -->
+    <div class="section-glow-1"></div>
+    <div class="section-glow-2"></div>
     <div class="section-header reveal">
       <div class="section-pill">✦ The Problem</div>
-      <h2 class="section-title">Printing, Finally Fixed</h2>
+      <h2 class="section-title">Printing, Finally Fixed.</h2>
       <p class="section-subtitle">Tired of long queues, exact change, and unhelpful shopkeepers? We were too. MIMO is here to change printing for students, forever.</p>
     </div>
 
@@ -1312,7 +1469,10 @@
   </section>
 
   <!-- ── HOW IT WORKS ── -->
-  <section class="section" style="border-top: none;" id="how-it-works">
+  <section class="section bg-subtle-brand" id="how-it-works">
+    <!-- Section-level ambient background glows -->
+    <div class="section-glow-1"></div>
+    <div class="section-glow-2"></div>
     <div class="section-header reveal">
       <div class="section-pill">✦ The Process</div>
       <h2 class="section-title">How MIMO Works</h2>
@@ -1324,14 +1484,14 @@
         <div class="step-num">1</div>
         <div class="step-text">
           <h4>Upload Your Files</h4>
-          <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload your documents from any device.</p>
+          <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload your documents from anywhere.</p>
         </div>
       </div>
       <div class="step-card reveal reveal-delay-2">
         <div class="step-num">2</div>
         <div class="step-text">
           <h4>Customise Your Print</h4>
-          <p>Select copies, B&amp;W or color, paper size, and print layout directly on your phone — no app needed.</p>
+          <p>Select copies, B&amp;W or color, and paper size directly on your phone — no app needed.</p>
         </div>
       </div>
       <div class="step-card reveal reveal-delay-3">
@@ -1352,7 +1512,10 @@
   </section>
 
   <!-- ── FEATURES ── -->
-  <section class="section" id="features">
+  <section class="section bg-subtle-white" id="features">
+    <!-- Section-level ambient background glows -->
+    <div class="section-glow-1"></div>
+    <div class="section-glow-2"></div>
     <div class="section-header reveal">
       <div class="section-pill">✦ Features</div>
       <h2 class="section-title">Built for Modern Students</h2>
@@ -1367,7 +1530,7 @@
           </svg>
         </div>
         <h4>Cloud Ready</h4>
-        <p>Upload from Drive, WhatsApp, or local storage.</p>
+        <p>Upload from Drive or local storage.</p>
       </div>
       <div class="feature-card reveal reveal-delay-2">
         <div class="feature-icon">
@@ -1389,8 +1552,8 @@
       </div>
       <div class="feature-card reveal reveal-delay-2">
         <div class="feature-icon">🕒</div>
-        <h4>Always Online</h4>
-        <p>Our kiosks are available 24/7, even on weekends.</p>
+        <h4>Convenient Access</h4>
+        <p>Kiosks are available throughout regular campus hours.</p>
       </div>
       <div class="feature-card reveal reveal-delay-1">
         <div class="feature-icon">💵</div>
@@ -1400,18 +1563,20 @@
       <div class="feature-card reveal reveal-delay-2">
         <div class="feature-icon">🎓</div>
         <h4>Campus First</h4>
-        <p>Placed strategically in hostels &amp; student zones.</p>
+        <p>Placed strategically in student zones.</p>
       </div>
     </div>
   </section>
 
 
   <!-- ── FAQ ── -->
-  <section class="section" id="faq">
+  <section class="section bg-subtle-brand" id="faq">
+    <!-- Section-level ambient background glows -->
+    <div class="section-glow-1"></div>
+    <div class="section-glow-2"></div>
     <div class="section-header reveal">
       <div class="section-pill">✦ FAQ</div>
       <h2 class="section-title">Got Questions?</h2>
-      <p class="section-subtitle">Everything you need to know about MIMO, answered.</p>
     </div>
 
     <div class="reveal">
@@ -1459,7 +1624,7 @@
 
       <div class="faq-item" id="faq-4">
         <div class="faq-question" onclick="toggleFaq('faq-4')">
-          Is my document data safe and private?
+          Is my document data private and safe?
           <div class="faq-icon">
             <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
               <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1474,7 +1639,10 @@
   </section>
 
   <!-- ── TRUST BADGES ── -->
-  <section class="section" style="border-top: none;" id="trust">
+  <section class="section bg-subtle-white" id="trust">
+    <!-- Section-level ambient background glows -->
+    <div class="section-glow-1"></div>
+    <div class="section-glow-2"></div>
     <div class="section-header reveal">
       <div class="section-pill">✦ Why Us</div>
       <h2 class="section-title">You Can Trust MIMO</h2>
@@ -1512,9 +1680,28 @@
           </svg>
         </div>
         <div class="trust-row-text">
-          <h4>24/7 Availability</h4>
-          <p>Kiosks are online round the clock. Print whenever you need.</p>
+          <h4>Convenient Access</h4>
+          <p>Kiosks are available throughout regular campus hours.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SUPPORTED BY ── -->
+  <section class="supported-by-section">
+    <h3 class="supported-by-title">Supported by</h3>
+    <div class="marquee-container">
+      <div class="marquee-content">
+        <!-- Set 1 -->
+        <img src="Brands/IMG_3075.PNG" alt="Raajply">
+        <img src="Brands/logo1.png" alt="REVA NEST">
+        <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+        <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        <!-- Set 2 (for seamless loop) -->
+        <img src="Brands/IMG_3075.PNG" alt="Raajply">
+        <img src="Brands/logo1.png" alt="REVA NEST">
+        <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+        <img src="Brands/Vasavi.jpg" alt="Vasavi">
       </div>
     </div>
   </section>
@@ -1522,7 +1709,10 @@
   <!-- ── FOOTER ── -->
   <footer class="footer-main" id="footer">
     <div class="footer-brand">
-      <h2>VisionPrintt</h2>
+      <div class="footer-brand-title">
+        <img src="vision-print-logo.jpg" alt="VisionPrintt Logo" class="footer-logo">
+        <h2>VisionPrintt</h2>
+      </div>
       <p class="tagline">Smart printing solutions for modern campuses and offices.</p>
       <div class="footer-address">
         <strong><span>📍</span><span>Vision Printt Technologies<br>REVA NEST, Rukmini Knowledge Park<br>Kattegenahalli, Yelahanka<br>Bengaluru - 560064</span></strong>
@@ -1570,6 +1760,9 @@
 
   <!-- ── DESKTOP PANEL (visible only at 1024px+) ── -->
   <div class="desktop-panel" id="desktop-panel">
+    <!-- Section-level ambient background glows -->
+    <div class="section-glow-1"></div>
+    <div class="section-glow-2"></div>
 
     <div class="desktop-hero-text">
       <div class="eyebrow">✦ Smart Campus Printing</div>
@@ -1593,15 +1786,15 @@
 
     <div class="desktop-stats-strip">
       <div class="desktop-stat-tile">
-        <div class="desktop-stat-num">5,000+</div>
+        <div class="desktop-stat-num">1,600+</div>
         <div class="desktop-stat-label">Happy Students</div>
       </div>
       <div class="desktop-stat-tile">
-        <div class="desktop-stat-num">12</div>
+        <div class="desktop-stat-num">2</div>
         <div class="desktop-stat-label">Campus Kiosks</div>
       </div>
       <div class="desktop-stat-tile">
-        <div class="desktop-stat-num">99%</div>
+        <div class="desktop-stat-num">90%</div>
         <div class="desktop-stat-label">Kiosk Uptime</div>
       </div>
     </div>
@@ -1615,7 +1808,7 @@
         </div>
         <div class="desktop-tile-text">
           <h4>Cloud Ready</h4>
-          <p>Upload from Google Drive, WhatsApp, or your local device.</p>
+          <p>Upload from Google Drive or your local device.</p>
         </div>
       </div>
       <div class="desktop-feature-tile">
@@ -1647,8 +1840,8 @@
           </svg>
         </div>
         <div class="desktop-tile-text">
-          <h4>Always Available</h4>
-          <p>Kiosks run 24/7 — print even on weekends or late nights.</p>
+          <h4>Convenient Access</h4>
+          <p>Kiosks are available throughout regular campus hours.</p>
         </div>
       </div>
       <div class="desktop-feature-tile">
@@ -1732,6 +1925,7 @@
       answer.classList.add('open');
     }
   }
+
 </script>
 </body>
 </html>
