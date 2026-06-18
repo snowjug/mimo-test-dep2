@@ -1953,8 +1953,14 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
       let finalKioskId = kioskId;
       if (directKioskId) {
         finalKioskId = directKioskId;
-      } else if (colorMode === "color") {
-        finalKioskId = "SV-002"; // Force color jobs to the SV-002 Epson kiosk
+      }
+
+      // CV-001 only has a monochrome Brother printer — always route color to SV-002 (Epson)
+      if (colorMode === "color") {
+        if (finalKioskId === "CV-001") {
+          console.warn(`[ROUTING] Color job requested on CV-001 (monochrome only) — rerouting to SV-002 (Epson color)`);
+        }
+        finalKioskId = "SV-002"; // Force ALL color jobs to the SV-002 Epson kiosk
       }
 
       // Mark sending to Pi

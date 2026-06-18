@@ -18,6 +18,8 @@ COLOR_PRINTER_NAME = os.environ.get("COLOR_PRINTER_NAME", "Epson_L3250")
 # Kiosk Routing Identity
 KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
 TEMP_DIR = "/tmp/mimo_prints"
+# Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
+IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
 
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
@@ -364,8 +366,68 @@ def impose_nup(input_pdf, output_pdf, layout_num):
         print(f"❌ impose_nup (GS+Pillow) failed: {e}")
         return False
 
-def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
+def is_printer_online(printer_name):
+    """Check if the CUPS printer queue is enabled and accepting jobs."""
     try:
+        res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=5)
+        output = res.stdout.lower()
+        if "disabled" in output or "stopped" in output or "not accepting" in output:
+            print(f"❌ Printer {printer_name} is OFFLINE/DISABLED")
+            return False
+        if res.returncode != 0 or "is idle" not in output and "now printing" not in output and "enabled" not in output:
+            print(f"⚠️ Could not verify printer {printer_name} status: {res.stdout.strip()}")
+            return False
+        return True
+    except Exception as e:
+        print(f"⚠️ Printer status check failed: {e}")
+        return False
+
+def wait_for_cups_job(job_id, doc_ref, timeout=600):
+    """
+    Background thread: polls CUPS until 'job_id' disappears from the
+    not-completed queue, then updates Firestore to completed.
+    timeout: max seconds to wait (default 10 min).
+    """
+    import re
+    start = time.time()
+    print(f"⏳ [SYNC] Waiting for CUPS job {job_id} to physically finish printing...")
+    while time.time() - start < timeout:
+        try:
+            res = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True, timeout=10)
+            if job_id not in res.stdout:
+                # Job finished (printed or error)
+                # Check if it ended in an error by looking at completed jobs
+                res2 = subprocess.run(["lpstat", "-W", "completed"], capture_output=True, text=True, timeout=10)
+                job_ok = job_id in res2.stdout
+                if job_ok:
+                    print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
+                    safe_update(doc_ref, {
+                        "status": "completed",
+                        "isPrinted": True,
+                        "printerStatus": "Printed",
+                        "printedAt": firestore.SERVER_TIMESTAMP
+                    })
+                else:
+                    print(f"❌ [SYNC] CUPS job {job_id} ended in error. Marking Firestore failed.")
+                    safe_update(doc_ref, {"status": "failed", "printerStatus": "CUPS print error"})
+                return
+        except Exception as e:
+            print(f"⚠️ [SYNC] lpstat poll error: {e}")
+        time.sleep(5)
+    # Timeout — mark failed
+    print(f"❌ [SYNC] Timed out waiting for CUPS job {job_id}. Marking failed.")
+    safe_update(doc_ref, {"status": "failed", "printerStatus": "Print timeout — no response from printer"})
+
+def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME,
+               photo_layout=None, double_sided="single", is_blank_sheet=False,
+               doc_ref=None):
+    """
+    Submits job to CUPS. If doc_ref is given, a background thread will poll CUPS
+    for physical completion and update Firestore (status sync with actual print).
+    """
+    import re
+    try:
+        # ── Validate files ──
         total_size = sum(os.path.getsize(p) for p in file_paths)
         if total_size < 100:
             print("❌ Invalid file(s) size")
@@ -376,13 +438,17 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                 with open(file_path, 'rb') as f:
                     header = f.read(8)
                 if not header.startswith(b'%PDF'):
-                    print(f"❌ File not a valid PDF")
+                    print(f"❌ File not a valid PDF: {file_path}")
                     return False
 
+        # ── Printer online guard ──
+        if not is_printer_online(printer_name):
+            print(f"❌ Aborting: printer {printer_name} is offline.")
+            return False
 
-
-        sliced_paths = []
+        # ── Page range slicing ──
         if page_range:
+            sliced_paths = []
             for p in file_paths:
                 sliced = slice_pdf_pages(p, page_range)
                 sliced_paths.append(sliced)
@@ -390,47 +456,49 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         print(f"🖨️  Sending to CUPS [{printer_name}]: {[os.path.basename(f) for f in file_paths]} "
               f"({copies} copies, layout: {photo_layout or '1-up'}, sides: {double_sided})")
-        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4"]
-        
-        if not is_blank_sheet:
-            cmd.extend(["-o", "fit-to-page"])
 
-        # NOTE: N-up layout is always pre-imposed by impose_nup() before reaching here.
-        # photo_layout is cleared to None after imposition, so this block is a safety guard only.
+        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4"]
+
+        # fit-to-page is skipped for:
+        #  - blank sheets / graph paper (print at exact size)
+        #  - N-up imposed PDFs (geometry is pre-computed)
+        skip_fit = is_blank_sheet or (photo_layout and str(photo_layout) in ["2", "4", "6", "9"])
+        if not skip_fit:
+            cmd.extend(["-o", "fit-to-page"])
+        else:
+            cmd.extend(["-o", "print-scaling=none"])
+
+        # N-up safety guard (should never run — impose_nup pre-processes):
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
-            print(f"⚠️ photo_layout={photo_layout} still set at print_file — N-up was not pre-imposed. Passing to CUPS as fallback.")
+            print(f"⚠️ photo_layout={photo_layout} still set — N-up not pre-imposed. Using CUPS fallback.")
             cmd.extend(["-o", f"number-up={photo_layout}"])
-            
+
         if double_sided == "double":
             cmd.extend(["-o", "sides=two-sided-long-edge", "-o", "Duplex=DuplexNoTumble", "-o", "BRDuplex=DuplexNoTumble"])
         else:
             cmd.extend(["-o", "sides=one-sided", "-o", "Duplex=None", "-o", "BRDuplex=None"])
-        
+
         cmd.extend(file_paths)
-        
+
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
         lp_output = result.stdout.strip()
-        print(f"CUPS: {lp_output}")
-        
-        total_pages = 0
-        try:
-            for f in file_paths:
-                pi_info = subprocess.run(["pdfinfo", f], capture_output=True, text=True, timeout=10)
-                for line in pi_info.stdout.split("\n"):
-                    if "Pages:" in line:
-                        total_pages += int(line.split(":")[1].strip())
-        except Exception:
-            total_pages = max(1, total_pages)
-            
-        total_physical_pages = total_pages * copies
-        
-        import re
+        print(f"CUPS accepted: {lp_output}")
+
+        # Extract CUPS job ID
         match = re.search(r'request id is (\S+)', lp_output)
-        if match:
+        if match and doc_ref:
             job_id = match.group(1)
-            print(f"✅ CUPS job {job_id} accepted successfully. Returning immediately for FAST UI response.")
-        
-        return True
+            print(f"✅ CUPS job {job_id} queued. Spawning sync thread to track physical completion.")
+            # Spawn background thread to wait for physical print and update Firestore
+            t = threading.Thread(target=wait_for_cups_job, args=(job_id, doc_ref), daemon=True)
+            t.start()
+            # Return None to indicate 'async' — caller should NOT update Firestore immediately
+            return None
+        else:
+            # No job ID extracted — fallback to immediate success
+            print("⚠️ Could not extract CUPS job ID. Marking completed immediately.")
+            return True
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Print failed: {e.stderr.strip() if e.stderr else str(e)}")
         return False
@@ -439,14 +507,18 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         return False
 
 def download_file(file_url, file_name):
+    """Download file from Firebase Storage or a signed URL. Uses GCS SDK for fastest transfer."""
     try:
         safe_name = "".join([c for c in file_name if c.isalpha() or c.isdigit() or c in ' ._-']).rstrip()
+        if not safe_name:
+            safe_name = "document.pdf"
         local_path = os.path.join(TEMP_DIR, f"{int(time.time())}_{safe_name}")
-        print(f"⬇️  Downloading from Firebase...")
+        print(f"⬇️  Downloading: {file_name}")
         blob_path = None
 
         if file_url.startswith("gs://"):
-            blob_path = file_url.split(bucket.name + "/")[1]
+            # gs://bucket-name/path
+            blob_path = file_url.split(bucket.name + "/", 1)[1] if bucket.name in file_url else file_url[5:]
         elif "firebasestorage.googleapis.com" in file_url and "/o/" in file_url:
             path = file_url.split("/o/")[1].split("?")[0]
             blob_path = urllib.parse.unquote(path)
@@ -456,16 +528,19 @@ def download_file(file_url, file_name):
                 blob_path = urllib.parse.unquote(path)
 
         if blob_path:
+            # Direct GCS SDK download — fastest, no HTTP overhead
             blob = bucket.blob(blob_path)
             blob.download_to_filename(local_path)
         else:
-            response = requests.get(file_url, stream=True, timeout=120)
+            # Fallback: HTTP download with large chunk size for speed
+            response = requests.get(file_url, stream=True, timeout=180)
             response.raise_for_status()
             with open(local_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
                     f.write(chunk)
-        
-        print(f"✅ Downloaded to: {local_path}")
+
+        size_kb = os.path.getsize(local_path) / 1024
+        print(f"✅ Downloaded {size_kb:.0f} KB → {local_path}")
         return local_path
     except Exception as e:
         print(f"❌ Download failed: {e}")
@@ -488,12 +563,12 @@ def process_job(doc_snapshot):
     doc = doc_snapshot.to_dict()
     doc_id = doc_snapshot.id
     doc_ref = db.collection('print_jobs').document(doc_id)
-    
+
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
     color_mode = doc.get("colorMode", "monochrome")
     is_color = color_mode.lower() == "color"
-    
+
     print_options = doc.get("printOptions", {})
     # Read copies from printOptions (where frontend stores it), fallback to top-level
     copies = int(print_options.get("copies", doc.get("copies", 1)))
@@ -506,16 +581,23 @@ def process_job(doc_snapshot):
     page_range = None
     if page_selection == "custom":
         page_range = print_options.get("pageRange") or print_options.get("customPageRange")
-    
+
     files = doc.get("files")
     if not files:
         files = [{"url": file_url, "name": file_name, "type": doc.get("mimetype")}]
-        
+
     local_paths = []
     final_paths = []
 
+    # ── Monochrome-only guard (e.g. CV-001 which has only B&W Brother) ──
+    # If IS_MONOCHROME_ONLY is set, we always print on the B&W printer regardless of color mode.
+    if IS_MONOCHROME_ONLY and is_color:
+        print(f"ℹ️  IS_MONOCHROME_ONLY: downgrading color job {doc_id} to B&W on {BW_PRINTER_NAME}")
+        is_color = False
+        color_mode = "monochrome"
+
     # Dynamic Printer Selection
-    target_printer = COLOR_PRINTER_NAME if color_mode.lower() == "color" else BW_PRINTER_NAME
+    target_printer = COLOR_PRINTER_NAME if is_color else BW_PRINTER_NAME
 
     try:
         for f in files:
@@ -577,31 +659,34 @@ def process_job(doc_snapshot):
             except Exception as merge_err:
                 print(f"❌ Failed to merge PDF files: {merge_err}")
 
-        # Imposition with PyPDF2 for consistent N-up layouts
+        # ── N-up layout imposition ──
+        was_imposed = False
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
-            print(f"🖼️ Generating consistent {photo_layout}-per-page layout using PyPDF2...")
-            merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
+            print(f"🖼️ N-up: generating {photo_layout}-per-page layout...")
+            # Merge all PDFs into one before imposing
+            if len(pdf_paths) > 1:
+                merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
+                subprocess.run(
+                    ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
+                     f"-sOutputFile={merged_pdf}"] + pdf_paths,
+                    check=True, timeout=60
+                )
+            else:
+                merged_pdf = pdf_paths[0]
+
             imposed_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_imposed_layout.pdf")
-            
+
             try:
-                # 1. Merge if multiple files
-                if len(pdf_paths) > 1:
-                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
-                else:
-                    merged_pdf = pdf_paths[0]
-                    
-                # 2. Impose using PyPDF2
                 success_nup = impose_nup(merged_pdf, imposed_pdf, photo_layout)
-                
-                if success_nup:
+                if success_nup and os.path.exists(imposed_pdf):
                     final_paths = [imposed_pdf]
-                    photo_layout = None # Clear it so CUPS doesn't impose again
-                    print(f"✅ Successfully imposed layout into {imposed_pdf}")
+                    photo_layout = None  # Cleared — CUPS must NOT impose again
+                    was_imposed = True
+                    print(f"✅ N-up imposition succeeded: {imposed_pdf}")
                 else:
-                    raise Exception("PyPDF2 N-up returned False")
-                    
+                    raise Exception("impose_nup returned False")
             except Exception as jam_err:
-                print(f"⚠️ Native PyPDF2 imposition failed, falling back to CUPS number-up: {jam_err}")
+                print(f"⚠️ N-up imposition failed, falling back to CUPS number-up: {jam_err}")
                 try:
                     layout_num = int(photo_layout)
                     total_p = 1
@@ -615,25 +700,34 @@ def process_job(doc_snapshot):
                                     pass
                     except Exception as pdfinfo_err:
                         print(f"⚠️ pdfinfo failed ({pdfinfo_err}), assuming 1 page.")
-                    
+
                     if total_p == 1:
                         dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_layout.pdf")
-                        subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [merged_pdf] * layout_num, check=True)
+                        subprocess.run(
+                            ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
+                             f"-sOutputFile={dup_pdf}"] + [merged_pdf] * layout_num,
+                            check=True
+                        )
                         final_paths = [dup_pdf]
                     else:
                         final_paths = [merged_pdf]
-                    # DO NOT clear photo_layout, so CUPS will use '-o number-up=X'
-                    print(f"✅ Fallback successful")
+                    # Keep photo_layout set so CUPS uses number-up
+                    was_imposed = True  # Prevent pdf_paths override below
+                    print(f"✅ N-up fallback prepared (CUPS number-up will be used)")
                 except Exception as fallback_err:
-                    print(f"❌ Fallback failed: {fallback_err}")
-                    raise Exception("Layout generation failed on Kiosk.")
+                    print(f"❌ N-up fallback failed: {fallback_err}")
+                    raise Exception("Layout generation failed entirely.")
 
-        # Ensure final_paths is synced with pdf_paths if layout imposition did not run
-        if not (photo_layout and str(photo_layout) in ["2", "4", "6", "9"]):
+        # ── Ensure final_paths is in sync with pdf_paths only if N-up was NOT applied ──
+        # was_imposed prevents the bug where photo_layout=None (cleared on success) causes
+        # the check below to override final_paths with the un-imposed pdf_paths.
+        if not was_imposed:
             final_paths = pdf_paths
 
-        # Check if duplex is requested for a single-page document and copies > 1
-        if double_sided == "double" and copies > 1:
+
+        # ── Duplex: duplicate single-page PDFs to enable 2-sided printing with multiple copies ──
+        # Brother duplex requires at least 2 pages per copy to pair front/back correctly.
+        if double_sided == "double":
             total_pages = 0
             try:
                 if len(final_paths) == 1:
@@ -643,29 +737,43 @@ def process_job(doc_snapshot):
                             total_pages = int(line.split(":")[1].strip())
             except Exception as e:
                 print(f"⚠️ Failed to check pages for duplex: {e}")
-            
-            if total_pages == 1:
-                print(f"📄 Duplicating single-page PDF {copies} times to enable double-sided printing...")
+
+            if total_pages == 1 and copies > 1:
+                # Single-page doc: duplicate copies times so each copy has page+blank for 2-sided
+                print(f"📄 Duplex: Duplicating single-page PDF {copies}× to pair front/back...")
                 dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
                 try:
-                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * copies, check=True, timeout=60)
+                    subprocess.run(
+                        ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
+                         f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * (copies * 2),
+                        check=True, timeout=60
+                    )
                     if os.path.exists(dup_pdf):
                         final_paths = [dup_pdf]
                         copies = 1
-                        print(f"✅ Successfully duplicated single-page PDF to {dup_pdf} with copies=1")
+                        print(f"✅ Duplex duplication done: {dup_pdf}")
                 except Exception as dup_err:
-                    print(f"❌ Failed to duplicate single-page PDF for duplex: {dup_err}")
+                    print(f"❌ Failed to duplicate for duplex: {dup_err}")
+            elif total_pages > 1 and copies > 1:
+                # Multi-page doc: lp -n <copies> handles it correctly
+                print(f"📄 Duplex multi-page ({total_pages} pages, {copies} copies) — sending as-is to CUPS.")
 
-        success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
-        
-        if success:
+        # ── Submit to CUPS ──
+        # Pass doc_ref so print_file can spawn the background sync thread
+        result = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet, doc_ref=doc_ref)
+
+        if result is None:
+            # Async path: background thread (wait_for_cups_job) will update Firestore when done.
+            print(f"⏳ Job {doc_id} submitted. Firestore will be updated after physical print completes.")
+        elif result is True:
+            # Sync fallback (no job ID extracted): mark completed now
             doc_ref.update({
-                "status": "completed", 
-                "isPrinted": True, 
+                "status": "completed",
+                "isPrinted": True,
                 "printerStatus": "Printed",
                 "printedAt": firestore.SERVER_TIMESTAMP
             })
-            print(f"🎉 Job {doc_id} marked as completed.")
+            print(f"🎉 Job {doc_id} marked as completed (sync mode).")
         else:
             safe_update(doc_ref, {"status": "failed", "printerStatus": "CUPS error on Pi"})
 
