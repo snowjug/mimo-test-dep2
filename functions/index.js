@@ -2215,6 +2215,15 @@ app.post("/kiosk/print", async (req, res) => {
       finalKioskId = isColor ? "SV-002" : "CV-001";
       console.log(`No directKioskId found. Routing by color mode (isColor=${isColor}) to ${finalKioskId}`);
     }
+
+    // CV-001 only has a monochrome Brother printer — always route color to SV-002 (Epson)
+    const colorMode = jobData?.colorMode || jobData?.printOptions?.colorMode;
+    if (colorMode === "color") {
+      if (finalKioskId === "CV-001") {
+        console.warn(`[ROUTING] Color job requested on CV-001 (monochrome only) — rerouting to SV-002 (Epson color)`);
+      }
+      finalKioskId = "SV-002"; // Force ALL color jobs to the SV-002 Epson kiosk
+    }
     
     // Set status to printing so the Pi's firebase_listener.py picks it up
     await jobDoc.ref.update({ 
