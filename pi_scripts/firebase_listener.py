@@ -428,23 +428,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         match = re.search(r'request id is (\S+)', lp_output)
         if match:
             job_id = match.group(1)
-            print(f"⏳ Waiting for CUPS job {job_id} to spool and physically finish printing...")
-            timeout_counter = 0
-            while timeout_counter < 400:  # 10 minutes max wait per file batch (400 * 1.5s = 600s)
-                try:
-                    active_jobs = subprocess.run(["lpstat", "-o"], capture_output=True, text=True).stdout
-                    if job_id not in active_jobs:
-                        # Job is out of the queue, now ensure the physical printer is idle
-                        status_res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True).stdout.lower()
-                        if "printing" not in status_res:
-                            print(f"✅ CUPS job {job_id} completed and printer is idle.")
-                            break
-                except Exception as e:
-                    print(f"⚠️ lpstat check failed: {e}")
-                time.sleep(1.5)
-                timeout_counter += 1
-            if timeout_counter >= 400:
-                print(f"⚠️ Timeout waiting for job {job_id} physically. Assuming complete or stuck.")
+            print(f"✅ CUPS job {job_id} accepted successfully. Returning immediately for FAST UI response.")
         
         return True
     except subprocess.CalledProcessError as e:

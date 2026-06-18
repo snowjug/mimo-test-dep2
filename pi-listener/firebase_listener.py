@@ -290,28 +290,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         
         if match:
             job_id = match.group(1)
-            print(f"⏳ Waiting for hardware to finish job {job_id}...")
-            
-            start_wait = time.time()
-            while time.time() - start_wait < 300:  # 5 minutes max
-                q_status = subprocess.run(["lpstat", "-W", "not-completed"], 
-                                         capture_output=True, text=True).stdout
-                if job_id not in q_status:
-                    print("✅ Job successfully completed by hardware!")
-                    return True
-                
-                p_status = subprocess.run(["lpstat", "-p", printer_name], 
-                                         capture_output=True, text=True).stdout.lower()
-                if "unplugged" in p_status or "turned off" in p_status:
-                    subprocess.run(["cancel", job_id])
-                    raise Exception("Printer hardware is unplugged or turned off.")
-                if "waiting for printer" in p_status:
-                    subprocess.run(["cancel", job_id])
-                    raise Exception("Printer unreachable (waiting for printer).")
-                
-                time.sleep(2)
-            
-            print("⏳ Job still printing after 5 min, assuming success for large job.")
+            print(f"✅ CUPS job {job_id} accepted successfully. Returning immediately for FAST UI response.")
         
         return True
     except subprocess.CalledProcessError as e:
