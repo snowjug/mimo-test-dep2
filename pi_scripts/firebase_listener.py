@@ -226,7 +226,12 @@ def slice_pdf_pages(input_pdf, page_range):
         return input_pdf
 
 def convert_image_to_pdf_fit(input_path, is_color=False):
-    """Convert an image to PDF for 'fit' mode so CUPS number-up works reliably."""
+    """Convert an image to PDF for 'fit' mode so CUPS number-up works reliably.
+    
+    IMPORTANT: Image is resized to A4 dimensions at target DPI before saving.
+    This ensures GS rasterizes a proper A4-sized page, so impose_nup cells
+    get a full-resolution image to work with (avoids tiny source pages).
+    """
     try:
         from PIL import Image
         dpi = 150.0 if is_color else 300.0
@@ -234,8 +239,26 @@ def convert_image_to_pdf_fit(input_path, is_color=False):
         with Image.open(input_path) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            img.save(pdf_path, "PDF", resolution=dpi)
-        print(f"✅ Image fit → PDF: {pdf_path}")
+            # A4 dimensions at target DPI
+            a4_portrait_w = int(8.27 * dpi)   # ~1240 @ 150dpi, ~2480 @ 300dpi
+            a4_portrait_h = int(11.69 * dpi)  # ~1754 @ 150dpi, ~3508 @ 300dpi
+            orig_w, orig_h = img.size
+            # Choose canvas orientation to best match image orientation
+            if orig_w > orig_h:  # landscape image
+                canvas_w, canvas_h = a4_portrait_h, a4_portrait_w  # landscape A4
+            else:  # portrait image
+                canvas_w, canvas_h = a4_portrait_w, a4_portrait_h  # portrait A4
+            # Fit image into A4 canvas (letterbox / contain mode)
+            scale = min(canvas_w / orig_w, canvas_h / orig_h)
+            new_w = int(orig_w * scale)
+            new_h = int(orig_h * scale)
+            resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            canvas = Image.new('RGB', (canvas_w, canvas_h), (255, 255, 255))
+            paste_x = (canvas_w - new_w) // 2
+            paste_y = (canvas_h - new_h) // 2
+            canvas.paste(resized, (paste_x, paste_y))
+            canvas.save(pdf_path, "PDF", resolution=dpi)
+        print(f"✅ Image fit → PDF ({canvas_w}x{canvas_h}px @ {dpi}dpi): {pdf_path}")
         return pdf_path
     except Exception as e:
         print(f"❌ Image fit conversion failed: {e}")
@@ -328,9 +351,29 @@ def impose_nup(input_pdf, output_pdf, layout_num):
                     if idx >= len(page_imgs):
                         break
                     with Image.open(page_imgs[idx]) as pg_img:
-                        pg_img.thumbnail((cell_w_s, cell_h_s), Image.Resampling.LANCZOS)
-                        paste_x = col * cell_w_s + (cell_w_s - pg_img.width) // 2
-                        paste_y = row * cell_h_s + (cell_h_s - pg_img.height) // 2
+                        if pg_img.mode != 'RGB':
+                            pg_img = pg_img.convert('RGB')
+                        img_w, img_h = pg_img.size
+                        # Auto-rotate: if image is landscape but cell is portrait (or vice versa),
+                        # rotate 90° if it would give better coverage of the cell.
+                        cell_ratio = cell_w_s / cell_h_s
+                        img_ratio  = img_w / img_h if img_h > 0 else 1.0
+                        # Coverage with no rotation vs with rotation
+                        def coverage(iw, ih, cw, ch):
+                            s = min(cw / iw, ch / ih)
+                            return (iw * s * ih * s) / (cw * ch)
+                        cov_normal  = coverage(img_w, img_h, cell_w_s, cell_h_s)
+                        cov_rotated = coverage(img_h, img_w, cell_w_s, cell_h_s)
+                        if cov_rotated > cov_normal + 0.05:  # rotate only if meaningfully better
+                            pg_img = pg_img.rotate(90, expand=True)
+                            img_w, img_h = pg_img.size
+                        # Scale image to fill cell (contain mode, scales UP and DOWN)
+                        scale = min(cell_w_s / img_w, cell_h_s / img_h)
+                        new_w = max(1, int(img_w * scale))
+                        new_h = max(1, int(img_h * scale))
+                        pg_img = pg_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                        paste_x = col * cell_w_s + (cell_w_s - new_w) // 2
+                        paste_y = row * cell_h_s + (cell_h_s - new_h) // 2
                         canvas_img.paste(pg_img, (paste_x, paste_y))
                     idx += 1
             sheet_path = os.path.join(TEMP_DIR, f"_nup_sheet_{idx}_{int(time.time()*1000)}.pdf")
@@ -478,9 +521,12 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             cmd.extend(["-o", f"number-up={photo_layout}"])
 
         if double_sided == "double":
-            cmd.extend(["-o", "sides=two-sided-long-edge", "-o", "Duplex=DuplexNoTumble", "-o", "BRDuplex=DuplexNoTumble"])
+            # sides= and Duplex= are the standard CUPS options for duplex.
+            # BRDuplex is NOT present in the Brother L2440DW PPD — omit it to avoid
+            # potential conflicts. Duplex=DuplexNoTumble is the correct PPD option.
+            cmd.extend(["-o", "sides=two-sided-long-edge", "-o", "Duplex=DuplexNoTumble"])
         else:
-            cmd.extend(["-o", "sides=one-sided", "-o", "Duplex=None", "-o", "BRDuplex=None"])
+            cmd.extend(["-o", "sides=one-sided", "-o", "Duplex=None"])
 
         cmd.extend(file_paths)
 
