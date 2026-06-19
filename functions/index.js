@@ -2171,13 +2171,141 @@ app.get("/kiosk/job-status", async (req, res) => {
     if (snapshot.empty) return res.status(404).json({ error: "Job not found" });
     
     // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
-    const sortedDocs = snapshot.docs.sort((a, b) => {
-      const timeA = a.data().createdAt?.toDate().getTime() || 0;
-      const timeB = b.data().createdAt?.toDate().getTime() || 0;
+    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    docs.sort((a, b) => {
+      const timeA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()) : 0;
+      const timeB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
       return timeB - timeA;
     });
-    const jobData = sortedDocs[0].data();
-    res.json({ status: jobData.status || "pending", isPrinted: jobData.isPrinted || false });
+
+    const latestTime = docs[0].createdAt ? (docs[0].createdAt.toDate ? docs[0].createdAt.toDate().getTime() : new Date(docs[0].createdAt).getTime()) : 0;
+
+    // Get all docs belonging to this latest checkout session (within 5 seconds threshold)
+    const currentSessionDocs = docs.filter(d => {
+      const t = d.createdAt ? (d.createdAt.toDate ? d.createdAt.toDate().getTime() : new Date(d.createdAt).getTime()) : 0;
+      return Math.abs(t - latestTime) < 5000;
+    });
+
+    // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
+    const kioskId = currentSessionDocs[0].kioskId || "CV-001";
+    const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
+    try {
+      const statusDoc = await db.collection("system_status").doc(kioskId).get();
+      if (statusDoc.exists) {
+        const statusData = statusDoc.data();
+        
+        // A. Kiosk Online Check (lastSeen)
+        const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
+        if (lastSeen) {
+          const now = new Date();
+          const diffMs = now.getTime() - lastSeen.getTime();
+          if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
+            return res.json({
+              status: "failed",
+              isPrinted: false,
+              printerStatus: "System error: Kiosk printer listener is offline (not connected)"
+            });
+          }
+        }
+
+        // B. Printer Offline/Disabled Check
+        const printerStatusStr = statusData.printerStatus || "";
+        if (isColorJob) {
+          if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
+            return res.json({
+              status: "failed",
+              isPrinted: false,
+              printerStatus: "Printer error: Color printer is offline or disabled"
+            });
+          }
+        } else {
+          if (printerStatusStr.includes("B&W: Paused/Error") || printerStatusStr.includes("B&W: lpstat failed")) {
+            return res.json({
+              status: "failed",
+              isPrinted: false,
+              printerStatus: "Printer error: B&W printer is offline or disabled"
+            });
+          }
+        }
+      }
+    } catch (statusErr) {
+      console.error("⚠️ Error checking system status:", statusErr);
+    }
+
+    // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
+    let totalPageCount = 0;
+    currentSessionDocs.forEach(d => {
+      const pCount = d.pageCount || 1;
+      const copies = d.printOptions ? (d.printOptions.copies || 1) : (d.copies || 1);
+      totalPageCount += pCount * copies;
+    });
+
+    const baseWarmupSec = 60; // 60 seconds base warmup/spooling time
+    const secPerPage = isColorJob ? 35 : 8; // Inkjet color prints need longer timeout headroom than B&W laser prints
+    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage) * 1000;
+
+    let anyStuck = false;
+    for (const d of currentSessionDocs) {
+      if (d.status === "printing") {
+        const updatedAt = d.updatedAt ? (d.updatedAt.toDate ? d.updatedAt.toDate() : new Date(d.updatedAt)) : new Date();
+        const elapsedMs = new Date().getTime() - updatedAt.getTime();
+        if (elapsedMs > timeoutMs) {
+          anyStuck = true;
+          try {
+            await db.collection("print_jobs").doc(d.id).update({
+              status: "failed",
+              printerStatus: "Print timeout: Printer not responding (check power/cable)"
+            });
+          } catch (err) {
+            console.error(`Failed to update stuck job ${d.id}:`, err);
+          }
+        }
+      }
+    }
+
+    if (anyStuck) {
+      return res.json({
+        status: "failed",
+        isPrinted: false,
+        printerStatus: "Print timeout: Printer not responding (check power/cable)"
+      });
+    }
+
+    // === 3. STANDARD STATUS RESOLUTION ===
+    let allCompleted = true;
+    let anyFailed = false;
+    let anyPrinting = false;
+    let failedDoc = null;
+
+    currentSessionDocs.forEach((data) => {
+      if (data.status === "failed") {
+        anyFailed = true;
+        failedDoc = data;
+      }
+      if (data.status === "printing") anyPrinting = true;
+      if (!["completed", "printed"].includes(data.status) && data.isPrinted !== true) {
+        allCompleted = false;
+      }
+    });
+
+    if (anyFailed) {
+      return res.json({
+        status: "failed",
+        isPrinted: false,
+        printerStatus: failedDoc ? (failedDoc.printerStatus || failedDoc.error || "Print failed") : "Print failed"
+      });
+    }
+
+    if (allCompleted) {
+      return res.json({ status: "completed", isPrinted: true });
+    }
+    
+    if (anyPrinting) {
+      return res.json({ status: "printing", isPrinted: false });
+    }
+
+    return res.json({ status: "paid", isPrinted: false });
+
   } catch (err) {
     console.error("❌ KIOSK JOB STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch job status" });

@@ -1708,6 +1708,7 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
 
     // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
     const kioskId = currentSessionDocs[0].kioskId || "CV-001";
+    const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
     try {
       const statusDoc = await db.collection("system_status").doc(kioskId).get();
       if (statusDoc.exists) {
@@ -1729,7 +1730,6 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
 
         // B. Printer Offline/Disabled Check
         const printerStatusStr = statusData.printerStatus || "";
-        const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
         if (isColorJob) {
           if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
             return res.json({
@@ -1761,7 +1761,7 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     });
 
     const baseWarmupSec = 60; // 60 seconds base warmup/spooling time
-    const secPerPage = 8; // 8 seconds per page (conservative estimate)
+    const secPerPage = isColorJob ? 35 : 8; // Inkjet color prints need longer timeout headroom than B&W laser prints
     const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage) * 1000;
 
     let anyStuck = false;
