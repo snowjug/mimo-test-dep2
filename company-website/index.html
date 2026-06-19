@@ -169,7 +169,7 @@
     /* Speech bubble */
     .speech-bubble {
       position: absolute;
-      top: 2rem; left: 2rem;
+      top: 3.5rem; left: 2rem;
       background: #fff;
       padding: .75rem 1.1rem;
       border-radius: 1.125rem;
@@ -361,6 +361,8 @@
        STATS BAR
     ═══════════════════════════════════════════ */
     .stats-bar {
+      position: relative;
+      z-index: 20;
       background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
       margin: 0 1.5rem;
       border-radius: 1.5rem;
@@ -398,19 +400,49 @@
     /* ═══════════════════════════════════════════
        SECTIONS — SHARED
     ═══════════════════════════════════════════ */
-    /* ═══════════════════════════════════════════
-       SECTIONS — SHARED
-    ═══════════════════════════════════════════ */
     .section {
       padding: 2.5rem 1.5rem;
       position: relative;
-      overflow: hidden;
+      /* overflow: visible so ::before can bleed into adjacent sections,
+         creating a true cross-boundary gradient blend */
+      overflow: visible;
+    }
+
+    /* ── True Cross-Section Blending ───────────────────────────────────────
+       Both bg classes are TRANSPARENT — the phone-card's solid #EEF2FF
+       shows through everywhere as the base.
+
+       White sections get a ::before that extends 5rem OUTSIDE their own
+       boundaries in both directions. It uses rgba(white) fading from
+       transparent→white→transparent so it physically bleeds into the
+       adjacent brand sections above and below, producing a genuine
+       cross-element gradient instead of two clipped halves.            */
+
+    .bg-subtle-brand {
+      background: transparent !important;
+      z-index: 20 !important;
     }
     .bg-subtle-white {
-      background-color: #ffffff !important;
+      background: transparent !important;
     }
-    .bg-subtle-brand {
-      background-color: #EEF2FF !important;
+    .bg-subtle-white::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      top: -5rem;    /* bleeds 5rem UP into previous brand section */
+      bottom: -5rem; /* bleeds 5rem DOWN into next brand section  */
+      background: linear-gradient(to bottom,
+        rgba(255,255,255,0)    0%,
+        rgba(255,255,255,0.45) 8%,
+        rgba(255,255,255,0.85) 18%,
+        rgba(255,255,255,1)    28%,
+        rgba(255,255,255,1)    72%,
+        rgba(255,255,255,0.85) 82%,
+        rgba(255,255,255,0.45) 92%,
+        rgba(255,255,255,0)    100%
+      );
+      z-index: 0;
+      pointer-events: none;
     }
     /* Ambient Glow Blobs for Depth */
     .section-glow-1 {
@@ -805,13 +837,68 @@
     .btn-primary svg { width: 1.125rem; height: 1.125rem; }
 
     /* ═══════════════════════════════════════════
+       SUPPORTED BY (MARQUEE)
+    ═══════════════════════════════════════════ */
+    .supported-by-section {
+      padding: 1.5rem 0 2rem;
+      text-align: center;
+      background: #ffffff;
+      border-top: 1px solid #cbd5e1;
+      overflow: hidden;
+      /* Place above footer but below problems */
+      position: relative;
+      z-index: 10;
+    }
+    .supported-by-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #0d3b66;
+      margin-top: 0;
+      margin-bottom: 2rem;
+      font-family: 'Inter', sans-serif;
+      position: relative;
+      z-index: 5;
+    }
+    .marquee-container {
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+      z-index: 5;
+    }
+    .marquee-track {
+      display: flex;
+      width: max-content;
+      animation: marquee 45s linear infinite;
+      will-change: transform;
+    }
+    .marquee-set {
+      display: flex;
+      align-items: center;
+      gap: 4rem;
+      padding-right: 4rem; /* must match gap for seamless -50% loop */
+      flex-shrink: 0;
+    }
+    .marquee-set img {
+      height: 90px;
+      width: auto;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    @keyframes marquee {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    /* ═══════════════════════════════════════════
        FOOTER
     ═══════════════════════════════════════════ */
     .footer-main {
-      background: #fff;
+      position: relative;
+      z-index: 15;
+      background: #f4f7fb;
       color: #111827;
-      padding: 2.5rem 1.5rem 2rem;
-      z-index: 20;
+      padding: 2rem 1.5rem 2rem;
+      border-top: 1px solid #cbd5e1; /* Clear separation line */
     }
     .footer-brand { margin-bottom: 2rem; }
     .footer-brand-title {
@@ -1000,6 +1087,8 @@
 
     /* Hide desktop panel on mobile/tablet */
     .desktop-panel { display: none; }
+    /* Hide desktop site on mobile */
+    .desktop-site  { display: none; }
 
     /* ═══════════════════════════════════════════
        RESPONSIVE — TABLET (≥ 640px)
@@ -1062,8 +1151,133 @@
         box-shadow: 0 30px 60px rgba(9, 55, 101, 0.05), 0 10px 20px rgba(9, 55, 101, 0.02);
         animation: slideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
         position: relative;
-        overflow: hidden;
+        overflow: visible;
       }
+
+      /* ── Desktop Section Shared ── */
+      .desktop-divider {
+        height: 1px;
+        background: linear-gradient(to right, transparent, rgba(74,107,255,0.15), transparent);
+        margin: 0;
+      }
+      .desktop-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .desktop-section-pill {
+        display: inline-flex;
+        align-items: center;
+        background: #EEF2FF;
+        color: #4A6BFF;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 0.275rem 0.75rem;
+        border-radius: 99px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        align-self: flex-start;
+        margin-bottom: 0.2rem;
+      }
+      .desktop-section-title {
+        font-size: 1.5rem;
+        font-weight: 900;
+        color: #111827;
+        letter-spacing: -0.03em;
+        line-height: 1.2;
+        margin-bottom: 0.25rem;
+      }
+      .desktop-section-subtitle {
+        font-size: 0.875rem;
+        color: #6B7280;
+        line-height: 1.6;
+      }
+      /* ── How It Works Steps ── */
+      .desktop-steps { display: flex; flex-direction: column; gap: 0.75rem; }
+      .desktop-step-row {
+        display: flex; align-items: center; gap: 1rem;
+        background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
+        border: 1px solid rgba(74,107,255,0.14);
+        border-radius: 1.125rem;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 8px 24px -4px rgba(74,107,255,0.07), inset 0 1px 0 rgba(255,255,255,0.8);
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      }
+      .desktop-step-row:hover { border-color: rgba(74,107,255,0.25); box-shadow: 0 12px 32px -6px rgba(74,107,255,0.12); }
+      .desktop-step-badge {
+        min-width: 2.25rem; height: 2.25rem;
+        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.875rem; font-weight: 800; color: #fff; flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(74,107,255,.35);
+      }
+      .desktop-step-row h4 { font-family:'Outfit',sans-serif; font-size:0.9375rem; font-weight:750; color:#0f172a; margin-bottom:0.175rem; letter-spacing:-0.01em; }
+      .desktop-step-row p  { font-family:'Inter',sans-serif; font-size:0.8125rem; color:#334155; line-height:1.55; }
+      /* ── Trust Rows ── */
+      .desktop-trust-list { display: flex; flex-direction: column; gap: 0.75rem; }
+      .desktop-trust-row {
+        display: flex; align-items: center; gap: 1rem;
+        background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
+        border: 1px solid rgba(74,107,255,0.14);
+        border-radius: 1.125rem;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 8px 24px -4px rgba(74,107,255,0.07), inset 0 1px 0 rgba(255,255,255,0.8);
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      }
+      .desktop-trust-row:hover { border-color: rgba(74,107,255,0.25); box-shadow: 0 12px 32px -6px rgba(74,107,255,0.12); }
+      .desktop-trust-icon-wrap {
+        width: 2.25rem; height: 2.25rem;
+        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        border: 1.5px solid rgba(74,107,255,0.18);
+      }
+      .desktop-trust-icon-wrap svg { width: 1.125rem; height: 1.125rem; color: #4A6BFF; }
+      .desktop-trust-row h4 { font-family:'Outfit',sans-serif; font-size:0.9375rem; font-weight:750; color:#0f172a; margin-bottom:0.175rem; letter-spacing:-0.01em; }
+      .desktop-trust-row p  { font-family:'Inter',sans-serif; font-size:0.8125rem; color:#334155; line-height:1.55; }
+      /* ── Desktop CTA Card ── */
+      .desktop-cta-card {
+        background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
+        border-radius: 1.75rem;
+        padding: 2rem;
+        text-align: center;
+        position: relative; overflow: hidden;
+        box-shadow: 0 16px 48px rgba(74,107,255,.4);
+      }
+      .desktop-cta-card::before {
+        content:''; position:absolute; top:-40px; right:-40px;
+        width:180px; height:180px; border-radius:50%;
+        background:rgba(255,255,255,0.07);
+      }
+      .desktop-cta-card::after {
+        content:''; position:absolute; bottom:-30px; left:-30px;
+        width:140px; height:140px; border-radius:50%;
+        background:rgba(255,255,255,0.05);
+      }
+      .desktop-cta-card h3 {
+        font-size:1.625rem; font-weight:900; color:#fff;
+        letter-spacing:-0.03em; line-height:1.2;
+        margin-bottom:0.625rem; position:relative; z-index:1;
+      }
+      .desktop-cta-card p {
+        font-size:0.9rem; color:rgba(255,255,255,0.82);
+        line-height:1.55; margin-bottom:1.5rem;
+        position:relative; z-index:1;
+      }
+      .desktop-cta-btn {
+        display:inline-flex; align-items:center; gap:0.5rem;
+        background:#fff; color:#4A6BFF;
+        font-family:'Outfit',sans-serif; font-weight:700; font-size:0.9375rem;
+        padding:0.875rem 1.75rem;
+        border-radius:99px; border:none; cursor:pointer;
+        text-decoration:none;
+        box-shadow:0 6px 20px rgba(0,0,0,.15);
+        transition:all .25s cubic-bezier(0.34,1.56,0.64,1);
+        position:relative; z-index:1;
+      }
+      .desktop-cta-btn:hover { transform:scale(1.05) translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.2); }
+
       .desktop-hero-text {
         /* animated via parent container */
       }
@@ -1210,6 +1424,339 @@
         line-height: 1;
       }
       .desktop-stat-label { font-size: 0.8125rem; color: #6B7280; margin-top: 0.3rem; font-weight: 500; }
+
+      /* ═══ RESPONSIVE SWITCH: Auto-switch between mobile and desktop ═══ */
+      .desktop-site { display: none; }
+      
+      @media (min-width: 1024px) {
+        .page-wrap { display: none !important; }
+        .desktop-site { display: block; }
+      }
+
+      .desktop-site  {
+        background: #e8ecf5;
+        min-height: 100vh;
+        font-family: 'Outfit', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ─ NAVBAR ─ */
+      .ds-nav {
+        position: sticky; top: 0; z-index: 100;
+        background: rgba(232, 236, 245, 0.85); /* Matches #e8ecf5 hero background */
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: none;
+        box-shadow: none;
+      }
+      .ds-nav-inner {
+        width: 100%; max-width: none; margin: 0;
+        padding: 3.5rem 3vw 0 3vw; height: 7.5rem;
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .ds-nav-logo {
+        font-family: 'Lovelo', sans-serif;
+        font-size: 3.5rem; font-weight: 900;
+        color: #111827; letter-spacing: -0.03em; text-decoration: none;
+      }
+      .ds-nav-links { display: flex; align-items: center; gap: 3.5rem; transform: translateY(-1.2rem); }
+      .ds-nav-links a {
+        font-size: 1.1rem; font-weight: 600;
+        color: #374151; text-decoration: none;
+        position: relative;
+        padding: 0.25rem 0;
+        transition: color 0.25s ease;
+      }
+      .ds-nav-links a::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 50%;
+        width: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #4A6BFF, #7C3AED);
+        border-radius: 99px;
+        transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1), transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        transform: translateX(-50%);
+      }
+      .ds-nav-links a:hover {
+        color: #111827;
+      }
+      .ds-nav-links a:hover::after {
+        width: 100%;
+      }
+      .ds-nav-cta {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
+        color: #fff; font-family: 'Outfit', sans-serif;
+        font-weight: 700; font-size: 0.9375rem;
+        padding: 0.65rem 1.5rem;
+        border-radius: 99px; border: none; cursor: pointer;
+        box-shadow: 0 4px 18px rgba(74,107,255,.38);
+        transition: all .25s cubic-bezier(0.34,1.56,0.64,1);
+        text-decoration: none;
+      }
+      .ds-nav-cta:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 8px 28px rgba(74,107,255,.5); }
+
+      /* ─ HERO ─ */
+      .ds-hero-wrap {
+        min-height: calc(100vh - 4.5rem);
+        display: flex; align-items: center;
+        padding-bottom: 3rem;
+      }
+      .ds-hero {
+        width: 100%; max-width: 1280px; margin: 0 auto;
+        padding: 3rem 3vw 2rem;
+        display: grid;
+        grid-template-columns: 1fr 500px;
+        justify-content: space-between;
+        gap: 3rem; align-items: center;
+        transform: translateY(-5rem);
+      }
+      .ds-hero-eyebrow {
+        display: inline-flex; align-items: center;
+        background: #EEF2FF; color: #4A6BFF;
+        font-size: 0.875rem; font-weight: 700;
+        padding: 0.5rem 1.25rem; border-radius: 99px;
+        letter-spacing: 0.05em; text-transform: uppercase;
+        margin-bottom: 1.5rem;
+      }
+      .ds-hero-h1 {
+        font-size: 4rem; font-weight: 900;
+        color: #111827; letter-spacing: -0.04em;
+        line-height: 1.05; margin-bottom: 1.5rem;
+      }
+      .ds-hero-h1 span { color: #4A6BFF; }
+      .ds-hero-p {
+        font-size: 1.125rem; color: #4B5563;
+        line-height: 1.6; margin-bottom: 1.5rem; max-width: 620px;
+      }
+      .ds-hero-p * { color: inherit !important; background: transparent !important; }
+      .ds-hero-btns { display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap; }
+      .ds-btn-primary {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
+        color: #fff; font-family: 'Outfit', sans-serif;
+        font-weight: 700; font-size: 1.05rem;
+        padding: 1.125rem 2.5rem; border-radius: 99px; border: none; cursor: pointer;
+        box-shadow: 0 8px 28px rgba(74,107,255,.45);
+        transition: all .25s cubic-bezier(0.34,1.56,0.64,1); text-decoration: none;
+      }
+      .ds-btn-primary:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 14px 36px rgba(74,107,255,.55); }
+      .ds-btn-outline {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        background: #fff; color: #4A6BFF;
+        font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1.05rem;
+        padding: 1.125rem 2.5rem; border-radius: 99px;
+        border: 2px solid rgba(74,107,255,0.2); cursor: pointer;
+        transition: all .2s ease; text-decoration: none;
+      }
+      .ds-btn-outline:hover { border-color: #4A6BFF; background: #EEF2FF; }
+      .ds-hero-visual {
+        position: relative; display: flex;
+        align-items: center; justify-content: center;
+        padding: 2rem; margin-top: -3rem;
+      }
+      .ds-hero-bg-blob {
+        position: absolute; width: 480px; height: 480px;
+        background: radial-gradient(ellipse at center, rgba(100,140,255,0.22) 0%, rgba(124,58,237,0.1) 50%, transparent 70%);
+        border-radius: 50%; filter: blur(30px);
+        z-index: 0;
+      }
+      .ds-hero-kiosk-wrapper {
+        width: 100%; max-width: 440px;
+        filter: drop-shadow(0 24px 48px rgba(0,0,0,0.12));
+        animation: heroImgFloat 6s ease-in-out infinite;
+        position: relative; z-index: 2;
+        display: flex; justify-content: center;
+      }
+      .ds-hero-image {
+        width: 100%; height: auto;
+        object-fit: contain;
+        /* Shave off the dirty fuzzy edges from the background removal */
+        clip-path: inset(3.2% 4.5% 2% 4.5%);
+        filter: contrast(1.02) saturate(1.05);
+      }
+      @keyframes heroImgFloat {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-12px); }
+      }
+      .ds-bubble-text { font-size: 1.125rem; font-weight: 700; color: #111827; line-height: 1.3; }
+
+      /* ─ STATS BAR ─ */
+      .ds-stats-bar {
+        background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
+        padding: 2.5rem 0;
+      }
+      .ds-stats-inner {
+        max-width: 1200px; margin: 0 auto; padding: 0 2.5rem;
+        display: grid; grid-template-columns: repeat(3, 1fr);
+      }
+      .ds-stat-item { text-align: center; position: relative; }
+      .ds-stat-item:not(:last-child)::after {
+        content: ''; position: absolute; right: 0; top: 15%; bottom: 15%;
+        width: 1px; background: rgba(255,255,255,0.2);
+      }
+      .ds-stat-num { font-size: 2.5rem; font-weight: 900; color: #fff; letter-spacing: -0.02em; line-height: 1; }
+      .ds-stat-label { font-size: 0.9rem; color: rgba(255,255,255,0.78); font-weight: 500; margin-top: 0.4rem; }
+
+      /* ─ SHARED SECTION ─ */
+      .ds-section { padding: 5rem 0; position: relative; }
+      .ds-section-inner { max-width: 1200px; margin: 0 auto; padding: 0 2.5rem; }
+      .ds-section-header { text-align: center; margin-bottom: 3rem; }
+      .ds-section-pill {
+        display: inline-flex; align-items: center;
+        background: #EEF2FF; color: #4A6BFF;
+        font-size: 0.75rem; font-weight: 700;
+        padding: 0.3rem 0.875rem; border-radius: 99px;
+        letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.875rem;
+      }
+      .ds-section-title {
+        font-size: 2.25rem; font-weight: 900;
+        color: #111827; letter-spacing: -0.04em; line-height: 1.15;
+        margin-bottom: 0.75rem;
+      }
+      .ds-section-subtitle { font-size: 1rem; color: #6B7280; line-height: 1.7; max-width: 560px; margin: 0 auto; }
+      .ds-alt-bg { background: #fff; }
+
+      /* ─ 3-COL CARD GRID (How It Works + Problems) ─ */
+      .ds-three-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+      .ds-card {
+        background: linear-gradient(185deg, #fff 0%, #f9faff 100%);
+        border: 1px solid rgba(74,107,255,0.14);
+        border-radius: 1.5rem; padding: 2rem 1.5rem;
+        box-shadow: 0 12px 32px -4px rgba(74,107,255,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+        transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s, border-color 0.35s;
+        text-align: center;
+      }
+      .ds-card:hover { transform: translateY(-6px); box-shadow: 0 24px 48px -8px rgba(74,107,255,0.16); border-color: rgba(74,107,255,0.28); }
+      .ds-card-badge {
+        width: 3rem; height: 3rem;
+        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.125rem; font-weight: 900; color: #fff;
+        margin: 0 auto 1.25rem;
+        box-shadow: 0 6px 16px rgba(74,107,255,.4);
+      }
+      .ds-card-badge-emoji {
+        width: 3rem; height: 3rem;
+        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.375rem; margin: 0 auto 1.25rem;
+        border: 1.5px solid rgba(74,107,255,0.18);
+      }
+      .ds-card h3 { font-size: 1.125rem; font-weight: 800; color: #0f172a; margin-bottom: 0.625rem; letter-spacing: -0.02em; }
+      .ds-card p { font-size: 0.9rem; color: #334155; line-height: 1.65; }
+
+      /* ─ FEATURES 3-COL ─ */
+      .ds-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+      .ds-feature-card {
+        background: linear-gradient(185deg, #fff 0%, #f9faff 100%);
+        border: 2px solid rgba(74,107,255,0.14);
+        border-radius: 1.5rem; padding: 1.75rem;
+        box-shadow: 0 12px 32px -4px rgba(74,107,255,0.07);
+        transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s, border-color 0.35s;
+      }
+      .ds-feature-card:hover { transform: translateY(-5px); box-shadow: 0 20px 44px -8px rgba(74,107,255,0.14); border-color: rgba(74,107,255,0.28); }
+      .ds-feature-icon {
+        width: 3rem; height: 3rem;
+        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 1.125rem; font-size: 1.375rem;
+        border: 1.5px solid rgba(74,107,255,0.18);
+      }
+      .ds-feature-card h3 { font-size: 1.0625rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
+      .ds-feature-card p { font-size: 0.875rem; color: #334155; line-height: 1.65; }
+
+      /* ─ TRUST 3-COL ─ */
+      .ds-trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+      .ds-trust-card {
+        background: linear-gradient(185deg, #fff 0%, #f9faff 100%);
+        border: 2px solid rgba(74,107,255,0.14);
+        border-radius: 1.5rem; padding: 2rem 1.5rem; text-align: center;
+        box-shadow: 0 12px 32px -4px rgba(74,107,255,0.07);
+        transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s;
+      }
+      .ds-trust-card:hover { transform: translateY(-4px); box-shadow: 0 20px 44px -8px rgba(74,107,255,0.14); }
+      .ds-trust-icon {
+        width: 3.5rem; height: 3.5rem;
+        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 1.125rem;
+        border: 1.5px solid rgba(74,107,255,0.18);
+      }
+      .ds-trust-icon svg { width: 1.375rem; height: 1.375rem; color: #4A6BFF; }
+      .ds-trust-card h3 { font-size: 1.125rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
+      .ds-trust-card p { font-size: 0.875rem; color: #334155; line-height: 1.65; }
+
+      /* ─ FAQ ─ */
+      .ds-faq-wrap { max-width: 720px; margin: 0 auto; }
+
+      /* ─ CTA BANNER ─ */
+      .ds-cta {
+        background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
+        padding: 5rem 0; text-align: center;
+        position: relative; overflow: hidden;
+      }
+      .ds-cta::before {
+        content: ''; position: absolute; top: -60px; right: -60px;
+        width: 300px; height: 300px; border-radius: 50%;
+        background: rgba(255,255,255,0.06);
+      }
+      .ds-cta::after {
+        content: ''; position: absolute; bottom: -60px; left: -60px;
+        width: 240px; height: 240px; border-radius: 50%;
+        background: rgba(255,255,255,0.04);
+      }
+      .ds-cta-inner { max-width: 1200px; margin: 0 auto; padding: 0 2.5rem; position: relative; z-index: 1; }
+      .ds-cta h2 { font-size: 2.625rem; font-weight: 900; color: #fff; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 0.75rem; }
+      .ds-cta p { font-size: 1.0625rem; color: rgba(255,255,255,0.82); line-height: 1.6; margin-bottom: 2rem; }
+      .ds-cta-btn {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        background: #fff; color: #4A6BFF;
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.0625rem;
+        padding: 1rem 2.25rem; border-radius: 99px; border: none; cursor: pointer;
+        box-shadow: 0 8px 28px rgba(0,0,0,.15);
+        transition: all .25s cubic-bezier(0.34,1.56,0.64,1); text-decoration: none;
+      }
+      .ds-cta-btn:hover { transform: scale(1.06) translateY(-2px); box-shadow: 0 14px 36px rgba(0,0,0,.2); }
+
+      /* ─ MARQUEE (reuses .marquee-track/.marquee-set) ─ */
+      .ds-marquee-section {
+        background: #fff; border-top: 1px solid #cbd5e1;
+        padding: 2rem 0; overflow: hidden;
+      }
+      .ds-marquee-title {
+        text-align: center; font-size: 1.5rem; font-weight: 700;
+        color: #0d3b66; margin-bottom: 1.75rem;
+        font-family: 'Inter', sans-serif;
+      }
+
+      /* ─ FOOTER ─ */
+      .ds-footer { background: #f4f7fb; border-top: 1px solid #cbd5e1; padding: 3.5rem 0 2rem; }
+      .ds-footer-inner { max-width: 1200px; margin: 0 auto; padding: 0 2.5rem; }
+      .ds-footer-grid {
+        display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+        gap: 3rem; margin-bottom: 2.5rem;
+      }
+      .ds-footer-brand h2 { font-size: 1.625rem; font-weight: 900; color: #174A87; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+      .ds-footer-logo { width: 2.5rem; height: 2.5rem; object-fit: contain; border-radius: 0.5rem; margin-bottom: 0.75rem; display: block; }
+      .ds-footer-tagline { font-size: 0.9rem; color: #6B7280; line-height: 1.6; margin-bottom: 1rem; max-width: 280px; }
+      .ds-footer-address { font-size: 0.8125rem; color: #6B7280; line-height: 1.7; }
+      .ds-footer-col h4 { font-size: 0.9375rem; font-weight: 700; color: #111827; margin-bottom: 1.125rem; }
+      .ds-footer-col ul { list-style: none; }
+      .ds-footer-col li { margin-bottom: 0.625rem; }
+      .ds-footer-col a { font-size: 0.875rem; color: #6B7280; text-decoration: none; transition: color .2s; }
+      .ds-footer-col a:hover { color: #4A6BFF; }
+      .ds-footer-divider { height: 1px; background: #e5e7eb; margin-bottom: 1.5rem; }
+      .ds-footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+      .ds-footer-copy { font-size: 0.8125rem; color: #9CA3AF; }
+      .ds-footer-credit { font-size: 0.75rem; color: #9CA3AF; }
+      .ds-footer-credit strong { color: #4A6BFF; }
     }
   </style>
 </head>
@@ -1221,9 +1768,9 @@
 <div class="phone-card">
 
   <!-- ── HEADER ── -->
-  <header class="flex items-center justify-between px-6 pt-6 pb-2 z-50 bg-transparent" data-purpose="navigation-header" style="font-family:'Inter',sans-serif;">
+  <header class="flex items-center justify-between px-6 pt-6 pb-2 z-50 bg-transparent relative" data-purpose="navigation-header" style="font-family:'Inter',sans-serif;">
     <div class="flex flex-col">
-      <h1 class="text-3xl font-black tracking-tight leading-none text-slate-900" style="font-family:'Lovelo',sans-serif;">MIMO</h1>
+      <h1 class="text-4xl font-black tracking-tight leading-none text-slate-900" style="font-family:'Lovelo',sans-serif;">MIMO</h1>
     </div>
     <div class="flex items-center gap-3">
       <a href="https://printmimo.tech" id="header-cta"
@@ -1234,12 +1781,6 @@
           <path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </a>
-      <button id="menu-btn" aria-label="Menu"
-              class="w-11 h-11 bg-slate-50 flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-100">
-        <span class="w-6 h-0.5 bg-slate-800 block"></span>
-        <span class="w-6 h-0.5 bg-slate-800 block"></span>
-        <span class="w-4 h-0.5 bg-slate-800 block self-start ml-2.5"></span>
-      </button>
     </div>
   </header>
 
@@ -1329,7 +1870,7 @@
 
     <!-- ── TRUST CARD (Secure. Private. Reliable.) ── -->
     <div id="trust-card"
-         class="bg-white p-5 rounded-3xl flex items-center gap-5 border border-slate-100 animate-fade-in-up delay-400"
+         class="bg-white p-5 rounded-3xl flex items-center gap-5 border border-slate-100 animate-fade-in-up delay-400 mt-4"
          style="box-shadow:0 10px 30px -5px rgba(0,0,0,0.07);font-family:'Inter',sans-serif;" data-purpose="card-trust-badge">
       <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
         <svg class="h-6 w-6 text-[#4666F6]" fill="currentColor" viewBox="0 0 24 24">
@@ -1360,7 +1901,7 @@
   </div>
 
   <!-- ── PROBLEM SOLVED ── -->
-  <section class="section bg-subtle-white" style="border-top: none;" id="problems">
+  <section class="section bg-subtle-white" id="problems">
     <!-- Section-level ambient background glows -->
     <div class="section-glow-1"></div>
     <div class="section-glow-2"></div>
@@ -1394,7 +1935,7 @@
   </section>
 
   <!-- ── HOW IT WORKS ── -->
-  <section class="section bg-subtle-brand" style="border-top: none;" id="how-it-works">
+  <section class="section bg-subtle-brand" id="how-it-works">
     <!-- Section-level ambient background glows -->
     <div class="section-glow-1"></div>
     <div class="section-glow-2"></div>
@@ -1564,7 +2105,7 @@
   </section>
 
   <!-- ── TRUST BADGES ── -->
-  <section class="section bg-subtle-white" style="border-top: none;" id="trust">
+  <section class="section bg-subtle-white" id="trust">
     <!-- Section-level ambient background glows -->
     <div class="section-glow-1"></div>
     <div class="section-glow-2"></div>
@@ -1607,6 +2148,43 @@
         <div class="trust-row-text">
           <h4>Convenient Access</h4>
           <p>Kiosks are available throughout regular campus hours.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SUPPORTED BY ── -->
+  <section class="supported-by-section">
+    <h3 class="supported-by-title">Supported by</h3>
+    <div class="marquee-container">
+      <div class="marquee-track">
+        <!-- Set 1 -->
+        <div class="marquee-set">
+          <img src="Brands/IMG_3075.PNG" alt="Raajply">
+          <img src="Brands/logo1.png" alt="REVA NEST">
+          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+          <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        </div>
+        <!-- Set 2 -->
+        <div class="marquee-set">
+          <img src="Brands/IMG_3075.PNG" alt="Raajply">
+          <img src="Brands/logo1.png" alt="REVA NEST">
+          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+          <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        </div>
+        <!-- Set 3 -->
+        <div class="marquee-set">
+          <img src="Brands/IMG_3075.PNG" alt="Raajply">
+          <img src="Brands/logo1.png" alt="REVA NEST">
+          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+          <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        </div>
+        <!-- Set 4 -->
+        <div class="marquee-set">
+          <img src="Brands/IMG_3075.PNG" alt="Raajply">
+          <img src="Brands/logo1.png" alt="REVA NEST">
+          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+          <img src="Brands/Vasavi.jpg" alt="Vasavi">
         </div>
       </div>
     </div>
@@ -1774,6 +2352,125 @@
       </div>
     </div>
 
+    <div class="desktop-divider"></div>
+
+    <!-- ── How It Works ── -->
+    <div class="desktop-section">
+      <div>
+        <div class="desktop-section-pill">✦ The Process</div>
+        <h3 class="desktop-section-title">How MIMO Works</h3>
+        <p class="desktop-section-subtitle">A seamless, delightful experience in just 3 simple steps.</p>
+      </div>
+      <div class="desktop-steps">
+        <div class="desktop-step-row">
+          <div class="desktop-step-badge">1</div>
+          <div>
+            <h4>Upload Your Files</h4>
+            <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload from anywhere.</p>
+          </div>
+        </div>
+        <div class="desktop-step-row">
+          <div class="desktop-step-badge">2</div>
+          <div>
+            <h4>Customise Your Print</h4>
+            <p>Select copies, B&amp;W or color, and paper size directly on your phone — no app needed.</p>
+          </div>
+        </div>
+        <div class="desktop-step-row">
+          <div class="desktop-step-badge">3</div>
+          <div>
+            <h4>Enter Code &amp; Collect</h4>
+            <p>Receive a secure 4-digit code. Enter it at the kiosk and collect your prints instantly.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="desktop-divider"></div>
+
+    <!-- ── Why Trust MIMO ── -->
+    <div class="desktop-section">
+      <div>
+        <div class="desktop-section-pill">✦ Why Us</div>
+        <h3 class="desktop-section-title">You Can Trust MIMO</h3>
+      </div>
+      <div class="desktop-trust-list">
+        <div class="desktop-trust-row">
+          <div class="desktop-trust-icon-wrap">
+            <svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.516 2.17a.75.75 0 00-1.032 0 11.209 11.209 0 01-7.877 3.08.75.75 0 00-.722.515A12.74 12.74 0 002.25 9.75c0 5.942 4.064 10.933 9.563 12.348a.749.749 0 00.374 0c5.499-1.415 9.563-6.406 9.563-12.348 0-1.39-.223-2.73-.635-3.985a.75.75 0 00-.722-.516l-.143.001c-2.996 0-5.717-1.17-7.734-3.08z"/></svg>
+          </div>
+          <div>
+            <h4>Secure by Design</h4>
+            <p>End-to-end encrypted. Your data is never stored or shared with anyone.</p>
+          </div>
+        </div>
+        <div class="desktop-trust-row">
+          <div class="desktop-trust-icon-wrap">
+            <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div>
+            <h4>Instant Refunds</h4>
+            <p>If your print fails for any reason, you get an automatic full refund.</p>
+          </div>
+        </div>
+        <div class="desktop-trust-row">
+          <div class="desktop-trust-icon-wrap">
+            <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div>
+            <h4>Convenient Campus Hours</h4>
+            <p>Kiosks are available throughout regular campus hours, ready when you are.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="desktop-divider"></div>
+
+    <!-- ── FAQ ── -->
+    <div class="desktop-section">
+      <div>
+        <div class="desktop-section-pill">✦ FAQ</div>
+        <h3 class="desktop-section-title">Got Questions?</h3>
+      </div>
+      <div>
+        <div class="faq-item" id="dfaq-1">
+          <div class="faq-question" onclick="toggleFaq('dfaq-1')">What file formats does MIMO support?
+            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div class="faq-answer" id="dfaq-1-answer">MIMO supports PDF, DOC, DOCX, JPG, and PNG. PDFs are recommended for the best print quality.</div>
+        </div>
+        <div class="faq-item" id="dfaq-2">
+          <div class="faq-question" onclick="toggleFaq('dfaq-2')">How long is my print code valid?
+            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div class="faq-answer" id="dfaq-2-answer">Your 4-digit code is valid for 24 hours. If uncollected, your payment is automatically refunded.</div>
+        </div>
+        <div class="faq-item" id="dfaq-3">
+          <div class="faq-question" onclick="toggleFaq('dfaq-3')">What payment methods are accepted?
+            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div class="faq-answer" id="dfaq-3-answer">All major UPI apps (Google Pay, PhonePe, Paytm), debit/credit cards, and net banking via Cashfree.</div>
+        </div>
+        <div class="faq-item" id="dfaq-4">
+          <div class="faq-question" onclick="toggleFaq('dfaq-4')">Is my document data safe?
+            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div class="faq-answer" id="dfaq-4-answer">Absolutely. Files are encrypted in transit and permanently deleted immediately after printing. We never store or share your documents.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CTA Banner ── -->
+    <div class="desktop-cta-card">
+      <h3>Ready to Print?</h3>
+      <p>Join 1,600+ students already printing smarter on campus. Upload, pay, collect — done in seconds.</p>
+      <a href="https://printmimo.tech" class="desktop-cta-btn">
+        Start Printing Now
+        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+
   </div><!-- /desktop-panel -->
 
 </div><!-- /page-wrap -->
@@ -1831,6 +2528,342 @@
       answer.classList.add('open');
     }
   }
+
 </script>
+<!-- ══════════════════════════════════════════════════════════════
+     DESKTOP SITE — visible only at ≥1024px via CSS
+     The mobile phone-card layout above is completely untouched
+     ══════════════════════════════════════════════════════════════ -->
+<div class="desktop-site" aria-label="Desktop website">
+
+  <!-- ── NAVBAR ── -->
+  <nav class="ds-nav">
+    <div class="ds-nav-inner">
+      <a href="#" class="ds-nav-logo">MIMO</a>
+      <div class="ds-nav-links">
+        <a href="#ds-problems">Why MIMO</a>
+        <a href="#ds-how">How It Works</a>
+        <a href="#ds-features">Features</a>
+        <a href="#ds-faq">FAQ</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── HERO ── -->
+  <section style="background:#e8ecf5;">
+    <div class="ds-hero-wrap">
+      <div class="ds-hero">
+        <!-- Left: copy -->
+        <div class="ds-hero-text">
+          <h1 class="ds-hero-h1">Print anything, from<br><span>anywhere</span> on<br>campus.</h1>
+          <p class="ds-hero-p">MIMO lets you upload your documents from your phone, customise your print settings, pay via UPI, and collect a crisp printout — all without standing in a single queue.</p>
+          <div class="ds-hero-btns">
+            <a href="https://printmimo.tech" class="ds-btn-primary">
+              Start Printing
+              <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+          </div>
+        </div>
+        <!-- Right: kiosk image -->
+        <div class="ds-hero-visual">
+          <div class="ds-hero-bg-blob"></div>
+          <div class="ds-hero-kiosk-wrapper">
+            <img src="kiosk-image-transparent.png" alt="MIMO Kiosk" class="ds-hero-image">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── STATS BAR ── -->
+  <div class="ds-stats-bar">
+    <div class="ds-stats-inner">
+      <div class="ds-stat-item">
+        <div class="ds-stat-num" data-target="1600" data-suffix="+">0</div>
+        <div class="ds-stat-label">Happy Students</div>
+      </div>
+      <div class="ds-stat-item">
+        <div class="ds-stat-num" data-target="2">0</div>
+        <div class="ds-stat-label">Campus Kiosks</div>
+      </div>
+      <div class="ds-stat-item">
+        <div class="ds-stat-num">90%</div>
+        <div class="ds-stat-label">Kiosk Uptime</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PROBLEMS ── -->
+  <section class="ds-section" id="ds-problems">
+    <div class="ds-section-inner">
+      <div class="ds-section-header">
+        <div class="ds-section-pill">✦ The Problem</div>
+        <h2 class="ds-section-title">Printing, Finally Fixed.</h2>
+        <p class="ds-section-subtitle">Tired of long queues, exact change, and unhelpful shopkeepers? We were too. MIMO is here to change printing for students, forever.</p>
+      </div>
+      <div class="ds-three-grid">
+        <div class="ds-card">
+          <div class="ds-card-badge-emoji">🥇</div>
+          <h3>No More Long Queues</h3>
+          <p>Print instantly from your phone and collect from our self-service kiosks. Zero waiting, zero stress.</p>
+        </div>
+        <div class="ds-card">
+          <div class="ds-card-badge-emoji">🪙</div>
+          <h3>Cashless &amp; Convenient</h3>
+          <p>Pay seamlessly using UPI, cards, or net banking. No more scrambling for exact change at odd hours.</p>
+        </div>
+        <div class="ds-card">
+          <div class="ds-card-badge-emoji">🔒</div>
+          <h3>Complete Privacy</h3>
+          <p>Your documents are yours. Once printed, they are instantly and permanently deleted from our servers.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ── -->
+  <section class="ds-section ds-alt-bg" id="ds-how">
+    <div class="ds-section-inner">
+      <div class="ds-section-header">
+        <div class="ds-section-pill">✦ The Process</div>
+        <h2 class="ds-section-title">How MIMO Works</h2>
+        <p class="ds-section-subtitle">A seamless, delightful experience in just 3 simple steps.</p>
+      </div>
+      <div class="ds-three-grid">
+        <div class="ds-card">
+          <div class="ds-card-badge">1</div>
+          <h3>Upload Your Files</h3>
+          <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload your documents from anywhere.</p>
+        </div>
+        <div class="ds-card">
+          <div class="ds-card-badge">2</div>
+          <h3>Customise Your Print</h3>
+          <p>Select copies, B&amp;W or color, and paper size directly on your phone — no app needed.</p>
+        </div>
+        <div class="ds-card">
+          <div class="ds-card-badge">3</div>
+          <h3>Enter Code &amp; Collect</h3>
+          <p>Receive a secure 4-digit code. Enter it at the kiosk and your prints come out instantly.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FEATURES ── -->
+  <section class="ds-section" id="ds-features">
+    <div class="ds-section-inner">
+      <div class="ds-section-header">
+        <div class="ds-section-pill">✦ Features</div>
+        <h2 class="ds-section-title">Built for Modern Students</h2>
+        <p class="ds-section-subtitle">Everything you need for a hassle-free printing experience, built into one seamless platform.</p>
+      </div>
+      <div class="ds-features-grid">
+        <div class="ds-feature-card">
+          <div class="ds-feature-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>Cloud Ready</h3>
+          <p>Upload from Google Drive or your local storage. Works with any device and browser.</p>
+        </div>
+        <div class="ds-feature-card">
+          <div class="ds-feature-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>High-Quality Prints</h3>
+          <p>Professional laser printing for crisp, clear text and vibrant colors every time.</p>
+        </div>
+        <div class="ds-feature-card">
+          <div class="ds-feature-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>No App Needed</h3>
+          <p>Works smoothly in any mobile browser. No downloads, no installs, no friction.</p>
+        </div>
+        <div class="ds-feature-card">
+          <div class="ds-feature-icon">🕒</div>
+          <h3>Convenient Access</h3>
+          <p>Kiosks are placed strategically in student zones and available during regular campus hours.</p>
+        </div>
+        <div class="ds-feature-card">
+          <div class="ds-feature-icon">💵</div>
+          <h3>Pay What You Print</h3>
+          <p>B&amp;W at ₹2.30/page · Color at ₹10/page. Transparent pricing, zero hidden fees.</p>
+        </div>
+        <div class="ds-feature-card">
+          <div class="ds-feature-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>UPI &amp; Cards</h3>
+          <p>Pay via any UPI app, debit/credit card, or net banking — all through a secure gateway.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TRUST ── -->
+  <section class="ds-section ds-alt-bg" id="ds-trust">
+    <div class="ds-section-inner">
+      <div class="ds-section-header">
+        <div class="ds-section-pill">✦ Why Us</div>
+        <h2 class="ds-section-title">You Can Trust MIMO</h2>
+        <p class="ds-section-subtitle">Built with security, reliability, and student convenience at the core of every decision.</p>
+      </div>
+      <div class="ds-trust-grid">
+        <div class="ds-trust-card">
+          <div class="ds-trust-icon">
+            <svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.516 2.17a.75.75 0 00-1.032 0 11.209 11.209 0 01-7.877 3.08.75.75 0 00-.722.515A12.74 12.74 0 002.25 9.75c0 5.942 4.064 10.933 9.563 12.348a.749.749 0 00.374 0c5.499-1.415 9.563-6.406 9.563-12.348 0-1.39-.223-2.73-.635-3.985a.75.75 0 00-.722-.516l-.143.001c-2.996 0-5.717-1.17-7.734-3.08z"/></svg>
+          </div>
+          <h3>Secure by Design</h3>
+          <p>End-to-end encrypted. Your data is never stored or shared with anyone.</p>
+        </div>
+        <div class="ds-trust-card">
+          <div class="ds-trust-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>Instant Refunds</h3>
+          <p>If your print fails for any reason, you receive an automatic full refund — no questions asked.</p>
+        </div>
+        <div class="ds-trust-card">
+          <div class="ds-trust-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>Reliable Uptime</h3>
+          <p>90% kiosk uptime with active monitoring ensures you can always print when you need to.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FAQ ── -->
+  <section class="ds-section" id="ds-faq">
+    <div class="ds-section-inner">
+      <div class="ds-section-header">
+        <div class="ds-section-pill">✦ FAQ</div>
+        <h2 class="ds-section-title">Got Questions?</h2>
+        <p class="ds-section-subtitle">Everything you need to know about MIMO.</p>
+      </div>
+      <div class="ds-faq-wrap">
+        <div class="faq-item" id="dsfaq-1">
+          <div class="faq-question" onclick="toggleFaq('dsfaq-1')">What file formats does MIMO support?
+            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div class="faq-answer" id="dsfaq-1-answer">MIMO supports PDF, DOC, DOCX, JPG, and PNG files. PDFs are recommended for the best print quality. You can convert most documents to PDF before uploading.</div>
+        </div>
+        <div class="faq-item" id="dsfaq-2">
+          <div class="faq-question" onclick="toggleFaq('dsfaq-2')">How long is my print code valid?
+            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div class="faq-answer" id="dsfaq-2-answer">Your 4-digit print code is valid for 24 hours. If you don't collect your prints within this window, your payment is automatically refunded.</div>
+        </div>
+        <div class="faq-item" id="dsfaq-3">
+          <div class="faq-question" onclick="toggleFaq('dsfaq-3')">What payment methods are accepted?
+            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div class="faq-answer" id="dsfaq-3-answer">We accept all major UPI apps (Google Pay, PhonePe, Paytm), debit/credit cards, and net banking. All payments are processed securely via Cashfree.</div>
+        </div>
+        <div class="faq-item" id="dsfaq-4">
+          <div class="faq-question" onclick="toggleFaq('dsfaq-4')">Is my document data private and safe?
+            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div class="faq-answer" id="dsfaq-4-answer">Absolutely. Files are encrypted in transit and permanently deleted from our servers immediately after printing. We never store, read, or share your documents.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA BANNER ── -->
+  <section class="ds-cta">
+    <div class="ds-cta-inner">
+      <h2>Ready to Print Smarter?</h2>
+      <p>Join 1,600+ students already printing smarter on campus.<br>Upload, pay, collect — done in seconds.</p>
+      <a href="https://printmimo.tech" class="ds-cta-btn">
+        Start Printing Now
+        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── SUPPORTED BY ── -->
+  <div class="ds-marquee-section">
+    <h3 class="ds-marquee-title">Supported by</h3>
+    <div class="marquee-container">
+      <div class="marquee-track">
+        <div class="marquee-set">
+          <img src="Brands/IMG_3075.PNG" alt="Raajply">
+          <img src="Brands/logo1.png" alt="REVA NEST">
+          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+          <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        </div>
+        <div class="marquee-set">
+          <img src="Brands/IMG_3075.PNG" alt="Raajply">
+          <img src="Brands/logo1.png" alt="REVA NEST">
+          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+          <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        </div>
+        <div class="marquee-set">
+          <img src="Brands/IMG_3075.PNG" alt="Raajply">
+          <img src="Brands/logo1.png" alt="REVA NEST">
+          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+          <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        </div>
+        <div class="marquee-set">
+          <img src="Brands/IMG_3075.PNG" alt="Raajply">
+          <img src="Brands/logo1.png" alt="REVA NEST">
+          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
+          <img src="Brands/Vasavi.jpg" alt="Vasavi">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <footer class="ds-footer">
+    <div class="ds-footer-inner">
+      <div class="ds-footer-grid">
+        <div class="ds-footer-brand">
+          <img src="vision-print-logo.jpg" alt="VisionPrintt" class="ds-footer-logo">
+          <h2>VisionPrintt</h2>
+          <p class="ds-footer-tagline">Smart printing solutions for modern campuses and offices.</p>
+          <div class="ds-footer-address">📍 REVA NEST, Rukmini Knowledge Park<br>Kattegenahalli, Yelahanka<br>Bengaluru — 560064</div>
+        </div>
+        <div class="ds-footer-col">
+          <h4>Quick Links</h4>
+          <ul>
+            <li><a href="#">Home</a></li>
+            <li><a href="#ds-features">Features</a></li>
+            <li><a href="#ds-how">How It Works</a></li>
+            <li><a href="#ds-faq">FAQ</a></li>
+            <li><a href="https://printmimo.tech">Print Now</a></li>
+          </ul>
+        </div>
+        <div class="ds-footer-col">
+          <h4>Support</h4>
+          <ul>
+            <li><a href="#">Contact Support</a></li>
+            <li><a href="#">Report an Issue</a></li>
+            <li><a href="#">Send Feedback</a></li>
+            <li><a href="tel:+918123028797">+91 8123028797</a></li>
+            <li><a href="#">Mon–Fri, 9AM–6PM IST</a></li>
+          </ul>
+        </div>
+        <div class="ds-footer-col">
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms of Service</a></li>
+            <li><a href="#">Cookie Policy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="ds-footer-divider"></div>
+      <div class="ds-footer-bottom">
+        <div class="ds-footer-copy">© 2025 VisionPrintt Technologies. All rights reserved.</div>
+        <div class="ds-footer-credit">Designed &amp; developed by <strong>Rathindra</strong></div>
+      </div>
+    </div>
+  </footer>
+
+</div><!-- /desktop-site -->
+
 </body>
 </html>

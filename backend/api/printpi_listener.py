@@ -428,26 +428,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         match = re.search(r'request id is (\S+)', lp_output)
         if match:
             job_id = match.group(1)
-            print(f"⏳ Waiting for CUPS job {job_id} to spool and physically finish printing...")
-            timeout_counter = 0
-            while timeout_counter < 400:  # 10 minutes max wait per file batch (400 * 1.5s = 600s)
-                try:
-                    active_jobs = subprocess.run(["lpstat", "-o"], capture_output=True, text=True).stdout
-                    if job_id not in active_jobs:
-                        # Job is out of the queue, now ensure the physical printer is idle
-                        status_res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True).stdout.lower()
-                        if "printing" not in status_res:
-                            eject_delay = 3.0 + (total_physical_pages * 1.5)
-                            print(f"✅ CUPS job {job_id} completed. Waiting {eject_delay:.1f}s for physical paper ejection...")
-                            time.sleep(eject_delay)
-                            print(f"✅ Physical print considered fully ejected!")
-                            break
-                except Exception as e:
-                    print(f"⚠️ lpstat check failed: {e}")
-                time.sleep(1.5)
-                timeout_counter += 1
-            if timeout_counter >= 400:
-                print(f"⚠️ Timeout waiting for job {job_id} physically. Assuming complete or stuck.")
+            print(f"✅ CUPS job {job_id} accepted successfully. Returning immediately for FAST UI response.")
         
         return True
     except subprocess.CalledProcessError as e:
@@ -641,8 +622,8 @@ def process_job(doc_snapshot):
         if not (photo_layout and str(photo_layout) in ["2", "4", "6", "9"]):
             final_paths = pdf_paths
 
-        # Check if duplex is requested for a single-page document and copies > 1
-        if double_sided == "double" and copies > 1:
+        # Check if duplex is requested for a single-page document
+        if double_sided == "double":
             total_pages = 0
             try:
                 if len(final_paths) == 1:
@@ -657,7 +638,7 @@ def process_job(doc_snapshot):
                 print(f"📄 Duplicating single-page PDF {copies} times to enable double-sided printing...")
                 dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
                 try:
-                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * copies, check=True, timeout=60)
+                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * (copies * 2), check=True, timeout=60)
                     if os.path.exists(dup_pdf):
                         final_paths = [dup_pdf]
                         copies = 1

@@ -7,7 +7,7 @@ interface PrintingScreenProps {
   statusTitle?: string;
   statusSub?: string;
   onComplete: () => void;
-  onError?: () => void;
+  onError?: (errorMsg?: string) => void;
   pages?: number;
   copies?: number;
   printCode?: string;       // ← needed to poll real status
@@ -117,7 +117,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
-  const schedulePoll = useCallback(() => {
+  const schedulePoll = useCallback((delayMs = 2000) => {
     if (!printCode || printCode === '0000' || !isActive) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
@@ -132,17 +132,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           setPrintDone(true);
           // animateTo100AndComplete will be called via the printDone effect
         } else if (data.status === 'failed') {
-          setStatusMsg('Printer reported an error.');
-          if (onError) onError();
+          const errMsg = data.printerStatus || data.error || 'Printer reported an error.';
+          setStatusMsg(errMsg);
+          if (onError) onError(errMsg);
         } else {
-          // Still printing — poll again in 4 s
-          schedulePoll();
+          // Still printing — poll again in 2 s (fast enough to catch physical completion)
+          schedulePoll(2000);
         }
       } catch {
-        // Network hiccup — retry in 5 s
-        pollTimerRef.current = window.setTimeout(schedulePoll, 5000);
+        // Network hiccup — retry in 4 s
+        pollTimerRef.current = window.setTimeout(() => schedulePoll(2000), 4000);
       }
-    }, 4000); // poll every 4 seconds
+    }, delayMs);
   }, [printCode, isActive, onError]);
 
   // ─── slow progress simulation ──────────────────────────────────────────────
@@ -263,7 +264,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       }
     } else {
       startSlowTick();
-      if (printCode) schedulePoll();
+      if (printCode) schedulePoll(1000); // First check after 1s, then every 2s
     }
 
     return () => {

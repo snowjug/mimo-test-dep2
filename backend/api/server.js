@@ -1706,12 +1706,103 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
       return Math.abs(t - latestTime) < 5000;
     });
 
+    // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
+    const kioskId = currentSessionDocs[0].kioskId || "CV-001";
+    const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
+    try {
+      const statusDoc = await db.collection("system_status").doc(kioskId).get();
+      if (statusDoc.exists) {
+        const statusData = statusDoc.data();
+        
+        // A. Kiosk Online Check (lastSeen)
+        const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
+        if (lastSeen) {
+          const now = new Date();
+          const diffMs = now.getTime() - lastSeen.getTime();
+          if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
+            return res.json({
+              status: "failed",
+              isPrinted: false,
+              printerStatus: "System error: Kiosk printer listener is offline (not connected)"
+            });
+          }
+        }
+
+        // B. Printer Offline/Disabled Check
+        const printerStatusStr = statusData.printerStatus || "";
+        if (isColorJob) {
+          if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
+            return res.json({
+              status: "failed",
+              isPrinted: false,
+              printerStatus: "Printer error: Color printer is offline or disabled"
+            });
+          }
+        } else {
+          if (printerStatusStr.includes("B&W: Paused/Error") || printerStatusStr.includes("B&W: lpstat failed")) {
+            return res.json({
+              status: "failed",
+              isPrinted: false,
+              printerStatus: "Printer error: B&W printer is offline or disabled"
+            });
+          }
+        }
+      }
+    } catch (statusErr) {
+      console.error("⚠️ Error checking system status:", statusErr);
+    }
+
+    // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
+    let totalPageCount = 0;
+    currentSessionDocs.forEach(d => {
+      const pCount = d.pageCount || 1;
+      const copies = d.printOptions ? (d.printOptions.copies || 1) : (d.copies || 1);
+      totalPageCount += pCount * copies;
+    });
+
+    const baseWarmupSec = 60; // 60 seconds base warmup/spooling time
+    const secPerPage = isColorJob ? 35 : 8; // Inkjet color prints need longer timeout headroom than B&W laser prints
+    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage) * 1000;
+
+    let anyStuck = false;
+    for (const d of currentSessionDocs) {
+      if (d.status === "printing") {
+        const updatedAt = d.updatedAt ? (d.updatedAt.toDate ? d.updatedAt.toDate() : new Date(d.updatedAt)) : new Date();
+        const elapsedMs = new Date().getTime() - updatedAt.getTime();
+        if (elapsedMs > timeoutMs) {
+          anyStuck = true;
+          // Proactively update Firestore so it doesn't stay stuck
+          try {
+            await db.collection("print_jobs").doc(d.id).update({
+              status: "failed",
+              printerStatus: "Print timeout: Printer not responding (check power/cable)"
+            });
+          } catch (err) {
+            console.error(`Failed to update stuck job ${d.id}:`, err);
+          }
+        }
+      }
+    }
+
+    if (anyStuck) {
+      return res.json({
+        status: "failed",
+        isPrinted: false,
+        printerStatus: "Print timeout: Printer not responding (check power/cable)"
+      });
+    }
+
+    // === 3. STANDARD STATUS RESOLUTION ===
     let allCompleted = true;
     let anyFailed = false;
     let anyPrinting = false;
+    let failedDoc = null;
 
     currentSessionDocs.forEach((data) => {
-      if (data.status === "failed") anyFailed = true;
+      if (data.status === "failed") {
+        anyFailed = true;
+        failedDoc = data;
+      }
       if (data.status === "printing") anyPrinting = true;
       if (!["completed", "printed"].includes(data.status) && data.isPrinted !== true) {
         allCompleted = false;
@@ -1719,7 +1810,11 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     });
 
     if (anyFailed) {
-      return res.json({ status: "failed", isPrinted: false });
+      return res.json({
+        status: "failed",
+        isPrinted: false,
+        printerStatus: failedDoc ? (failedDoc.printerStatus || failedDoc.error || "Print failed") : "Print failed"
+      });
     }
 
     if (allCompleted) {
@@ -1731,6 +1826,7 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     }
 
     return res.json({ status: "paid", isPrinted: false });
+
   } catch (err) {
     console.error("❌ KIOSK JOB STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch job status" });
@@ -1953,8 +2049,14 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
       let finalKioskId = kioskId;
       if (directKioskId) {
         finalKioskId = directKioskId;
-      } else if (colorMode === "color") {
-        finalKioskId = "SV-002"; // Force color jobs to the SV-002 Epson kiosk
+      }
+
+      // CV-001 only has a monochrome Brother printer — always route color to SV-002 (Epson)
+      if (colorMode === "color") {
+        if (finalKioskId === "CV-001") {
+          console.warn(`[ROUTING] Color job requested on CV-001 (monochrome only) — rerouting to SV-002 (Epson color)`);
+        }
+        finalKioskId = "SV-002"; // Force ALL color jobs to the SV-002 Epson kiosk
       }
 
       // Mark sending to Pi

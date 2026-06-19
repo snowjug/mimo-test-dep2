@@ -18,6 +18,8 @@ COLOR_PRINTER_NAME = os.environ.get("COLOR_PRINTER_NAME", "Epson_L3250")
 # Kiosk Routing Identity
 KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
 TEMP_DIR = "/tmp/mimo_prints"
+# Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
+IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
 
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
@@ -224,7 +226,12 @@ def slice_pdf_pages(input_pdf, page_range):
         return input_pdf
 
 def convert_image_to_pdf_fit(input_path, is_color=False):
-    """Convert an image to PDF for 'fit' mode so CUPS number-up works reliably."""
+    """Convert an image to PDF for 'fit' mode so CUPS number-up works reliably.
+    
+    IMPORTANT: Image is resized to A4 dimensions at target DPI before saving.
+    This ensures GS rasterizes a proper A4-sized page, so impose_nup cells
+    get a full-resolution image to work with (avoids tiny source pages).
+    """
     try:
         from PIL import Image
         dpi = 150.0 if is_color else 300.0
@@ -232,8 +239,26 @@ def convert_image_to_pdf_fit(input_path, is_color=False):
         with Image.open(input_path) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            img.save(pdf_path, "PDF", resolution=dpi)
-        print(f"✅ Image fit → PDF: {pdf_path}")
+            # A4 dimensions at target DPI
+            a4_portrait_w = int(8.27 * dpi)   # ~1240 @ 150dpi, ~2480 @ 300dpi
+            a4_portrait_h = int(11.69 * dpi)  # ~1754 @ 150dpi, ~3508 @ 300dpi
+            orig_w, orig_h = img.size
+            # Choose canvas orientation to best match image orientation
+            if orig_w > orig_h:  # landscape image
+                canvas_w, canvas_h = a4_portrait_h, a4_portrait_w  # landscape A4
+            else:  # portrait image
+                canvas_w, canvas_h = a4_portrait_w, a4_portrait_h  # portrait A4
+            # Fit image into A4 canvas (letterbox / contain mode)
+            scale = min(canvas_w / orig_w, canvas_h / orig_h)
+            new_w = int(orig_w * scale)
+            new_h = int(orig_h * scale)
+            resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            canvas = Image.new('RGB', (canvas_w, canvas_h), (255, 255, 255))
+            paste_x = (canvas_w - new_w) // 2
+            paste_y = (canvas_h - new_h) // 2
+            canvas.paste(resized, (paste_x, paste_y))
+            canvas.save(pdf_path, "PDF", resolution=dpi)
+        print(f"✅ Image fit → PDF ({canvas_w}x{canvas_h}px @ {dpi}dpi): {pdf_path}")
         return pdf_path
     except Exception as e:
         print(f"❌ Image fit conversion failed: {e}")
@@ -326,9 +351,29 @@ def impose_nup(input_pdf, output_pdf, layout_num):
                     if idx >= len(page_imgs):
                         break
                     with Image.open(page_imgs[idx]) as pg_img:
-                        pg_img.thumbnail((cell_w_s, cell_h_s), Image.Resampling.LANCZOS)
-                        paste_x = col * cell_w_s + (cell_w_s - pg_img.width) // 2
-                        paste_y = row * cell_h_s + (cell_h_s - pg_img.height) // 2
+                        if pg_img.mode != 'RGB':
+                            pg_img = pg_img.convert('RGB')
+                        img_w, img_h = pg_img.size
+                        # Auto-rotate: if image is landscape but cell is portrait (or vice versa),
+                        # rotate 90° if it would give better coverage of the cell.
+                        cell_ratio = cell_w_s / cell_h_s
+                        img_ratio  = img_w / img_h if img_h > 0 else 1.0
+                        # Coverage with no rotation vs with rotation
+                        def coverage(iw, ih, cw, ch):
+                            s = min(cw / iw, ch / ih)
+                            return (iw * s * ih * s) / (cw * ch)
+                        cov_normal  = coverage(img_w, img_h, cell_w_s, cell_h_s)
+                        cov_rotated = coverage(img_h, img_w, cell_w_s, cell_h_s)
+                        if cov_rotated > cov_normal + 0.05:  # rotate only if meaningfully better
+                            pg_img = pg_img.rotate(90, expand=True)
+                            img_w, img_h = pg_img.size
+                        # Scale image to fill cell (contain mode, scales UP and DOWN)
+                        scale = min(cell_w_s / img_w, cell_h_s / img_h)
+                        new_w = max(1, int(img_w * scale))
+                        new_h = max(1, int(img_h * scale))
+                        pg_img = pg_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                        paste_x = col * cell_w_s + (cell_w_s - new_w) // 2
+                        paste_y = row * cell_h_s + (cell_h_s - new_h) // 2
                         canvas_img.paste(pg_img, (paste_x, paste_y))
                     idx += 1
             sheet_path = os.path.join(TEMP_DIR, f"_nup_sheet_{idx}_{int(time.time()*1000)}.pdf")
@@ -364,8 +409,72 @@ def impose_nup(input_pdf, output_pdf, layout_num):
         print(f"❌ impose_nup (GS+Pillow) failed: {e}")
         return False
 
-def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
+def is_printer_online(printer_name):
+    """Check if the CUPS printer queue is enabled and accepting jobs."""
     try:
+        res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=5)
+        output = res.stdout.lower()
+        if "disabled" in output or "stopped" in output or "not accepting" in output:
+            print(f"❌ Printer {printer_name} is OFFLINE/DISABLED")
+            return False
+        if res.returncode != 0 or "is idle" not in output and "now printing" not in output and "enabled" not in output:
+            print(f"⚠️ Could not verify printer {printer_name} status: {res.stdout.strip()}")
+            return False
+        return True
+    except Exception as e:
+        print(f"⚠️ Printer status check failed: {e}")
+        return False
+
+def wait_for_cups_job(job_id, doc_ref, timeout=600):
+    """
+    Background thread: polls CUPS until 'job_id' disappears from the
+    not-completed queue, then updates Firestore to completed.
+    timeout: max seconds to wait (default 10 min).
+    """
+    import re
+    start = time.time()
+    print(f"⏳ [SYNC] Waiting for CUPS job {job_id} to physically finish printing...")
+    try:
+        while time.time() - start < timeout:
+            try:
+                res = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True, timeout=10)
+                if job_id not in res.stdout:
+                    # Job finished (printed or error)
+                    # Check if it ended in an error by looking at completed jobs
+                    res2 = subprocess.run(["lpstat", "-W", "completed"], capture_output=True, text=True, timeout=10)
+                    job_ok = job_id in res2.stdout
+                    if job_ok:
+                        print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
+                        safe_update(doc_ref, {
+                            "status": "completed",
+                            "isPrinted": True,
+                            "printerStatus": "Printed",
+                            "printedAt": firestore.SERVER_TIMESTAMP
+                        })
+                    else:
+                        print(f"❌ [SYNC] CUPS job {job_id} ended in error. Marking Firestore failed.")
+                        safe_update(doc_ref, {"status": "failed", "printerStatus": "CUPS print error"})
+                    return
+            except Exception as e:
+                print(f"⚠️ [SYNC] lpstat poll error: {e}")
+            time.sleep(5)
+        # Timeout — mark failed
+        print(f"❌ [SYNC] Timed out waiting for CUPS job {job_id}. Marking failed.")
+        safe_update(doc_ref, {"status": "failed", "printerStatus": "Print timeout — no response from printer"})
+    finally:
+        active_jobs.discard(doc_ref.id)
+        print(f"ℹ️ [SYNC] Job {doc_ref.id} removed from active jobs list.")
+
+def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME,
+               photo_layout=None, double_sided="single", is_blank_sheet=False,
+               doc_ref=None):
+    """
+    Submits job to CUPS. If doc_ref is given, a background thread will poll CUPS
+    for physical completion and update Firestore (status sync with actual print).
+    """
+    import re
+    try:
+        # ── Validate files ──
         total_size = sum(os.path.getsize(p) for p in file_paths)
         if total_size < 100:
             print("❌ Invalid file(s) size")
@@ -376,13 +485,17 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                 with open(file_path, 'rb') as f:
                     header = f.read(8)
                 if not header.startswith(b'%PDF'):
-                    print(f"❌ File not a valid PDF")
+                    print(f"❌ File not a valid PDF: {file_path}")
                     return False
 
+        # ── Printer online guard ──
+        if not is_printer_online(printer_name):
+            print(f"❌ Aborting: printer {printer_name} is offline.")
+            return False
 
-
-        sliced_paths = []
+        # ── Page range slicing ──
         if page_range:
+            sliced_paths = []
             for p in file_paths:
                 sliced = slice_pdf_pages(p, page_range)
                 sliced_paths.append(sliced)
@@ -390,63 +503,52 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         print(f"🖨️  Sending to CUPS [{printer_name}]: {[os.path.basename(f) for f in file_paths]} "
               f"({copies} copies, layout: {photo_layout or '1-up'}, sides: {double_sided})")
-        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4"]
-        
-        if not is_blank_sheet:
-            cmd.extend(["-o", "fit-to-page"])
 
-        # NOTE: N-up layout is always pre-imposed by impose_nup() before reaching here.
-        # photo_layout is cleared to None after imposition, so this block is a safety guard only.
-        if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
-            print(f"⚠️ photo_layout={photo_layout} still set at print_file — N-up was not pre-imposed. Passing to CUPS as fallback.")
-            cmd.extend(["-o", f"number-up={photo_layout}"])
-            
-        if double_sided == "double":
-            cmd.extend(["-o", "sides=two-sided-long-edge", "-o", "Duplex=DuplexNoTumble", "-o", "BRDuplex=DuplexNoTumble"])
+        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4"]
+
+        # fit-to-page is skipped for:
+        #  - blank sheets / graph paper (print at exact size)
+        #  - N-up imposed PDFs (geometry is pre-computed)
+        skip_fit = is_blank_sheet or (photo_layout and str(photo_layout) in ["2", "4", "6", "9"])
+        if not skip_fit:
+            cmd.extend(["-o", "fit-to-page"])
         else:
-            cmd.extend(["-o", "sides=one-sided", "-o", "Duplex=None", "-o", "BRDuplex=None"])
-        
+            cmd.extend(["-o", "print-scaling=none"])
+
+        # N-up safety guard (should never run — impose_nup pre-processes):
+        if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
+            print(f"⚠️ photo_layout={photo_layout} still set — N-up not pre-imposed. Using CUPS fallback.")
+            cmd.extend(["-o", f"number-up={photo_layout}"])
+
+        if double_sided == "double":
+            # sides= and Duplex= are the standard CUPS options for duplex.
+            # BRDuplex is NOT present in the Brother L2440DW PPD — omit it to avoid
+            # potential conflicts. Duplex=DuplexNoTumble is the correct PPD option.
+            cmd.extend(["-o", "sides=two-sided-long-edge", "-o", "Duplex=DuplexNoTumble"])
+        else:
+            cmd.extend(["-o", "sides=one-sided", "-o", "Duplex=None"])
+
         cmd.extend(file_paths)
-        
+
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
         lp_output = result.stdout.strip()
-        print(f"CUPS: {lp_output}")
-        
-        total_pages = 0
-        try:
-            for f in file_paths:
-                pi_info = subprocess.run(["pdfinfo", f], capture_output=True, text=True, timeout=10)
-                for line in pi_info.stdout.split("\n"):
-                    if "Pages:" in line:
-                        total_pages += int(line.split(":")[1].strip())
-        except Exception:
-            total_pages = max(1, total_pages)
-            
-        total_physical_pages = total_pages * copies
-        
-        import re
+        print(f"CUPS accepted: {lp_output}")
+
+        # Extract CUPS job ID
         match = re.search(r'request id is (\S+)', lp_output)
-        if match:
+        if match and doc_ref:
             job_id = match.group(1)
-            print(f"⏳ Waiting for CUPS job {job_id} to spool and physically finish printing...")
-            timeout_counter = 0
-            while timeout_counter < 400:  # 10 minutes max wait per file batch (400 * 1.5s = 600s)
-                try:
-                    active_jobs = subprocess.run(["lpstat", "-o"], capture_output=True, text=True).stdout
-                    if job_id not in active_jobs:
-                        # Job is out of the queue, now ensure the physical printer is idle
-                        status_res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True).stdout.lower()
-                        if "printing" not in status_res:
-                            print(f"✅ CUPS job {job_id} completed and printer is idle.")
-                            break
-                except Exception as e:
-                    print(f"⚠️ lpstat check failed: {e}")
-                time.sleep(1.5)
-                timeout_counter += 1
-            if timeout_counter >= 400:
-                print(f"⚠️ Timeout waiting for job {job_id} physically. Assuming complete or stuck.")
-        
-        return True
+            print(f"✅ CUPS job {job_id} queued. Spawning sync thread to track physical completion.")
+            # Spawn background thread to wait for physical print and update Firestore
+            t = threading.Thread(target=wait_for_cups_job, args=(job_id, doc_ref), daemon=True)
+            t.start()
+            # Return None to indicate 'async' — caller should NOT update Firestore immediately
+            return None
+        else:
+            # No job ID extracted — fallback to immediate success
+            print("⚠️ Could not extract CUPS job ID. Marking completed immediately.")
+            return True
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Print failed: {e.stderr.strip() if e.stderr else str(e)}")
         return False
@@ -455,14 +557,18 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         return False
 
 def download_file(file_url, file_name):
+    """Download file from Firebase Storage or a signed URL. Uses GCS SDK for fastest transfer."""
     try:
         safe_name = "".join([c for c in file_name if c.isalpha() or c.isdigit() or c in ' ._-']).rstrip()
+        if not safe_name:
+            safe_name = "document.pdf"
         local_path = os.path.join(TEMP_DIR, f"{int(time.time())}_{safe_name}")
-        print(f"⬇️  Downloading from Firebase...")
+        print(f"⬇️  Downloading: {file_name}")
         blob_path = None
 
         if file_url.startswith("gs://"):
-            blob_path = file_url.split(bucket.name + "/")[1]
+            # gs://bucket-name/path
+            blob_path = file_url.split(bucket.name + "/", 1)[1] if bucket.name in file_url else file_url[5:]
         elif "firebasestorage.googleapis.com" in file_url and "/o/" in file_url:
             path = file_url.split("/o/")[1].split("?")[0]
             blob_path = urllib.parse.unquote(path)
@@ -472,16 +578,19 @@ def download_file(file_url, file_name):
                 blob_path = urllib.parse.unquote(path)
 
         if blob_path:
+            # Direct GCS SDK download — fastest, no HTTP overhead
             blob = bucket.blob(blob_path)
             blob.download_to_filename(local_path)
         else:
-            response = requests.get(file_url, stream=True, timeout=120)
+            # Fallback: HTTP download with large chunk size for speed
+            response = requests.get(file_url, stream=True, timeout=180)
             response.raise_for_status()
             with open(local_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
                     f.write(chunk)
-        
-        print(f"✅ Downloaded to: {local_path}")
+
+        size_kb = os.path.getsize(local_path) / 1024
+        print(f"✅ Downloaded {size_kb:.0f} KB → {local_path}")
         return local_path
     except Exception as e:
         print(f"❌ Download failed: {e}")
@@ -501,15 +610,16 @@ def safe_update(doc_ref, data):
             print(f"❌ safe_update final failure: {e2}")
 
 def process_job(doc_snapshot):
+    async_spawned = False
     doc = doc_snapshot.to_dict()
     doc_id = doc_snapshot.id
     doc_ref = db.collection('print_jobs').document(doc_id)
-    
+
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
     color_mode = doc.get("colorMode", "monochrome")
     is_color = color_mode.lower() == "color"
-    
+
     print_options = doc.get("printOptions", {})
     # Read copies from printOptions (where frontend stores it), fallback to top-level
     copies = int(print_options.get("copies", doc.get("copies", 1)))
@@ -522,16 +632,23 @@ def process_job(doc_snapshot):
     page_range = None
     if page_selection == "custom":
         page_range = print_options.get("pageRange") or print_options.get("customPageRange")
-    
+
     files = doc.get("files")
     if not files:
         files = [{"url": file_url, "name": file_name, "type": doc.get("mimetype")}]
-        
+
     local_paths = []
     final_paths = []
 
+    # ── Monochrome-only guard (e.g. CV-001 which has only B&W Brother) ──
+    # If IS_MONOCHROME_ONLY is set, we always print on the B&W printer regardless of color mode.
+    if IS_MONOCHROME_ONLY and is_color:
+        print(f"ℹ️  IS_MONOCHROME_ONLY: downgrading color job {doc_id} to B&W on {BW_PRINTER_NAME}")
+        is_color = False
+        color_mode = "monochrome"
+
     # Dynamic Printer Selection
-    target_printer = COLOR_PRINTER_NAME if color_mode.lower() == "color" else BW_PRINTER_NAME
+    target_printer = COLOR_PRINTER_NAME if is_color else BW_PRINTER_NAME
 
     try:
         for f in files:
@@ -593,31 +710,34 @@ def process_job(doc_snapshot):
             except Exception as merge_err:
                 print(f"❌ Failed to merge PDF files: {merge_err}")
 
-        # Imposition with PyPDF2 for consistent N-up layouts
+        # ── N-up layout imposition ──
+        was_imposed = False
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
-            print(f"🖼️ Generating consistent {photo_layout}-per-page layout using PyPDF2...")
-            merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
+            print(f"🖼️ N-up: generating {photo_layout}-per-page layout...")
+            # Merge all PDFs into one before imposing
+            if len(pdf_paths) > 1:
+                merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
+                subprocess.run(
+                    ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
+                     f"-sOutputFile={merged_pdf}"] + pdf_paths,
+                    check=True, timeout=60
+                )
+            else:
+                merged_pdf = pdf_paths[0]
+
             imposed_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_imposed_layout.pdf")
-            
+
             try:
-                # 1. Merge if multiple files
-                if len(pdf_paths) > 1:
-                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
-                else:
-                    merged_pdf = pdf_paths[0]
-                    
-                # 2. Impose using PyPDF2
                 success_nup = impose_nup(merged_pdf, imposed_pdf, photo_layout)
-                
-                if success_nup:
+                if success_nup and os.path.exists(imposed_pdf):
                     final_paths = [imposed_pdf]
-                    photo_layout = None # Clear it so CUPS doesn't impose again
-                    print(f"✅ Successfully imposed layout into {imposed_pdf}")
+                    photo_layout = None  # Cleared — CUPS must NOT impose again
+                    was_imposed = True
+                    print(f"✅ N-up imposition succeeded: {imposed_pdf}")
                 else:
-                    raise Exception("PyPDF2 N-up returned False")
-                    
+                    raise Exception("impose_nup returned False")
             except Exception as jam_err:
-                print(f"⚠️ Native PyPDF2 imposition failed, falling back to CUPS number-up: {jam_err}")
+                print(f"⚠️ N-up imposition failed, falling back to CUPS number-up: {jam_err}")
                 try:
                     layout_num = int(photo_layout)
                     total_p = 1
@@ -631,25 +751,34 @@ def process_job(doc_snapshot):
                                     pass
                     except Exception as pdfinfo_err:
                         print(f"⚠️ pdfinfo failed ({pdfinfo_err}), assuming 1 page.")
-                    
+
                     if total_p == 1:
                         dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_layout.pdf")
-                        subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [merged_pdf] * layout_num, check=True)
+                        subprocess.run(
+                            ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
+                             f"-sOutputFile={dup_pdf}"] + [merged_pdf] * layout_num,
+                            check=True
+                        )
                         final_paths = [dup_pdf]
                     else:
                         final_paths = [merged_pdf]
-                    # DO NOT clear photo_layout, so CUPS will use '-o number-up=X'
-                    print(f"✅ Fallback successful")
+                    # Keep photo_layout set so CUPS uses number-up
+                    was_imposed = True  # Prevent pdf_paths override below
+                    print(f"✅ N-up fallback prepared (CUPS number-up will be used)")
                 except Exception as fallback_err:
-                    print(f"❌ Fallback failed: {fallback_err}")
-                    raise Exception("Layout generation failed on Kiosk.")
+                    print(f"❌ N-up fallback failed: {fallback_err}")
+                    raise Exception("Layout generation failed entirely.")
 
-        # Ensure final_paths is synced with pdf_paths if layout imposition did not run
-        if not (photo_layout and str(photo_layout) in ["2", "4", "6", "9"]):
+        # ── Ensure final_paths is in sync with pdf_paths only if N-up was NOT applied ──
+        # was_imposed prevents the bug where photo_layout=None (cleared on success) causes
+        # the check below to override final_paths with the un-imposed pdf_paths.
+        if not was_imposed:
             final_paths = pdf_paths
 
-        # Check if duplex is requested for a single-page document and copies > 1
-        if double_sided == "double" and copies > 1:
+
+        # ── Duplex: duplicate single-page PDFs to enable 2-sided printing with multiple copies ──
+        # Brother duplex requires at least 2 pages per copy to pair front/back correctly.
+        if double_sided == "double":
             total_pages = 0
             try:
                 if len(final_paths) == 1:
@@ -659,29 +788,45 @@ def process_job(doc_snapshot):
                             total_pages = int(line.split(":")[1].strip())
             except Exception as e:
                 print(f"⚠️ Failed to check pages for duplex: {e}")
-            
+
             if total_pages == 1:
-                print(f"📄 Duplicating single-page PDF {copies} times to enable double-sided printing...")
+                # Single-page doc: duplicate copies times so each copy has page+blank for 2-sided
+                print(f"📄 Duplex: Duplicating single-page PDF {copies}× to pair front/back...")
                 dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
                 try:
-                    subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * copies, check=True, timeout=60)
+                    subprocess.run(
+                        ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
+                         f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * (copies * 2),
+                        check=True, timeout=60
+                    )
                     if os.path.exists(dup_pdf):
                         final_paths = [dup_pdf]
                         copies = 1
-                        print(f"✅ Successfully duplicated single-page PDF to {dup_pdf} with copies=1")
+                        print(f"✅ Duplex duplication done: {dup_pdf}")
                 except Exception as dup_err:
-                    print(f"❌ Failed to duplicate single-page PDF for duplex: {dup_err}")
+                    print(f"❌ Failed to duplicate for duplex: {dup_err}")
+            elif total_pages > 1 and copies > 1:
+                # Multi-page doc: lp -n <copies> handles it correctly
+                print(f"📄 Duplex multi-page ({total_pages} pages, {copies} copies) — sending as-is to CUPS.")
 
-        success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
-        
-        if success:
+        # ── Submit to CUPS ──
+        # Pass doc_ref so print_file can spawn the background sync thread
+        async_spawned = False
+        result = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet, doc_ref=doc_ref)
+
+        if result is None:
+            # Async path: background thread (wait_for_cups_job) will update Firestore when done.
+            async_spawned = True
+            print(f"⏳ Job {doc_id} submitted. Firestore will be updated after physical print completes.")
+        elif result is True:
+            # Sync fallback (no job ID extracted): mark completed now
             doc_ref.update({
-                "status": "completed", 
-                "isPrinted": True, 
+                "status": "completed",
+                "isPrinted": True,
                 "printerStatus": "Printed",
                 "printedAt": firestore.SERVER_TIMESTAMP
             })
-            print(f"🎉 Job {doc_id} marked as completed.")
+            print(f"🎉 Job {doc_id} marked as completed (sync mode).")
         else:
             safe_update(doc_ref, {"status": "failed", "printerStatus": "CUPS error on Pi"})
 
@@ -699,7 +844,8 @@ def process_job(doc_snapshot):
         except Exception as e:
             print(f"⚠️ Cleanup failed: {e}")
         finally:
-            active_jobs.discard(doc_id)
+            if not async_spawned:
+                active_jobs.discard(doc_id)
 
 def on_snapshot(col_snapshot, changes, read_time):
     print(f"Snapshot fired! Changes: {len(changes)}")
@@ -805,48 +951,52 @@ def resume_printer_jobs(printer_name):
 
 def watchdog_loop():
     stuck_cycles = {BW_PRINTER_NAME: 0, COLOR_PRINTER_NAME: 0}
+    counter = 0
     while True:
         try:
-            printer_active = {}
-            for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
-                # Only re-enable if the printer is currently disabled
-                status_res = subprocess.run(["lpstat", "-p", printer], capture_output=True, text=True)
-                status_out = status_res.stdout.lower()
-                if "disabled" in status_out:
-                    print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
-                    subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
-                    resume_printer_jobs(printer)
-                
-                # Check if printer is currently printing
-                printer_active[printer] = "printing" in status_out
+            # 1. Run CUPS and printer checks every 60 seconds (every 6 iterations of 10s sleep)
+            if counter % 6 == 0:
+                printer_active = {}
+                for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
+                    # Only re-enable if the printer is currently disabled
+                    status_res = subprocess.run(["lpstat", "-p", printer], capture_output=True, text=True)
+                    status_out = status_res.stdout.lower()
+                    if "disabled" in status_out:
+                        print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
+                        subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                        resume_printer_jobs(printer)
+                    
+                    # Check if printer is currently printing
+                    printer_active[printer] = "printing" in status_out
 
-            result = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True)
+                result = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True)
 
-            for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
-                if printer in result.stdout:
-                    if printer_active.get(printer, False):
-                        stuck_cycles[printer] = 0
-                    else:
-                        stuck_cycles[printer] += 1
-                        print(f"⚠️ Watchdog: Stuck job detected on {printer} (Cycle {stuck_cycles[printer]} - Printer Idle but Job in Queue)")
-
-                        if stuck_cycles[printer] >= 3:
-                            print(f"🔧 Watchdog: Waking up sleeping printer {printer}...")
-                            reset_printer_usb(printer)
-                            
-                            # Restart ipp-usb if it's a Brother printer
-                            if "Brother" in printer:
-                                print("Restarting ipp-usb...")
-                                subprocess.run(f"echo 'printpi' | sudo -S systemctl restart ipp-usb", shell=True, capture_output=True)
-                            
-                            # Re-enable CUPS queue
-                            subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
-                            resume_printer_jobs(printer)
+                for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
+                    if printer in result.stdout:
+                        if printer_active.get(printer, False):
                             stuck_cycles[printer] = 0
-                else:
-                    stuck_cycles[printer] = 0
+                        else:
+                            stuck_cycles[printer] += 1
+                            print(f"⚠️ Watchdog: Stuck job detected on {printer} (Cycle {stuck_cycles[printer]} - Printer Idle but Job in Queue)")
+
+                            if stuck_cycles[printer] >= 5: # 5 minutes threshold
+                                print(f"🔧 Watchdog: Waking up sleeping printer {printer}...")
+                                reset_printer_usb(printer)
+                                
+                                # Ensure ipp-usb is stopped and disabled so direct USB works
+                                if "Brother" in printer:
+                                    print("Ensuring ipp-usb is stopped...")
+                                    subprocess.run(f"echo 'printpi' | sudo -S systemctl stop ipp-usb", shell=True, capture_output=True)
+                                    subprocess.run(f"echo 'printpi' | sudo -S systemctl disable ipp-usb", shell=True, capture_output=True)
+                                
+                                # Re-enable CUPS queue
+                                subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                                resume_printer_jobs(printer)
+                                stuck_cycles[printer] = 0
+                    else:
+                        stuck_cycles[printer] = 0
             
-            # Fallback polling for silent grpc disconnects with a 30s timeout
+            # 2. Run Firestore polling every 10 seconds (every iteration)
             docs = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID)).stream(timeout=30)
             for doc in docs:
                 if doc.id not in active_jobs:
@@ -862,15 +1012,39 @@ def watchdog_loop():
                     
         except Exception as e:
             print(f"⚠️ Watchdog failed: {e}")
-        time.sleep(60)
+        
+        counter += 1
+        time.sleep(10)
 
+
+def ping_printer_raw(printer_name, payload):
+    try:
+        temp_file = os.path.join(TEMP_DIR, f"ping_{printer_name}_{int(time.time())}.bin")
+        with open(temp_file, "wb") as f:
+            f.write(payload)
+        subprocess.run(["lp", "-d", printer_name, "-o", "raw", temp_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+    except Exception as e:
+        print(f"⚠️ Failed to ping printer {printer_name}: {e}")
 
 def keep_warm_loop():
+    # Wait 60 seconds after startup before first ping to allow systems to settle
+    time.sleep(60)
     while True:
         try:
             requests.get("https://api-upqxuj7evq-uc.a.run.app/", timeout=10)
         except:
             pass
+
+        # Ping local printers to prevent them from entering deep sleep/USB suspend
+        # 1. Brother Laser (BW_PRINTER_NAME) -> PJL status query (no-op)
+        ping_printer_raw(BW_PRINTER_NAME, b'\x1b%-12345X@PJL INFO STATUS\r\n\x1b%-12345X')
+
+        # 2. Epson Inkjet (COLOR_PRINTER_NAME) -> ESC/P reset (no-op, only on SV-002)
+        if not IS_MONOCHROME_ONLY:
+            ping_printer_raw(COLOR_PRINTER_NAME, b'\x1b@')
+
         time.sleep(600)
 
 # Start background threads

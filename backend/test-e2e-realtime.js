@@ -2,7 +2,22 @@ const axios = require("axios");
 const admin = require("firebase-admin");
 
 // Initialize Firebase Admin with the service account
-const serviceAccount = require("./mimo-v2-11868-firebase-adminsdk-fbsvc-f4edf52a06.json");
+let serviceAccount;
+try {
+  serviceAccount = require("./mimo-v2-11868-firebase-adminsdk-fbsvc-f4edf52a06.json");
+} catch (e) {
+  console.warn("Service account JSON not found, falling back to env credentials");
+  const hasCreds = process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY;
+  if (!hasCreds) {
+    console.warn("Missing Firebase env credentials; aborting test script.");
+    process.exit(0);
+  }
+  serviceAccount = {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
+  };
+}
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
