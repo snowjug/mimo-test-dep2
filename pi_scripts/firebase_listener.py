@@ -1017,12 +1017,34 @@ def watchdog_loop():
         time.sleep(10)
 
 
+def ping_printer_raw(printer_name, payload):
+    try:
+        temp_file = os.path.join(TEMP_DIR, f"ping_{printer_name}_{int(time.time())}.bin")
+        with open(temp_file, "wb") as f:
+            f.write(payload)
+        subprocess.run(["lp", "-d", printer_name, "-o", "raw", temp_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+    except Exception as e:
+        print(f"⚠️ Failed to ping printer {printer_name}: {e}")
+
 def keep_warm_loop():
+    # Wait 60 seconds after startup before first ping to allow systems to settle
+    time.sleep(60)
     while True:
         try:
             requests.get("https://api-upqxuj7evq-uc.a.run.app/", timeout=10)
         except:
             pass
+
+        # Ping local printers to prevent them from entering deep sleep/USB suspend
+        # 1. Brother Laser (BW_PRINTER_NAME) -> PJL status query (no-op)
+        ping_printer_raw(BW_PRINTER_NAME, b'\x1b%-12345X@PJL INFO STATUS\r\n\x1b%-12345X')
+
+        # 2. Epson Inkjet (COLOR_PRINTER_NAME) -> ESC/P reset (no-op, only on SV-002)
+        if not IS_MONOCHROME_ONLY:
+            ping_printer_raw(COLOR_PRINTER_NAME, b'\x1b@')
+
         time.sleep(600)
 
 # Start background threads
