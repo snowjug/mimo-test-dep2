@@ -218,10 +218,10 @@ function App() {
           setPrintStatus('completed');
           goToSummary();
         }}
-        onError={() => {
+        onError={(errMsg?: string) => {
           setPrintStatus('idle');
           setCurrentScreen('code-entry-screen');
-          showToast('Printer reported an error processing your document.', true);
+          showToast(errMsg || 'Printer reported an error processing your document.', true);
         }}
       />
 

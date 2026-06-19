@@ -7,7 +7,7 @@ interface PrintingScreenProps {
   statusTitle?: string;
   statusSub?: string;
   onComplete: () => void;
-  onError?: () => void;
+  onError?: (errorMsg?: string) => void;
   pages?: number;
   copies?: number;
   printCode?: string;       // ← needed to poll real status
@@ -132,8 +132,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           setPrintDone(true);
           // animateTo100AndComplete will be called via the printDone effect
         } else if (data.status === 'failed') {
-          setStatusMsg('Printer reported an error.');
-          if (onError) onError();
+          const errMsg = data.printerStatus || data.error || 'Printer reported an error.';
+          setStatusMsg(errMsg);
+          if (onError) onError(errMsg);
         } else {
           // Still printing — poll again in 2 s (fast enough to catch physical completion)
           schedulePoll(2000);
