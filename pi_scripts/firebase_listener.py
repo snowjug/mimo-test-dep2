@@ -24,6 +24,15 @@ IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "t
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
+# ── Ghostscript compression presets ──
+# /ebook  → downsample images to 150 DPI; great for B&W laser (small spool, fast USB transfer)
+# /screen → 72 DPI (too low for print quality)
+# /printer → 300 DPI (keeps full quality but no size reduction)
+GS_BW_COMPRESS  = ["-dPDFSETTINGS=/ebook",  "-dCompatibilityLevel=1.4",
+                   "-dEmbedAllFonts=true",   "-dSubsetFonts=true"]
+GS_COLOR_COMPRESS = ["-dPDFSETTINGS=/printer", "-dCompatibilityLevel=1.4",
+                     "-dEmbedAllFonts=true",    "-dSubsetFonts=true"]
+
 # Initialize Firebase
 try:
     cred = credentials.Certificate('serviceAccountKey.json')
@@ -193,6 +202,7 @@ def slice_pdf_pages(input_pdf, page_range):
             cmd = [
                 "gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
                 f"-dFirstPage={page_num}", f"-dLastPage={page_num}",
+            ] + GS_BW_COMPRESS + [
                 f"-sOutputFile={temp_page}", input_pdf
             ]
             result = subprocess.run(cmd, capture_output=True, timeout=30)
@@ -206,8 +216,8 @@ def slice_pdf_pages(input_pdf, page_range):
         if len(temp_pages) == 1:
             os.rename(temp_pages[0], output_pdf)
         else:
-            merge_cmd = ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
-                        f"-sOutputFile={output_pdf}"] + temp_pages
+            merge_cmd = ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
+                        ] + GS_BW_COMPRESS + [f"-sOutputFile={output_pdf}"] + temp_pages
             subprocess.run(merge_cmd, check=True, timeout=60)
             for tp in temp_pages:
                 try:
@@ -386,8 +396,8 @@ def impose_nup(input_pdf, output_pdf, layout_num):
         else:
             merge_cmd = [
                 "gs", "-dBATCH", "-dNOPAUSE", "-q",
-                "-sDEVICE=pdfwrite", f"-sOutputFile={output_pdf}"
-            ] + output_sheets
+                "-sDEVICE=pdfwrite"
+            ] + GS_BW_COMPRESS + [f"-sOutputFile={output_pdf}"] + output_sheets
             subprocess.run(merge_cmd, check=True, timeout=120)
             for s in output_sheets:
                 try:
@@ -408,6 +418,36 @@ def impose_nup(input_pdf, output_pdf, layout_num):
     except Exception as e:
         print(f"❌ impose_nup (GS+Pillow) failed: {e}")
         return False
+
+def fast_compress_pdf(input_pdf, is_color=False, size_threshold_kb=512):
+    """
+    Pre-flight PDF compressor. Runs GS /ebook (B&W) or /printer (color) on any
+    PDF that exceeds size_threshold_kb. Returns the compressed path, or the
+    original path if compression fails / file is already small.
+    Safe: never deletes the original, never raises exceptions.
+    """
+    try:
+        size_kb = os.path.getsize(input_pdf) / 1024
+        if size_kb <= size_threshold_kb:
+            return input_pdf  # already small enough
+        flags = GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS
+        compressed = input_pdf.replace(".pdf", "_c.pdf")
+        if compressed == input_pdf:          # safety: never overwrite source
+            compressed = input_pdf + "_c.pdf"
+        print(f"⚡ Pre-compressing PDF ({size_kb:.0f} KB → target <{size_threshold_kb} KB): {os.path.basename(input_pdf)}")
+        subprocess.run(
+            ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"]
+            + flags + [f"-sOutputFile={compressed}", input_pdf],
+            check=True, timeout=120
+        )
+        if os.path.exists(compressed):
+            new_kb = os.path.getsize(compressed) / 1024
+            print(f"⚡ Compressed: {size_kb:.0f} KB → {new_kb:.0f} KB (saved {size_kb - new_kb:.0f} KB)")
+            return compressed
+    except Exception as e:
+        print(f"⚠️ fast_compress_pdf failed ({e}), using original")
+    return input_pdf
+
 
 def is_printer_online(printer_name):
     """Check if the CUPS printer queue is enabled and accepting jobs."""
@@ -461,15 +501,15 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
                             "printedAt": firestore.SERVER_TIMESTAMP
                         })
                     else:
-                        print(f"❌ [SYNC] CUPS job {job_id} ended in error. Marking Firestore failed.")
-                        safe_update(doc_ref, {"status": "failed", "printerStatus": "CUPS print error"})
+                        print(f"❌ [SYNC] CUPS job {job_id} ended in error. Reporting failure for auto-refund.")
+                        report_print_failure(doc_ref, "CUPS print error")
                     return
             except Exception as e:
                 print(f"⚠️ [SYNC] lpstat poll error: {e}")
             time.sleep(5)
         # Timeout — mark failed
-        print(f"❌ [SYNC] Timed out waiting for CUPS job {job_id}. Marking failed.")
-        safe_update(doc_ref, {"status": "failed", "printerStatus": "Print timeout — no response from printer"})
+        print(f"❌ [SYNC] Timed out waiting for CUPS job {job_id}. Reporting failure for auto-refund.")
+        report_print_failure(doc_ref, "Print timeout — no response from printer")
     finally:
         active_jobs.discard(doc_ref.id)
         print(f"ℹ️ [SYNC] Job {doc_ref.id} removed from active jobs list.")
@@ -531,6 +571,11 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                 cmd.extend(["-o", "fit-to-page"])
         else:
             cmd.extend(["-o", "print-scaling=none"])
+
+        # ── Print quality ──
+        # B&W laser: Normal (300×300 dpi) is plenty and keeps spool data half the size of High (1200dpi).
+        # Color inkjet: always Normal — High (1200dpi) massively slows Epson inkjet jobs.
+        cmd.extend(["-o", "cupsPrintQuality=Normal"])
 
         # N-up safety guard (should never run — impose_nup pre-processes):
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
@@ -626,6 +671,35 @@ def safe_update(doc_ref, data):
         except Exception as e2:
             print(f"❌ safe_update final failure: {e2}")
 
+def report_print_failure(doc_ref, reason):
+    """
+    Calls backend /kiosk/report-failure to trigger auto-refund.
+    If the backend call fails, falls back to updating Firestore locally to 'failed'.
+    """
+    import os
+    import requests
+    job_id = doc_ref.id
+    try:
+        secret = os.environ.get("INTERNAL_WEBHOOK_SECRET", "mimo_secret_123")
+        api_url = os.environ.get("BACKEND_URL", "https://api-upqxuj7evq-uc.a.run.app")
+        endpoint = f"{api_url.rstrip('/')}/kiosk/report-failure"
+        print(f"📣 [AUTO-REFUND] Reporting print failure for job {job_id} to backend: {reason}")
+        res = requests.post(endpoint, json={
+            "jobId": job_id,
+            "reason": reason,
+            "secret": secret
+        }, timeout=15)
+        print(f"📣 [AUTO-REFUND] Backend response: {res.status_code} - {res.text}")
+        if res.status_code == 200:
+            return True
+    except Exception as e:
+        print(f"⚠️ [AUTO-REFUND] Failed to report failure to backend: {e}")
+    
+    print(f"⚠️ [AUTO-REFUND] Falling back to local Firestore failed status for job {job_id}")
+    safe_update(doc_ref, {"status": "failed", "printerStatus": reason})
+    return False
+
+
 def process_job(doc_snapshot):
     async_spawned = False
     doc = doc_snapshot.to_dict()
@@ -673,10 +747,16 @@ def process_job(doc_snapshot):
             f_name = f.get("name", "document.pdf")
             l_path = download_file(f_url, f_name)
             if not l_path:
-                safe_update(doc_ref, {"status": "failed", "printerStatus": f"Failed to download {f_name}"})
+                report_print_failure(doc_ref, f"Failed to download {f_name}")
                 return
             local_paths.append(l_path)
-            
+
+            # ── Pre-flight compression ──
+            # Compress large PDFs before any processing to reduce GS + CUPS + USB load.
+            # This is the single biggest speed win for files like 5.4 MB grid PDFs.
+            if l_path.lower().endswith(".pdf"):
+                l_path = fast_compress_pdf(l_path, is_color=is_color)
+
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             
@@ -696,7 +776,7 @@ def process_job(doc_snapshot):
                 pdf_path = convert_to_pdf(l_path)
                 if pdf_path: f_final = pdf_path
                 else:
-                    safe_update(doc_ref, {"status": "failed", "printerStatus": f"LibreOffice failed for {f_name}"})
+                    report_print_failure(doc_ref, f"LibreOffice failed for {f_name}")
                     return
             
             final_paths.append(f_final)
@@ -721,8 +801,10 @@ def process_job(doc_snapshot):
         if len(pdf_paths) > 1:
             merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_all.pdf")
             try:
+                compress_flags = GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS
                 print(f"🔗 Merging {len(pdf_paths)} documents into a single PDF using Ghostscript...")
-                subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite", f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
+                subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
+                               ] + compress_flags + [f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
                 pdf_paths = [merged_pdf]
             except Exception as merge_err:
                 print(f"❌ Failed to merge PDF files: {merge_err}")
@@ -735,8 +817,8 @@ def process_job(doc_snapshot):
             if len(pdf_paths) > 1:
                 merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
                 subprocess.run(
-                    ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
-                     f"-sOutputFile={merged_pdf}"] + pdf_paths,
+                    ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
+                    ] + (GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS) + [f"-sOutputFile={merged_pdf}"] + pdf_paths,
                     check=True, timeout=60
                 )
             else:
@@ -772,8 +854,8 @@ def process_job(doc_snapshot):
                     if total_p == 1:
                         dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_layout.pdf")
                         subprocess.run(
-                            ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
-                             f"-sOutputFile={dup_pdf}"] + [merged_pdf] * layout_num,
+                            ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
+                            ] + (GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS) + [f"-sOutputFile={dup_pdf}"] + [merged_pdf] * layout_num,
                             check=True
                         )
                         final_paths = [dup_pdf]
@@ -812,8 +894,8 @@ def process_job(doc_snapshot):
                 dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
                 try:
                     subprocess.run(
-                        ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
-                         f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * 2,
+                        ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
+                        ] + (GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS) + [f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * 2,
                         check=True, timeout=60
                     )
                     if os.path.exists(dup_pdf):
@@ -835,12 +917,13 @@ def process_job(doc_snapshot):
                     norm_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_color_norm.pdf")
                     try:
                         print(f"📄 Normalizing color PDF to A4: {fp} -> {norm_pdf}")
-                        subprocess.run([
-                            "gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
-                            "-dFIXEDMEDIA", "-dDEVICEWIDTHPOINTS=595", "-dDEVICEHEIGHTPOINTS=842",
-                            "-dPDFFitPage",
-                            f"-sOutputFile={norm_pdf}", fp
-                        ], check=True, timeout=60)
+                        subprocess.run(
+                            ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
+                             "-dFIXEDMEDIA", "-dDEVICEWIDTHPOINTS=595", "-dDEVICEHEIGHTPOINTS=842",
+                             "-dPDFFitPage"
+                            ] + GS_COLOR_COMPRESS + [f"-sOutputFile={norm_pdf}", fp],
+                            check=True, timeout=60
+                        )
                         if os.path.exists(norm_pdf):
                             normalized_paths.append(norm_pdf)
                         else:
@@ -871,12 +954,12 @@ def process_job(doc_snapshot):
             })
             print(f"🎉 Job {doc_id} marked as completed (sync mode).")
         else:
-            safe_update(doc_ref, {"status": "failed", "printerStatus": "CUPS error on Pi"})
+            report_print_failure(doc_ref, "CUPS error on Pi")
 
             
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
-        safe_update(doc_ref, {"status": "failed", "printerStatus": f"Pi processing error: {str(e)[:50]}"})
+        report_print_failure(doc_ref, f"Pi processing error: {str(e)[:50]}")
 
     finally:
         try:

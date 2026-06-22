@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
-import { Copy, CheckCircle2, CheckCircle, Home, Printer, QrCode, Download, Share2, Mail, Loader2, X, FileText } from "lucide-react";
+import { Copy, CheckCircle2, CheckCircle, Home, Printer, QrCode, Download, Share2, Mail, Loader2, X, FileText, AlertCircle } from "lucide-react";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { MimoHeader } from "../components/mimo-header";
 import { toast } from "sonner";
@@ -30,6 +30,9 @@ export function PrintCode() {
   const [printStatus, setPrintStatus] = useState<"paid" | "printing" | "completed" | "failed">(
     () => (sessionStorage.getItem("printStatus") as any) || "paid"
   );
+  const [printProgress, setPrintProgress] = useState(0);
+  const [refundRequested, setRefundRequested] = useState(false);
+  const [refundLoading, setRefundLoading] = useState(false);
 
   useEffect(() => {
     if (!printCode) {
@@ -94,6 +97,69 @@ export function PrintCode() {
     const interval = setInterval(checkStatus, 3000);
     return () => clearInterval(interval);
   }, [printCode, printStatus]);
+
+  // Animated progress during printing
+  useEffect(() => {
+    if (printStatus === "paid" || isProcessing) {
+      setPrintProgress(8);
+      return;
+    }
+    if (printStatus === "completed") {
+      setPrintProgress(100);
+      return;
+    }
+    if (printStatus === "failed") {
+      // Freeze wherever we are
+      return;
+    }
+    // printStatus === "printing" — animate 20% → 90% over ~90 s
+    if (printStatus === "printing") {
+      setPrintProgress(20);
+      const start = Date.now();
+      const DURATION_MS = 90_000; // 90 s max estimate
+      const tick = setInterval(() => {
+        const elapsed = Date.now() - start;
+        const frac = Math.min(elapsed / DURATION_MS, 1);
+        // Ease-out curve: grows fast at first then slows near 90%
+        const eased = 1 - Math.pow(1 - frac, 2.5);
+        const next = 20 + eased * 70; // 20% → 90%
+        setPrintProgress(Math.min(next, 90));
+      }, 500);
+      return () => clearInterval(tick);
+    }
+  }, [printStatus, isProcessing]);
+
+  const handleRequestRefund = async () => {
+    const orderId = sessionStorage.getItem("orderId");
+    if (!orderId) {
+      toast.error("Order ID not found. Please contact support.");
+      return;
+    }
+    setRefundLoading(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "https://api-upqxuj7evq-uc.a.run.app";
+      const token = localStorage.getItem("jwtToken");
+      const res = await fetch(`${apiUrl}/request-refund`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ orderId, reason: "Print failed at kiosk" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRefundRequested(true);
+        toast.success("Refund request submitted! We'll process it within 24–48 hours.");
+      } else {
+        toast.error(data.error || "Failed to submit refund request.");
+      }
+    } catch {
+      toast.error("Network error. Please try again or contact support.");
+    } finally {
+      setRefundLoading(false);
+    }
+  };
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(printCode);
@@ -286,36 +352,44 @@ export function PrintCode() {
               </p>
             )}
 
-            {/* Status Progress Bar */}
-            <div className="flex items-center justify-between w-full max-w-[240px] mx-auto mt-1 mb-0.5">
-              {/* Step 1: Paid */}
-              <div className="flex flex-col items-center">
-                <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold ${printStatus !== 'failed' ? 'bg-[#093765] text-white' : 'bg-gray-200 text-gray-500'}`}>
-                  <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 mt-1">Paid</span>
+            {/* Animated Physical Print Progress Bar */}
+            <div className="w-full mt-3 mb-1 px-1">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  {printStatus === 'completed' ? 'Print Complete' :
+                   printStatus === 'failed'    ? 'Print Failed' :
+                   printStatus === 'printing'  ? 'Printing…' :
+                   'Preparing…'}
+                </span>
+                <span className={`text-[10px] font-black tabular-nums ${
+                  printStatus === 'completed' ? 'text-green-600' :
+                  printStatus === 'failed'    ? 'text-red-500' :
+                  'text-[#093765]'
+                }`}>
+                  {Math.round(printProgress)}%
+                </span>
               </div>
-              
-              {/* Line 1 */}
-              <div className={`flex-1 h-0.5 mx-1.5 rounded-full transition-colors duration-500 ${printStatus === 'printing' || printStatus === 'completed' ? 'bg-[#093765]' : 'bg-gray-200'}`} />
-
-              {/* Step 2: Printing */}
-              <div className="flex flex-col items-center">
-                <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${(printStatus === 'printing' || printStatus === 'completed') ? 'bg-[#093765] text-white' : 'bg-gray-200 text-gray-400'} ${printStatus === 'printing' ? 'animate-pulse' : ''}`}>
-                  {printStatus === 'completed' ? <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" /> : <Printer className="w-3 h-3 sm:w-4 sm:h-4" />}
-                </div>
-                <span className={`text-[9px] sm:text-[10px] font-bold mt-1 transition-colors duration-500 ${(printStatus === 'printing' || printStatus === 'completed') ? 'text-gray-700' : 'text-gray-400'}`}>Printing</span>
+              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    printStatus === 'completed' ? 'bg-green-500 duration-700' :
+                    printStatus === 'failed'    ? 'bg-red-400 duration-300' :
+                    'bg-gradient-to-r from-[#093765] to-blue-500 duration-500'
+                  }`}
+                  style={{ width: `${printProgress}%` }}
+                />
               </div>
-              
-              {/* Line 2 */}
-              <div className={`flex-1 h-0.5 mx-1.5 rounded-full transition-colors duration-500 ${printStatus === 'completed' ? 'bg-green-500' : 'bg-gray-200'}`} />
-
-              {/* Step 3: Done */}
-              <div className="flex flex-col items-center">
-                <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${printStatus === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                </div>
-                <span className={`text-[9px] sm:text-[10px] font-bold mt-1 transition-colors duration-500 ${printStatus === 'completed' ? 'text-green-600' : 'text-gray-400'}`}>Done</span>
+              {/* Step labels below bar */}
+              <div className="flex justify-between mt-1">
+                <span className={`text-[9px] font-bold ${
+                  printStatus !== 'failed' ? 'text-[#093765]' : 'text-gray-400'
+                }`}>Paid ✓</span>
+                <span className={`text-[9px] font-bold ${
+                  printStatus === 'printing' || printStatus === 'completed' ? 'text-[#093765]' : 'text-gray-400'
+                }`}>Printing</span>
+                <span className={`text-[9px] font-bold ${
+                  printStatus === 'completed' ? 'text-green-600' : 'text-gray-400'
+                }`}>Done ✓</span>
               </div>
             </div>
           </div>
@@ -377,7 +451,29 @@ export function PrintCode() {
           </div>
 
           {/* Action Buttons */}
-          <div className="w-full mt-auto animate-in slide-in-from-bottom-4 duration-700 delay-300">
+          <div className="w-full mt-auto animate-in slide-in-from-bottom-4 duration-700 delay-300 space-y-2">
+            {/* Refund button — only shown when print failed */}
+            {printStatus === 'failed' && (
+              <div className="w-full bg-red-50 border border-red-200 rounded-xl p-3 flex flex-col items-center gap-2">
+                <div className="flex items-center gap-1.5 text-red-700">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-xs font-bold">Print failed at kiosk</span>
+                </div>
+                {!refundRequested ? (
+                  <Button
+                    variant="outline"
+                    className="w-full h-9 border-red-300 text-red-700 hover:bg-red-100 font-bold text-xs tracking-wide rounded-lg cursor-pointer"
+                    onClick={handleRequestRefund}
+                    disabled={refundLoading}
+                  >
+                    {refundLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    {refundLoading ? "Submitting…" : "Request Refund"}
+                  </Button>
+                ) : (
+                  <p className="text-xs text-green-700 font-bold">✓ Refund request submitted</p>
+                )}
+              </div>
+            )}
             <Button
               className="w-full h-10 sm:h-11 bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 text-[11px] sm:text-xs px-2 rounded-xl cursor-pointer font-bold uppercase tracking-wider"
               onClick={handleDone}

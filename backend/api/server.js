@@ -1707,10 +1707,186 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       }, { merge: true });
 
       res.status(200).send("Webhook received");
+
+    // ── PAYMENT FAILED ──────────────────────────────────────────────────────────
+    } else if (event.type === "PAYMENT_FAILED_WEBHOOK") {
+      const orderId   = event.data?.order?.order_id;
+      const userId    = event.data?.customer_details?.customer_id;
+      const failedAt  = admin.firestore.FieldValue.serverTimestamp();
+      const failReason = event.data?.error_details?.error_description || "Payment failed";
+
+      console.log(`[WEBHOOK] PAYMENT_FAILED for orderId=${orderId} userId=${userId} reason=${failReason}`);
+
+      // 1. Mark the order FAILED in both orders + payment_transactions
+      try {
+        let ordSnap = await db.collection("orders").where("orderId", "==", orderId).get();
+        if (ordSnap.empty) ordSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+        const failBatch = db.batch();
+        ordSnap.forEach((doc) => {
+          failBatch.update(doc.ref, {
+            status: "FAILED",
+            orderStatus: "failed",
+            failedAt,
+            failReason,
+            "paymentDetails.paymentStatus": "failed",
+          });
+        });
+        await failBatch.commit();
+      } catch (e) {
+        console.error("[WEBHOOK FAILED] Error marking order failed:", e.message);
+      }
+
+      // 2. Reset print_jobs back to 'pending' so the user can retry
+      try {
+        const jobsSnap = await db.collection("print_jobs")
+          .where("userId", "==", userId)
+          .where("orderId", "==", orderId)
+          .get();
+        // Fallback: if orderId not on jobs yet, grab all pending jobs for user
+        let docsToReset = jobsSnap.docs;
+        if (docsToReset.length === 0 && userId) {
+          const fallbackSnap = await db.collection("print_jobs")
+            .where("userId", "==", userId)
+            .where("status", "==", "pending")
+            .get();
+          docsToReset = fallbackSnap.docs;
+        }
+        const resetBatch = db.batch();
+        docsToReset.forEach((doc) => {
+          const data = doc.data();
+          // Only reset if not already printing or completed
+          if (!["printing", "completed"].includes(data.status)) {
+            resetBatch.update(doc.ref, {
+              status: "pending",
+              "paymentStatus.status": "failed",
+              "paymentStatus.failedAt": failedAt,
+              "paymentStatus.failReason": failReason,
+              printCode: admin.firestore.FieldValue.delete(),
+              tokenId: admin.firestore.FieldValue.delete(),
+            });
+          }
+        });
+        await resetBatch.commit();
+        console.log(`[WEBHOOK FAILED] Reset ${docsToReset.length} jobs to pending for userId=${userId}`);
+      } catch (e) {
+        console.error("[WEBHOOK FAILED] Error resetting jobs:", e.message);
+      }
+
+      // 3. Restore Mimo Coins if any were deducted for this order
+      try {
+        const coinTxSnap = await db.collection("mimo_coin_transactions")
+          .where("userId", "==", userId)
+          .where("orderId", "==", orderId)
+          .where("type", "==", "deducted")
+          .get();
+        if (!coinTxSnap.empty) {
+          const coinsBatch = db.batch();
+          let totalRestored = 0;
+          coinTxSnap.forEach((doc) => {
+            totalRestored += doc.data().amount || 0;
+            coinsBatch.update(doc.ref, { refunded: true, refundedAt: failedAt });
+          });
+          if (totalRestored > 0) {
+            const restoreTxRef = db.collection("mimo_coin_transactions").doc();
+            coinsBatch.set(restoreTxRef, {
+              userId, orderId, type: "restored",
+              amount: totalRestored,
+              description: `Coins restored — payment failed for order ${orderId}`,
+              createdAt: failedAt,
+            });
+            const userRef = db.collection("users").doc(userId);
+            coinsBatch.update(userRef, {
+              "mimo_coins.balance": admin.firestore.FieldValue.increment(totalRestored),
+            });
+            await coinsBatch.commit();
+            console.log(`[WEBHOOK FAILED] Restored ${totalRestored} Mimo Coins for userId=${userId}`);
+          }
+        }
+      } catch (e) {
+        console.error("[WEBHOOK FAILED] Error restoring coins:", e.message);
+      }
+
+      // 4. Update payment_transactions audit record
+      try {
+        const txnSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+        if (!txnSnap.empty) {
+          const paymentData = event.data?.payment || {};
+          await txnSnap.docs[0].ref.update({
+            "transactionStatus.status": "failed",
+            "transactionStatus.gatewayStatus": paymentData.payment_status || "FAILED",
+            "transactionStatus.failedAt": failedAt,
+            failReason,
+          });
+        }
+      } catch (e) {
+        console.error("[WEBHOOK FAILED] Error updating txn record:", e.message);
+      }
+
+      res.status(200).send("Webhook received");
+
+    } else {
+      // Unknown event type — acknowledge so Cashfree doesn't retry
+      console.log(`[WEBHOOK] Unhandled event type: ${event.type}`);
+      res.status(200).send("Unhandled event acknowledged");
     }
+
   } catch (err) {
     console.error(err);
     res.sendStatus(500);
+  }
+});
+
+// ================= USER REFUND REQUEST =================
+// Lets an authenticated user flag a failed/unprinted paid order for admin review.
+app.post("/request-refund", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { orderId, reason } = req.body;
+    if (!orderId) return res.status(400).json({ error: "orderId is required" });
+
+    // Verify the order belongs to this user
+    let ordSnap = await db.collection("orders").where("orderId", "==", orderId).where("userId", "==", userId).get();
+    if (ordSnap.empty) {
+      ordSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).where("userId", "==", userId).get();
+    }
+    if (ordSnap.empty) return res.status(404).json({ error: "Order not found or does not belong to you" });
+
+    const orderData = ordSnap.docs[0].data();
+    const orderStatus = orderData.status || orderData.orderStatus || "";
+
+    // Only allow refund requests for FAILED or PAID-but-unprinted orders
+    const isPrintedOrPrinting = orderStatus === "printing" || orderStatus === "completed" || orderStatus === "PRINTED";
+    if (isPrintedOrPrinting) {
+      return res.status(400).json({ error: "Cannot request refund for an order that has been printed." });
+    }
+
+    // Check for duplicate request
+    const existingReq = await db.collection("refund_requests")
+      .where("orderId", "==", orderId)
+      .where("userId", "==", userId)
+      .get();
+    if (!existingReq.empty) {
+      return res.status(409).json({ error: "A refund request already exists for this order.", status: existingReq.docs[0].data().status });
+    }
+
+    const refundReqRef = await db.collection("refund_requests").add({
+      userId,
+      orderId,
+      orderStatus,
+      amount: orderData.amount || orderData.totals?.totalAmount || 0,
+      reason: reason || "User requested refund",
+      status: "pending",        // pending → approved → processed | rejected
+      requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+      resolvedAt: null,
+      resolvedBy: null,
+      adminNote: null,
+    });
+
+    console.log(`[REQUEST-REFUND] Created refund_request ${refundReqRef.id} for orderId=${orderId} userId=${userId}`);
+    res.json({ message: "Refund request submitted. Our team will review it within 24–48 hours.", requestId: refundReqRef.id });
+  } catch (err) {
+    console.error("[REQUEST-REFUND] Error:", err);
+    res.status(500).json({ error: "Failed to submit refund request" });
   }
 });
 
@@ -1913,6 +2089,167 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
   } catch (err) {
     console.error("❌ KIOSK JOB STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch job status" });
+  }
+});
+
+// ================= KIOSK: AUTO-REFUND ON PRINT FAILURE =================
+// Called by the Pi listener whenever a paid print job physically fails.
+// Automatically triggers a full Cashfree refund — no admin action required.
+app.post("/kiosk/report-failure", async (req, res) => {
+  try {
+    const { jobId, reason, secret } = req.body;
+
+    // Authenticate with the shared internal secret
+    if (secret !== process.env.INTERNAL_WEBHOOK_SECRET) {
+      console.warn("[AUTO-REFUND] Unauthorized report-failure call");
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+    if (!jobId) return res.status(400).json({ error: "jobId required" });
+
+    // 1. Fetch the failed job from Firestore
+    const jobRef = db.collection("print_jobs").doc(jobId);
+    const jobSnap = await jobRef.get();
+    if (!jobSnap.exists) {
+      console.warn(`[AUTO-REFUND] Job ${jobId} not found`);
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const job = jobSnap.data();
+    const orderId = job.orderId;
+    const userId  = job.userId;
+    const failReason = reason || "Print failed at kiosk";
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    console.log(`[AUTO-REFUND] Print failure reported — jobId=${jobId} orderId=${orderId} userId=${userId} reason=${failReason}`);
+
+    // 2. Only refund if the job was actually PAID (don't double-refund)
+    const paidStatuses = ["paid", "printing"];
+    if (!paidStatuses.includes(job.status)) {
+      console.log(`[AUTO-REFUND] Job ${jobId} status="${job.status}" — not eligible for refund`);
+      return res.json({ skipped: true, reason: `Job status "${job.status}" is not refundable` });
+    }
+
+    // Check if already refunded
+    if (job.refundId || job.status === "refunded") {
+      console.log(`[AUTO-REFUND] Job ${jobId} already refunded — skipping`);
+      return res.json({ skipped: true, reason: "Already refunded" });
+    }
+
+    // 3. Look up the order to get the refund amount
+    let ordSnap = null;
+    let orderAmount = 0;
+    if (orderId) {
+      let snap = await db.collection("orders").where("orderId", "==", orderId).get();
+      if (snap.empty) snap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      if (!snap.empty) {
+        ordSnap = snap;
+        const od = snap.docs[0].data();
+        orderAmount = od.amount || od.totals?.totalAmount || 0;
+      }
+    }
+
+    if (orderAmount <= 0) {
+      // Free order — no money to refund, just mark failed
+      console.log(`[AUTO-REFUND] Order amount is ₹0 for job ${jobId} — marking failed, no refund needed`);
+      await jobRef.update({ status: "failed", printerStatus: failReason, failedAt: now });
+      return res.json({ refunded: false, reason: "Free order — no refund needed" });
+    }
+
+    // 4. Call Cashfree Refund API
+    const refundId = `autorefund_${jobId}_${Date.now()}`;
+    let cashfreeRefundResponse = null;
+    let cashfreeError = null;
+
+    try {
+      const cfRes = await axios.post(
+        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        {
+          refund_amount: orderAmount,
+          refund_id: refundId,
+          refund_note: `Auto-refund: ${failReason}`,
+        },
+        { headers: cashfreeHeaders, timeout: 15000 }
+      );
+      cashfreeRefundResponse = cfRes.data;
+      console.log(`✅ [AUTO-REFUND] Cashfree refund initiated: ${refundId} — ₹${orderAmount} for orderId=${orderId}`);
+    } catch (cfErr) {
+      cashfreeError = cfErr.response?.data?.message || cfErr.message;
+      console.error(`❌ [AUTO-REFUND] Cashfree refund API failed: ${cashfreeError}`);
+      // Still mark the job failed in Firestore even if Cashfree API fails
+      // A refund_requests doc is created so admin can retry manually
+    }
+
+    // 5. Batch-write all Firestore updates atomically
+    const batch = db.batch();
+
+    // Mark job as failed (or refunded if Cashfree succeeded)
+    batch.update(jobRef, {
+      status: cashfreeRefundResponse ? "refunded" : "failed",
+      printerStatus: failReason,
+      failedAt: now,
+      refundId: cashfreeRefundResponse ? refundId : null,
+      refundedAt: cashfreeRefundResponse ? now : null,
+      autoRefundAttempted: true,
+      autoRefundError: cashfreeError || null,
+    });
+
+    // Mark order as REFUNDED
+    if (ordSnap) {
+      ordSnap.forEach((doc) => {
+        batch.update(doc.ref, {
+          status: cashfreeRefundResponse ? "REFUNDED" : "FAILED",
+          orderStatus: cashfreeRefundResponse ? "refunded" : "failed",
+          refundId: refundId,
+          refundedAt: now,
+          refundAmount: orderAmount,
+        });
+      });
+    }
+
+    // Record in refunds collection (whether or not Cashfree succeeded)
+    const refundDocRef = db.collection("refunds").doc(refundId);
+    batch.set(refundDocRef, {
+      refundId,
+      orderId: orderId || null,
+      jobId,
+      userId,
+      refundAmount: orderAmount,
+      status: cashfreeRefundResponse ? (cashfreeRefundResponse.refund_status || "PENDING") : "CASHFREE_FAILED",
+      cashfreeRefundId: cashfreeRefundResponse?.cf_refund_id || null,
+      cashfreeError: cashfreeError || null,
+      reason: failReason,
+      triggeredBy: "auto",
+      initiatedAt: now,
+      cashfreeResponse: cashfreeRefundResponse || null,
+    });
+
+    // If Cashfree failed, create a refund_requests doc so admin is alerted
+    if (!cashfreeRefundResponse) {
+      const reqRef = db.collection("refund_requests").doc();
+      batch.set(reqRef, {
+        userId, orderId, jobId,
+        amount: orderAmount,
+        reason: `AUTO-REFUND FAILED: ${failReason}. Cashfree error: ${cashfreeError}`,
+        status: "pending",
+        autoRefundFailed: true,
+        requestedAt: now,
+        resolvedAt: null, resolvedBy: null, adminNote: null,
+      });
+    }
+
+    await batch.commit();
+
+    res.json({
+      refunded: !!cashfreeRefundResponse,
+      refundId,
+      amount: orderAmount,
+      cashfreeStatus: cashfreeRefundResponse?.refund_status || null,
+      error: cashfreeError || null,
+    });
+
+  } catch (err) {
+    console.error("[AUTO-REFUND] Unexpected error:", err);
+    res.status(500).json({ error: "Auto-refund processing failed" });
   }
 });
 
@@ -2422,6 +2759,140 @@ const authenticateAdmin = (req, res, next) => {
     next();
   });
 };
+
+// ================= ADMIN REFUND =================
+// Admin manually triggers a real Cashfree refund for an order.
+app.post("/admin/refund", authenticateAdmin, async (req, res) => {
+  try {
+    const { orderId, refundAmount, note } = req.body;
+    if (!orderId) return res.status(400).json({ error: "orderId is required" });
+
+    // 1. Fetch the order to get the amount and userId
+    let ordSnap = await db.collection("orders").where("orderId", "==", orderId).get();
+    if (ordSnap.empty) {
+      ordSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+    }
+    if (ordSnap.empty) return res.status(404).json({ error: "Order not found" });
+
+    const orderData = ordSnap.docs[0].data();
+    const userId = orderData.userId;
+    const originalAmount = orderData.amount || orderData.totals?.totalAmount || 0;
+    const amountToRefund = refundAmount ? Number(refundAmount) : originalAmount;
+
+    if (amountToRefund <= 0 || amountToRefund > originalAmount) {
+      return res.status(400).json({ error: `Invalid refund amount. Must be between 0.01 and ${originalAmount}` });
+    }
+
+    // 2. Call Cashfree Refund API
+    const refundId = `refund_${Date.now()}`;
+    let cashfreeRefundResponse = null;
+    try {
+      const cfRefundRes = await axios.post(
+        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        {
+          refund_amount: amountToRefund,
+          refund_id: refundId,
+          refund_note: note || "Refund initiated by Mimo admin",
+        },
+        { headers: cashfreeHeaders, timeout: 15000 }
+      );
+      cashfreeRefundResponse = cfRefundRes.data;
+      console.log(`[ADMIN-REFUND] Cashfree refund created: ${refundId} for orderId=${orderId} amount=₹${amountToRefund}`);
+    } catch (cfErr) {
+      const cfError = cfErr.response?.data?.message || cfErr.message;
+      console.error(`[ADMIN-REFUND] Cashfree refund API failed: ${cfError}`);
+      return res.status(502).json({ error: `Cashfree refund failed: ${cfError}` });
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+
+    // 3. Record refund in Firestore `refunds` collection
+    const refundDocRef = db.collection("refunds").doc(refundId);
+    batch.set(refundDocRef, {
+      refundId,
+      orderId,
+      userId,
+      refundAmount: amountToRefund,
+      originalAmount,
+      status: cashfreeRefundResponse?.refund_status || "PENDING",
+      cashfreeRefundId: cashfreeRefundResponse?.cf_refund_id || null,
+      note: note || null,
+      initiatedAt: now,
+      cashfreeResponse: cashfreeRefundResponse,
+    });
+
+    // 4. Mark order as REFUNDED
+    ordSnap.forEach((doc) => {
+      batch.update(doc.ref, {
+        status: "REFUNDED",
+        orderStatus: "refunded",
+        refundId,
+        refundedAt: now,
+        refundAmount: amountToRefund,
+      });
+    });
+
+    // 5. Reset print_jobs to 'pending' if not yet printed (allows admin retry if needed)
+    const jobsSnap = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("orderId", "==", orderId)
+      .get();
+    jobsSnap.forEach((doc) => {
+      const data = doc.data();
+      if (!["printing", "completed"].includes(data.status)) {
+        batch.update(doc.ref, {
+          status: "refunded",
+          "paymentStatus.status": "refunded",
+          refundId,
+          refundedAt: now,
+        });
+      }
+    });
+
+    // 6. Mark pending refund_request as resolved (if one exists)
+    const refReqSnap = await db.collection("refund_requests")
+      .where("orderId", "==", orderId)
+      .where("status", "==", "pending")
+      .get();
+    refReqSnap.forEach((doc) => {
+      batch.update(doc.ref, {
+        status: "processed",
+        resolvedAt: now,
+        resolvedBy: "admin",
+        adminNote: note || "Refund processed",
+        refundId,
+      });
+    });
+
+    await batch.commit();
+
+    res.json({
+      message: `Refund of ₹${amountToRefund} initiated successfully for order ${orderId}`,
+      refundId,
+      cashfreeStatus: cashfreeRefundResponse?.refund_status,
+    });
+  } catch (err) {
+    console.error("[ADMIN-REFUND] Error:", err);
+    res.status(500).json({ error: "Refund processing failed" });
+  }
+});
+
+// ================= ADMIN REFUND REQUESTS LIST =================
+// Admin views all pending user refund requests.
+app.get("/admin/refund-requests", authenticateAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection("refund_requests")
+      .orderBy("requestedAt", "desc")
+      .limit(50)
+      .get();
+    const requests = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json({ requests });
+  } catch (err) {
+    console.error("[ADMIN-REFUND-REQUESTS] Error:", err);
+    res.status(500).json({ error: "Failed to fetch refund requests" });
+  }
+});
 
 app.post("/admin/login", async (req, res) => {
   const { email, password } = req.body;
