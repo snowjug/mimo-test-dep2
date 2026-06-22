@@ -421,31 +421,8 @@ def impose_nup(input_pdf, output_pdf, layout_num):
 
 def fast_compress_pdf(input_pdf, is_color=False, size_threshold_kb=512):
     """
-    Pre-flight PDF compressor. Runs GS /ebook (B&W) or /printer (color) on any
-    PDF that exceeds size_threshold_kb. Returns the compressed path, or the
-    original path if compression fails / file is already small.
-    Safe: never deletes the original, never raises exceptions.
+    Bypassed: We now print PDFs directly to the printer to avoid slow Ghostscript compression on the Pi.
     """
-    try:
-        size_kb = os.path.getsize(input_pdf) / 1024
-        if size_kb <= size_threshold_kb:
-            return input_pdf  # already small enough
-        flags = GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS
-        compressed = input_pdf.replace(".pdf", "_c.pdf")
-        if compressed == input_pdf:          # safety: never overwrite source
-            compressed = input_pdf + "_c.pdf"
-        print(f"⚡ Pre-compressing PDF ({size_kb:.0f} KB → target <{size_threshold_kb} KB): {os.path.basename(input_pdf)}")
-        subprocess.run(
-            ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"]
-            + flags + [f"-sOutputFile={compressed}", input_pdf],
-            check=True, timeout=120
-        )
-        if os.path.exists(compressed):
-            new_kb = os.path.getsize(compressed) / 1024
-            print(f"⚡ Compressed: {size_kb:.0f} KB → {new_kb:.0f} KB (saved {size_kb - new_kb:.0f} KB)")
-            return compressed
-    except Exception as e:
-        print(f"⚠️ fast_compress_pdf failed ({e}), using original")
     return input_pdf
 
 
