@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <!-- No special screen lock policies needed; we just need system-level admin for Kiosk/Lock Task mode -->
+    </uses-policies>
+</device-admin>
