@@ -222,6 +222,7 @@ function App() {
         onError={(errMsg?: string) => {
           setPrintStatus('idle');
           setCurrentScreen('code-entry-screen');
+          setCode('');
           showToast(errMsg || 'Printer reported an error processing your document.', true);
         }}
       />

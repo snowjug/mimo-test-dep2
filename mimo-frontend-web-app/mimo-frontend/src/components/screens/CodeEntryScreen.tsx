@@ -55,12 +55,11 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({ onSuccess, onB
   useEffect(() => {
     if (!isActive) {
       const timer = setTimeout(() => {
-        setCode('');  
         setIsShaking(false);
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [isActive, setCode]);
+  }, [isActive]);
 
   return (
     <div 
