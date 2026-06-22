@@ -1782,49 +1782,57 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     });
 
     // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
-    const kioskId = currentSessionDocs[0].kioskId || "CV-001";
-    const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
-    try {
-      const statusDoc = await db.collection("system_status").doc(kioskId).get();
-      if (statusDoc.exists) {
-        const statusData = statusDoc.data();
-        
-        // A. Kiosk Online Check (lastSeen)
-        const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
-        if (lastSeen) {
-          const now = new Date();
-          const diffMs = now.getTime() - lastSeen.getTime();
-          if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "System error: Kiosk printer listener is offline (not connected)"
-            });
-          }
-        }
+    // Only perform health checks if printing has not started yet.
+    // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
+    const hasStarted = currentSessionDocs.some(d => 
+      ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
+    );
 
-        // B. Printer Offline/Disabled Check
-        const printerStatusStr = statusData.printerStatus || "";
-        if (isColorJob) {
-          if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "Printer error: Color printer is offline or disabled"
-            });
+    if (!hasStarted) {
+      const kioskId = currentSessionDocs[0].kioskId || "CV-001";
+      const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
+      try {
+        const statusDoc = await db.collection("system_status").doc(kioskId).get();
+        if (statusDoc.exists) {
+          const statusData = statusDoc.data();
+          
+          // A. Kiosk Online Check (lastSeen)
+          const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
+          if (lastSeen) {
+            const now = new Date();
+            const diffMs = now.getTime() - lastSeen.getTime();
+            if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
+              return res.json({
+                status: "failed",
+                isPrinted: false,
+                printerStatus: "System error: Kiosk printer listener is offline (not connected)"
+              });
+            }
           }
-        } else {
-          if (printerStatusStr.includes("B&W: Paused/Error") || printerStatusStr.includes("B&W: lpstat failed")) {
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "Printer error: B&W printer is offline or disabled"
-            });
+
+          // B. Printer Offline/Disabled Check
+          const printerStatusStr = statusData.printerStatus || "";
+          if (isColorJob) {
+            if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
+              return res.json({
+                status: "failed",
+                isPrinted: false,
+                printerStatus: "Printer error: Color printer is offline or disabled"
+              });
+            }
+          } else {
+            if (printerStatusStr.includes("B&W: Paused/Error") || printerStatusStr.includes("B&W: lpstat failed")) {
+              return res.json({
+                status: "failed",
+                isPrinted: false,
+                printerStatus: "Printer error: B&W printer is offline or disabled"
+              });
+            }
           }
         }
+      } catch (statusErr) {
+        console.error("⚠️ Error checking system status:", statusErr);
       }
-    } catch (statusErr) {
-      console.error("⚠️ Error checking system status:", statusErr);
     }
 
     // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
@@ -1835,7 +1843,7 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
       totalPageCount += pCount * copies;
     });
 
-    const baseWarmupSec = 60; // 60 seconds base warmup/spooling time
+    const baseWarmupSec = 120; // 120 seconds base warmup/spooling time
     const secPerPage = isColorJob ? 35 : 8; // Inkjet color prints need longer timeout headroom than B&W laser prints
     const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage) * 1000;
 
