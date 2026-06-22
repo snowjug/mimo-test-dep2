@@ -1784,13 +1784,13 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
     // Only perform health checks if printing has not started yet.
     // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
+    const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
     const hasStarted = currentSessionDocs.some(d => 
       ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
     );
 
     if (!hasStarted) {
       const kioskId = currentSessionDocs[0].kioskId || "CV-001";
-      const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
       try {
         const statusDoc = await db.collection("system_status").doc(kioskId).get();
         if (statusDoc.exists) {

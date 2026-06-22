@@ -481,6 +481,84 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
   }
 });
 
+// ================= GENERATE TEXT PDF =================
+app.post("/generate-text-pdf", authMiddleware, async (req, res, next) => {
+  try {
+    const { textContent, fontFamily, fontSize, lineSpacing, alignment, pageSize, margins } = req.body;
+    if (!textContent) {
+      return res.status(400).send("Text content is required");
+    }
+
+    // Map margin options
+    let marginValue = 54; // default medium (0.75 inch)
+    if (margins === "small") marginValue = 36; // 0.5 inch
+    else if (margins === "large") marginValue = 72; // 1.0 inch
+
+    // Map font family
+    let mappedFont = "Helvetica";
+    const fontLower = (fontFamily || "").toLowerCase();
+    if (fontLower.includes("times") || fontLower.includes("georgia") || fontLower.includes("serif")) {
+      mappedFont = "Times-Roman";
+    } else if (fontLower.includes("courier") || fontLower.includes("mono")) {
+      mappedFont = "Courier";
+    }
+
+    // Map line gap (PDFKit lineGap is extra space between lines in points)
+    const size = Number(fontSize || 12);
+    const lineGapValue = (parseFloat(lineSpacing || 1.15) - 1.0) * size;
+
+    const PDFDocumentKit = require("pdfkit");
+
+    // Generate PDF via PDFKit
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const doc = new PDFDocumentKit({
+        size: pageSize === "Letter" ? "LETTER" : "A4",
+        margin: marginValue,
+        autoFirstPage: true
+      });
+      const chunks = [];
+      doc.on("data", chunk => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", err => reject(err));
+
+      doc.font(mappedFont)
+         .fontSize(size)
+         .lineGap(lineGapValue)
+         .text(textContent, {
+           align: alignment === "justify" ? "justify" : alignment === "center" ? "center" : alignment === "right" ? "right" : "left"
+         });
+
+      doc.end();
+    });
+
+    // Get page count using pdf-lib
+    const pdfLibDoc = await PDFDocument.load(pdfBuffer);
+    const pageCount = pdfLibDoc.getPageCount();
+
+    // Upload to Firebase Storage
+    const bucket = admin.storage().bucket();
+    const safeFileName = "custom_document.pdf";
+    const fileName = `files/${Date.now()}_${safeFileName}`;
+    const fileUpload = bucket.file(fileName);
+    await fileUpload.save(pdfBuffer, {
+      contentType: "application/pdf",
+      metadata: { cacheControl: "public, max-age=86400" },
+    });
+    const fileUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+
+    res.json({
+      name: "custom_document.pdf",
+      url: fileUrl,
+      type: "application/pdf",
+      size: pdfBuffer.length,
+      pageCount: pageCount
+    });
+
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ================= CREATE BLANK JOB =================
 app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
   try {
@@ -2187,49 +2265,57 @@ app.get("/kiosk/job-status", async (req, res) => {
     });
 
     // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
-    const kioskId = currentSessionDocs[0].kioskId || "CV-001";
+    // Only perform health checks if printing has not started yet.
+    // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
     const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
-    try {
-      const statusDoc = await db.collection("system_status").doc(kioskId).get();
-      if (statusDoc.exists) {
-        const statusData = statusDoc.data();
-        
-        // A. Kiosk Online Check (lastSeen)
-        const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
-        if (lastSeen) {
-          const now = new Date();
-          const diffMs = now.getTime() - lastSeen.getTime();
-          if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "System error: Kiosk printer listener is offline (not connected)"
-            });
-          }
-        }
+    const hasStarted = currentSessionDocs.some(d => 
+      ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
+    );
 
-        // B. Printer Offline/Disabled Check
-        const printerStatusStr = statusData.printerStatus || "";
-        if (isColorJob) {
-          if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "Printer error: Color printer is offline or disabled"
-            });
+    if (!hasStarted) {
+      const kioskId = currentSessionDocs[0].kioskId || "CV-001";
+      try {
+        const statusDoc = await db.collection("system_status").doc(kioskId).get();
+        if (statusDoc.exists) {
+          const statusData = statusDoc.data();
+          
+          // A. Kiosk Online Check (lastSeen)
+          const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
+          if (lastSeen) {
+            const now = new Date();
+            const diffMs = now.getTime() - lastSeen.getTime();
+            if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
+              return res.json({
+                status: "failed",
+                isPrinted: false,
+                printerStatus: "System error: Kiosk printer listener is offline (not connected)"
+              });
+            }
           }
-        } else {
-          if (printerStatusStr.includes("B&W: Paused/Error") || printerStatusStr.includes("B&W: lpstat failed")) {
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "Printer error: B&W printer is offline or disabled"
-            });
+
+          // B. Printer Offline/Disabled Check
+          const printerStatusStr = statusData.printerStatus || "";
+          if (isColorJob) {
+            if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
+              return res.json({
+                status: "failed",
+                isPrinted: false,
+                printerStatus: "Printer error: Color printer is offline or disabled"
+              });
+            }
+          } else {
+            if (printerStatusStr.includes("B&W: Paused/Error") || printerStatusStr.includes("B&W: lpstat failed")) {
+              return res.json({
+                status: "failed",
+                isPrinted: false,
+                printerStatus: "Printer error: B&W printer is offline or disabled"
+              });
+            }
           }
         }
+      } catch (statusErr) {
+        console.error("⚠️ Error checking system status:", statusErr);
       }
-    } catch (statusErr) {
-      console.error("⚠️ Error checking system status:", statusErr);
     }
 
     // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
@@ -2240,7 +2326,7 @@ app.get("/kiosk/job-status", async (req, res) => {
       totalPageCount += pCount * copies;
     });
 
-    const baseWarmupSec = 60; // 60 seconds base warmup/spooling time
+    const baseWarmupSec = 120; // 120 seconds base warmup/spooling time
     const secPerPage = isColorJob ? 35 : 8; // Inkjet color prints need longer timeout headroom than B&W laser prints
     const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage) * 1000;
 
