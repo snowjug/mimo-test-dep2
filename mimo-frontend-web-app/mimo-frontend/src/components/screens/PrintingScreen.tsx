@@ -12,6 +12,7 @@ interface PrintingScreenProps {
   copies?: number;
   printCode?: string;       // ← needed to poll real status
   manualProgress?: number;  // ← optional override for testing
+  colorMode?: 'color' | 'bw';
 }
 
 /**
@@ -35,6 +36,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   copies = 1,
   printCode,
   manualProgress,
+  colorMode = 'bw',
 }) => {
   const [progress, setProgress]         = useState(0);
   const [typedTitle, setTypedTitle]     = useState('');
@@ -81,10 +83,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
     setStatusMsg('Finishing up…');
 
-    // Smooth finish: every digit from current% → 100 is shown clearly.
-    // 500ms per step → 15 digits (85→100) take ~7.5 s — readable on kiosk.
-    // We add a slight ease-in so early digits are a touch slower, speeding
-    // gently toward 100 for a satisfying "locking in" feel.
     let stepIndex = 0;
     const finish = () => {
       const currentProgress = progressRef.current;
@@ -97,16 +95,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         return;
       }
 
-      // If the backend finished incredibly fast (e.g., under 4 seconds) and we're still at 15%,
-      // jump ahead to 80% instantly, then rapidly tick up to 100%.
-      const next = currentProgress < 80 ? 80 : currentProgress + 1;
+      const next = currentProgress + 1;
       
       progressRef.current = next;
       setProgress(next);
       stepIndex++;
 
-      // Super fast finish (30ms per step) because the Pi already reported success!
-      const delay = 30;
+      // Steady 400ms delay per step so it finishes smoothly and matches paper ejection
+      const delay = 400;
       tickTimerRef.current = window.setTimeout(finish, delay);
 
       // Update status message as we near the end
@@ -156,12 +152,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     // ── Target total time for the 0→99% animation ─────────────────────────────
     // Based on optimized proactive wakeup: ~3s warmup + ~1.5s per page
     // This keeps 1-sheet jobs lightning fast (~4.5s) and multi-sheet jobs proportional.
-    //   1 sheet  → 4 500 ms
-    //   3 sheets → 7 500 ms
-    //   5 sheets → 10 500 ms
-    //   10 sheets→ 18 000 ms
-    //   20 sheets→ 33 000 ms
-    const totalAnimMs  = 3000 + totalSheets * 1500;  // total 0→99 window (ms)
+    const speedFactor = colorMode === 'color' ? 5.0 : 1.5; // seconds per sheet
+    const totalAnimMs = 5000 + totalSheets * speedFactor * 1000;
     const baseDelay    = Math.max(50, totalAnimMs / 99); // ms per 1% step
 
     const tick = () => {
@@ -220,7 +212,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     };
 
     tickTimerRef.current = window.setTimeout(tick, 600);
-  }, [pages, copies, printCode, manualProgress, animateTo100AndComplete]);
+  }, [pages, copies, printCode, manualProgress, colorMode, animateTo100AndComplete]);
 
   // ─── main effect ──────────────────────────────────────────────────────────
 
@@ -281,6 +273,19 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       animateTo100AndComplete();
     }
   }, [printDone, isActive, animateTo100AndComplete]);
+
+  // Stall timeout check to prevent infinite hangs
+  useEffect(() => {
+    if (!isActive || !printCode || printCode === '0000') return;
+    const stallTimeout = Math.max(120000, 30000 + Math.max(1, pages * copies) * 15000);
+    const stallTimer = window.setTimeout(() => {
+      if (progressRef.current >= 99 && !isCompletingRef.current) {
+        console.warn('[PrintingScreen] Stall timeout hit — auto-completing.');
+        animateTo100AndComplete();
+      }
+    }, stallTimeout);
+    return () => clearTimeout(stallTimer);
+  }, [isActive, printCode, pages, copies, animateTo100AndComplete]);
 
   // ─── SVG geometry ─────────────────────────────────────────────────────────
 

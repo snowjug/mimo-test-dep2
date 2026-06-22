@@ -444,6 +444,15 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
                     res2 = subprocess.run(["lpstat", "-W", "completed"], capture_output=True, text=True, timeout=10)
                     job_ok = job_id in res2.stdout
                     if job_ok:
+                        # Physical delay: give the printer time to actually eject the paper
+                        # Brother laser: ~3s. Epson inkjet: ~15s.
+                        doc_dict = doc_ref.get().to_dict() or {}
+                        color_mode = doc_dict.get("colorMode", "monochrome")
+                        is_inkjet = color_mode.lower() == "color"
+                        paper_exit_delay = 15 if is_inkjet else 3
+                        print(f"⏳ [SYNC] CUPS job {job_id} done in queue. Waiting {paper_exit_delay}s for physical paper ejection...")
+                        time.sleep(paper_exit_delay)
+
                         print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
                         safe_update(doc_ref, {
                             "status": "completed",
@@ -504,14 +513,22 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         print(f"🖨️  Sending to CUPS [{printer_name}]: {[os.path.basename(f) for f in file_paths]} "
               f"({copies} copies, layout: {photo_layout or '1-up'}, sides: {double_sided})")
 
-        cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4"]
+        is_color = (printer_name == COLOR_PRINTER_NAME)
+        cmd = ["lp", "-d", printer_name, "-n", str(copies),
+               "-o", "media=A4",
+               "-o", "page-left=0", "-o", "page-right=0",
+               "-o", "page-top=0", "-o", "page-bottom=0"]
 
         # fit-to-page is skipped for:
         #  - blank sheets / graph paper (print at exact size)
         #  - N-up imposed PDFs (geometry is pre-computed)
         skip_fit = is_blank_sheet or (photo_layout and str(photo_layout) in ["2", "4", "6", "9"])
         if not skip_fit:
-            cmd.extend(["-o", "fit-to-page"])
+            if is_color:
+                # Epson: use print-scaling=fit to avoid right-shift from fit-to-page margin calc
+                cmd.extend(["-o", "print-scaling=fit"])
+            else:
+                cmd.extend(["-o", "fit-to-page"])
         else:
             cmd.extend(["-o", "print-scaling=none"])
 
@@ -790,24 +807,50 @@ def process_job(doc_snapshot):
                 print(f"⚠️ Failed to check pages for duplex: {e}")
 
             if total_pages == 1:
-                # Single-page doc: duplicate copies times so each copy has page+blank for 2-sided
-                print(f"📄 Duplex: Duplicating single-page PDF {copies}× to pair front/back...")
+                # Single-page doc: duplicate 2x so each copy has page+back for 2-sided
+                print(f"📄 Duplex: Duplicating single-page PDF 2× to pair front/back...")
                 dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
                 try:
                     subprocess.run(
                         ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
-                         f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * (copies * 2),
+                         f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * 2,
                         check=True, timeout=60
                     )
                     if os.path.exists(dup_pdf):
                         final_paths = [dup_pdf]
-                        copies = 1
-                        print(f"✅ Duplex duplication done: {dup_pdf}")
+                        # copies stays as-is -> CUPS sends N copies of the 2-page PDF = N duplex sheets
+                        print(f"✅ Duplex duplication done: {dup_pdf} (CUPS will send {copies} copies)")
                 except Exception as dup_err:
                     print(f"❌ Failed to duplicate for duplex: {dup_err}")
             elif total_pages > 1 and copies > 1:
                 # Multi-page doc: lp -n <copies> handles it correctly
                 print(f"📄 Duplex multi-page ({total_pages} pages, {copies} copies) — sending as-is to CUPS.")
+
+        # ── Color PDF Normalization ──
+        # Explicitly set MediaBox to exactly A4 (595x842) for Epson L3250
+        if is_color:
+            normalized_paths = []
+            for fp in final_paths:
+                if fp.lower().endswith(".pdf"):
+                    norm_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_color_norm.pdf")
+                    try:
+                        print(f"📄 Normalizing color PDF to A4: {fp} -> {norm_pdf}")
+                        subprocess.run([
+                            "gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite",
+                            "-dFIXEDMEDIA", "-dDEVICEWIDTHPOINTS=595", "-dDEVICEHEIGHTPOINTS=842",
+                            "-dPDFFitPage",
+                            f"-sOutputFile={norm_pdf}", fp
+                        ], check=True, timeout=60)
+                        if os.path.exists(norm_pdf):
+                            normalized_paths.append(norm_pdf)
+                        else:
+                            normalized_paths.append(fp)
+                    except Exception as e:
+                        print(f"⚠️ Color normalization failed for {fp}: {e}")
+                        normalized_paths.append(fp)
+                else:
+                    normalized_paths.append(fp)
+            final_paths = normalized_paths
 
         # ── Submit to CUPS ──
         # Pass doc_ref so print_file can spawn the background sync thread

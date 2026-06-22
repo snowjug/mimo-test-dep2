@@ -1116,6 +1116,81 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
   }
 });
 
+// ================= GENERATE TEXT PDF =================
+app.post("/generate-text-pdf", authenticateToken, async (req, res, next) => {
+  try {
+    const { textContent, fontFamily, fontSize, lineSpacing, alignment, pageSize, margins } = req.body;
+    if (!textContent) {
+      return res.status(400).send("Text content is required");
+    }
+
+    // Map margin options
+    let marginValue = 54; // default medium (0.75 inch)
+    if (margins === "small") marginValue = 36; // 0.5 inch
+    else if (margins === "large") marginValue = 72; // 1.0 inch
+
+    // Map font family
+    let mappedFont = "Helvetica";
+    const fontLower = (fontFamily || "").toLowerCase();
+    if (fontLower.includes("times") || fontLower.includes("georgia") || fontLower.includes("serif")) {
+      mappedFont = "Times-Roman";
+    } else if (fontLower.includes("courier") || fontLower.includes("mono")) {
+      mappedFont = "Courier";
+    }
+
+    // Map line gap (PDFKit lineGap is extra space between lines in points)
+    const size = Number(fontSize || 12);
+    const lineGapValue = (parseFloat(lineSpacing || 1.15) - 1.0) * size;
+
+    const PDFDocumentKit = require("pdfkit");
+
+    // Generate PDF via PDFKit
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const doc = new PDFDocumentKit({
+        size: pageSize === "Letter" ? "LETTER" : "A4",
+        margin: marginValue,
+        autoFirstPage: true
+      });
+      const chunks = [];
+      doc.on("data", chunk => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", err => reject(err));
+
+      doc.font(mappedFont)
+         .fontSize(size)
+         .lineGap(lineGapValue)
+         .text(textContent, {
+           align: alignment === "justify" ? "justify" : alignment === "center" ? "center" : alignment === "right" ? "right" : "left"
+         });
+
+      doc.end();
+    });
+
+    // Get page count using pdf-lib (which is required at L12)
+    const pdfLibDoc = await PDFDocument.load(pdfBuffer);
+    const pageCount = pdfLibDoc.getPageCount();
+
+    // Upload to Firebase Storage
+    const mockFile = {
+      originalname: "custom_document.pdf",
+      buffer: pdfBuffer,
+      mimetype: "application/pdf"
+    };
+    const fileUrl = await uploadToStorage(mockFile);
+
+    res.json({
+      name: mockFile.originalname,
+      url: fileUrl,
+      type: mockFile.mimetype,
+      size: pdfBuffer.length,
+      pageCount: pageCount
+    });
+
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ================= CREATE BLANK JOB =================
 app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
   try {

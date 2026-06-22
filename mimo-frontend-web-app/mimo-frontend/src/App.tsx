@@ -93,7 +93,7 @@ function App() {
             fileName: doc.file || doc.fileName || "Document",
             pages: doc.pages || doc.pageCount || 1,
             copies: doc.copies || 1,
-            mode: "Black & White",
+            mode: doc.colorMode || data.colorMode || "Black & White",
           };
 
           setJobData(job);
@@ -214,6 +214,7 @@ function App() {
         pages={jobData?.pages || 1}
         copies={jobData?.copies || 1}
         printCode={code}
+        colorMode={jobData?.mode?.toLowerCase().includes('color') ? 'color' : 'bw'}
         onComplete={() => {
           setPrintStatus('completed');
           goToSummary();

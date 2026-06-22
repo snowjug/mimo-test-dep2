@@ -662,9 +662,9 @@ export function UploadFile() {
           </div>
         </Card>
 
-        {/* Quick Print - A4 Sheet & Mimo Graph */}
+        {/* Quick Print - A4 Sheet, Mimo Graph & Custom Document */}
         {files.length === 0 && (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <button
               onClick={() => navigate("/blank-pages?type=a4")}
               className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
@@ -701,6 +701,22 @@ export function UploadFile() {
                 </div>
               </div>
               <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-emerald-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
+            </button>
+
+            <button
+              onClick={() => navigate("/text-editor")}
+              className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-indigo-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative z-10 flex flex-col items-center sm:items-start gap-3">
+                <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-purple-300 bg-white flex items-center justify-center shadow-sm group-hover:border-purple-500 group-hover:shadow-md transition-all duration-300">
+                  <FileText className="w-6 h-6 sm:w-7 sm:h-7 text-purple-400 group-hover:text-purple-600 transition-colors duration-300" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-purple-700 transition-colors">Custom Document</h3>
+                </div>
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-purple-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
             </button>
           </div>
         )}
