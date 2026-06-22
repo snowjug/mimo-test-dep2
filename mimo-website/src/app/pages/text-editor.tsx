@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { MimoHeader } from "../components/mimo-header";
-import { ArrowLeft, Loader2, AlignLeft, AlignCenter, AlignRight, AlignJustify, Plus, Minus, FileText, Check } from "lucide-react";
+import { ArrowLeft, Loader2, AlignLeft, AlignCenter, AlignRight, AlignJustify, Plus, Minus, FileText, Check, MapPin, Printer } from "lucide-react";
 import api from "../api";
 import { toast } from "sonner";
 
@@ -17,12 +17,12 @@ export function TextEditor() {
   const [alignment, setAlignment] = useState("left");
   const [pageSize, setPageSize] = useState("A4");
   const [margins, setMargins] = useState("medium");
-  const [colorMode, setColorMode] = useState("bw"); // "bw" or "color"
+  const [directKioskId, setDirectKioskId] = useState("CV-001");
   const [copies, setCopies] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Constants
-  const pricePerPage = colorMode === "color" ? 10.00 : 2.30;
+  const pricePerPage = 2.30; // Always B&W
   
   // Calculate dynamic page estimation
   // Average A4 page holds ~2500 characters at 12pt single spacing.
@@ -61,14 +61,15 @@ export function TextEditor() {
         "printOptions",
         JSON.stringify({
           copies,
-          colorMode,
+          colorMode: "bw",
           doubleSided: "single",
           pageSelection: "all",
           pageRange: "",
           orientation: "portrait",
           totalPages: fileData.pageCount,
           totalCost: fileData.pageCount * copies * pricePerPage,
-          isBlankSheet: false
+          isBlankSheet: false,
+          directKioskId: directKioskId?.startsWith("SV-002") ? "SV-002" : directKioskId,
         })
       );
 
@@ -312,56 +313,101 @@ export function TextEditor() {
                   </div>
                 </div>
 
-                {/* Print Options Quick Config */}
-                <div className="w-full grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-slate-100">
+                {/* Print Destination Selection */}
+                <div className="w-full space-y-3 mt-4 pt-4 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Where do you want to print this?</label>
                   
-                  {/* Color Mode */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Color Mode</label>
-                    <div className="flex border border-slate-200 rounded-lg overflow-hidden h-10 bg-white">
-                      <button
-                        onClick={() => setColorMode("bw")}
-                        className={`flex-1 h-full text-xs font-bold uppercase transition-all ${
-                          colorMode === "bw"
-                            ? "bg-slate-900 text-white"
-                            : "text-slate-500 hover:bg-slate-50"
-                        }`}
-                      >
-                        B&W (₹2.30)
-                      </button>
-                      <button
-                        onClick={() => setColorMode("color")}
-                        className={`flex-1 h-full text-xs font-bold uppercase transition-all ${
-                          colorMode === "color"
-                            ? "bg-gradient-to-tr from-blue-600 to-purple-600 text-white"
-                            : "text-slate-500 hover:bg-slate-50"
-                        }`}
-                      >
-                        Color (₹10)
-                      </button>
+                  {/* MIMO 1.0 */}
+                  <div 
+                    onClick={() => setDirectKioskId("CV-001")}
+                    className={`group p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-center justify-between gap-3 ${
+                      directKioskId === 'CV-001' 
+                        ? 'border-[#093765] bg-blue-50/20 shadow-sm' 
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg transition-all ${
+                        directKioskId === 'CV-001' ? 'bg-[#093765] text-white' : 'bg-slate-100 text-slate-400'
+                      }`}>
+                        <Printer className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="text-left">
+                        <p className={`text-sm font-bold flex items-center gap-2 ${
+                          directKioskId === 'CV-001' ? 'text-[#093765]' : 'text-slate-700'
+                        }`}>
+                          MIMO 1.0
+                          <Badge className="bg-slate-700 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black border-0">
+                            B&W
+                          </Badge>
+                        </p>
+                        <p className="text-xs text-slate-500 font-medium leading-none mt-1">C. V. Raman Block</p>
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                      directKioskId === 'CV-001' 
+                        ? 'bg-[#093765] border-[#093765] text-white' 
+                        : 'border-slate-200 bg-transparent'
+                    }`}>
+                      {directKioskId === 'CV-001' && <Check className="w-3 h-3" strokeWidth={3} />}
                     </div>
                   </div>
 
-                  {/* Copies */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Copies</label>
-                    <div className="flex items-center border border-slate-200 rounded-lg bg-white h-10 overflow-hidden">
-                      <button
-                        onClick={() => setCopies(prev => Math.max(1, prev - 1))}
-                        className="flex-1 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="w-10 text-center text-sm font-bold text-slate-700">{copies}</span>
-                      <button
-                        onClick={() => setCopies(prev => Math.min(99, prev + 1))}
-                        className="flex-1 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
+                  {/* MIMO 2.0 */}
+                  <div 
+                    onClick={() => setDirectKioskId("SV-002")}
+                    className={`group p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-center justify-between gap-3 ${
+                      directKioskId === 'SV-002' 
+                        ? 'border-[#093765] bg-blue-50/20 shadow-sm' 
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg transition-all ${
+                        directKioskId === 'SV-002' ? 'bg-[#093765] text-white' : 'bg-slate-100 text-slate-400'
+                      }`}>
+                        <Printer className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="text-left">
+                        <p className={`text-sm font-bold flex items-center gap-2 ${
+                          directKioskId === 'SV-002' ? 'text-[#093765]' : 'text-slate-700'
+                        }`}>
+                          MIMO 2.0
+                          <Badge className="bg-slate-700 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black border-0">
+                            B&W
+                          </Badge>
+                        </p>
+                        <p className="text-xs text-slate-500 font-medium leading-none mt-1">Swami Vivekananda Block</p>
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                      directKioskId === 'SV-002' 
+                        ? 'bg-[#093765] border-[#093765] text-white' 
+                        : 'border-slate-200 bg-transparent'
+                    }`}>
+                      {directKioskId === 'SV-002' && <Check className="w-3 h-3" strokeWidth={3} />}
                     </div>
                   </div>
+                </div>
 
+                {/* Copies Config */}
+                <div className="w-full flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Copies</label>
+                  <div className="flex items-center border border-slate-200 rounded-lg bg-white h-10 w-32 overflow-hidden">
+                    <button
+                      onClick={() => setCopies(prev => Math.max(1, prev - 1))}
+                      className="flex-1 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-10 text-center text-sm font-bold text-slate-700">{copies}</span>
+                    <button
+                      onClick={() => setCopies(prev => Math.min(99, prev + 1))}
+                      className="flex-1 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Final Cost Summary Card */}
