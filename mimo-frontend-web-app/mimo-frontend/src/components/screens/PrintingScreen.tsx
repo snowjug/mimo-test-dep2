@@ -73,7 +73,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     completionTimerRef.current = null;
   }, []);
 
-  const animateTo100AndComplete = useCallback(() => {
+  const animateTo100AndComplete = useCallback((fast = false) => {
     if (isCompletingRef.current) return;
     isCompletingRef.current = true;
 
@@ -88,10 +88,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       const currentProgress = progressRef.current;
       if (currentProgress >= 100) {
         setStatusMsg('Print complete!');
-        // Hold at 100% for 1.5 s then transition
+        // Hold at 100% for 1.5 s then transition (or 500ms if fast mode)
         completionTimerRef.current = window.setTimeout(() => {
           onComplete();
-        }, 1500);
+        }, fast ? 500 : 1500);
         return;
       }
 
@@ -101,8 +101,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       setProgress(next);
       stepIndex++;
 
-      // Steady 400ms delay per step so it finishes smoothly and matches paper ejection
-      const delay = 400;
+      // If fast mode, animate at 10ms per step. Otherwise 400ms.
+      const delay = fast ? 10 : 400;
       tickTimerRef.current = window.setTimeout(finish, delay);
 
       // Update status message as we near the end
@@ -270,7 +270,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   // When Pi confirms done, fast-finish the bar
   useEffect(() => {
     if (printDone && isActive && !isCompletingRef.current) {
-      animateTo100AndComplete();
+      animateTo100AndComplete(true); // Pass true to fast-finish the progress bar
     }
   }, [printDone, isActive, animateTo100AndComplete]);
 
