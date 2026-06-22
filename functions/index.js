@@ -2273,7 +2273,10 @@ app.get("/kiosk/job-status", async (req, res) => {
     );
 
     if (!hasStarted) {
-      const kioskId = currentSessionDocs[0].kioskId || "CV-001";
+      const kioskId = currentSessionDocs[0].printOptions?.directKioskId || 
+                      currentSessionDocs[0].settings?.directKioskId || 
+                      currentSessionDocs[0].kioskId || 
+                      "CV-001";
       try {
         const statusDoc = await db.collection("system_status").doc(kioskId).get();
         if (statusDoc.exists) {
