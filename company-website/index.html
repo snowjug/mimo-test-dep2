@@ -1454,11 +1454,33 @@
         padding: 3.5rem 3vw 0 3vw; height: 7.5rem;
         display: flex; align-items: center; justify-content: space-between;
       }
+      @keyframes mimoShine {
+        0%   { background-position: 200% center; }
+        100% { background-position: -200% center; }
+      }
       .ds-nav-logo {
         font-family: 'Lovelo', sans-serif;
-        font-size: 3.5rem; font-weight: 900;
-        color: #111827; letter-spacing: -0.03em; text-decoration: none;
+        font-size: 2.8rem; font-weight: 900;
+        letter-spacing: -0.03em; text-decoration: none;
+        transform: translateY(-0.8rem);
+        display: inline-block;
+        background: linear-gradient(
+          105deg,
+          #111827 0%,
+          #111827 30%,
+          #ffffff 45%,
+          #c8d8ff 50%,
+          #ffffff 55%,
+          #111827 70%,
+          #111827 100%
+        );
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: mimoShine 7s linear infinite;
       }
+
       .ds-nav-links { display: flex; align-items: center; gap: 3.5rem; transform: translateY(-1.2rem); }
       .ds-nav-links a {
         font-size: 1.1rem; font-weight: 600;
@@ -1512,6 +1534,9 @@
         justify-content: space-between;
         gap: 3rem; align-items: center;
         transform: translateY(-5rem);
+      }
+      .ds-hero-text {
+        transform: translateY(calc(-0.8rem - 2px));
       }
       .ds-hero-eyebrow {
         display: inline-flex; align-items: center;
@@ -1573,7 +1598,6 @@
       .ds-hero-image {
         width: 100%; height: auto;
         object-fit: contain;
-        /* Shave off the dirty fuzzy edges from the background removal */
         clip-path: inset(3.2% 4.5% 2% 4.5%);
         filter: contrast(1.02) saturate(1.05);
       }
@@ -1587,6 +1611,9 @@
       .ds-stats-bar {
         background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
         padding: 2.5rem 0;
+        margin-top: -7.5rem;
+        position: relative;
+        z-index: 10;
       }
       .ds-stats-inner {
         max-width: 1200px; margin: 0 auto; padding: 0 2.5rem;
@@ -1623,9 +1650,9 @@
       .ds-three-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
       .ds-card {
         background: linear-gradient(185deg, #fff 0%, #f9faff 100%);
-        border: 1px solid rgba(74,107,255,0.14);
+        border: 1px solid rgba(74, 107, 255, 0.4);
         border-radius: 1.5rem; padding: 2rem 1.5rem;
-        box-shadow: 0 12px 32px -4px rgba(74,107,255,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+        box-shadow: 0 12px 32px -4px rgba(74, 107, 255, 0.15), inset 0 1px 0 rgba(255,255,255,0.8);
         transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s, border-color 0.35s;
         text-align: center;
       }
@@ -1654,9 +1681,9 @@
       .ds-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
       .ds-feature-card {
         background: linear-gradient(185deg, #fff 0%, #f9faff 100%);
-        border: 2px solid rgba(74,107,255,0.14);
+        border: 1px solid rgba(74, 107, 255, 0.4);
         border-radius: 1.5rem; padding: 1.75rem;
-        box-shadow: 0 12px 32px -4px rgba(74,107,255,0.07);
+        box-shadow: 0 12px 32px -4px rgba(74, 107, 255, 0.15);
         transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s, border-color 0.35s;
       }
       .ds-feature-card:hover { transform: translateY(-5px); box-shadow: 0 20px 44px -8px rgba(74,107,255,0.14); border-color: rgba(74,107,255,0.28); }
@@ -1675,9 +1702,9 @@
       .ds-trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
       .ds-trust-card {
         background: linear-gradient(185deg, #fff 0%, #f9faff 100%);
-        border: 2px solid rgba(74,107,255,0.14);
+        border: 1px solid rgba(74, 107, 255, 0.4);
         border-radius: 1.5rem; padding: 2rem 1.5rem; text-align: center;
-        box-shadow: 0 12px 32px -4px rgba(74,107,255,0.07);
+        box-shadow: 0 12px 32px -4px rgba(74, 107, 255, 0.15);
         transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s;
       }
       .ds-trust-card:hover { transform: translateY(-4px); box-shadow: 0 20px 44px -8px rgba(74,107,255,0.14); }
@@ -1699,20 +1726,33 @@
       /* ─ CTA BANNER ─ */
       .ds-cta {
         background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
-        padding: 5rem 0; text-align: center;
-        position: relative; overflow: hidden;
+        padding: 0; position: relative; overflow: hidden;
       }
-      .ds-cta::before {
-        content: ''; position: absolute; top: -60px; right: -60px;
-        width: 300px; height: 300px; border-radius: 50%;
-        background: rgba(255,255,255,0.06);
+      .ds-cta-content {
+        padding: 4rem 2.5rem;
+        width: 100%;
+        text-align: center;
       }
-      .ds-cta::after {
-        content: ''; position: absolute; bottom: -60px; left: -60px;
-        width: 240px; height: 240px; border-radius: 50%;
-        background: rgba(255,255,255,0.04);
+      .ds-cta-watermark {
+        font-size: 10rem; font-weight: 900;
+        line-height: 1;
+        color: #ffffff;
+        font-family: 'Lovelo', 'Outfit', sans-serif;
+        letter-spacing: 0.05em; pointer-events: none;
+        white-space: nowrap; user-select: none;
       }
-      .ds-cta-inner { max-width: 1200px; margin: 0 auto; padding: 0 2.5rem; position: relative; z-index: 1; }
+      .ds-cta-subtitle {
+        font-size: 1.75rem; font-weight: 500;
+        color: rgba(255, 255, 255, 0.9);
+        margin-top: 0.5rem;
+        letter-spacing: 0.02em;
+      }
+      .ds-cta-inner {
+        max-width: 1400px; margin: 0 auto; padding: 0;
+        display: flex; align-items: center;
+        justify-content: center;
+        position: relative; z-index: 1;
+      }
       .ds-cta h2 { font-size: 2.625rem; font-weight: 900; color: #fff; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 0.75rem; }
       .ds-cta p { font-size: 1.0625rem; color: rgba(255,255,255,0.82); line-height: 1.6; margin-bottom: 2rem; }
       .ds-cta-btn {
@@ -1728,7 +1768,10 @@
       /* ─ MARQUEE (reuses .marquee-track/.marquee-set) ─ */
       .ds-marquee-section {
         background: #fff; border-top: 1px solid #cbd5e1;
-        padding: 2rem 0; overflow: hidden;
+        padding: 3rem 0; overflow: hidden;
+      }
+      .ds-marquee-section .marquee-set img {
+        height: 140px;
       }
       .ds-marquee-title {
         text-align: center; font-size: 1.5rem; font-weight: 700;
@@ -1743,8 +1786,9 @@
         display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
         gap: 3rem; margin-bottom: 2.5rem;
       }
-      .ds-footer-brand h2 { font-size: 1.625rem; font-weight: 900; color: #174A87; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
-      .ds-footer-logo { width: 2.5rem; height: 2.5rem; object-fit: contain; border-radius: 0.5rem; margin-bottom: 0.75rem; display: block; }
+      .ds-footer-logo-wrap { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+      .ds-footer-brand h2 { font-size: 1.625rem; font-weight: 900; color: #174A87; letter-spacing: -0.03em; margin-bottom: 0; }
+      .ds-footer-logo { width: 2.5rem; height: 2.5rem; object-fit: contain; border-radius: 0.5rem; display: block; }
       .ds-footer-tagline { font-size: 0.9rem; color: #6B7280; line-height: 1.6; margin-bottom: 1rem; max-width: 280px; }
       .ds-footer-address { font-size: 0.8125rem; color: #6B7280; line-height: 1.7; }
       .ds-footer-col h4 { font-size: 0.9375rem; font-weight: 700; color: #111827; margin-bottom: 1.125rem; }
@@ -1753,7 +1797,7 @@
       .ds-footer-col a { font-size: 0.875rem; color: #6B7280; text-decoration: none; transition: color .2s; }
       .ds-footer-col a:hover { color: #4A6BFF; }
       .ds-footer-divider { height: 1px; background: #e5e7eb; margin-bottom: 1.5rem; }
-      .ds-footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+      .ds-footer-bottom { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; text-align: center; }
       .ds-footer-copy { font-size: 0.8125rem; color: #9CA3AF; }
       .ds-footer-credit { font-size: 0.75rem; color: #9CA3AF; }
       .ds-footer-credit strong { color: #4A6BFF; }
@@ -2217,9 +2261,9 @@
       <div class="footer-col">
         <h4>Support</h4>
         <ul>
-          <li><a href="#">Contact Support</a></li>
-          <li><a href="#">Report Issue</a></li>
-          <li><a href="#">Feedback</a></li>
+          <li><a href="https://wa.me/919364028349?text=Namastey%20MIMO%20%F0%9F%91%8B%0A%0AI%20need%20some%20assistance%20with%20my%20recent%20print%20order.%20Could%20you%20please%20help%20me%3F" target="_blank" rel="noopener noreferrer">Contact Support</a></li>
+          <li><a href="https://wa.me/919364028349?text=Namastey%20MIMO%20%F0%9F%91%8B%0A%0AI%20would%20like%20to%20explore%20advertising%20opportunities%20with%20MIMO.%20Please%20share%20details%20regarding%20ad%20placements%2C%20audience%20reach%2C%20and%20pricing." target="_blank" rel="noopener noreferrer">Advertise with Us</a></li>
+          <li><a href="https://wa.me/919364028349?text=Hey%20MIMO%20%F0%9F%91%8B%0A%0AI%20wanted%20to%20share%20some%20feedback%20about%20my%20experience%20with%20MIMO." target="_blank" rel="noopener noreferrer">Feedback</a></li>
           <li><a href="tel:+918123028797">+91 8123028797</a></li>
           <li><a href="#">Mon–Fri, 9AM–6PM IST</a></li>
         </ul>
@@ -2229,13 +2273,7 @@
     <div class="footer-divider"></div>
     <div class="footer-bottom">
       <div class="footer-bottom-copy">&copy; 2025 VisionPrintt. All rights reserved.</div>
-      <div class="footer-legal">
-        <a href="#">Privacy Policy</a>
-        <span>|</span>
-        <a href="#">Terms of Service</a>
-        <span>|</span>
-        <a href="#">Cookies</a>
-      </div>
+
       <div class="footer-credit">Designed &amp; developed by <strong>Rathindra</strong></div>
     </div>
   </footer>
@@ -2461,15 +2499,7 @@
       </div>
     </div>
 
-    <!-- ── CTA Banner ── -->
-    <div class="desktop-cta-card">
-      <h3>Ready to Print?</h3>
-      <p>Join 1,600+ students already printing smarter on campus. Upload, pay, collect — done in seconds.</p>
-      <a href="https://printmimo.tech" class="desktop-cta-btn">
-        Start Printing Now
-        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-    </div>
+
 
   </div><!-- /desktop-panel -->
 
@@ -2579,11 +2609,11 @@
   <div class="ds-stats-bar">
     <div class="ds-stats-inner">
       <div class="ds-stat-item">
-        <div class="ds-stat-num" data-target="1600" data-suffix="+">0</div>
+        <div class="ds-stat-num">1,600+</div>
         <div class="ds-stat-label">Happy Students</div>
       </div>
       <div class="ds-stat-item">
-        <div class="ds-stat-num" data-target="2">0</div>
+        <div class="ds-stat-num">2</div>
         <div class="ds-stat-label">Campus Kiosks</div>
       </div>
       <div class="ds-stat-item">
@@ -2663,38 +2693,38 @@
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
           <h3>Cloud Ready</h3>
-          <p>Upload from Google Drive or your local storage. Works with any device and browser.</p>
+          <p>Upload from Drive or local storage.</p>
         </div>
         <div class="ds-feature-card">
           <div class="ds-feature-icon">
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
-          <h3>High-Quality Prints</h3>
-          <p>Professional laser printing for crisp, clear text and vibrant colors every time.</p>
+          <h3>High-Quality</h3>
+          <p>Professional laser printing for crisp, clear text.</p>
         </div>
         <div class="ds-feature-card">
           <div class="ds-feature-icon">
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
           <h3>No App Needed</h3>
-          <p>Works smoothly in any mobile browser. No downloads, no installs, no friction.</p>
+          <p>Works smoothly in any mobile browser.</p>
         </div>
         <div class="ds-feature-card">
           <div class="ds-feature-icon">🕒</div>
           <h3>Convenient Access</h3>
-          <p>Kiosks are placed strategically in student zones and available during regular campus hours.</p>
+          <p>Kiosks are available throughout regular campus hours.</p>
         </div>
         <div class="ds-feature-card">
           <div class="ds-feature-icon">💵</div>
           <h3>Pay What You Print</h3>
-          <p>B&amp;W at ₹2.30/page · Color at ₹10/page. Transparent pricing, zero hidden fees.</p>
+          <p>Transparent pricing, no hidden fees. Ever.</p>
         </div>
         <div class="ds-feature-card">
           <div class="ds-feature-icon">
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
-          <h3>UPI &amp; Cards</h3>
-          <p>Pay via any UPI app, debit/credit card, or net banking — all through a secure gateway.</p>
+          <h3>Campus First</h3>
+          <p>Placed strategically in student zones.</p>
         </div>
       </div>
     </div>
@@ -2737,10 +2767,9 @@
   <!-- ── FAQ ── -->
   <section class="ds-section" id="ds-faq">
     <div class="ds-section-inner">
-      <div class="ds-section-header">
+      <div class="ds-section-header" style="margin-bottom: 2rem;">
         <div class="ds-section-pill">✦ FAQ</div>
-        <h2 class="ds-section-title">Got Questions?</h2>
-        <p class="ds-section-subtitle">Everything you need to know about MIMO.</p>
+        <h2 class="ds-section-title" style="margin-bottom: 0;">Got Questions?</h2>
       </div>
       <div class="ds-faq-wrap">
         <div class="faq-item" id="dsfaq-1">
@@ -2774,12 +2803,10 @@
   <!-- ── CTA BANNER ── -->
   <section class="ds-cta">
     <div class="ds-cta-inner">
-      <h2>Ready to Print Smarter?</h2>
-      <p>Join 1,600+ students already printing smarter on campus.<br>Upload, pay, collect — done in seconds.</p>
-      <a href="https://printmimo.tech" class="ds-cta-btn">
-        Start Printing Now
-        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
+      <div class="ds-cta-content">
+        <div class="ds-cta-watermark">MIMO</div>
+        <div class="ds-cta-subtitle">Smart printing solutions for modern campuses and offices</div>
+      </div>
     </div>
   </section>
 
@@ -2821,8 +2848,10 @@
     <div class="ds-footer-inner">
       <div class="ds-footer-grid">
         <div class="ds-footer-brand">
-          <img src="vision-print-logo.jpg" alt="VisionPrintt" class="ds-footer-logo">
-          <h2>VisionPrintt</h2>
+          <div class="ds-footer-logo-wrap">
+            <img src="vision-print-logo.jpg" alt="VisionPrintt" class="ds-footer-logo">
+            <h2>VisionPrintt</h2>
+          </div>
           <p class="ds-footer-tagline">Smart printing solutions for modern campuses and offices.</p>
           <div class="ds-footer-address">📍 REVA NEST, Rukmini Knowledge Park<br>Kattegenahalli, Yelahanka<br>Bengaluru — 560064</div>
         </div>
@@ -2839,21 +2868,14 @@
         <div class="ds-footer-col">
           <h4>Support</h4>
           <ul>
-            <li><a href="#">Contact Support</a></li>
-            <li><a href="#">Report an Issue</a></li>
-            <li><a href="#">Send Feedback</a></li>
+            <li><a href="https://wa.me/919364028349?text=Namastey%20MIMO%20%F0%9F%91%8B%0A%0AI%20need%20some%20assistance%20with%20my%20recent%20print%20order.%20Could%20you%20please%20help%20me%3F" target="_blank" rel="noopener noreferrer">Contact Support</a></li>
+            <li><a href="https://wa.me/919364028349?text=Namastey%20MIMO%20%F0%9F%91%8B%0A%0AI%20would%20like%20to%20explore%20advertising%20opportunities%20with%20MIMO.%20Please%20share%20details%20regarding%20ad%20placements%2C%20audience%20reach%2C%20and%20pricing." target="_blank" rel="noopener noreferrer">Advertise with Us</a></li>
+            <li><a href="https://wa.me/919364028349?text=Hey%20MIMO%20%F0%9F%91%8B%0A%0AI%20wanted%20to%20share%20some%20feedback%20about%20my%20experience%20with%20MIMO." target="_blank" rel="noopener noreferrer">Send Feedback</a></li>
             <li><a href="tel:+918123028797">+91 8123028797</a></li>
             <li><a href="#">Mon–Fri, 9AM–6PM IST</a></li>
           </ul>
         </div>
-        <div class="ds-footer-col">
-          <h4>Legal</h4>
-          <ul>
-            <li><a href="#">Privacy Policy</a></li>
-            <li><a href="#">Terms of Service</a></li>
-            <li><a href="#">Cookie Policy</a></li>
-          </ul>
-        </div>
+
       </div>
       <div class="ds-footer-divider"></div>
       <div class="ds-footer-bottom">
