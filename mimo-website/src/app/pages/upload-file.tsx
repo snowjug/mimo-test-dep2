@@ -404,7 +404,7 @@ export function UploadFile() {
 
       // 3. Tell backend to finalize and create database records
       // In Serverless architecture, this doesn't trigger conversion anymore. It just creates the job.
-      const response = await api.post("/finalize-upload", { files: uploadedFiles });
+      const response = await api.post("/finalize-upload", { files: [...uploadedFilesData, ...uploadedFiles] });
       
       // Update UI
       setFiles((prev) =>
