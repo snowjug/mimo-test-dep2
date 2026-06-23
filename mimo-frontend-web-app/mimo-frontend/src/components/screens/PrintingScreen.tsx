@@ -286,7 +286,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   // Treat as an error: the user's money may be at risk, so surface the error screen.
   useEffect(() => {
     if (!isActive || !printCode || printCode === '0000') return;
-    const stallTimeout = Math.max(120000, 30000 + Math.max(1, pages * copies) * 15000);
+
+    // Color prints are naturally slower (inkjet print heads), so we use a larger timeout.
+    const isColor = colorMode === 'color';
+    const baseStall = isColor ? 240000 : 120000;
+    const perPageStall = isColor ? 45000 : 15000;
+    const stallTimeout = Math.max(baseStall, 30000 + Math.max(1, pages * copies) * perPageStall);
+
     const stallTimer = window.setTimeout(() => {
       if (progressRef.current >= 99 && !isCompletingRef.current) {
         console.warn('[PrintingScreen] Stall timeout hit — surfacing error.');
@@ -296,7 +302,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       }
     }, stallTimeout);
     return () => clearTimeout(stallTimer);
-  }, [isActive, printCode, pages, copies, onError]);
+  }, [isActive, printCode, pages, copies, colorMode, onError]);
 
   // ─── SVG geometry ─────────────────────────────────────────────────────────
 

@@ -426,6 +426,88 @@ def fast_compress_pdf(input_pdf, is_color=False, size_threshold_kb=512):
     return input_pdf
 
 
+def get_pdf_page_count(pdf_path):
+    try:
+        res = subprocess.run(["pdfinfo", pdf_path], capture_output=True, text=True, timeout=5)
+        for line in res.stdout.splitlines():
+            if line.startswith("Pages:"):
+                return int(line.split(":")[1].strip())
+    except Exception as e:
+        print(f"⚠️ Failed to get page count for {pdf_path}: {e}")
+    return 1
+
+
+def pre_rasterize_pdf_for_color(pdf_path, is_color):
+    """
+    Pre-rasterize complex color PDFs using pdftoppm at 150 DPI to bypass
+    expensive vector rendering filters on the Pi's CPU at print time.
+    """
+    if not is_color:
+        return pdf_path
+    try:
+        import os
+        import subprocess
+        import glob
+
+        size_mb = os.path.getsize(pdf_path) / (1024 * 1024)
+        if size_mb < 1.0:  # Skip small PDFs
+            return pdf_path
+            
+        pages = get_pdf_page_count(pdf_path)
+        if pages > 5:
+            print(f"📄 Color PDF has {pages} pages (exceeds threshold of 5). Skipping pre-rasterization to prevent overhead.")
+            return pdf_path
+            
+        print(f"📄 Color PDF size is {size_mb:.2f}MB ({pages} page(s)). Pre-rasterizing via pdftoppm to speed up print...")
+        prefix = os.path.splitext(pdf_path)[0] + "_raster"
+        rasterized_pdf = os.path.splitext(pdf_path)[0] + "_rasterized.pdf"
+        
+        # Convert PDF to PNGs at 150 DPI
+        cmd = ["pdftoppm", "-png", "-r", "150", pdf_path, prefix]
+        subprocess.run(cmd, check=True, timeout=120)
+        
+        # Merge PNGs back to PDF using system python (which has Pillow compiled with JPEG support)
+        py_cmd = [
+            "/usr/bin/python3", "-c",
+            "import glob, os; from PIL import Image; "
+            f"png_files = sorted(glob.glob('{prefix}-*.png')); "
+            "if not png_files: raise Exception('No PNGs generated'); "
+            "images = [Image.open(pf).convert('RGB') for pf in png_files]; "
+            f"images[0].save('{rasterized_pdf}', save_all=True, append_images=images[1:])"
+        ]
+        subprocess.run(py_cmd, check=True, timeout=120)
+        
+        if os.path.exists(rasterized_pdf):
+            print(f"✅ Pre-rasterized PDF created: {rasterized_pdf}")
+            
+            # Clean up temp PNGs
+            png_files = sorted(glob.glob(prefix + "-*.png"))
+            for pf in png_files:
+                try:
+                    os.remove(pf)
+                except:
+                    pass
+            # Remove original vector PDF to save disk space
+            try:
+                os.remove(pdf_path)
+            except:
+                pass
+            return rasterized_pdf
+            
+    except Exception as e:
+        print(f"⚠️ Pre-rasterization failed: {e}")
+        # Clean up any leftover PNGs
+        try:
+            prefix = os.path.splitext(pdf_path)[0] + "_raster"
+            png_files = glob.glob(prefix + "-*.png")
+            for pf in png_files:
+                os.remove(pf)
+        except:
+            pass
+            
+    return pdf_path
+
+
 def is_printer_online(printer_name):
     """Check if the CUPS printer queue is enabled and accepting jobs."""
     try:
@@ -734,6 +816,7 @@ def process_job(doc_snapshot):
             # Pre-flight compression (currently a no-op, but keep the hook)
             if path.lower().endswith(".pdf"):
                 path = fast_compress_pdf(path, is_color=is_color)
+                path = pre_rasterize_pdf_for_color(path, is_color=is_color)
             return f, path, None
 
         # Run downloads in parallel — cap at 4 threads to avoid Pi memory pressure
@@ -1158,14 +1241,10 @@ def keep_warm_loop():
         except:
             pass
 
-        # Ping local printers to prevent them from entering deep sleep/USB suspend
-        # 1. Brother Laser (BW_PRINTER_NAME) -> PJL status query (no-op)
-        ping_printer_raw(BW_PRINTER_NAME, b'\x1b%-12345X@PJL INFO STATUS\r\n\x1b%-12345X')
-
-        # 2. Epson Inkjet (COLOR_PRINTER_NAME) -> ESC/P reset (no-op, only on SV-002)
-        if not IS_MONOCHROME_ONLY:
-            ping_printer_raw(COLOR_PRINTER_NAME, b'\x1b@')
-
+        # We no longer send raw print jobs to printers to prevent deep sleep,
+        # as this can trigger unwanted blank/PJL page printouts on driverless 
+        # printers (like Brother HL-L2440DW). Printer reachability is kept
+        # active via lpstat checks in the watchdog and heartbeat loops.
         time.sleep(600)
 
 # Start background threads
