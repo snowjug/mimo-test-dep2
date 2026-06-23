@@ -13,11 +13,11 @@
     },
     {
       "source": "/",
-      "destination": "/landing.html"
+      "destination": "/index.html"
     },
     {
       "source": "/landing",
-      "destination": "/landing.html"
+      "destination": "/index.html"
     },
     {
       "source": "/privacy",
@@ -45,7 +45,7 @@
     },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/app.html"
     }
   ]
 }

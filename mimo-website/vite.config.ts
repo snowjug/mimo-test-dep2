@@ -14,25 +14,37 @@ export default defineConfig({
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
           const url = req.url?.split('?')[0];
-          const rewrites = [
-            '/landing',
-            '/privacy',
-            '/terms',
-            '/cookie-policy',
-            '/contact',
-            '/about',
-            '/refund-policy'
-          ];
-          if (url === '/') {
-            req.url = '/landing.html';
-          } else if (url && rewrites.includes(url)) {
-            req.url = `${url}.html`;
+          const acceptsHtml = req.headers.accept?.includes('text/html');
+          
+          if (acceptsHtml) {
+            const staticRewrites = [
+              '/privacy',
+              '/terms',
+              '/cookie-policy',
+              '/contact',
+              '/about',
+              '/refund-policy'
+            ];
+            if (url === '/' || url === '/landing') {
+              req.url = '/index.html';
+            } else if (url && staticRewrites.includes(url)) {
+              req.url = `${url}.html`;
+            } else if (url && !url.startsWith('/api') && !url.startsWith('/admin')) {
+              req.url = '/app.html';
+            }
           }
           next();
         });
       }
     }
   ],
+  build: {
+    rollupOptions: {
+      input: {
+        app: path.resolve(__dirname, 'app.html')
+      }
+    }
+  },
   resolve: {
     alias: {
       // Alias @ to the src directory
