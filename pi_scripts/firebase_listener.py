@@ -429,7 +429,7 @@ def fast_compress_pdf(input_pdf, is_color=False, size_threshold_kb=512):
 def is_printer_online(printer_name):
     """Check if the CUPS printer queue is enabled and accepting jobs."""
     try:
-        res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=5)
+        res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=2)
         output = res.stdout.lower()
         if "disabled" in output or "stopped" in output or "not accepting" in output:
             print(f"❌ Printer {printer_name} is OFFLINE/DISABLED")
@@ -719,21 +719,39 @@ def process_job(doc_snapshot):
     target_printer = COLOR_PRINTER_NAME if is_color else BW_PRINTER_NAME
 
     try:
-        for f in files:
-            f_url = f.get("url")
+        # ── PARALLEL DOWNLOAD: fetch all files simultaneously ──────────────────
+        # Each file is downloaded in its own thread so multi-file jobs are as fast
+        # as a single-file job (limited only by the slowest individual download).
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _download_one(f):
+            """Download one file entry and return (f_dict, local_path, error)."""
+            f_url  = f.get("url")
             f_name = f.get("name", "document.pdf")
-            l_path = download_file(f_url, f_name)
-            if not l_path:
-                report_print_failure(doc_ref, f"Failed to download {f_name}")
-                return
-            local_paths.append(l_path)
+            path = download_file(f_url, f_name)
+            if not path:
+                return f, None, f"Failed to download {f_name}"
+            # Pre-flight compression (currently a no-op, but keep the hook)
+            if path.lower().endswith(".pdf"):
+                path = fast_compress_pdf(path, is_color=is_color)
+            return f, path, None
 
-            # ── Pre-flight compression ──
-            # Compress large PDFs before any processing to reduce GS + CUPS + USB load.
-            # This is the single biggest speed win for files like 5.4 MB grid PDFs.
-            if l_path.lower().endswith(".pdf"):
-                l_path = fast_compress_pdf(l_path, is_color=is_color)
+        # Run downloads in parallel — cap at 4 threads to avoid Pi memory pressure
+        download_results = [None] * len(files)  # preserve file order
+        with ThreadPoolExecutor(max_workers=min(4, len(files))) as pool:
+            future_to_idx = {pool.submit(_download_one, f): i for i, f in enumerate(files)}
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                f_entry, l_path, err = future.result()
+                if err:
+                    # One file failed — abort the whole job
+                    report_print_failure(doc_ref, err)
+                    return
+                download_results[idx] = (f_entry, l_path)
+                local_paths.append(l_path)
 
+        # ── Per-file processing (conversion, scaling) ──────────────────────────
+        for f_entry, l_path in download_results:
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             
@@ -753,7 +771,7 @@ def process_job(doc_snapshot):
                 pdf_path = convert_to_pdf(l_path)
                 if pdf_path: f_final = pdf_path
                 else:
-                    report_print_failure(doc_ref, f"LibreOffice failed for {f_name}")
+                    report_print_failure(doc_ref, f"LibreOffice failed for {f_entry.get('name', 'document')}")
                     return
             
             final_paths.append(f_final)
