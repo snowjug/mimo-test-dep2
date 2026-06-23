@@ -9,6 +9,27 @@ export default defineConfig({
     // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
+    {
+      name: 'static-pages-rewrite',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const url = req.url?.split('?')[0];
+          const rewrites = [
+            '/landing',
+            '/privacy',
+            '/terms',
+            '/cookie-policy',
+            '/contact',
+            '/about',
+            '/refund-policy'
+          ];
+          if (url && rewrites.includes(url)) {
+            req.url = `${url}.html`;
+          }
+          next();
+        });
+      }
+    }
   ],
   resolve: {
     alias: {
