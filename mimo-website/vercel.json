@@ -12,6 +12,10 @@
       "destination": "/admin/index.html"
     },
     {
+      "source": "/",
+      "destination": "/landing.html"
+    },
+    {
       "source": "/landing",
       "destination": "/landing.html"
     },

@@ -23,7 +23,9 @@ export default defineConfig({
             '/about',
             '/refund-policy'
           ];
-          if (url && rewrites.includes(url)) {
+          if (url === '/') {
+            req.url = '/landing.html';
+          } else if (url && rewrites.includes(url)) {
             req.url = `${url}.html`;
           }
           next();
