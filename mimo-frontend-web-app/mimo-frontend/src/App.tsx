@@ -23,6 +23,8 @@ function App() {
   const [toastMsg, setToastMsg] = useState('');
   const [toastError, setToastError] = useState(false);
   const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>('idle');
+  const [printError, setPrintError] = useState<string | undefined>(undefined);
+  const [showRefundBanner, setShowRefundBanner] = useState(false);
 
   const [jobData, setJobData] = useState<{
     userName: string;
@@ -154,6 +156,8 @@ function App() {
     setCode('');
     setJobData(null);
     setPrintStatus('idle');
+    setPrintError(undefined);
+    setShowRefundBanner(false);
     setCurrentScreen('main-interface');
   }, []);
 
@@ -221,9 +225,17 @@ function App() {
         }}
         onError={(errMsg?: string) => {
           setPrintStatus('idle');
-          setCurrentScreen('code-entry-screen');
           setCode('');
-          showToast(errMsg || 'Printer reported an error processing your document.', true);
+          // Determine if this is a print failure that may involve a refund
+          const isRefundCase = !!(errMsg && (
+            errMsg.toLowerCase().includes('refund') ||
+            errMsg.toLowerCase().includes('timed out') ||
+            errMsg.toLowerCase().includes('timeout') ||
+            errMsg.toLowerCase().includes('charged')
+          ));
+          setPrintError(errMsg || 'Something went wrong while printing your document.');
+          setShowRefundBanner(isRefundCase);
+          setCurrentScreen('system-error-screen');
         }}
       />
 
@@ -238,6 +250,8 @@ function App() {
         jobData={jobData}
         onReset={handleReset}
         onRetry={handleRetry}
+        errorMsg={printError}
+        showRefundBanner={showRefundBanner}
       />
 
       <MaintenanceScreen

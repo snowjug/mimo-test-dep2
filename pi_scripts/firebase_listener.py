@@ -569,7 +569,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         cmd.extend(file_paths)
 
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=120)
         lp_output = result.stdout.strip()
         print(f"CUPS accepted: {lp_output}")
 

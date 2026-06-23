@@ -2033,14 +2033,26 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
         const elapsedMs = new Date().getTime() - updatedAt.getTime();
         if (elapsedMs > timeoutMs) {
           anyStuck = true;
+          const userFriendlyMsg = "Print timed out. If you were charged, your refund will be processed automatically.";
           // Proactively update Firestore so it doesn't stay stuck
           try {
             await db.collection("print_jobs").doc(d.id).update({
               status: "failed",
-              printerStatus: "Print timeout: Printer not responding (check power/cable)"
+              printerStatus: userFriendlyMsg
             });
           } catch (err) {
             console.error(`Failed to update stuck job ${d.id}:`, err);
+          }
+          // Trigger auto-refund asynchronously — fire-and-forget
+          const secret = process.env.INTERNAL_WEBHOOK_SECRET;
+          if (secret) {
+            const apiBase = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+            const selfUrl = `${apiBase}/kiosk/report-failure`;
+            fetch(selfUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jobId: d.id, reason: userFriendlyMsg, secret }),
+            }).catch(e => console.error('[AUTO-REFUND] Self-call failed:', e.message));
           }
         }
       }
@@ -2050,7 +2062,7 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
       return res.json({
         status: "failed",
         isPrinted: false,
-        printerStatus: "Print timeout: Printer not responding (check power/cable)"
+        printerStatus: "Print timed out. If you were charged, your refund will be processed automatically."
       });
     }
 
@@ -2273,6 +2285,20 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       .get();
 
     if (snapshot.empty) {
+      // Secondary check: was this code already used (completed / refunded / printing)?
+      const usedSnap = await db
+        .collection("print_jobs")
+        .where("printCode", "==", printCode)
+        .where("status", "in", ["completed", "printing", "refunded", "printed", "expired"])
+        .limit(1)
+        .get();
+      if (!usedSnap.empty) {
+        const usedStatus = usedSnap.docs[0].data().status || "used";
+        const msg = usedStatus === "refunded"
+          ? "This print code has been refunded and can no longer be used."
+          : "Print code already used. Your document has already been printed with this code.";
+        return res.status(409).json({ error: msg });
+      }
       return res.status(404).json({ error: "Invalid code" });
     }
 

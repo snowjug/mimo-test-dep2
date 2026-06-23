@@ -274,18 +274,22 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     }
   }, [printDone, isActive, animateTo100AndComplete]);
 
-  // Stall timeout check to prevent infinite hangs
+  // Stall timeout check to prevent infinite hangs — if we're stuck at 99% it means
+  // polling stopped (network loss) or the backend never got a completed/failed update.
+  // Treat as an error: the user's money may be at risk, so surface the error screen.
   useEffect(() => {
     if (!isActive || !printCode || printCode === '0000') return;
     const stallTimeout = Math.max(120000, 30000 + Math.max(1, pages * copies) * 15000);
     const stallTimer = window.setTimeout(() => {
       if (progressRef.current >= 99 && !isCompletingRef.current) {
-        console.warn('[PrintingScreen] Stall timeout hit — auto-completing.');
-        animateTo100AndComplete();
+        console.warn('[PrintingScreen] Stall timeout hit — surfacing error.');
+        if (onError) {
+          onError('Print timed out. If you were charged, your refund will be processed automatically.');
+        }
       }
     }, stallTimeout);
     return () => clearTimeout(stallTimer);
-  }, [isActive, printCode, pages, copies, animateTo100AndComplete]);
+  }, [isActive, printCode, pages, copies, onError]);
 
   // ─── SVG geometry ─────────────────────────────────────────────────────────
 

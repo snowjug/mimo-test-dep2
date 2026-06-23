@@ -9,9 +9,11 @@ interface SystemErrorScreenProps {
     } | null;
     onReset: () => void;
     onRetry: () => void;
+    errorMsg?: string;
+    showRefundBanner?: boolean;
 }
 
-export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, jobData, onReset, onRetry }) => {
+export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, jobData, onReset, onRetry, errorMsg, showRefundBanner }) => {
     const firstName = jobData?.userName?.split(' ')[0] || 'there';
 
     return (
@@ -41,10 +43,25 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                 <div className="err-glass-card">
                     <div className="err-card-border" />
                     <div className="err-apology-content">
-                        <p className="err-apology-main">We apologize for the inconvenience. Something went wrong while printing your document.</p>
-                        <p className="err-retry-line">PLEASE TRY AGAIN.</p>
+                        <p className="err-apology-main">
+                            {errorMsg || 'We apologize for the inconvenience. Something went wrong while printing your document.'}
+                        </p>
+                        {!showRefundBanner && (
+                            <p className="err-retry-line">PLEASE TRY AGAIN.</p>
+                        )}
                     </div>
                 </div>
+
+                {/* ── Refund Banner ── */}
+                {showRefundBanner && (
+                    <div className="err-refund-banner err-a2">
+                        <div className="err-refund-icon">💚</div>
+                        <div className="err-refund-text">
+                            <strong>Refund in Progress</strong>
+                            <span>If you were charged, your payment will be refunded within 5–7 business days.</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
 
@@ -54,18 +71,20 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
             {/* ── BOTTOM SECTION ── */}
             <div className="err-bottom err-a3">
                 <div className="err-buttons">
+                    {!showRefundBanner && (
+                        <button
+                            className="err-btn-white"
+                            onClick={onRetry}
+                            onPointerDown={e => (e.currentTarget.style.transform = 'scale(0.95)')}
+                            onPointerUp={e => (e.currentTarget.style.transform = '')}
+                            onPointerLeave={e => (e.currentTarget.style.transform = '')}
+                        >
+                            <span className="material-symbols-outlined err-spin">refresh</span>
+                            Try Again
+                        </button>
+                    )}
                     <button
-                        className="err-btn-white"
-                        onClick={onRetry}
-                        onPointerDown={e => (e.currentTarget.style.transform = 'scale(0.95)')}
-                        onPointerUp={e => (e.currentTarget.style.transform = '')}
-                        onPointerLeave={e => (e.currentTarget.style.transform = '')}
-                    >
-                        <span className="material-symbols-outlined err-spin">refresh</span>
-                        Try Again
-                    </button>
-                    <button
-                        className="err-btn-glass"
+                        className={showRefundBanner ? 'err-btn-white' : 'err-btn-glass'}
                         onClick={onReset}
                         onPointerDown={e => (e.currentTarget.style.transform = 'scale(0.95)')}
                         onPointerUp={e => (e.currentTarget.style.transform = '')}
@@ -167,6 +186,54 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     margin: 0;
                     line-height: 1;
                     opacity: 1;
+                }
+
+                /* ── Refund Banner ── */
+                .err-refund-banner {
+                    display: flex;
+                    align-items: center;
+                    gap: 24px;
+                    padding: 24px 40px;
+                    background: linear-gradient(135deg, rgba(0, 200, 140, 0.18), rgba(0, 242, 180, 0.10));
+                    border: 1.5px solid rgba(0, 230, 160, 0.45);
+                    border-radius: 24px;
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
+                    box-shadow: 0 0 40px rgba(0, 200, 140, 0.18), inset 0 1px 0 rgba(255,255,255,0.08);
+                    max-width: 900px;
+                    animation: refund-glow-pulse 3s ease-in-out infinite;
+                }
+
+                @keyframes refund-glow-pulse {
+                    0%, 100% { box-shadow: 0 0 30px rgba(0, 200, 140, 0.15), inset 0 1px 0 rgba(255,255,255,0.08); }
+                    50%       { box-shadow: 0 0 60px rgba(0, 200, 140, 0.32), inset 0 1px 0 rgba(255,255,255,0.08); }
+                }
+
+                .err-refund-icon {
+                    font-size: 48px;
+                    flex-shrink: 0;
+                    filter: drop-shadow(0 0 10px rgba(0, 230, 160, 0.6));
+                }
+
+                .err-refund-text {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    text-align: left;
+                }
+
+                .err-refund-text strong {
+                    font-size: 32px;
+                    font-weight: 800;
+                    color: #00e6a0;
+                    letter-spacing: 0.01em;
+                }
+
+                .err-refund-text span {
+                    font-size: 26px;
+                    font-weight: 400;
+                    color: rgba(255, 255, 255, 0.75);
+                    line-height: 1.4;
                 }
 
                 /* ── POP BADGE ── */
