@@ -42,7 +42,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const [typedTitle, setTypedTitle]     = useState('');
   const [typedSub, setTypedSub]         = useState('');
   const [printDone, setPrintDone]       = useState(false);   // true once Pi confirms
-  const setStatusMsg = (_msg: string) => {};
+  const [statusMsg, setStatusMsg]       = useState('Warming up printer…');
 
   const progressRef         = useRef(0);   // mirror of progress for closures
   const tickTimerRef        = useRef<number | null>(null);
@@ -150,10 +150,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     const totalSheets = Math.max(1, pages * copies);
 
     // ── Target total time for the 0→99% animation ─────────────────────────────
-    // Based on optimized proactive wakeup: ~3s warmup + ~1.5s per page
-    // This keeps 1-sheet jobs lightning fast (~4.5s) and multi-sheet jobs proportional.
-    const speedFactor = colorMode === 'color' ? 5.0 : 1.5; // seconds per sheet
-    const totalAnimMs = 5000 + totalSheets * speedFactor * 1000;
+    // Updated with realistic system times: B&W laser base ~12s (+1.5s per page),
+    // Color inkjet base ~15s (+30s per page).
+    const isColor = colorMode === 'color';
+    const baseWarmup = isColor ? 15000 : 12000;
+    const speedFactor = isColor ? 30000 : 1500;
+    const totalAnimMs = baseWarmup + totalSheets * speedFactor;
     const baseDelay    = Math.max(50, totalAnimMs / 99); // ms per 1% step
 
     const tick = () => {
@@ -166,11 +168,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         if (!printCode || printCode === '0000') {
           animateTo100AndComplete();
         } else {
-          setStatusMsg(
-            totalSheets === 1
-              ? 'Printing…'
-              : `Printing page ${totalSheets} of ${totalSheets}…`
-          );
+          setStatusMsg('Completing print job…');
         }
         return;
       }
@@ -180,8 +178,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       setProgress(next);
 
       // ── Phase-based delay multipliers & status text ────────────────────────
-      // All phases share baseDelay so total duration always matches the job size.
-      // Multipliers only shift emphasis: warmup feels slower, spooling faster.
       let delay: number;
       if (next <= 20) {
         // Warm-up (0→20%): 1.4× — visible hesitation while drum heats up
@@ -192,9 +188,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         delay = baseDelay * 0.75;
         setStatusMsg('Spooling document…');
       } else {
-        // Printing (35→99%): base pace — 1 tick per sheet-proportional interval
+        // Printing (35→99%): base pace
         delay = baseDelay;
-        // Show page progress: which "page" are we on out of totalSheets
         const printingPct  = next - 35;           // 0…64
         const currentPage  = Math.min(
           totalSheets,
@@ -204,6 +199,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           totalSheets === 1
             ? `Printing…`
             : `Printing page ${currentPage} of ${totalSheets}…`
+        );
+      }
+
+      // Creep / Deceleration logic: if we are close to 99%, slow down the progress tick
+      // to avoid getting stuck at a single number before physical completion.
+      if (next > 85 && next < 99) {
+        const factor = 1 + Math.pow((next - 85) / 3, 1.8);
+        delay = delay * factor;
+        setStatusMsg(
+          totalSheets === 1
+            ? `Finishing print…`
+            : `Ejecting page ${totalSheets} of ${totalSheets}…`
         );
       }
 
@@ -393,9 +400,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           <h2 style={{ fontSize: '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-3px', lineHeight: '1.05', display: 'flex' }}>
             <span className={isActive ? "data-text-highlight" : ""}>{typedTitle}</span>
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '36px', fontWeight: 500, lineHeight: '1.4', whiteSpace: 'pre-line' }}>
+          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '36px', fontWeight: 500, lineHeight: '1.4', whiteSpace: 'pre-line', marginBottom: '15px' }}>
             {typedSub}
           </p>
+          {!isCompleted && (
+            <p style={{ color: '#00f2fe', fontSize: '24px', fontWeight: 600, opacity: 0.95, letterSpacing: '0.5px', textShadow: '0 0 10px rgba(0,242,254,0.3)', minHeight: '36px' }}>
+              {statusMsg}
+            </p>
+          )}
         </div>
       </div>
 
