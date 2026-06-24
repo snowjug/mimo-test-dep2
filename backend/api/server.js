@@ -758,7 +758,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const now = new Date();
-    const { printOptions: bodyPrintOptions, isFreeBypass, internalSecret } = req.body || {};
+    const { printOptions: bodyPrintOptions, isFreeBypass, internalSecret, orderId } = req.body || {};
 
     // ─── SECURITY MEASURE ──────────────────────────────────────────
     // The frontend should ONLY call this endpoint directly if amount <= 0.
@@ -770,11 +770,15 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     }
     // ───────────────────────────────────────────────────────────────
 
-    const snapshot = await db
-      .collection("print_jobs")
+    let queryRef = db.collection("print_jobs")
       .where("userId", "==", userId)
-      .where("status", "in", ["pending", "paid", "pending_conversion", "processing"])
-      .get();
+      .where("status", "in", ["pending", "paid", "pending_conversion", "processing"]);
+
+    if (orderId) {
+      queryRef = queryRef.where("orderId", "==", orderId);
+    }
+
+    const snapshot = await queryRef.get();
 
     // Filter jobs that don't have a printCode yet
     let jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
@@ -794,7 +798,9 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       const recentJob = sortedDocs.find(doc => doc.data().printCode);
       if (recentJob) {
         console.log(`[PAYMENT-SUCCESS] Returning existing code for user ${userId}`);
-        return res.json({ printCode: recentJob.data().printCode });
+        const jobData = recentJob.data();
+        const directKioskId = jobData.printOptions?.directKioskId || jobData.settings?.directKioskId || jobData.kioskId || null;
+        return res.json({ printCode: recentJob.data().printCode, directKioskId });
       }
     }
 
@@ -1573,7 +1579,7 @@ app.get("/verify-payment/:orderId", async (req, res) => {
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         const internalRes = await axios.post(
           `http://127.0.0.1:${process.env.PORT || 3000}/payment-success`,
-          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
         printCode = internalRes.data.printCode;
@@ -1665,7 +1671,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         await axios.post(
           `http://localhost:${process.env.PORT || 3000}/payment-success`,
-          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
       } catch (internalErr) {
@@ -2491,21 +2497,17 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         continue;
       }
 
-      const directKioskId = data.printOptions?.directKioskId;
       const colorMode = data.colorMode || data.printOptions?.colorMode;
+      const isColor = colorMode === "color" || data.color === true || data.printOptions?.colorMode === "color";
       
       // Determine the true destination kiosk
-      let finalKioskId = kioskId;
-      if (directKioskId) {
-        finalKioskId = directKioskId;
-      }
-
-      // CV-001 only has a monochrome Brother printer — always route color to SV-002 (Epson)
-      if (colorMode === "color") {
-        if (finalKioskId === "CV-001") {
-          console.warn(`[ROUTING] Color job requested on CV-001 (monochrome only) — rerouting to SV-002 (Epson color)`);
-        }
-        finalKioskId = "SV-002"; // Force ALL color jobs to the SV-002 Epson kiosk
+      let finalKioskId = kioskId || "CV-001";
+      if (isColor) {
+        // Color printing only supported on SV-002 (Epson)
+        finalKioskId = "SV-002";
+      } else {
+        // B&W printing supported on both - use physical kiosk where user is currently standing
+        finalKioskId = kioskId || "CV-001";
       }
 
       // Mark sending to Pi
