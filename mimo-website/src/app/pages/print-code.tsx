@@ -11,7 +11,30 @@ import { AdSenseBlock } from "../components/AdSenseBlock";
 
 export function PrintCode() {
   const navigate = useNavigate();
-  const [printCode, setPrintCode] = useState(() => sessionStorage.getItem("printCode") || "");
+  const [printCode, setPrintCode] = useState(() => {
+    // Primary: sessionStorage (set within the same browser tab session)
+    let code = sessionStorage.getItem("printCode") || "";
+    if (!code) {
+      // Fallback: localStorage — survives Cashfree UPI redirect on mobile.
+      // Only use it if it was stored within the last 30 minutes.
+      const ts = parseInt(localStorage.getItem("mimo_printCode_ts") || "0", 10);
+      const age = Date.now() - ts;
+      if (age < 30 * 60 * 1000) {
+        code = localStorage.getItem("mimo_printCode") || "";
+        if (code) {
+          // Re-populate sessionStorage so the rest of the page works normally
+          sessionStorage.setItem("printCode", code);
+          const kioskId = localStorage.getItem("mimo_directKioskId") || "";
+          if (kioskId) sessionStorage.setItem("directKioskId", kioskId);
+        }
+      }
+      // Always clean up localStorage entry regardless — one-time use
+      localStorage.removeItem("mimo_printCode");
+      localStorage.removeItem("mimo_printCode_ts");
+      localStorage.removeItem("mimo_directKioskId");
+    }
+    return code;
+  });
   const [files, setFiles] = useState<any[]>(() => {
     const storedFiles = sessionStorage.getItem("printFiles");
     if (storedFiles && storedFiles !== "undefined") {

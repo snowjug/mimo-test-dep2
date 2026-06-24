@@ -150,13 +150,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     const totalSheets = Math.max(1, pages * copies);
 
     // ── Target total time for the 0→99% animation ─────────────────────────────
-    // Updated with realistic system times: B&W laser base ~12s (+1.5s per page),
-    // Color inkjet base ~15s (+30s per page).
+    // Deliberately slow animation so the bar NEVER races ahead of the actual print.
+    // When the Pi confirms physical completion, animateTo100AndComplete(true) snaps
+    // the bar to 100% at 10ms/step (~1 second), giving a satisfying rush at the end.
+    // B&W laser: ~45s total (base 30s + 15s per sheet)
+    // Color inkjet: ~90s total (base 30s + 60s per sheet)
     const isColor = colorMode === 'color';
-    const baseWarmup = isColor ? 15000 : 12000;
-    const speedFactor = isColor ? 30000 : 1500;
+    const baseWarmup = isColor ? 30000 : 30000;
+    const speedFactor = isColor ? 60000 : 15000;
     const totalAnimMs = baseWarmup + totalSheets * speedFactor;
-    const baseDelay    = Math.max(50, totalAnimMs / 99); // ms per 1% step
+    const baseDelay    = Math.max(100, totalAnimMs / 99); // ms per 1% step
 
     const tick = () => {
       if (isCompletingRef.current) return;
@@ -202,10 +205,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
       }
 
-      // Creep / Deceleration logic: if we are close to 99%, slow down the progress tick
-      // to avoid getting stuck at a single number before physical completion.
-      if (next > 85 && next < 99) {
-        const factor = 1 + Math.pow((next - 85) / 3, 1.8);
+      // Creep / Deceleration: from 80% onward the bar slows dramatically to "wait" for
+      // the Pi's physical completion signal. The steeper the exponent the more it freezes
+      // near 99%. This makes the final fast-rush to 100% feel earned and satisfying.
+      if (next > 80 && next < 99) {
+        const factor = 1 + Math.pow((next - 80) / 2.5, 2.2);
         delay = delay * factor;
         setStatusMsg(
           totalSheets === 1
@@ -214,7 +218,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
       }
 
-      const jitter = (Math.random() - 0.5) * delay * 0.10;
+      const jitter = (Math.random() - 0.5) * delay * 0.08;
       tickTimerRef.current = window.setTimeout(tick, Math.max(150, delay + jitter));
     };
 
