@@ -2430,8 +2430,11 @@ app.post("/kiosk/print", async (req, res) => {
     const colorMode = jobData?.colorMode || jobData?.printOptions?.colorMode;
     const isColor = colorMode === "color" || jobData?.color === true || jobData?.printOptions?.colorMode === "color";
     
+    const directKioskId = jobData?.printOptions?.directKioskId || jobData?.settings?.directKioskId || jobData?.kioskId;
     let finalKioskId = kioskId || "CV-001";
-    if (isColor) {
+    if (directKioskId) {
+      finalKioskId = directKioskId;
+    } else if (isColor) {
       // Color printing only supported on SV-002 (Epson)
       finalKioskId = "SV-002";
     } else {
