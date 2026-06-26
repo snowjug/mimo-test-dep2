@@ -444,6 +444,15 @@ export function PrintCode() {
             </div>
           </div>
 
+          <Button
+            variant="outline"
+            className="w-full h-10 sm:h-11 border-slate-300 hover:bg-slate-50 text-slate-700 shadow-sm transition-all duration-200 text-[11px] sm:text-xs rounded-xl cursor-pointer font-bold uppercase tracking-wider"
+            onClick={() => window.open("https://wa.me/919364028349?text=Namastey%20MIMO%20%F0%9F%91%8B%0A%0AI%20need%20some%20assistance%20with%20my%20recent%20print%20order.%20Could%20you%20please%20help%20me%3F", "_blank")}
+          >
+            <Mail className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-slate-500" />
+            Contact Support
+          </Button>
+
           {/* --- SWIGGY-STYLE "WHILE YOU WAIT" ADS SECTION --- */}
           <div className="w-full mt-2 relative z-10 animate-in slide-in-from-bottom-12 fade-in duration-700 delay-300">
             <div className="flex items-center justify-center space-x-4 mb-3">
@@ -503,14 +512,6 @@ export function PrintCode() {
             >
               <Home className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
               Need more prints?
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full h-10 sm:h-11 border-slate-300 hover:bg-slate-50 text-slate-700 shadow-sm transition-all duration-200 text-[11px] sm:text-xs rounded-xl cursor-pointer font-bold uppercase tracking-wider"
-              onClick={() => window.open("https://wa.me/919364028349?text=Namastey%20MIMO%20%F0%9F%91%8B%0A%0AI%20need%20some%20assistance%20with%20my%20recent%20print%20order.%20Could%20you%20please%20help%20me%3F", "_blank")}
-            >
-              <Mail className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-slate-500" />
-              Contact Support
             </Button>
           </div>
         
