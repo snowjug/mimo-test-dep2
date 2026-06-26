@@ -867,6 +867,7 @@ def process_job(doc_snapshot):
                 local_paths.append(l_path)
 
         # ── Per-file processing (conversion, scaling) ──────────────────────────
+        any_file_sliced = False
         for f_entry, l_path in download_results:
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
@@ -889,6 +890,20 @@ def process_job(doc_snapshot):
                 else:
                     report_print_failure(doc_ref, f"LibreOffice failed for {f_entry.get('name', 'document')}")
                     return
+            
+            # Slice pages based on individual fileConfigs if available
+            file_name_key = f_entry.get("name")
+            file_config = print_options.get("fileConfigs", {}).get(file_name_key, {})
+            f_page_selection = file_config.get("pageSelection") or file_config.get("pagesToPrint") or "all"
+            f_page_range = None
+            if f_page_selection == "custom":
+                f_page_range = file_config.get("pageRange") or file_config.get("customPageRange")
+            
+            if f_page_range and f_final.lower().endswith(".pdf"):
+                sliced = slice_pdf_pages(f_final, f_page_range)
+                if sliced:
+                    f_final = sliced
+                    any_file_sliced = True
             
             final_paths.append(f_final)
 
@@ -1049,7 +1064,7 @@ def process_job(doc_snapshot):
         # ── Submit to CUPS ──
         # Pass doc_ref so print_file can spawn the background sync thread
         async_spawned = False
-        result = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet, doc_ref=doc_ref)
+        result = print_file(final_paths, copies, None if any_file_sliced else page_range, target_printer, photo_layout, double_sided, is_blank_sheet, doc_ref=doc_ref)
 
         if result is None:
             # Async path: background thread (wait_for_cups_job) will update Firestore when done.
