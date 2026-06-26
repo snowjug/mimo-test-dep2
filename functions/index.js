@@ -2432,17 +2432,14 @@ app.post("/kiosk/print", async (req, res) => {
     
     const directKioskId = jobData?.printOptions?.directKioskId || jobData?.settings?.directKioskId || jobData?.kioskId;
     let finalKioskId = kioskId || "CV-001";
-    if (isColor) {
+    if (directKioskId) {
+      finalKioskId = directKioskId;
+    } else if (isColor) {
       // Color printing only supported on SV-002 (Epson)
       finalKioskId = "SV-002";
-    } else if (kioskId) {
-      // B&W printing supported on both - use physical kiosk where user is currently standing
-      finalKioskId = kioskId;
-    } else if (directKioskId) {
-      // Fallback to pre-selected kiosk if no physical kiosk parameter
-      finalKioskId = directKioskId;
     } else {
-      finalKioskId = "CV-001";
+      // B&W printing supported on both - use physical kiosk where user is currently standing
+      finalKioskId = kioskId || "CV-001";
     }
     
     // Set status to printing so the Pi's firebase_listener.py picks it up

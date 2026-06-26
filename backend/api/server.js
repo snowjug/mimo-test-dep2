@@ -2503,17 +2503,14 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
       // Determine the true destination kiosk
       const directKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
       let finalKioskId = kioskId || "CV-001";
-      if (isColor) {
+      if (directKioskId) {
+        finalKioskId = directKioskId;
+      } else if (isColor) {
         // Color printing only supported on SV-002 (Epson)
         finalKioskId = "SV-002";
-      } else if (kioskId) {
-        // B&W printing supported on both - use physical kiosk where user is currently standing
-        finalKioskId = kioskId;
-      } else if (directKioskId) {
-        // Fallback to pre-selected kiosk if no physical kiosk parameter
-        finalKioskId = directKioskId;
       } else {
-        finalKioskId = "CV-001";
+        // B&W printing supported on both - use physical kiosk where user is currently standing
+        finalKioskId = kioskId || "CV-001";
       }
 
       // Mark sending to Pi
