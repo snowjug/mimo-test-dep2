@@ -655,7 +655,19 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         # ── Printer online guard ──
         if not is_printer_online(printer_name):
-            print(f"❌ Aborting: printer {printer_name} is offline.")
+            print(f"❌ Aborting: printer {printer_name} is offline. Cancelling any queued CUPS jobs to prevent ghost prints.")
+            # Cancel all queued jobs for this printer so they don't spool when printer comes back
+            try:
+                stale_res = subprocess.run(["lpstat", "-o"], capture_output=True, text=True)
+                for stale_line in stale_res.stdout.splitlines():
+                    if stale_line.startswith(printer_name + "-"):
+                        stale_parts = stale_line.split()
+                        if stale_parts:
+                            stale_job_id = stale_parts[0]
+                            print(f"🚫 Cancelling queued CUPS job {stale_job_id} (printer offline).")
+                            subprocess.run(["cancel", stale_job_id], capture_output=True)
+            except Exception as cancel_err:
+                print(f"⚠️ Failed to cancel queued CUPS jobs: {cancel_err}")
             return False
 
         # ── Page range slicing ──
@@ -1202,6 +1214,71 @@ def resume_printer_jobs(printer_name):
         print(f"⚠️ Failed to resume jobs for {printer_name}: {e}")
 
 
+def cancel_stale_cups_jobs_for_printer(printer_name):
+    """
+    When the printer comes back online, check every CUPS job queued for it.
+    If the corresponding Firestore print_job is already failed/refunded/completed,
+    cancel the CUPS spool entry so it never reprints.
+    Only jobs whose Firestore status is still 'printing' are resumed.
+    This prevents a job that was auto-refunded (because printer was off) from
+    printing again when the printer is switched back on.
+    """
+    try:
+        res = subprocess.run(["lpstat", "-o"], capture_output=True, text=True)
+        for line in res.stdout.splitlines():
+            if line.startswith(printer_name + "-"):
+                parts = line.split()
+                if not parts:
+                    continue
+                cups_job_id = parts[0]  # e.g. "Brother_HL_L2440DW_series-42"
+
+                # Try to find the Firestore job that owns this CUPS job
+                # The CUPS job title is usually the filename; we use active_jobs to match
+                # If any active Firestore job is still 'printing' → safe to resume
+                # Otherwise → cancel to prevent ghost prints
+
+                should_cancel = False
+                try:
+                    # Check ALL jobs with status=printing for this kiosk
+                    docs = db.collection('print_jobs') \
+                        .where('kioskId', '==', KIOSK_ID) \
+                        .where('status', 'in', ['failed', 'refunded', 'completed']) \
+                        .stream(timeout=10)
+                    failed_job_ids = {doc.id for doc in docs}
+
+                    # If the cups job ID suffix matches any active_jobs entry that is now failed
+                    for fj_id in failed_job_ids:
+                        if fj_id in active_jobs:
+                            should_cancel = True
+                            print(f"🚫 Watchdog: CUPS job {cups_job_id} belongs to already-failed/refunded Firestore job {fj_id} — cancelling spool to prevent ghost print.")
+                            break
+
+                    # If there are NO active jobs at all for this printer, be safe and cancel
+                    if not should_cancel:
+                        active_printing_docs = db.collection('print_jobs') \
+                            .where('kioskId', '==', KIOSK_ID) \
+                            .where('status', '==', 'printing') \
+                            .stream(timeout=10)
+                        active_printing_ids = {doc.id for doc in active_printing_docs}
+
+                        if not active_printing_ids:
+                            # No active Firestore job — this is a stale CUPS job, cancel it
+                            should_cancel = True
+                            print(f"🚫 Watchdog: No active Firestore jobs found — cancelling stale CUPS job {cups_job_id} to prevent ghost print.")
+
+                except Exception as fs_err:
+                    print(f"⚠️ Watchdog: Firestore check for CUPS job {cups_job_id} failed: {fs_err}. Cancelling job to be safe.")
+                    should_cancel = True
+
+                if should_cancel:
+                    subprocess.run(["cancel", cups_job_id], capture_output=True)
+                else:
+                    print(f"🔓 Watchdog: Resuming CUPS job {cups_job_id} on {printer_name} (Firestore job is still active)...")
+                    subprocess.run(["lp", "-i", cups_job_id, "-H", "resume"], capture_output=True)
+    except Exception as e:
+        print(f"⚠️ cancel_stale_cups_jobs_for_printer failed: {e}")
+
+
 def watchdog_loop():
     stuck_cycles = {BW_PRINTER_NAME: 0, COLOR_PRINTER_NAME: 0}
     counter = 0
@@ -1217,7 +1294,9 @@ def watchdog_loop():
                     if "disabled" in status_out:
                         print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
                         subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
-                        resume_printer_jobs(printer)
+                        # Cancel stale spool entries for jobs already failed/refunded in Firestore
+                        # before resuming to prevent ghost prints when printer comes back online
+                        cancel_stale_cups_jobs_for_printer(printer)
                     
                     # Check if printer is currently printing
                     printer_active[printer] = "printing" in status_out
@@ -1244,7 +1323,8 @@ def watchdog_loop():
                                 
                                 # Re-enable CUPS queue
                                 subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
-                                resume_printer_jobs(printer)
+                                # Cancel stale spool entries for jobs already failed/refunded in Firestore
+                                cancel_stale_cups_jobs_for_printer(printer)
                                 stuck_cycles[printer] = 0
                     else:
                         stuck_cycles[printer] = 0
