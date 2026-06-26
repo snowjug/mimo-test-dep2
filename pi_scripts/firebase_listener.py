@@ -28,6 +28,20 @@ TEMP_DIR = "/tmp/mimo_prints"
 # Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
 IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
 
+# Mapping of CUPS printer names to their USB Vendor/Product IDs
+PRINTER_USB_IDS = {
+    # SV-002 / pi
+    "Brother_HL_L2440DW_series": "04f9:0587",
+    "Epson_L3250": "04b8:118a",
+    "L3250-Series": "04b8:118a",
+    
+    # CV-001 / printpi
+    "Brother_HL_L5210DN_series_USB": "04f9:0503",
+    "Brother_HL_L5210DN_series": "04f9:0503",
+    "Brother_IPP": "04f9:0503",
+    "Brother": "04f9:0503"
+}
+
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
@@ -516,7 +530,17 @@ def pre_rasterize_pdf_for_color(pdf_path, is_color):
 
 
 def is_printer_online(printer_name):
-    """Check if the CUPS printer queue is enabled and accepting jobs."""
+    """Check if the CUPS printer queue is enabled and accepting jobs, and physically connected via USB."""
+    usb_id = PRINTER_USB_IDS.get(printer_name)
+    if usb_id:
+        try:
+            lsusb_out = subprocess.run(["lsusb"], capture_output=True, text=True, timeout=5).stdout
+            if usb_id not in lsusb_out:
+                print(f"❌ Printer {printer_name} USB ID ({usb_id}) NOT found in lsusb! Printer is physically off/disconnected.")
+                return False
+        except Exception as e:
+            print(f"⚠️ lsusb check failed: {e}")
+
     try:
         res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=2)
         output = res.stdout.lower()
@@ -1123,17 +1147,8 @@ def on_snapshot(col_snapshot, changes, read_time):
 def heartbeat_loop():
     while True:
         try:
-            status_bw = "Online"
-            status_color = "Online"
-            try:
-                res_bw = subprocess.run(["lpstat", "-p", BW_PRINTER_NAME], capture_output=True, text=True).stdout.lower()
-                status_bw = "Paused/Error" if "disabled" in res_bw or "paused" in res_bw else ("Printing" if "printing" in res_bw else "Idle")
-
-                res_color = subprocess.run(["lpstat", "-p", COLOR_PRINTER_NAME], capture_output=True, text=True).stdout.lower()
-                status_color = "Paused/Error" if "disabled" in res_color or "paused" in res_color else ("Printing" if "printing" in res_color else "Idle")
-            except:
-                status_bw = "lpstat failed"
-                status_color = "lpstat failed"
+            status_bw = "Idle" if is_printer_online(BW_PRINTER_NAME) else "Paused/Error"
+            status_color = "Idle" if is_printer_online(COLOR_PRINTER_NAME) else "Paused/Error"
                 
             db.collection("system_status").document(KIOSK_ID).set({
                 "lastSeen": firestore.SERVER_TIMESTAMP,
@@ -1142,20 +1157,6 @@ def heartbeat_loop():
         except Exception as e:
             print(f"⚠️ Heartbeat failed: {e}")
         time.sleep(30)
-
-# Mapping of CUPS printer names to their USB Vendor/Product IDs
-PRINTER_USB_IDS = {
-    # SV-002 / pi
-    "Brother_HL_L2440DW_series": "04f9:0587",
-    "Epson_L3250": "04b8:118a",
-    "L3250-Series": "04b8:118a",
-    
-    # CV-001 / printpi
-    "Brother_HL_L5210DN_series_USB": "04f9:0503",
-    "Brother_HL_L5210DN_series": "04f9:0503",
-    "Brother_IPP": "04f9:0503",
-    "Brother": "04f9:0503"
-}
 
 def reset_printer_usb(printer_name):
     usb_id = PRINTER_USB_IDS.get(printer_name)
