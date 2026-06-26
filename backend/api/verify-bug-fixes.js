@@ -31,11 +31,17 @@ async function simulatePaymentSuccess(jobRef, jobData) {
 function computeRouting(jobData, inputKioskId) {
   const directKioskId = jobData.printOptions?.directKioskId;
   const colorMode = jobData.colorMode || jobData.printOptions?.colorMode;
-  let finalKioskId = inputKioskId;
-  if (directKioskId) {
-    finalKioskId = directKioskId;
-  } else if (colorMode === "color") {
+  const isColor = colorMode === "color";
+  
+  let finalKioskId = inputKioskId || "CV-001";
+  if (isColor) {
     finalKioskId = "SV-002";
+  } else if (inputKioskId) {
+    finalKioskId = inputKioskId;
+  } else if (directKioskId) {
+    finalKioskId = directKioskId;
+  } else {
+    finalKioskId = "CV-001";
   }
   return finalKioskId;
 }
@@ -110,19 +116,19 @@ async function runTests() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // TEST 4: directKioskId override wins even for a B&W job
+  // TEST 4: physical kioskId override must win for B&W jobs
   // ─────────────────────────────────────────────────────────────────────────
-  console.log("\nTEST 4: directKioskId override must win over color routing...");
+  console.log("\nTEST 4: physical kioskId override must win for B&W jobs...");
   const directBWJobData = {
     colorMode: "monochrome",
     printOptions: { directKioskId: "SV-002", copies: 1, colorMode: "monochrome" }
   };
   const routedDirect = computeRouting(directBWJobData, "CV-001");
-  if (routedDirect === "SV-002") {
-    console.log(`  ✅ PASS: directKioskId override correctly routes to: ${routedDirect}`);
+  if (routedDirect === "CV-001") {
+    console.log(`  ✅ PASS: Physical kioskId CV-001 correctly wins: ${routedDirect}`);
     passed++;
   } else {
-    console.error(`  ❌ FAIL: Expected SV-002, got: ${routedDirect}`);
+    console.error(`  ❌ FAIL: Expected CV-001, got: ${routedDirect}`);
     failed++;
   }
 
@@ -136,6 +142,23 @@ async function runTests() {
     passed++;
   } else {
     console.error(`  ❌ FAIL: Expected SV-002, got: ${routedColorSV}`);
+    failed++;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 6: B&W job pre-selected for CV-001 but typed at SV-002 should print at SV-002
+  // ─────────────────────────────────────────────────────────────────────────
+  console.log("\nTEST 6: B&W job pre-selected for CV-001 but typed at SV-002 should print at SV-002...");
+  const preselectedBWData = {
+    colorMode: "monochrome",
+    printOptions: { directKioskId: "CV-001", copies: 1, colorMode: "monochrome" }
+  };
+  const routedPhysical = computeRouting(preselectedBWData, "SV-002");
+  if (routedPhysical === "SV-002") {
+    console.log(`  ✅ PASS: Pre-selected CV-001 job typed at SV-002 correctly prints at: ${routedPhysical}`);
+    passed++;
+  } else {
+    console.error(`  ❌ FAIL: Expected SV-002, got: ${routedPhysical}`);
     failed++;
   }
 
