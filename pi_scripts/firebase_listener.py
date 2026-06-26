@@ -542,6 +542,18 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
     print(f"⏳ [SYNC] Waiting for CUPS job {job_id} to physically finish printing...")
     try:
         while time.time() - start < timeout:
+            # Check if the Firestore document status has changed to "failed" (timed out / cancelled / refunded)
+            try:
+                doc_snap = doc_ref.get()
+                if doc_snap.exists:
+                    doc_status = doc_snap.to_dict().get("status")
+                    if doc_status == "failed":
+                        print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed in Firestore (timeout/refunded). Cancelling CUPS job {job_id}...")
+                        subprocess.run(["cancel", job_id], capture_output=True)
+                        return
+            except Exception as doc_err:
+                print(f"⚠️ [SYNC] Failed to verify job status from Firestore: {doc_err}")
+
             try:
                 res = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True, timeout=10)
                 if job_id not in res.stdout:
@@ -552,12 +564,26 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
                     if job_ok:
                         # Physical delay: give the printer time to actually eject the paper
                         # Brother laser: ~3s. Epson inkjet: ~15s.
-                        doc_dict = doc_ref.get().to_dict() or {}
+                        doc_snap_latest = doc_ref.get()
+                        doc_dict = doc_snap_latest.to_dict() or {} if doc_snap_latest.exists else {}
+                        
+                        # Double check that job wasn't failed/refunded while waiting
+                        if doc_dict.get("status") == "failed":
+                            print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed in Firestore. Cancelling CUPS job {job_id} and aborting completion.")
+                            subprocess.run(["cancel", job_id], capture_output=True)
+                            return
+
                         color_mode = doc_dict.get("colorMode", "monochrome")
                         is_inkjet = color_mode.lower() == "color"
                         paper_exit_delay = 15 if is_inkjet else 3
                         print(f"⏳ [SYNC] CUPS job {job_id} done in queue. Waiting {paper_exit_delay}s for physical paper ejection...")
                         time.sleep(paper_exit_delay)
+
+                        # Final status check after paper ejection sleep
+                        doc_snap_final = doc_ref.get()
+                        if doc_snap_final.exists and doc_snap_final.to_dict().get("status") == "failed":
+                            print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed during paper ejection sleep. Aborting completion.")
+                            return
 
                         print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
                         safe_update(doc_ref, {

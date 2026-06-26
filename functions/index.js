@@ -2478,9 +2478,12 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
     }
 
     // 1. Fetch the Order to get the actual amount paid
-    const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+    let orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
     if (orderSnapshot.empty) {
-      console.log(`[REFUND] Order ${orderId} not found.`);
+      orderSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+    }
+    if (orderSnapshot.empty) {
+      console.log(`[REFUND] Order ${orderId} not found in orders or payment_transactions.`);
       return;
     }
     const orderDoc = orderSnapshot.docs[0];
