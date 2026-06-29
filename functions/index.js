@@ -1,3 +1,4 @@
+// Deploy trigger: 2026-06-29 13:06:50
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const express = require("express");
@@ -1178,10 +1179,25 @@ app.post("/get-documents-by-code", async (req, res) => {
 
     const snapshot = await db.collection("print_jobs")
       .where("printCode", "==", printCode)
-      .where("status", "in", ["paid", "printing", "completed"])
+      .where("status", "==", "paid")
       .get();
 
-    if (snapshot.empty) return res.status(404).json({ error: "Invalid or expired print code" });
+    if (snapshot.empty) {
+      // Secondary check: was this code already used (completed / refunded / printing)?
+      const usedSnap = await db.collection("print_jobs")
+        .where("printCode", "==", printCode)
+        .where("status", "in", ["completed", "printing", "refunded", "printed", "expired"])
+        .limit(1)
+        .get();
+      if (!usedSnap.empty) {
+        const usedStatus = usedSnap.docs[0].data().status || "used";
+        const msg = usedStatus === "refunded"
+          ? "This print code has been refunded and can no longer be used."
+          : "Print code already used. Your document has already been printed with this code.";
+        return res.status(409).json({ error: msg });
+      }
+      return res.status(404).json({ error: "Invalid or expired print code" });
+    }
 
     // Get user info from first job
     const firstJob = snapshot.docs[0].data();

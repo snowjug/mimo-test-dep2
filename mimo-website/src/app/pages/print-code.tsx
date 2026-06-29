@@ -96,7 +96,7 @@ export function PrintCode() {
 
     const checkStatus = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || "https://api-upqxuj7evq-uc.a.run.app";
+        const apiUrl = "https://api-upqxuj7evq-uc.a.run.app";
         const res = await fetch(`${apiUrl}/kiosk/job-status?printCode=${printCode}`);
         const data = await res.json();
         
@@ -160,7 +160,7 @@ export function PrintCode() {
     }
     setRefundLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "https://api-upqxuj7evq-uc.a.run.app";
+      const apiUrl = "https://api-upqxuj7evq-uc.a.run.app";
       const token = localStorage.getItem("jwtToken");
       const res = await fetch(`${apiUrl}/request-refund`, {
         method: "POST",
