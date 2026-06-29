@@ -1,3 +1,4 @@
+// Deploy trigger: 2026-06-29 15:15:00
 import React, { useState, useRef, useEffect } from 'react';
 
 interface MainScreenProps {
