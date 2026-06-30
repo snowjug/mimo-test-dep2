@@ -42,13 +42,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const [typedTitle, setTypedTitle]     = useState('');
   const [typedSub, setTypedSub]         = useState('');
   const [printDone, setPrintDone]       = useState(false);   // true once Pi confirms
-  const setStatusMsg = (_msg: string) => {};
+  const [statusMsg, setStatusMsg]       = useState('Warming up printer…');
 
   const progressRef         = useRef(0);   // mirror of progress for closures
   const tickTimerRef        = useRef<number | null>(null);
   const pollTimerRef        = useRef<number | null>(null);
   const completionTimerRef  = useRef<number | null>(null);
   const isCompletingRef     = useRef(false);
+  const stallTimerRef       = useRef<number | null>(null);   // stall detector
+  const lastProgressRef     = useRef(0);                    // last recorded progress for stall check
+  const lastProgressTimeRef = useRef(Date.now());           // when progress last changed
 
   const isCompleted = progress >= 100;
 
@@ -68,9 +71,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     if (tickTimerRef.current)       clearTimeout(tickTimerRef.current);
     if (pollTimerRef.current)       clearTimeout(pollTimerRef.current);
     if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
+    if (stallTimerRef.current)      clearTimeout(stallTimerRef.current);
     tickTimerRef.current       = null;
     pollTimerRef.current       = null;
     completionTimerRef.current = null;
+    stallTimerRef.current      = null;
   }, []);
 
   const animateTo100AndComplete = useCallback((fast = false) => {
@@ -124,23 +129,27 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
         const data = await res.json();
 
+        // Reset stall timer on every successful poll response — the network is alive
+        lastProgressTimeRef.current = Date.now();
+
         if (data.status === 'completed' || data.isPrinted === true) {
           setPrintDone(true);
           // animateTo100AndComplete will be called via the printDone effect
         } else if (data.status === 'failed') {
           const errMsg = data.printerStatus || data.error || 'Printer reported an error.';
           setStatusMsg(errMsg);
+          clearAllTimers();
           if (onError) onError(errMsg);
         } else {
           // Still printing — poll again in 2 s (fast enough to catch physical completion)
           schedulePoll(2000);
         }
       } catch {
-        // Network hiccup — retry in 4 s
+        // Network hiccup — retry in 4 s but do NOT reset stall timer
         pollTimerRef.current = window.setTimeout(() => schedulePoll(2000), 4000);
       }
     }, delayMs);
-  }, [printCode, isActive, onError]);
+  }, [printCode, isActive, onError, clearAllTimers]);
 
   // ─── slow progress simulation ──────────────────────────────────────────────
 
@@ -150,11 +159,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     const totalSheets = Math.max(1, pages * copies);
 
     // ── Target total time for the 0→99% animation ─────────────────────────────
-    // Based on optimized proactive wakeup: ~3s warmup + ~1.5s per page
-    // This keeps 1-sheet jobs lightning fast (~4.5s) and multi-sheet jobs proportional.
-    const speedFactor = colorMode === 'color' ? 5.0 : 1.5; // seconds per sheet
-    const totalAnimMs = 5000 + totalSheets * speedFactor * 1000;
-    const baseDelay    = Math.max(50, totalAnimMs / 99); // ms per 1% step
+    // Progress is intentionally smooth & reasonably quick so the user sees real
+    // activity. When the Pi confirms completion, animateTo100AndComplete(true)
+    // snaps the bar to 100% at 10ms/step, giving a satisfying rush at the end.
+    // B&W laser:    ~25s total (base 15s + 8s per sheet)
+    // Color inkjet: ~50s total (base 15s + 30s per sheet)
+    const isColor = colorMode === 'color';
+    const baseWarmup  = 15000;
+    const speedFactor = isColor ? 30000 : 8000;
+    const totalAnimMs = baseWarmup + totalSheets * speedFactor;
+    const baseDelay   = Math.max(80, totalAnimMs / 99); // ms per 1% step
 
     const tick = () => {
       if (isCompletingRef.current) return;
@@ -166,11 +180,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         if (!printCode || printCode === '0000') {
           animateTo100AndComplete();
         } else {
-          setStatusMsg(
-            totalSheets === 1
-              ? 'Printing…'
-              : `Printing page ${totalSheets} of ${totalSheets}…`
-          );
+          setStatusMsg('Completing print job…');
         }
         return;
       }
@@ -180,8 +190,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       setProgress(next);
 
       // ── Phase-based delay multipliers & status text ────────────────────────
-      // All phases share baseDelay so total duration always matches the job size.
-      // Multipliers only shift emphasis: warmup feels slower, spooling faster.
       let delay: number;
       if (next <= 20) {
         // Warm-up (0→20%): 1.4× — visible hesitation while drum heats up
@@ -192,9 +200,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         delay = baseDelay * 0.75;
         setStatusMsg('Spooling document…');
       } else {
-        // Printing (35→99%): base pace — 1 tick per sheet-proportional interval
+        // Printing (35→99%): base pace
         delay = baseDelay;
-        // Show page progress: which "page" are we on out of totalSheets
         const printingPct  = next - 35;           // 0…64
         const currentPage  = Math.min(
           totalSheets,
@@ -207,8 +214,26 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
       }
 
-      const jitter = (Math.random() - 0.5) * delay * 0.10;
-      tickTimerRef.current = window.setTimeout(tick, Math.max(150, delay + jitter));
+      // Gentle deceleration from 85% onward so the bar waits for the Pi's signal
+      // without feeling completely frozen. Exponent kept low so it doesn't stall.
+      if (next > 85 && next < 99) {
+        const factor = 1 + Math.pow((next - 85) / 7, 1.6);
+        delay = delay * factor;
+        setStatusMsg(
+          totalSheets === 1
+            ? `Finishing print…`
+            : `Ejecting page ${totalSheets} of ${totalSheets}…`
+        );
+      }
+
+      // ── Stall detector: reset timestamp whenever progress actually moves ────
+      if (next !== lastProgressRef.current) {
+        lastProgressRef.current  = next;
+        lastProgressTimeRef.current = Date.now();
+      }
+
+      const jitter = (Math.random() - 0.5) * delay * 0.08;
+      tickTimerRef.current = window.setTimeout(tick, Math.max(100, delay + jitter));
     };
 
     tickTimerRef.current = window.setTimeout(tick, 600);
@@ -221,6 +246,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       clearAllTimers();
       setProgress(0);
       progressRef.current = 0;
+      lastProgressRef.current = 0;
+      lastProgressTimeRef.current = Date.now();
       setTypedTitle('');
       setTypedSub('');
       setPrintDone(false);
@@ -274,18 +301,41 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     }
   }, [printDone, isActive, animateTo100AndComplete]);
 
-  // Stall timeout check to prevent infinite hangs
+  // ── Stall detector ────────────────────────────────────────────────────────
+  // Fires every 5 seconds and checks how long ago the progress bar last moved.
+  // If it hasn't moved in 20 seconds and the print isn't completing, we surface
+  // an immediate error instead of waiting for the bar to crawl to 99%.
+  // This catches the "printer offline" scenario quickly regardless of position.
   useEffect(() => {
     if (!isActive || !printCode || printCode === '0000') return;
-    const stallTimeout = Math.max(120000, 30000 + Math.max(1, pages * copies) * 15000);
-    const stallTimer = window.setTimeout(() => {
-      if (progressRef.current >= 99 && !isCompletingRef.current) {
-        console.warn('[PrintingScreen] Stall timeout hit — auto-completing.');
-        animateTo100AndComplete();
+
+    // Reset tracking whenever we mount/activate
+    lastProgressRef.current  = progressRef.current;
+    lastProgressTimeRef.current = Date.now();
+
+    const STALL_THRESHOLD_MS = 20000; // 20 s with no progress movement = stall
+
+    const checkStall = () => {
+      if (isCompletingRef.current) return; // already finishing — no action needed
+      const msSinceMove = Date.now() - lastProgressTimeRef.current;
+      if (msSinceMove >= STALL_THRESHOLD_MS) {
+        console.warn('[PrintingScreen] Stall detected — progress frozen for', msSinceMove, 'ms. Surfacing error.');
+        clearAllTimers();
+        if (onError) {
+          onError('Printer is not responding. If you were charged, your refund will be processed automatically.');
+        }
+        return; // don't reschedule
       }
-    }, stallTimeout);
-    return () => clearTimeout(stallTimer);
-  }, [isActive, printCode, pages, copies, animateTo100AndComplete]);
+      stallTimerRef.current = window.setTimeout(checkStall, 5000);
+    };
+
+    // Start the first stall check after the initial warmup period (10 s)
+    stallTimerRef.current = window.setTimeout(checkStall, 10000);
+
+    return () => {
+      if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
+    };
+  }, [isActive, printCode, clearAllTimers, onError]);
 
   // ─── SVG geometry ─────────────────────────────────────────────────────────
 
@@ -389,9 +439,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           <h2 style={{ fontSize: '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-3px', lineHeight: '1.05', display: 'flex' }}>
             <span className={isActive ? "data-text-highlight" : ""}>{typedTitle}</span>
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '36px', fontWeight: 500, lineHeight: '1.4', whiteSpace: 'pre-line' }}>
+          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '36px', fontWeight: 500, lineHeight: '1.4', whiteSpace: 'pre-line', marginBottom: '15px' }}>
             {typedSub}
           </p>
+          {!isCompleted && (
+            <p style={{ color: '#00f2fe', fontSize: '24px', fontWeight: 600, opacity: 0.95, letterSpacing: '0.5px', textShadow: '0 0 10px rgba(0,242,254,0.3)', minHeight: '36px' }}>
+              {statusMsg}
+            </p>
+          )}
         </div>
       </div>
 

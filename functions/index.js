@@ -1,3 +1,4 @@
+// Deploy trigger: 2026-06-29 13:06:50
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const express = require("express");
@@ -964,7 +965,7 @@ app.get("/verify-payment/:orderId", async (req, res) => {
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         const internalRes = await axios.post(
           `http://localhost:${process.env.PORT || 8080}/payment-success`,
-          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
         printCode = internalRes.data.printCode;
@@ -1065,7 +1066,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
           const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
           await axios.post(
             `http://localhost:${process.env.PORT || 8080}/payment-success`,
-            { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+            { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
             { headers: { Authorization: `Bearer ${dummyToken}` } }
           );
         } catch (internalErr) {
@@ -1178,10 +1179,25 @@ app.post("/get-documents-by-code", async (req, res) => {
 
     const snapshot = await db.collection("print_jobs")
       .where("printCode", "==", printCode)
-      .where("status", "in", ["paid", "printing", "completed"])
+      .where("status", "==", "paid")
       .get();
 
-    if (snapshot.empty) return res.status(404).json({ error: "Invalid or expired print code" });
+    if (snapshot.empty) {
+      // Secondary check: was this code already used (completed / refunded / printing)?
+      const usedSnap = await db.collection("print_jobs")
+        .where("printCode", "==", printCode)
+        .where("status", "in", ["completed", "printing", "refunded", "printed", "expired"])
+        .limit(1)
+        .get();
+      if (!usedSnap.empty) {
+        const usedStatus = usedSnap.docs[0].data().status || "used";
+        const msg = usedStatus === "refunded"
+          ? "This print code has been refunded and can no longer be used."
+          : "Print code already used. Your document has already been printed with this code.";
+        return res.status(409).json({ error: msg });
+      }
+      return res.status(404).json({ error: "Invalid or expired print code" });
+    }
 
     // Get user info from first job
     const firstJob = snapshot.docs[0].data();
@@ -1240,15 +1256,23 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
     if (jobsToUpdate.length === 0) {
       const recentJob = snapshot.docs.find(doc => doc.data().printCode);
       if (recentJob) {
-        return res.json({ printCode: recentJob.data().printCode });
+        const jobData = recentJob.data();
+        const directKioskId = jobData.printOptions?.directKioskId || jobData.settings?.directKioskId || jobData.kioskId || null;
+        return res.json({ printCode: recentJob.data().printCode, directKioskId });
       }
       return res.status(400).json({ error: "No pending jobs without code" });
     }
 
     const printCode = Math.floor(1000 + Math.random() * 9000).toString();
+    let directKioskId = null;
 
     const batch = db.batch();
     jobsToUpdate.forEach((doc) => {
+      const data = doc.data();
+      const jobKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
+      if (jobKioskId) {
+        directKioskId = jobKioskId;
+      }
       batch.update(doc.ref, {
         status: "paid",
         paymentTime: admin.firestore.FieldValue.serverTimestamp(),
@@ -1314,7 +1338,7 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
       console.error("[WHATSAPP] Paid order notification failed:", waErr);
     }
 
-    res.json({ message: "Payment success", printCode });
+    res.json({ message: "Payment success", printCode, directKioskId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Payment update failed" });
@@ -2419,27 +2443,19 @@ app.post("/kiosk/print", async (req, res) => {
     const jobDoc = sortedDocs[0];
     const jobData = jobDoc.data();
     
-    let finalKioskId = kioskId;
-    const directKioskId = jobData?.settings?.directKioskId || jobData?.printOptions?.directKioskId || jobData.kioskId;
-    if (directKioskId) {
-      if (directKioskId !== kioskId) {
-        console.warn(`Kiosk mismatch: job assigned to ${directKioskId}, requested from ${kioskId}`);
-      }
-      finalKioskId = directKioskId; // Prioritize the user's choice from the front end
-    } else {
-      // Fallback: Route by color mode since there is only one kiosk URL
-      const isColor = jobData?.color === true || jobData?.colorMode === "color" || jobData?.printOptions?.colorMode === "color";
-      finalKioskId = isColor ? "SV-002" : "CV-001";
-      console.log(`No directKioskId found. Routing by color mode (isColor=${isColor}) to ${finalKioskId}`);
-    }
-
-    // CV-001 only has a monochrome Brother printer — always route color to SV-002 (Epson)
     const colorMode = jobData?.colorMode || jobData?.printOptions?.colorMode;
-    if (colorMode === "color") {
-      if (finalKioskId === "CV-001") {
-        console.warn(`[ROUTING] Color job requested on CV-001 (monochrome only) — rerouting to SV-002 (Epson color)`);
-      }
-      finalKioskId = "SV-002"; // Force ALL color jobs to the SV-002 Epson kiosk
+    const isColor = colorMode === "color" || jobData?.color === true || jobData?.printOptions?.colorMode === "color";
+    
+    const directKioskId = jobData?.printOptions?.directKioskId || jobData?.settings?.directKioskId || jobData?.kioskId;
+    let finalKioskId = kioskId || "CV-001";
+    if (directKioskId) {
+      finalKioskId = directKioskId;
+    } else if (isColor) {
+      // Color printing only supported on SV-002 (Epson)
+      finalKioskId = "SV-002";
+    } else {
+      // B&W printing supported on both - use physical kiosk where user is currently standing
+      finalKioskId = kioskId || "CV-001";
     }
     
     // Set status to printing so the Pi's firebase_listener.py picks it up
@@ -2478,9 +2494,12 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
     }
 
     // 1. Fetch the Order to get the actual amount paid
-    const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+    let orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
     if (orderSnapshot.empty) {
-      console.log(`[REFUND] Order ${orderId} not found.`);
+      orderSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+    }
+    if (orderSnapshot.empty) {
+      console.log(`[REFUND] Order ${orderId} not found in orders or payment_transactions.`);
       return;
     }
     const orderDoc = orderSnapshot.docs[0];

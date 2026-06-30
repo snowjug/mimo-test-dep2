@@ -88,6 +88,7 @@ export function PrintOptions() {
   const [pageRange, setPageRange] = useState("");
   const [orientation, setOrientation] = useState("portrait");
   const [photoLayout, setPhotoLayout] = useState("1");
+  const [isLayoutClicked, setIsLayoutClicked] = useState(false);
   const [imageScaling, setImageScaling] = useState("fit");
   const [customScale, setCustomScale] = useState(100);
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
@@ -1053,14 +1054,17 @@ export function PrintOptions() {
                       { id: "1", label: "1 per page", cols: 1, rows: 1, desc: "Full page" },
                       ...gridLayouts,
                     ].map((layout) => {
-                      const isSelected = photoLayout === layout.id;
+                      const isSelected = isLayoutClicked && photoLayout === layout.id;
                       const effectiveCols = orientation === "landscape" ? layout.rows : layout.cols;
                       const effectiveRows = orientation === "landscape" ? layout.cols : layout.rows;
                       const cellCount = effectiveCols * effectiveRows;
                       return (
                         <button
                           key={layout.id}
-                          onClick={() => setPhotoLayout(layout.id)}
+                          onClick={() => {
+                            setPhotoLayout(layout.id);
+                            setIsLayoutClicked(true);
+                          }}
                           className={`flex-1 flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
                             isSelected
                               ? "border-blue-500 bg-blue-50/70 shadow-md scale-[1.03]"
@@ -1109,7 +1113,7 @@ export function PrintOptions() {
                   </div>
 
                   {/* Live image layout preview - always show for images */}
-                  {hasImages && (
+                  {hasImages && isLayoutClicked && (
                     <div
                       key={`preview-${orientation}-${photoLayout}`}
                       className="mt-3 rounded-xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm"

@@ -12,12 +12,40 @@
       "destination": "/admin/index.html"
     },
     {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/landing",
-      "destination": "/landing.html"
+      "destination": "/index.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/cookie-policy",
+      "destination": "/cookie-policy.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/contact.html"
+    },
+    {
+      "source": "/about",
+      "destination": "/about.html"
+    },
+    {
+      "source": "/refund-policy",
+      "destination": "/refund-policy.html"
     },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/app.html"
     }
   ]
 }

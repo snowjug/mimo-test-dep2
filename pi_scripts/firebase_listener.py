@@ -10,6 +10,13 @@ from datetime import datetime, timedelta
 import threading
 import requests
 
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    print("✅ Registered pillow_heif opener")
+except ImportError:
+    print("⚠️ pillow_heif not installed. HEIC image support will be disabled.")
+
 active_jobs = set()
 
 # ================= CONFIGURATION =================
@@ -20,6 +27,20 @@ KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
 TEMP_DIR = "/tmp/mimo_prints"
 # Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
 IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
+
+# Mapping of CUPS printer names to their USB Vendor/Product IDs
+PRINTER_USB_IDS = {
+    # SV-002 / pi
+    "Brother_HL_L2440DW_series": "04f9:0587",
+    "Epson_L3250": "04b8:118a",
+    "L3250-Series": "04b8:118a",
+    
+    # CV-001 / printpi
+    "Brother_HL_L5210DN_series_USB": "04f9:0503",
+    "Brother_HL_L5210DN_series": "04f9:0503",
+    "Brother_IPP": "04f9:0503",
+    "Brother": "04f9:0503"
+}
 
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
@@ -426,10 +447,102 @@ def fast_compress_pdf(input_pdf, is_color=False, size_threshold_kb=512):
     return input_pdf
 
 
-def is_printer_online(printer_name):
-    """Check if the CUPS printer queue is enabled and accepting jobs."""
+def get_pdf_page_count(pdf_path):
     try:
-        res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=5)
+        res = subprocess.run(["pdfinfo", pdf_path], capture_output=True, text=True, timeout=5)
+        for line in res.stdout.splitlines():
+            if line.startswith("Pages:"):
+                return int(line.split(":")[1].strip())
+    except Exception as e:
+        print(f"⚠️ Failed to get page count for {pdf_path}: {e}")
+    return 1
+
+
+def pre_rasterize_pdf_for_color(pdf_path, is_color):
+    """
+    Pre-rasterize complex color PDFs using pdftoppm at 150 DPI to bypass
+    expensive vector rendering filters on the Pi's CPU at print time.
+    """
+    if not is_color:
+        return pdf_path
+    try:
+        import os
+        import subprocess
+        import glob
+
+        size_mb = os.path.getsize(pdf_path) / (1024 * 1024)
+        if size_mb < 1.0:  # Skip small PDFs
+            return pdf_path
+            
+        pages = get_pdf_page_count(pdf_path)
+        if pages > 5:
+            print(f"📄 Color PDF has {pages} pages (exceeds threshold of 5). Skipping pre-rasterization to prevent overhead.")
+            return pdf_path
+            
+        print(f"📄 Color PDF size is {size_mb:.2f}MB ({pages} page(s)). Pre-rasterizing via pdftoppm to speed up print...")
+        prefix = os.path.splitext(pdf_path)[0] + "_raster"
+        rasterized_pdf = os.path.splitext(pdf_path)[0] + "_rasterized.pdf"
+        
+        # Convert PDF to PNGs at 150 DPI
+        cmd = ["pdftoppm", "-png", "-r", "150", pdf_path, prefix]
+        subprocess.run(cmd, check=True, timeout=120)
+        
+        # Merge PNGs back to PDF using system python (which has Pillow compiled with JPEG support)
+        py_cmd = [
+            "/usr/bin/python3", "-c",
+            "import glob, os; from PIL import Image; "
+            f"png_files = sorted(glob.glob('{prefix}-*.png')); "
+            "if not png_files: raise Exception('No PNGs generated'); "
+            "images = [Image.open(pf).convert('RGB') for pf in png_files]; "
+            f"images[0].save('{rasterized_pdf}', save_all=True, append_images=images[1:])"
+        ]
+        subprocess.run(py_cmd, check=True, timeout=120)
+        
+        if os.path.exists(rasterized_pdf):
+            print(f"✅ Pre-rasterized PDF created: {rasterized_pdf}")
+            
+            # Clean up temp PNGs
+            png_files = sorted(glob.glob(prefix + "-*.png"))
+            for pf in png_files:
+                try:
+                    os.remove(pf)
+                except:
+                    pass
+            # Remove original vector PDF to save disk space
+            try:
+                os.remove(pdf_path)
+            except:
+                pass
+            return rasterized_pdf
+            
+    except Exception as e:
+        print(f"⚠️ Pre-rasterization failed: {e}")
+        # Clean up any leftover PNGs
+        try:
+            prefix = os.path.splitext(pdf_path)[0] + "_raster"
+            png_files = glob.glob(prefix + "-*.png")
+            for pf in png_files:
+                os.remove(pf)
+        except:
+            pass
+            
+    return pdf_path
+
+
+def is_printer_online(printer_name):
+    """Check if the CUPS printer queue is enabled and accepting jobs, and physically connected via USB."""
+    usb_id = PRINTER_USB_IDS.get(printer_name)
+    if usb_id:
+        try:
+            lsusb_out = subprocess.run(["lsusb"], capture_output=True, text=True, timeout=5).stdout
+            if usb_id not in lsusb_out:
+                print(f"❌ Printer {printer_name} USB ID ({usb_id}) NOT found in lsusb! Printer is physically off/disconnected.")
+                return False
+        except Exception as e:
+            print(f"⚠️ lsusb check failed: {e}")
+
+    try:
+        res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=2)
         output = res.stdout.lower()
         if "disabled" in output or "stopped" in output or "not accepting" in output:
             print(f"❌ Printer {printer_name} is OFFLINE/DISABLED")
@@ -453,6 +566,18 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
     print(f"⏳ [SYNC] Waiting for CUPS job {job_id} to physically finish printing...")
     try:
         while time.time() - start < timeout:
+            # Check if the Firestore document status has changed to "failed" (timed out / cancelled / refunded)
+            try:
+                doc_snap = doc_ref.get()
+                if doc_snap.exists:
+                    doc_status = doc_snap.to_dict().get("status")
+                    if doc_status == "failed":
+                        print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed in Firestore (timeout/refunded). Cancelling CUPS job {job_id}...")
+                        subprocess.run(["cancel", job_id], capture_output=True)
+                        return
+            except Exception as doc_err:
+                print(f"⚠️ [SYNC] Failed to verify job status from Firestore: {doc_err}")
+
             try:
                 res = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True, timeout=10)
                 if job_id not in res.stdout:
@@ -463,12 +588,26 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
                     if job_ok:
                         # Physical delay: give the printer time to actually eject the paper
                         # Brother laser: ~3s. Epson inkjet: ~15s.
-                        doc_dict = doc_ref.get().to_dict() or {}
+                        doc_snap_latest = doc_ref.get()
+                        doc_dict = doc_snap_latest.to_dict() or {} if doc_snap_latest.exists else {}
+                        
+                        # Double check that job wasn't failed/refunded while waiting
+                        if doc_dict.get("status") == "failed":
+                            print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed in Firestore. Cancelling CUPS job {job_id} and aborting completion.")
+                            subprocess.run(["cancel", job_id], capture_output=True)
+                            return
+
                         color_mode = doc_dict.get("colorMode", "monochrome")
                         is_inkjet = color_mode.lower() == "color"
                         paper_exit_delay = 15 if is_inkjet else 3
                         print(f"⏳ [SYNC] CUPS job {job_id} done in queue. Waiting {paper_exit_delay}s for physical paper ejection...")
                         time.sleep(paper_exit_delay)
+
+                        # Final status check after paper ejection sleep
+                        doc_snap_final = doc_ref.get()
+                        if doc_snap_final.exists and doc_snap_final.to_dict().get("status") == "failed":
+                            print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed during paper ejection sleep. Aborting completion.")
+                            return
 
                         print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
                         safe_update(doc_ref, {
@@ -516,7 +655,19 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         # ── Printer online guard ──
         if not is_printer_online(printer_name):
-            print(f"❌ Aborting: printer {printer_name} is offline.")
+            print(f"❌ Aborting: printer {printer_name} is offline. Cancelling any queued CUPS jobs to prevent ghost prints.")
+            # Cancel all queued jobs for this printer so they don't spool when printer comes back
+            try:
+                stale_res = subprocess.run(["lpstat", "-o"], capture_output=True, text=True)
+                for stale_line in stale_res.stdout.splitlines():
+                    if stale_line.startswith(printer_name + "-"):
+                        stale_parts = stale_line.split()
+                        if stale_parts:
+                            stale_job_id = stale_parts[0]
+                            print(f"🚫 Cancelling queued CUPS job {stale_job_id} (printer offline).")
+                            subprocess.run(["cancel", stale_job_id], capture_output=True)
+            except Exception as cancel_err:
+                print(f"⚠️ Failed to cancel queued CUPS jobs: {cancel_err}")
             return False
 
         # ── Page range slicing ──
@@ -569,7 +720,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         cmd.extend(file_paths)
 
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=120)
         lp_output = result.stdout.strip()
         print(f"CUPS accepted: {lp_output}")
 
@@ -719,25 +870,45 @@ def process_job(doc_snapshot):
     target_printer = COLOR_PRINTER_NAME if is_color else BW_PRINTER_NAME
 
     try:
-        for f in files:
-            f_url = f.get("url")
+        # ── PARALLEL DOWNLOAD: fetch all files simultaneously ──────────────────
+        # Each file is downloaded in its own thread so multi-file jobs are as fast
+        # as a single-file job (limited only by the slowest individual download).
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _download_one(f):
+            """Download one file entry and return (f_dict, local_path, error)."""
+            f_url  = f.get("url")
             f_name = f.get("name", "document.pdf")
-            l_path = download_file(f_url, f_name)
-            if not l_path:
-                report_print_failure(doc_ref, f"Failed to download {f_name}")
-                return
-            local_paths.append(l_path)
+            path = download_file(f_url, f_name)
+            if not path:
+                return f, None, f"Failed to download {f_name}"
+            # Pre-flight compression (currently a no-op, but keep the hook)
+            if path.lower().endswith(".pdf"):
+                path = fast_compress_pdf(path, is_color=is_color)
+                path = pre_rasterize_pdf_for_color(path, is_color=is_color)
+            return f, path, None
 
-            # ── Pre-flight compression ──
-            # Compress large PDFs before any processing to reduce GS + CUPS + USB load.
-            # This is the single biggest speed win for files like 5.4 MB grid PDFs.
-            if l_path.lower().endswith(".pdf"):
-                l_path = fast_compress_pdf(l_path, is_color=is_color)
+        # Run downloads in parallel — cap at 4 threads to avoid Pi memory pressure
+        download_results = [None] * len(files)  # preserve file order
+        with ThreadPoolExecutor(max_workers=min(4, len(files))) as pool:
+            future_to_idx = {pool.submit(_download_one, f): i for i, f in enumerate(files)}
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                f_entry, l_path, err = future.result()
+                if err:
+                    # One file failed — abort the whole job
+                    report_print_failure(doc_ref, err)
+                    return
+                download_results[idx] = (f_entry, l_path)
+                local_paths.append(l_path)
 
+        # ── Per-file processing (conversion, scaling) ──────────────────────────
+        any_file_sliced = False
+        for f_entry, l_path in download_results:
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             
-            if ext in [".jpg", ".jpeg", ".png"]:
+            if ext in [".jpg", ".jpeg", ".png", ".heic"]:
                 if image_scaling == "fill":
                     pdf_path = process_image_fill(l_path, photo_layout, is_color)
                     if pdf_path: f_final = pdf_path
@@ -753,15 +924,29 @@ def process_job(doc_snapshot):
                 pdf_path = convert_to_pdf(l_path)
                 if pdf_path: f_final = pdf_path
                 else:
-                    report_print_failure(doc_ref, f"LibreOffice failed for {f_name}")
+                    report_print_failure(doc_ref, f"LibreOffice failed for {f_entry.get('name', 'document')}")
                     return
+            
+            # Slice pages based on individual fileConfigs if available
+            file_name_key = f_entry.get("name")
+            file_config = print_options.get("fileConfigs", {}).get(file_name_key, {})
+            f_page_selection = file_config.get("pageSelection") or file_config.get("pagesToPrint") or "all"
+            f_page_range = None
+            if f_page_selection == "custom":
+                f_page_range = file_config.get("pageRange") or file_config.get("customPageRange")
+            
+            if f_page_range and f_final.lower().endswith(".pdf"):
+                sliced = slice_pdf_pages(f_final, f_page_range)
+                if sliced:
+                    f_final = sliced
+                    any_file_sliced = True
             
             final_paths.append(f_final)
 
         # Ensure all files are PDFs before merging
         pdf_paths = []
         for fp in final_paths:
-            if fp.lower().endswith(('.jpg', '.jpeg', '.png')):
+            if fp.lower().endswith(('.jpg', '.jpeg', '.png', '.heic')):
                 pdf_fp = fp + ".pdf"
                 try:
                     from PIL import Image
@@ -915,7 +1100,7 @@ def process_job(doc_snapshot):
         # ── Submit to CUPS ──
         # Pass doc_ref so print_file can spawn the background sync thread
         async_spawned = False
-        result = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet, doc_ref=doc_ref)
+        result = print_file(final_paths, copies, None if any_file_sliced else page_range, target_printer, photo_layout, double_sided, is_blank_sheet, doc_ref=doc_ref)
 
         if result is None:
             # Async path: background thread (wait_for_cups_job) will update Firestore when done.
@@ -974,17 +1159,8 @@ def on_snapshot(col_snapshot, changes, read_time):
 def heartbeat_loop():
     while True:
         try:
-            status_bw = "Online"
-            status_color = "Online"
-            try:
-                res_bw = subprocess.run(["lpstat", "-p", BW_PRINTER_NAME], capture_output=True, text=True).stdout.lower()
-                status_bw = "Paused/Error" if "disabled" in res_bw or "paused" in res_bw else ("Printing" if "printing" in res_bw else "Idle")
-
-                res_color = subprocess.run(["lpstat", "-p", COLOR_PRINTER_NAME], capture_output=True, text=True).stdout.lower()
-                status_color = "Paused/Error" if "disabled" in res_color or "paused" in res_color else ("Printing" if "printing" in res_color else "Idle")
-            except:
-                status_bw = "lpstat failed"
-                status_color = "lpstat failed"
+            status_bw = "Idle" if is_printer_online(BW_PRINTER_NAME) else "Paused/Error"
+            status_color = "Idle" if is_printer_online(COLOR_PRINTER_NAME) else "Paused/Error"
                 
             db.collection("system_status").document(KIOSK_ID).set({
                 "lastSeen": firestore.SERVER_TIMESTAMP,
@@ -993,20 +1169,6 @@ def heartbeat_loop():
         except Exception as e:
             print(f"⚠️ Heartbeat failed: {e}")
         time.sleep(30)
-
-# Mapping of CUPS printer names to their USB Vendor/Product IDs
-PRINTER_USB_IDS = {
-    # SV-002 / pi
-    "Brother_HL_L2440DW_series": "04f9:0587",
-    "Epson_L3250": "04b8:118a",
-    "L3250-Series": "04b8:118a",
-    
-    # CV-001 / printpi
-    "Brother_HL_L5210DN_series_USB": "04f9:0503",
-    "Brother_HL_L5210DN_series": "04f9:0503",
-    "Brother_IPP": "04f9:0503",
-    "Brother": "04f9:0503"
-}
 
 def reset_printer_usb(printer_name):
     usb_id = PRINTER_USB_IDS.get(printer_name)
@@ -1052,6 +1214,71 @@ def resume_printer_jobs(printer_name):
         print(f"⚠️ Failed to resume jobs for {printer_name}: {e}")
 
 
+def cancel_stale_cups_jobs_for_printer(printer_name):
+    """
+    When the printer comes back online, check every CUPS job queued for it.
+    If the corresponding Firestore print_job is already failed/refunded/completed,
+    cancel the CUPS spool entry so it never reprints.
+    Only jobs whose Firestore status is still 'printing' are resumed.
+    This prevents a job that was auto-refunded (because printer was off) from
+    printing again when the printer is switched back on.
+    """
+    try:
+        res = subprocess.run(["lpstat", "-o"], capture_output=True, text=True)
+        for line in res.stdout.splitlines():
+            if line.startswith(printer_name + "-"):
+                parts = line.split()
+                if not parts:
+                    continue
+                cups_job_id = parts[0]  # e.g. "Brother_HL_L2440DW_series-42"
+
+                # Try to find the Firestore job that owns this CUPS job
+                # The CUPS job title is usually the filename; we use active_jobs to match
+                # If any active Firestore job is still 'printing' → safe to resume
+                # Otherwise → cancel to prevent ghost prints
+
+                should_cancel = False
+                try:
+                    # Check ALL jobs with status=printing for this kiosk
+                    docs = db.collection('print_jobs') \
+                        .where('kioskId', '==', KIOSK_ID) \
+                        .where('status', 'in', ['failed', 'refunded', 'completed']) \
+                        .stream(timeout=10)
+                    failed_job_ids = {doc.id for doc in docs}
+
+                    # If the cups job ID suffix matches any active_jobs entry that is now failed
+                    for fj_id in failed_job_ids:
+                        if fj_id in active_jobs:
+                            should_cancel = True
+                            print(f"🚫 Watchdog: CUPS job {cups_job_id} belongs to already-failed/refunded Firestore job {fj_id} — cancelling spool to prevent ghost print.")
+                            break
+
+                    # If there are NO active jobs at all for this printer, be safe and cancel
+                    if not should_cancel:
+                        active_printing_docs = db.collection('print_jobs') \
+                            .where('kioskId', '==', KIOSK_ID) \
+                            .where('status', '==', 'printing') \
+                            .stream(timeout=10)
+                        active_printing_ids = {doc.id for doc in active_printing_docs}
+
+                        if not active_printing_ids:
+                            # No active Firestore job — this is a stale CUPS job, cancel it
+                            should_cancel = True
+                            print(f"🚫 Watchdog: No active Firestore jobs found — cancelling stale CUPS job {cups_job_id} to prevent ghost print.")
+
+                except Exception as fs_err:
+                    print(f"⚠️ Watchdog: Firestore check for CUPS job {cups_job_id} failed: {fs_err}. Cancelling job to be safe.")
+                    should_cancel = True
+
+                if should_cancel:
+                    subprocess.run(["cancel", cups_job_id], capture_output=True)
+                else:
+                    print(f"🔓 Watchdog: Resuming CUPS job {cups_job_id} on {printer_name} (Firestore job is still active)...")
+                    subprocess.run(["lp", "-i", cups_job_id, "-H", "resume"], capture_output=True)
+    except Exception as e:
+        print(f"⚠️ cancel_stale_cups_jobs_for_printer failed: {e}")
+
+
 def watchdog_loop():
     stuck_cycles = {BW_PRINTER_NAME: 0, COLOR_PRINTER_NAME: 0}
     counter = 0
@@ -1067,7 +1294,9 @@ def watchdog_loop():
                     if "disabled" in status_out:
                         print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
                         subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
-                        resume_printer_jobs(printer)
+                        # Cancel stale spool entries for jobs already failed/refunded in Firestore
+                        # before resuming to prevent ghost prints when printer comes back online
+                        cancel_stale_cups_jobs_for_printer(printer)
                     
                     # Check if printer is currently printing
                     printer_active[printer] = "printing" in status_out
@@ -1094,7 +1323,8 @@ def watchdog_loop():
                                 
                                 # Re-enable CUPS queue
                                 subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
-                                resume_printer_jobs(printer)
+                                # Cancel stale spool entries for jobs already failed/refunded in Firestore
+                                cancel_stale_cups_jobs_for_printer(printer)
                                 stuck_cycles[printer] = 0
                     else:
                         stuck_cycles[printer] = 0
@@ -1140,14 +1370,10 @@ def keep_warm_loop():
         except:
             pass
 
-        # Ping local printers to prevent them from entering deep sleep/USB suspend
-        # 1. Brother Laser (BW_PRINTER_NAME) -> PJL status query (no-op)
-        ping_printer_raw(BW_PRINTER_NAME, b'\x1b%-12345X@PJL INFO STATUS\r\n\x1b%-12345X')
-
-        # 2. Epson Inkjet (COLOR_PRINTER_NAME) -> ESC/P reset (no-op, only on SV-002)
-        if not IS_MONOCHROME_ONLY:
-            ping_printer_raw(COLOR_PRINTER_NAME, b'\x1b@')
-
+        # We no longer send raw print jobs to printers to prevent deep sleep,
+        # as this can trigger unwanted blank/PJL page printouts on driverless 
+        # printers (like Brother HL-L2440DW). Printer reachability is kept
+        # active via lpstat checks in the watchdog and heartbeat loops.
         time.sleep(600)
 
 # Start background threads

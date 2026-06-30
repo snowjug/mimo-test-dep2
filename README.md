@@ -52,20 +52,24 @@ Key backend responsibilities include:
 - webhook handling for payment confirmation
 
 ## Recent Features & Optimizations
-**Production Hardening (v2.0):**
-- **Async File Processing:** Document uploads now instantly queue as `pending_conversion` instead of blocking Node.js, resolving Out-of-Memory crashes.
-- **Frontend Polling:** UI gracefully holds upload progress at 99% until the background worker completes file parsing.
-- **Direct PDF Streaming:** Kiosk PDF downloads use Node.js `ReadStreams` bypassing RAM buffers entirely.
-- **In-Memory Cache:** 200MB maximum LRU Cache stores recent Kiosk PDFs ensuring fast downloads while strictly preventing memory leaks.
-- **Mimo Coins & Print History:** Fully functional backend integration for displaying previous prints and managing virtual currency. Print History gracefully filters and maps data in-memory to bypass Firebase composite index limits.
-- **Profile Enhancements:** Added secure profile photo uploads directly to Firebase Storage using long-lived Signed URLs.
-- **Kiosk UI Polish:** Replaced the bulky full-screen loading overlay with a sleek, inline button spinner on the numpad screen.
-- **Brute Force Protection:** Rate limiters added to Kiosk API endpoints (20 req/min).
-- **Index Optimization:** Re-architected backend queries for Server-Sent Events (SSE) and history to filter in-memory, completely removing the need for strict composite indexes.
-- **Hardware Integration (Pi Architecture):** The Node backend dynamically supports both Firebase Listener "Pull" architectures (for the Old Pi) and FastAPI "Push" mechanisms (for the New Pi).
-- **Permanent Pi Tunnel (ngrok):** Replaced unreliable temporary tunnels and Tailscale conflicts with a permanent ngrok static domain configuration, auto-starting via systemd on the Pi for 100% uptime.
-- **E2E Stability:** Fixed frontend React crashes on payment failure and implemented strict error handling in the background PDF processor to prevent infinite retry loops on corrupted uploads.
-- **Production Payments:** Fully integrated Cashfree Production APIs for live order creation and automatic refunds on hardware failure.
+
+### 🛡️ Production Hardening & Reliability (v2.0)
+- **Automatic Payment Refunds**: Deployed a secure, serverless auto-refund hook. When a physical print fails on the Pi (out of paper, disconnected, CUPS/conversion error), it calls `/kiosk/report-failure` to immediately trigger a Cashfree API refund, and displays a user-friendly pulsing **"💚 Refund in Progress"** status screen.
+- **Robust Multi-File State Syncing**: The user upload dashboard now dynamically syncs with Firestore and session storage. Deleting a file in the UI calls `/finalize-upload` to remove its document in Firestore, avoiding ghost charges, and session storage is auto-cleared on checkout popstate to prevent completed files from leaking into new sessions.
+- **Re-entered Code Detection**: Improved NumPad validation. Re-entering a print code that has already printed/refunded now queries Firestore history to display a clear `"Print code already used"` error instead of a generic 404 page.
+- **Async File Processing**: Document uploads now instantly queue as `pending_conversion` instead of blocking Node.js, resolving Out-of-Memory crashes.
+- **Direct PDF Streaming**: Kiosk PDF downloads use Node.js `ReadStreams` bypassing RAM buffers entirely.
+- **In-Memory Cache**: 200MB maximum LRU Cache stores recent Kiosk PDFs ensuring fast downloads while strictly preventing memory leaks.
+- **Mimo Coins & Print History**: Fully functional backend integration for displaying previous prints and managing virtual currency. Print History gracefully filters and maps data in-memory to bypass Firebase composite index limits.
+- **Profile Enhancements**: Added secure profile photo uploads directly to Firebase Storage using long-lived Signed URLs.
+- **Brute Force Protection**: Rate limiters added to Kiosk API endpoints (20 req/min).
+
+### ⚡ High-Speed Print & Performance Wins
+- **Parallel Document Downloads**: Refactored the Pi's `firebase_listener.py` to use a `ThreadPoolExecutor` to download files in parallel rather than sequentially, slicing wait times for multi-document print jobs.
+- **Instant Printer Spooling**: Reduced the local `lpstat` printer online check timeout from 5s to 2s, allowing the printer to wake up and spool print jobs near-instantly.
+- **300 DPI High-Speed Rendering**: Customized the Brother printer's PPD configuration file (`/etc/cups/ppd/Brother_HL_L5210DN_series.ppd`) on CV-001 to render at 300 DPI (down from the default 600 DPI). This reduced processed bitmap sizes by **4x**, cutting CPU rasterizing and USB spool times to **under 8 seconds**.
+- **Bypassed CPU-Heavy Pre-Compression**: Disabled slow on-Pi PDF pre-compression (which spooled through Ghostscript on the weak Pi CPU), allowing raw optimized PDFs to feed directly to the printer spooler.
+- **Kiosk Progress Fast-Finish**: Optimized the NumPad print progress bar to fast-finish (10ms per percent) the moment CUPS signals print success, letting users retrieve their papers without waiting on fake animations.
 
 ## Folder Structure
 

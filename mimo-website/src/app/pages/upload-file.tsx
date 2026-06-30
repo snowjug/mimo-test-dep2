@@ -242,6 +242,42 @@ export function UploadFile() {
     const storedName = localStorage.getItem("mimo_user_name");
     if (storedName) setUserName(storedName);
 
+    // If a print code is present, it means the user just finished a print job.
+    // Clear the print session to start fresh.
+    const storedPrintCode = sessionStorage.getItem("printCode");
+    if (storedPrintCode) {
+      sessionStorage.removeItem("printCode");
+      sessionStorage.removeItem("printFiles");
+      sessionStorage.removeItem("printOptions");
+      sessionStorage.removeItem("uploadedImages");
+      sessionStorage.removeItem("uploadAmount");
+      sessionStorage.removeItem("uploadTotalPages");
+      sessionStorage.removeItem("totalPages");
+      sessionStorage.removeItem("printStatus");
+    } else {
+      // Initialize from sessionStorage if exists
+      const storedPrintFiles = sessionStorage.getItem("printFiles");
+      if (storedPrintFiles) {
+        try {
+          const parsed = JSON.parse(storedPrintFiles);
+          setUploadedFilesData(parsed);
+          setFiles(parsed.map((f: any) => ({
+            name: f.name,
+            size: f.size,
+            type: f.type,
+            status: "completed",
+            progress: 100,
+            pageCount: f.pageCount || 1
+          })));
+          // Re-calculate total pages
+          const totalPages = parsed.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
+          setBackendTotalPages(totalPages);
+        } catch (err) {
+          console.error("Failed to restore files from session:", err);
+        }
+      }
+    }
+
     const fetchData = async () => {
       try {
         const userResponse = await api.get("/mimo/user");
@@ -368,7 +404,7 @@ export function UploadFile() {
 
       // 3. Tell backend to finalize and create database records
       // In Serverless architecture, this doesn't trigger conversion anymore. It just creates the job.
-      const response = await api.post("/finalize-upload", { files: uploadedFiles });
+      const response = await api.post("/finalize-upload", { files: [...uploadedFilesData, ...uploadedFiles] });
       
       // Update UI
       setFiles((prev) =>
@@ -424,10 +460,13 @@ export function UploadFile() {
       }
     }
 
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-    setUploadedFilesData((prev) => prev.filter((f) => f.name !== fileToRemove.name));
+    const updatedFiles = files.filter((_, i) => i !== index);
+    const updatedData = uploadedFilesData.filter((f) => f.name !== fileToRemove.name);
 
-    // Remove from sessionStorage
+    setFiles(updatedFiles);
+    setUploadedFilesData(updatedData);
+
+    // Remove from sessionStorage image list
     const existingRaw = sessionStorage.getItem("uploadedImages");
     if (existingRaw) {
       const existingImages = JSON.parse(existingRaw);
@@ -437,6 +476,28 @@ export function UploadFile() {
       } else {
         sessionStorage.removeItem("uploadedImages");
       }
+    }
+
+    // Sync Firestore with the remaining files list!
+    try {
+      await api.post("/finalize-upload", { files: updatedData });
+    } catch (err) {
+      console.error("Failed to sync remaining files with backend:", err);
+    }
+
+    // Update printFiles in sessionStorage
+    if (updatedData.length > 0) {
+      sessionStorage.setItem("printFiles", JSON.stringify(updatedData));
+      const totalPages = updatedData.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
+      setBackendTotalPages(totalPages);
+      sessionStorage.setItem("uploadTotalPages", totalPages.toString());
+      sessionStorage.setItem("uploadAmount", (totalPages * 2).toString());
+    } else {
+      sessionStorage.removeItem("printFiles");
+      sessionStorage.removeItem("printOptions");
+      sessionStorage.removeItem("uploadAmount");
+      sessionStorage.removeItem("uploadTotalPages");
+      setBackendTotalPages(0);
     }
   };
 
