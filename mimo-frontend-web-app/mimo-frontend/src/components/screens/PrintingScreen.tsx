@@ -49,6 +49,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const pollTimerRef        = useRef<number | null>(null);
   const completionTimerRef  = useRef<number | null>(null);
   const isCompletingRef     = useRef(false);
+  const stallTimerRef       = useRef<number | null>(null);   // stall detector
+  const lastProgressRef     = useRef(0);                    // last recorded progress for stall check
+  const lastProgressTimeRef = useRef(Date.now());           // when progress last changed
 
   const isCompleted = progress >= 100;
 
@@ -68,9 +71,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     if (tickTimerRef.current)       clearTimeout(tickTimerRef.current);
     if (pollTimerRef.current)       clearTimeout(pollTimerRef.current);
     if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
+    if (stallTimerRef.current)      clearTimeout(stallTimerRef.current);
     tickTimerRef.current       = null;
     pollTimerRef.current       = null;
     completionTimerRef.current = null;
+    stallTimerRef.current      = null;
   }, []);
 
   const animateTo100AndComplete = useCallback((fast = false) => {
@@ -124,23 +129,27 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
         const data = await res.json();
 
+        // Reset stall timer on every successful poll response — the network is alive
+        lastProgressTimeRef.current = Date.now();
+
         if (data.status === 'completed' || data.isPrinted === true) {
           setPrintDone(true);
           // animateTo100AndComplete will be called via the printDone effect
         } else if (data.status === 'failed') {
           const errMsg = data.printerStatus || data.error || 'Printer reported an error.';
           setStatusMsg(errMsg);
+          clearAllTimers();
           if (onError) onError(errMsg);
         } else {
           // Still printing — poll again in 2 s (fast enough to catch physical completion)
           schedulePoll(2000);
         }
       } catch {
-        // Network hiccup — retry in 4 s
+        // Network hiccup — retry in 4 s but do NOT reset stall timer
         pollTimerRef.current = window.setTimeout(() => schedulePoll(2000), 4000);
       }
     }, delayMs);
-  }, [printCode, isActive, onError]);
+  }, [printCode, isActive, onError, clearAllTimers]);
 
   // ─── slow progress simulation ──────────────────────────────────────────────
 
@@ -150,16 +159,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     const totalSheets = Math.max(1, pages * copies);
 
     // ── Target total time for the 0→99% animation ─────────────────────────────
-    // Deliberately slow animation so the bar NEVER races ahead of the actual print.
-    // When the Pi confirms physical completion, animateTo100AndComplete(true) snaps
-    // the bar to 100% at 10ms/step (~1 second), giving a satisfying rush at the end.
-    // B&W laser: ~45s total (base 30s + 15s per sheet)
-    // Color inkjet: ~90s total (base 30s + 60s per sheet)
+    // Progress is intentionally smooth & reasonably quick so the user sees real
+    // activity. When the Pi confirms completion, animateTo100AndComplete(true)
+    // snaps the bar to 100% at 10ms/step, giving a satisfying rush at the end.
+    // B&W laser:    ~25s total (base 15s + 8s per sheet)
+    // Color inkjet: ~50s total (base 15s + 30s per sheet)
     const isColor = colorMode === 'color';
-    const baseWarmup = isColor ? 30000 : 30000;
-    const speedFactor = isColor ? 60000 : 15000;
+    const baseWarmup  = 15000;
+    const speedFactor = isColor ? 30000 : 8000;
     const totalAnimMs = baseWarmup + totalSheets * speedFactor;
-    const baseDelay    = Math.max(100, totalAnimMs / 99); // ms per 1% step
+    const baseDelay   = Math.max(80, totalAnimMs / 99); // ms per 1% step
 
     const tick = () => {
       if (isCompletingRef.current) return;
@@ -205,11 +214,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
       }
 
-      // Creep / Deceleration: from 80% onward the bar slows dramatically to "wait" for
-      // the Pi's physical completion signal. The steeper the exponent the more it freezes
-      // near 99%. This makes the final fast-rush to 100% feel earned and satisfying.
-      if (next > 80 && next < 99) {
-        const factor = 1 + Math.pow((next - 80) / 2.5, 2.2);
+      // Gentle deceleration from 85% onward so the bar waits for the Pi's signal
+      // without feeling completely frozen. Exponent kept low so it doesn't stall.
+      if (next > 85 && next < 99) {
+        const factor = 1 + Math.pow((next - 85) / 7, 1.6);
         delay = delay * factor;
         setStatusMsg(
           totalSheets === 1
@@ -218,8 +226,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
       }
 
+      // ── Stall detector: reset timestamp whenever progress actually moves ────
+      if (next !== lastProgressRef.current) {
+        lastProgressRef.current  = next;
+        lastProgressTimeRef.current = Date.now();
+      }
+
       const jitter = (Math.random() - 0.5) * delay * 0.08;
-      tickTimerRef.current = window.setTimeout(tick, Math.max(150, delay + jitter));
+      tickTimerRef.current = window.setTimeout(tick, Math.max(100, delay + jitter));
     };
 
     tickTimerRef.current = window.setTimeout(tick, 600);
@@ -232,6 +246,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       clearAllTimers();
       setProgress(0);
       progressRef.current = 0;
+      lastProgressRef.current = 0;
+      lastProgressTimeRef.current = Date.now();
       setTypedTitle('');
       setTypedSub('');
       setPrintDone(false);
@@ -285,28 +301,41 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     }
   }, [printDone, isActive, animateTo100AndComplete]);
 
-  // Stall timeout check to prevent infinite hangs — if we're stuck at 99% it means
-  // polling stopped (network loss) or the backend never got a completed/failed update.
-  // Treat as an error: the user's money may be at risk, so surface the error screen.
+  // ── Stall detector ────────────────────────────────────────────────────────
+  // Fires every 5 seconds and checks how long ago the progress bar last moved.
+  // If it hasn't moved in 20 seconds and the print isn't completing, we surface
+  // an immediate error instead of waiting for the bar to crawl to 99%.
+  // This catches the "printer offline" scenario quickly regardless of position.
   useEffect(() => {
     if (!isActive || !printCode || printCode === '0000') return;
 
-    // Color prints are naturally slower (inkjet print heads), so we use a larger timeout.
-    const isColor = colorMode === 'color';
-    const baseStall = isColor ? 240000 : 120000;
-    const perPageStall = isColor ? 45000 : 15000;
-    const stallTimeout = Math.max(baseStall, 30000 + Math.max(1, pages * copies) * perPageStall);
+    // Reset tracking whenever we mount/activate
+    lastProgressRef.current  = progressRef.current;
+    lastProgressTimeRef.current = Date.now();
 
-    const stallTimer = window.setTimeout(() => {
-      if (progressRef.current >= 99 && !isCompletingRef.current) {
-        console.warn('[PrintingScreen] Stall timeout hit — surfacing error.');
+    const STALL_THRESHOLD_MS = 20000; // 20 s with no progress movement = stall
+
+    const checkStall = () => {
+      if (isCompletingRef.current) return; // already finishing — no action needed
+      const msSinceMove = Date.now() - lastProgressTimeRef.current;
+      if (msSinceMove >= STALL_THRESHOLD_MS) {
+        console.warn('[PrintingScreen] Stall detected — progress frozen for', msSinceMove, 'ms. Surfacing error.');
+        clearAllTimers();
         if (onError) {
-          onError('Print timed out. If you were charged, your refund will be processed automatically.');
+          onError('Printer is not responding. If you were charged, your refund will be processed automatically.');
         }
+        return; // don't reschedule
       }
-    }, stallTimeout);
-    return () => clearTimeout(stallTimer);
-  }, [isActive, printCode, pages, copies, colorMode, onError]);
+      stallTimerRef.current = window.setTimeout(checkStall, 5000);
+    };
+
+    // Start the first stall check after the initial warmup period (10 s)
+    stallTimerRef.current = window.setTimeout(checkStall, 10000);
+
+    return () => {
+      if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
+    };
+  }, [isActive, printCode, clearAllTimers, onError]);
 
   // ─── SVG geometry ─────────────────────────────────────────────────────────
 
