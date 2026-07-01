@@ -39,9 +39,17 @@ The platform coordinates printing operations across two physical Kiosk stations:
 
 ## Live Deployments
 
-- **Main Frontend URL**: https://printmimo.tech (or https://www.printmimo.tech)
-- **Company Landing Page**: https://printmimo.tech/landing
-- **Kiosk URL**: https://kisokmechine.vercel.app/
+| Service | URL |
+|---|---|
+| **Main Website** | https://printmimo.tech |
+| **Landing Page** | https://printmimo.tech/landing |
+| **Kiosk App (all kiosks)** | https://kisokmechine.vercel.app |
+| **Kiosk SV-002** | https://kisokmechine.vercel.app/?kioskId=SV-002 |
+| **Kiosk CV-001** | https://kisokmechine.vercel.app/?kioskId=CV-001 |
+| **Admin Dashboard** | https://printmimo.tech/admin |
+| **Firebase Functions API** | https://api-upqxuj7evq-uc.a.run.app |
+
+> **Note:** The kiosk app is a single Vercel deployment that supports unlimited physical kiosks via the `?kioskId=` URL parameter. The Pi autostart file on each device sets the correct `kioskId` for its location.
 
 Key backend responsibilities include:
 
@@ -70,6 +78,12 @@ Key backend responsibilities include:
 - **300 DPI High-Speed Rendering**: Customized the Brother printer's PPD configuration file (`/etc/cups/ppd/Brother_HL_L5210DN_series.ppd`) on CV-001 to render at 300 DPI (down from the default 600 DPI). This reduced processed bitmap sizes by **4x**, cutting CPU rasterizing and USB spool times to **under 8 seconds**.
 - **Bypassed CPU-Heavy Pre-Compression**: Disabled slow on-Pi PDF pre-compression (which spooled through Ghostscript on the weak Pi CPU), allowing raw optimized PDFs to feed directly to the printer spooler.
 - **Kiosk Progress Fast-Finish**: Optimized the NumPad print progress bar to fast-finish (10ms per percent) the moment CUPS signals print success, letting users retrieve their papers without waiting on fake animations.
+- **2× Faster Kiosk Progress Bar**: Reduced B&W animation baseline from `30s + 15s/sheet` to `15s + 8s/sheet`. Color inkjet from `30s + 60s/sheet` to `15s + 30s/sheet`. Exponential creep near completion replaced with a gentle deceleration starting at 85% (previously 80%), making the bar feel fluid instead of frozen.
+
+### 🔧 Kiosk UX Bug Fixes (v2.1)
+- **Printer Offline → Instant Error (was: stuck at ~93%)**: Replaced the old stall-check that only triggered at 99% with a **20-second progress-movement detector**. If the progress bar hasn't moved for 20 consecutive seconds (at *any* percentage), the kiosk immediately surfaces a `"Printer is not responding"` error screen. Previously, users were silently stuck watching the bar crawl for minutes before anything happened. Every successful API poll resets the stall clock; network failures do not, so a dead connection is correctly treated as a stall.
+- **Color Print "Ghost Complete" Fix — Epson L3250 Ejection Hold**: Users reported the kiosk showing 100% complete but no paper coming out for color jobs. Root cause: the Epson L3250 inkjet runs a **head initialization / maintenance cycle** on wake-up. CUPS spools the job and marks it "completed" in its queue while the printer is still in its cleaning cycle — the Pi's `wait_for_cups_job` thread sees CUPS completed, waits 15s, then sets `isPrinted: True` in Firestore. The kiosk polls, sees done, shows 100%, and the user walks away before paper physically ejects (30–60s later). **Fix:** After a color job hits 100%, the kiosk now shows a full-screen **"🖨️ Collecting your pages…"** overlay with a pulsing printer icon and a **25-second live countdown**, telling the user to stay at the printer. B&W laser prints are unaffected.
+
 
 ## Folder Structure
 
