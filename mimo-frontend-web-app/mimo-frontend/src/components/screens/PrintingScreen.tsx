@@ -43,6 +43,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const [typedSub, setTypedSub]         = useState('');
   const [printDone, setPrintDone]       = useState(false);   // true once Pi confirms
   const [statusMsg, setStatusMsg]       = useState('Warming up printer…');
+  // Color hold: after 100%, inkjet needs extra time to physically eject paper
+  const [collectingPages, setCollectingPages] = useState(false);
+  const [collectCountdown, setCollectCountdown] = useState(0);
+  const collectTimerRef = useRef<number | null>(null);
 
   const progressRef         = useRef(0);   // mirror of progress for closures
   const tickTimerRef        = useRef<number | null>(null);
@@ -72,11 +76,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     if (pollTimerRef.current)       clearTimeout(pollTimerRef.current);
     if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
     if (stallTimerRef.current)      clearTimeout(stallTimerRef.current);
+    if (collectTimerRef.current)    clearTimeout(collectTimerRef.current);
     tickTimerRef.current       = null;
     pollTimerRef.current       = null;
     completionTimerRef.current = null;
     stallTimerRef.current      = null;
+    collectTimerRef.current    = null;
   }, []);
+
+  // Color print ejection hold: 25s countdown shown after 100% for inkjet
+  const COLOR_COLLECT_SECS = 25;
 
   const animateTo100AndComplete = useCallback((fast = false) => {
     if (isCompletingRef.current) return;
@@ -88,23 +97,42 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
     setStatusMsg('Finishing up…');
 
-    let stepIndex = 0;
     const finish = () => {
       const currentProgress = progressRef.current;
       if (currentProgress >= 100) {
         setStatusMsg('Print complete!');
-        // Hold at 100% for 1.5 s then transition (or 500ms if fast mode)
-        completionTimerRef.current = window.setTimeout(() => {
-          onComplete();
-        }, fast ? 500 : 1500);
+
+        // ── Color inkjet: hold with countdown before transitioning ──────────
+        // The Epson L3250 can take 15–25s to physically eject after CUPS marks
+        // the job done. Show a collecting-pages screen so users don't walk away.
+        if (colorMode === 'color') {
+          setCollectingPages(true);
+          setCollectCountdown(COLOR_COLLECT_SECS);
+
+          let remaining = COLOR_COLLECT_SECS;
+          const tick = () => {
+            remaining -= 1;
+            setCollectCountdown(remaining);
+            if (remaining <= 0) {
+              setCollectingPages(false);
+              onComplete();
+              return;
+            }
+            collectTimerRef.current = window.setTimeout(tick, 1000);
+          };
+          collectTimerRef.current = window.setTimeout(tick, 1000);
+        } else {
+          // B&W laser — paper exits almost instantly, short hold is fine
+          completionTimerRef.current = window.setTimeout(() => {
+            onComplete();
+          }, fast ? 500 : 1500);
+        }
         return;
       }
 
       const next = currentProgress + 1;
-      
       progressRef.current = next;
       setProgress(next);
-      stepIndex++;
 
       // If fast mode, animate at 10ms per step. Otherwise 400ms.
       const delay = fast ? 10 : 400;
@@ -114,7 +142,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (next >= 95) setStatusMsg('Almost done…');
     };
     finish();
-  }, [onComplete]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onComplete, colorMode]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
@@ -251,6 +280,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       setTypedTitle('');
       setTypedSub('');
       setPrintDone(false);
+      setCollectingPages(false);
+      setCollectCountdown(0);
       isCompletingRef.current = false;
       setStatusMsg('Warming up printer…');
       return;
@@ -432,7 +463,84 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         }
         .music-particle-fly.p2 { animation-delay: 0.9s;  top: 15px;  font-size: 38px; color: rgba(79,172,254,0.85); }
         .music-particle-fly.p3 { animation-delay: 1.8s;  top: -15px; font-size: 46px; }
+        @keyframes collect-pulse {
+          0%,100% { box-shadow: 0 0 0 0 rgba(0,242,254,0.4); }
+          50%      { box-shadow: 0 0 0 30px rgba(0,242,254,0); }
+        }
+        @keyframes collect-fade-in {
+          from { opacity: 0; transform: scale(0.94); }
+          to   { opacity: 1; transform: scale(1); }
+        }
       `}</style>
+
+      {/* ── Color print: "Collecting your pages" overlay ── */}
+      {collectingPages && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 200,
+          background: 'linear-gradient(135deg, #001a28 0%, #00101c 100%)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '36px',
+          animation: 'collect-fade-in 0.5s ease',
+        }}>
+          {/* Printer icon + pulse ring */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '140px', height: '140px', borderRadius: '50%',
+              background: 'rgba(0,242,254,0.08)',
+              border: '3px solid rgba(0,242,254,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: 'collect-pulse 2s ease-in-out infinite',
+            }}>
+              <span className="material-symbols-outlined" style={{
+                fontSize: '72px', color: '#00f2fe',
+                filter: 'drop-shadow(0 0 16px rgba(0,242,254,0.7))',
+              }}>print</span>
+            </div>
+          </div>
+
+          {/* Main message */}
+          <div style={{ textAlign: 'center', maxWidth: '700px', padding: '0 40px' }}>
+            <h2 style={{
+              fontSize: '62px', fontWeight: 800, letterSpacing: '-2px',
+              lineHeight: 1.1, marginBottom: '20px',
+              background: 'linear-gradient(135deg, #00f2fe, #4facfe)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>
+              🖨️ Collecting your pages…
+            </h2>
+            <p style={{
+              fontSize: '28px', fontWeight: 500, color: 'rgba(255,255,255,0.75)',
+              lineHeight: 1.5,
+            }}>
+              Your color print is being ejected.<br />
+              <strong style={{ color: '#fff' }}>Please wait at the printer</strong> for your document.
+            </p>
+          </div>
+
+          {/* Countdown ring */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+          }}>
+            <div style={{
+              width: '90px', height: '90px', borderRadius: '50%',
+              border: '4px solid rgba(0,242,254,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(0,242,254,0.06)',
+              boxShadow: 'inset 0 0 20px rgba(0,242,254,0.1)',
+            }}>
+              <span style={{
+                fontSize: '38px', fontWeight: 800, color: '#00f2fe',
+                fontVariantNumeric: 'tabular-nums',
+                filter: 'drop-shadow(0 0 8px rgba(0,242,254,0.6))',
+              }}>{collectCountdown}</span>
+            </div>
+            <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px', textTransform: 'uppercase' }}>
+              seconds
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Left text block ── */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '30px', flex: 1, textAlign: 'left', maxWidth: '750px', zIndex: 10 }}>
         <div style={{ minHeight: '180px' }}>
