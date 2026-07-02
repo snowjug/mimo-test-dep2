@@ -84,9 +84,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     collectTimerRef.current    = null;
   }, []);
 
-  // Color print ejection hold: 25s countdown shown after 100% for inkjet
-  const COLOR_COLLECT_SECS = 25;
-
   const animateTo100AndComplete = useCallback((fast = false) => {
     if (isCompletingRef.current) return;
     isCompletingRef.current = true;
