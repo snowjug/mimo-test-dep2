@@ -102,31 +102,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (currentProgress >= 100) {
         setStatusMsg('Print complete!');
 
-        // ── Color inkjet: hold with countdown before transitioning ──────────
-        // The Epson L3250 can take 15–25s to physically eject after CUPS marks
-        // the job done. Show a collecting-pages screen so users don't walk away.
-        if (colorMode === 'color') {
-          setCollectingPages(true);
-          setCollectCountdown(COLOR_COLLECT_SECS);
-
-          let remaining = COLOR_COLLECT_SECS;
-          const tick = () => {
-            remaining -= 1;
-            setCollectCountdown(remaining);
-            if (remaining <= 0) {
-              setCollectingPages(false);
-              onComplete();
-              return;
-            }
-            collectTimerRef.current = window.setTimeout(tick, 1000);
-          };
-          collectTimerRef.current = window.setTimeout(tick, 1000);
-        } else {
-          // B&W laser — paper exits almost instantly, short hold is fine
-          completionTimerRef.current = window.setTimeout(() => {
-            onComplete();
-          }, fast ? 500 : 1500);
-        }
+        // Proceed to completion immediately for all print types
+        completionTimerRef.current = window.setTimeout(() => {
+          onComplete();
+        }, fast ? 500 : 1500);
         return;
       }
 
