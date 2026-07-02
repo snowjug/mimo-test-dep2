@@ -70,6 +70,19 @@ function App() {
                 }
               ]
             };
+          } else if (code === "9999") {
+            // 🧪 Developer test code — simulates a color print demo, no backend calls
+            data = {
+              userName: "Dev Tester",
+              documents: [
+                {
+                  file: "test_color_demo.pdf",
+                  pages: 2,
+                  copies: 1,
+                  colorMode: "color"
+                }
+              ]
+            };
           } else {
             const res = await fetch("https://api-upqxuj7evq-uc.a.run.app/get-documents-by-code", {
               method: "POST",
@@ -103,7 +116,7 @@ function App() {
           setCurrentScreen("printing-screen");
 
           // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS (Pi listener picks it up via Firestore)
-          if (code !== "0000") {
+          if (code !== "0000" && code !== "9999") {
             try {
               // Read specific Kiosk ID from URL so one Vercel deployment supports infinite kiosks!
               // Example: printmimo.tech/kiosk?kioskId=SV-002
