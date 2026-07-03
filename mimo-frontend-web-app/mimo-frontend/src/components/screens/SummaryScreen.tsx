@@ -72,12 +72,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 opacity: 0,
                 transform: 'translateY(-40px)'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                    <span className="material-symbols-outlined" style={{ color: '#E8B86D', fontSize: '28px' }}>check_circle</span>
-                    <span style={{ fontSize: '18px', color: '#E8B86D', fontWeight: 800, letterSpacing: '4px', textTransform: 'uppercase' }}>
-                        Success!
-                    </span>
-                </div>
+
                 <div style={{ fontSize: '48px', fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', textShadow: '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
                     <span style={{ color: '#FFD97D', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
                 </div>

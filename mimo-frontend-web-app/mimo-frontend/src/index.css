@@ -104,18 +104,7 @@ body {
     pointer-events: none;
 }
 
-/* Soft light vignette over the photo */
-.kiosk-bg::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(
-        ellipse 80% 70% at 50% 30%,
-        rgba(216, 153, 60, 0.10) 0%,
-        rgba(120, 80, 10, 0.22) 100%
-    );
-    pointer-events: none;
-}
+/* Removed .kiosk-bg::after vignette to prevent seams */
 
 /* ---- SCREEN SYSTEM ---- */
 .screen {
@@ -144,8 +133,7 @@ body {
 }
 
 .main-interface-wrap .kiosk-bg {
-    /* slight warm overlay for the welcome screen */
-    filter: brightness(0.92);
+    /* Empty - removed filter to prevent seams */
 }
 
 .immersive-container {
@@ -1129,9 +1117,9 @@ body {
     z-index: 1;
 }
 
-.glow-1 { top: -15%; left: -5%;  background: radial-gradient(circle, rgba(230,170,80,0.15) 0%, transparent 65%); animation-delay: 0s; }
-.glow-2 { bottom: -15%; right: -5%; background: radial-gradient(circle, rgba(100,60,10,0.25) 0%, transparent 65%); animation-delay: -6s; }
-.glow-3 { top: 35%; left: 38%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(210,150,50,0.18) 0%, transparent 65%); animation-delay: -12s; }
+.glow-1 { top: -10%; left: -10%;  background: radial-gradient(circle, rgba(240,180,90,0.15) 0%, transparent 65%); animation-delay: 0s; }
+.glow-2 { bottom: -10%; right: -10%; background: radial-gradient(circle, rgba(240,180,90,0.15) 0%, transparent 65%); animation-delay: -6s; }
+.glow-3 { top: 35%; left: 35%; width: 600px; height: 600px; background: radial-gradient(circle, rgba(255,200,100,0.12) 0%, transparent 65%); animation-delay: -12s; }
 
 @keyframes drift {
     0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
