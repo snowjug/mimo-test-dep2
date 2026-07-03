@@ -408,6 +408,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         overflow: 'hidden',
       }}
     >
+      {/* Botanical background */}
+      <div className="kiosk-bg" />
+      <div className="ambient-glow glow-1" />
+      <div className="ambient-glow glow-2" />
       <style>{`
         @keyframes spin-slow {
           100% { transform: rotate(360deg); }
@@ -420,32 +424,45 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           50%  { opacity: 0.8; }
           100% { transform: scale(1.4);  opacity: 0; }
         }
-        @keyframes float-note {
-          0%   { transform: translate(0, 0)        scale(0.6) rotate(-10deg); opacity: 0; }
-          20%  { transform: translate(40px, -25px) scale(0.8) rotate(5deg);  opacity: 0.9; }
-          80%  { transform: translate(120px,-65px) scale(1)   rotate(-5deg); opacity: 0.9; }
-          100% { transform: translate(160px,-90px) scale(0.6) rotate(15deg); opacity: 0; }
+        @keyframes petal-float {
+          0%   { transform: translate(0, 0)        rotate(0deg)   scale(0.7); opacity: 0; }
+          15%  { opacity: 0.85; }
+          60%  { transform: translate(50px, -55px) rotate(120deg) scale(1.0); opacity: 0.70; }
+          100% { transform: translate(80px, -110px) rotate(220deg) scale(0.5); opacity: 0; }
+        }
+        @keyframes petal-float-2 {
+          0%   { transform: translate(0, 0)         rotate(0deg)   scale(0.6); opacity: 0; }
+          15%  { opacity: 0.75; }
+          60%  { transform: translate(-40px, -70px) rotate(-140deg) scale(1.0); opacity: 0.60; }
+          100% { transform: translate(-65px,-130px) rotate(-260deg) scale(0.4); opacity: 0; }
         }
         @keyframes text-glow-pulse {
-          0%,100% { filter: drop-shadow(0 0 15px rgba(0,242,254,0.3)); }
-          50%      { filter: drop-shadow(0 0 35px rgba(0,242,254,0.8)); }
+          0%,100% { filter: drop-shadow(0 0 15px rgba(200,134,10,0.4)); }
+          50%      { filter: drop-shadow(0 0 35px rgba(232,184,109,0.9)); }
         }
-        .music-particle-fly {
+        .petal-fly {
           position: absolute;
-          font-size: 52px;
-          color: rgba(0,242,254,0.85);
-          filter: drop-shadow(0 4px 12px rgba(0,242,254,0.45));
-          animation: float-note 2.8s cubic-bezier(0.25,1,0.5,1) infinite;
+          font-size: 28px;
+          animation: petal-float 3.2s cubic-bezier(0.25,1,0.5,1) infinite;
+          pointer-events: none;
+          /* Strip colour from emoji — renders as white petals */
+          filter: grayscale(1) brightness(8) drop-shadow(0 2px 8px rgba(255,255,255,0.5));
         }
-        .music-particle-fly.p2 { animation-delay: 0.9s;  top: 15px;  font-size: 38px; color: rgba(79,172,254,0.85); }
-        .music-particle-fly.p3 { animation-delay: 1.8s;  top: -15px; font-size: 46px; }
+        .petal-fly.p2 { animation: petal-float-2 2.8s cubic-bezier(0.25,1,0.5,1) infinite 1.1s; top: 20px; font-size: 22px; }
+        .petal-fly.p3 { animation: petal-float 3.6s cubic-bezier(0.25,1,0.5,1) infinite 2.0s; top: -20px; font-size: 24px; }
         @keyframes collect-pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(0,242,254,0.4); }
-          50%      { box-shadow: 0 0 0 30px rgba(0,242,254,0); }
+          0%,100% { box-shadow: 0 0 0 0 rgba(76,175,80,0.4); }
+          50%      { box-shadow: 0 0 0 30px rgba(76,175,80,0); }
         }
         @keyframes collect-fade-in {
           from { opacity: 0; transform: scale(0.94); }
           to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes petal-orbit {
+          0%   { opacity: 0;   transform: translateY(0px)   scale(0.7) rotate(0deg); }
+          15%  { opacity: 0.9; }
+          50%  { opacity: 0.6; transform: translateY(-20px) scale(1.1) rotate(180deg); }
+          100% { opacity: 0;   transform: translateY(-40px) scale(0.6) rotate(360deg); }
         }
       `}</style>
 
@@ -517,17 +534,27 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         </div>
       )}
 
-      {/* ── Left text block ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '30px', flex: 1, textAlign: 'left', maxWidth: '750px', zIndex: 10 }}>
+      {/* ── Left text block — glass card for readability on amber bg ── */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '30px',
+        flex: 1, textAlign: 'left', maxWidth: '750px', zIndex: 10,
+        background: 'rgba(0,0,0,0.22)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        border: '1px solid rgba(255,255,255,0.14)',
+        borderRadius: '28px',
+        padding: '40px 48px',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+      }}>
         <div style={{ minHeight: '180px' }}>
-          <h2 style={{ fontSize: '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-3px', lineHeight: '1.05', display: 'flex' }}>
+          <h2 style={{ fontSize: '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-3px', lineHeight: '1.05', display: 'flex', textShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
             <span className={isActive ? "data-text-highlight" : ""}>{typedTitle}</span>
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '36px', fontWeight: 500, lineHeight: '1.4', whiteSpace: 'pre-line', marginBottom: '15px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.95)', fontSize: '36px', fontWeight: 600, lineHeight: '1.4', whiteSpace: 'pre-line', marginBottom: '15px', textShadow: '0 2px 12px rgba(0,0,0,0.3)' }}>
             {typedSub}
           </p>
           {!isCompleted && (
-            <p style={{ color: '#00f2fe', fontSize: '24px', fontWeight: 600, opacity: 0.95, letterSpacing: '0.5px', textShadow: '0 0 10px rgba(0,242,254,0.3)', minHeight: '36px' }}>
+            <p style={{ color: '#FFD97D', fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: '0 0 16px rgba(200,134,10,0.5)', minHeight: '36px' }}>
               {statusMsg}
             </p>
           )}
@@ -537,12 +564,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       {/* ── Right circle ── */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
 
-        {/* Flying musical notes from the left */}
+        {/* Floating petals beside the circle */}
         {isActive && progress < 100 && (
-          <div style={{ position: 'absolute', left: '-150px', top: '50%', transform: 'translateY(-50%)', zIndex: 1, pointerEvents: 'none' }}>
-            <div className="music-particle-fly">♪</div>
-            <div className="music-particle-fly p2">♫</div>
-            <div className="music-particle-fly p3">♬</div>
+          <div style={{ position: 'absolute', left: '-120px', top: '50%', transform: 'translateY(-50%)', zIndex: 1, pointerEvents: 'none' }}>
+            <div className="petal-fly">🌸</div>
+            <div className="petal-fly p2">🌺</div>
+            <div className="petal-fly p3">🌼</div>
           </div>
         )}
 
@@ -550,64 +577,65 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           className="circular-progress-container"
           style={{ position: 'relative', width: '380px', height: '380px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          {/* Dynamic glow background — grows with progress */}
+          {/* Gold glow background — grows with progress */}
           <div style={{
             position: 'absolute',
             width: '300px',
             height: '300px',
             borderRadius: '50%',
-            background: '#00f2fe',
+            background: '#C8860A',
             filter: 'blur(70px)',
-            opacity: 0.08 + (progress / 100) * 0.22,
+            opacity: 0.10 + (progress / 100) * 0.22,
             transition: 'opacity 0.3s',
             pointerEvents: 'none',
           }} />
 
-          {/* Pulse-ring halos */}
+          {/* Gold pulse-ring halos */}
           {isActive && progress < 100 && (
             <>
               <div style={{
                 position: 'absolute', inset: '45px', borderRadius: '50%',
-                border: '2px solid rgba(0,242,254,0.5)',
+                border: '2px solid rgba(232,184,109,0.6)',
                 animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite',
                 pointerEvents: 'none',
               }} />
               <div style={{
                 position: 'absolute', inset: '45px', borderRadius: '50%',
-                border: '2px solid rgba(0,242,254,0.2)',
+                border: '2px solid rgba(200,134,10,0.28)',
                 animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite 1.5s',
                 pointerEvents: 'none',
               }} />
             </>
           )}
-          {/* ── Musical note particles ── */}
+          {/* ── Floating petal orbit particles — white ── */}
           {isActive && noteParticles.map(note => (
             <div
               key={note.id}
               className="music-note-particle"
               style={{
-                // Position at pre-computed orbit point; subtract half font-size for centering
                 left: `${note.x}px`,
                 top: `${note.y}px`,
-                fontSize: `${note.fontSize}px`,
-                color: note.id % 3 === 0 ? '#00f2fe' : note.id % 3 === 1 ? '#4facfe' : '#a78bfa',
-                animationName: 'noteFloat',
+                fontSize: `${note.fontSize - 4}px`,
+                animationName: 'petal-orbit',
                 animationDuration: `${note.duration}ms`,
                 animationDelay: `${note.delay}ms`,
                 animationTimingFunction: 'ease-in-out',
                 animationIterationCount: 'infinite',
+                textShadow: 'none',
+                /* Strip emoji colour → white petals */
+                filter: 'grayscale(1) brightness(8) drop-shadow(0 1px 4px rgba(255,255,255,0.4))',
               }}
             >
-              {note.char}
+              {note.id % 4 === 0 ? '🌸' : note.id % 4 === 1 ? '🌺' : note.id % 4 === 2 ? '🌼' : '🌷'}
             </div>
           ))}
 
           <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2, overflow: 'visible' }}>
             <defs>
               <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%"   stopColor="#00f2fe" />
-                <stop offset="60%"  stopColor="#4facfe" />
-                <stop offset="100%" stopColor="#0052d4" />
+                <stop offset="0%"   stopColor="#FFD97D" />
+                <stop offset="50%"  stopColor="#E8B86D" />
+                <stop offset="100%" stopColor="#C8860A" />
               </linearGradient>
               <filter id="neonGlow" x="-30%" y="-30%" width="160%" height="160%">
                 <feGaussianBlur stdDeviation="6" result="blur" />
@@ -630,13 +658,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               <circle cx="190" cy="190" r="176" fill="transparent" stroke="rgba(255,255,255,0.08)" strokeWidth="3" strokeDasharray="12 18" />
             </g>
 
-            {/* Inner dotted ring — slow counter-clockwise spin */}
+            {/* Inner dotted ring — slow counter-clockwise spin, gold */}
             <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow-reverse 18s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="105" fill="transparent" stroke="rgba(0,242,254,0.15)" strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
+              <circle cx="190" cy="190" r="105" fill="transparent" stroke="rgba(232,184,109,0.22)" strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
             </g>
 
-            {/* Glassmorphic deep-teal circle background */}
-            <circle cx="190" cy="190" r="130" fill="rgba(0, 35, 55, 0.6)" stroke="rgba(0,242,254,0.12)" strokeWidth="2" />
+            {/* Glassmorphic warm-dark circle background */}
+            <circle cx="190" cy="190" r="130" fill="rgba(30, 18, 0, 0.62)" stroke="rgba(200,134,10,0.20)" strokeWidth="2" />
 
             {/* Static background track */}
             <circle cx="190" cy="190" r={radius} fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
@@ -652,7 +680,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               }}
             >
               <tspan fontSize="92px" fontWeight="800" fill="#ffffff" letterSpacing="-2px" style={{ fontFeatureSettings: '"tnum"', fontVariantNumeric: 'tabular-nums' }}>{progress}</tspan>
-              <tspan fontSize="32px" fontWeight="700" fill="#00f2fe" dx="4">%</tspan>
+              <tspan fontSize="32px" fontWeight="700" fill="#FFD97D" dx="4">%</tspan>
             </text>
 
             {/* Rotated group for progress arc and comet tail */}
@@ -695,8 +723,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 cx={pt.x}
                 cy={pt.y}
                 r={Math.max(0.5, pt.r)}
-                fill={pt.key === 0 ? '#ffffff' : '#00f2fe'}
-                opacity={pt.opacity * (pt.key === 0 ? 1 : 0.55)}
+                fill={pt.key === 0 ? '#ffffff' : '#E8B86D'}
+                opacity={pt.opacity * (pt.key === 0 ? 1 : 0.65)}
                 filter={pt.key <= 2 ? 'url(#cometGlow)' : undefined}
                 style={{ transition: 'cx 0.18s linear, cy 0.18s linear' }}
               />

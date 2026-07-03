@@ -52,6 +52,11 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ isActive, 
             onPointerDown={handleScreenTouch}
             style={{ touchAction: 'none', display: isActive ? 'flex' : 'none' }}
         >
+            {/* Botanical background */}
+            <div className="kiosk-bg" style={{ filter: 'brightness(0.85)' }} />
+            <div className="ambient-glow glow-1" />
+            <div className="ambient-glow glow-2" />
+
             {/* ── Ripple Container ── */}
             {ripples.map(r => (
                 <div 

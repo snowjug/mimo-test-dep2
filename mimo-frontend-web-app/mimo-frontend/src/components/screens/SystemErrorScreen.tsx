@@ -21,6 +21,10 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
             className={`screen err-screen ${isActive ? 'visible' : ''}`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
+            {/* Botanical background */}
+            <div className="kiosk-bg" />
+            <div className="ambient-glow glow-1" />
+            <div className="ambient-glow glow-2" />
 
             <div className="err-pop-badge-container err-a1">
                 <div className="err-pop-badge">

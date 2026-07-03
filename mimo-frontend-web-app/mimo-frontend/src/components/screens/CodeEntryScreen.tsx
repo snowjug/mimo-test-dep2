@@ -9,7 +9,14 @@ interface CodeEntryScreenProps {
   hasError?: boolean;
 }
 
-export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({ onSuccess, onBack, isActive, code, setCode, hasError }) => {
+export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
+  onSuccess,
+  onBack,
+  isActive,
+  code,
+  setCode,
+  hasError,
+}) => {
   const [isShaking, setIsShaking] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -31,22 +38,14 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({ onSuccess, onB
 
   const handleSubmit = async () => {
     if (code.length !== 4 || loading) return;
-
     try {
       setLoading(true);
-
-      await onSuccess(); // backend call
-
+      await onSuccess();
     } catch (err: any) {
       console.error(err);
-
-      // 👇 Trigger shake animation
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
-
-      // 👇 Optional: clear code
       setTimeout(() => setCode(''), 600);
-
     } finally {
       setLoading(false);
     }
@@ -54,101 +53,118 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({ onSuccess, onB
 
   useEffect(() => {
     if (!isActive) {
-      const timer = setTimeout(() => {
-        setIsShaking(false);
-      }, 0);
+      const timer = setTimeout(() => setIsShaking(false), 0);
       return () => clearTimeout(timer);
     }
   }, [isActive]);
 
   return (
-    <div 
-        className={`screen code-entry-wrap ${isActive ? 'visible' : ''}`}
-        style={{ display: isActive ? 'flex' : 'none' }}
+    <div
+      className={`screen code-entry-wrap ${isActive ? 'visible' : ''}`}
+      style={{ display: isActive ? 'flex' : 'none' }}
     >
-      <div className="keypad-layout" style={{ position: 'relative' }}>
-        <style>{`
-          @keyframes mimo-spin {
-            to { transform: rotate(360deg); }
-          }
-          .kiosk-back-btn {
-            position: absolute;
-            top: 40px;
-            left: 40px;
-            width: 76px;
-            height: 76px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.20);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            transition: all 0.2s ease-in-out;
-            z-index: 100;
-          }
-          .kiosk-back-btn:active {
-            transform: scale(0.90);
-            background: rgba(255, 255, 255, 0.20);
-            border-color: rgba(255, 255, 255, 0.40);
-          }
-          .kiosk-back-btn .material-symbols-outlined {
-            font-size: 36px;
-          }
-        `}</style>
+      {/* Botanical background shared layer */}
+      <div className="kiosk-bg" />
 
-        <button 
-          onClick={onBack}
-          className="kiosk-back-btn"
-          aria-label="Go back to home"
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
+      {/* Ambient warm glows */}
+      <div className="ambient-glow glow-1" />
+      <div className="ambient-glow glow-2" />
 
+      {/* Back button */}
+      <button
+        onClick={onBack}
+        className="kiosk-back-btn"
+        aria-label="Go back to home"
+      >
+        <span className="material-symbols-outlined">arrow_back</span>
+      </button>
+
+      {/* Main layout */}
+      <div className="keypad-layout">
+
+        {/* LEFT: Instruction + Code Slots */}
         <div className="input-display-area">
           <div className="entry-instruction">
-            <h2>Enter Your Mimo <br /> Code Here</h2>
-            <p>Enter your 4-digit code provided to you.</p>
+            <h2>Enter Your Mimo<br />Code Here</h2>
           </div>
-          <div className={`slots-container ${isShaking ? 'shake error' : ''}`}>
+
+          {/* Code slots */}
+          <div className={`slots-container ${isShaking ? 'shake' : ''}`}>
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
-                className={`code-slot ${i === code.length && !isShaking ? 'active' : ''} ${i < code.length ? 'filled' : ''} ${isShaking ? 'error-box' : ''}`}
-                style={isShaking ? { borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5' } : {}}
+                className={`code-slot
+                  ${i === code.length && !isShaking ? 'active' : ''}
+                  ${i < code.length ? 'filled' : ''}
+                `}
+                style={
+                  isShaking
+                    ? {
+                        borderColor: 'rgba(239,68,68,0.70)',
+                        backgroundColor: 'rgba(239,68,68,0.12)',
+                        color: '#fca5a5',
+                        boxShadow: '0 0 0 2px rgba(239,68,68,0.35)',
+                      }
+                    : {}
+                }
               >
-                {code[i] || ''}
+                {code[i] ? '●' : ''}
               </div>
             ))}
           </div>
+
+
         </div>
+
+        {/* RIGHT: Keypad */}
         <div className="modern-keypad">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
-            <button key={num} className="num-btn" onClick={() => handleNumClick(num)}>{num}</button>
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+            <button
+              key={num}
+              className="num-btn"
+              onClick={() => handleNumClick(num)}
+              id={`key-${num}`}
+            >
+              {num}
+            </button>
           ))}
 
-          <button className="num-btn accent-red" onClick={() => handleNumClick('del')}>
+          {/* Delete */}
+          <button
+            className="num-btn accent-red"
+            onClick={() => handleNumClick('del')}
+            id="key-del"
+          >
             <span className="material-symbols-outlined">backspace</span>
           </button>
-          <button className="num-btn" onClick={() => handleNumClick('0')}>0</button>
+
+          {/* 0 */}
+          <button
+            className="num-btn"
+            onClick={() => handleNumClick('0')}
+            id="key-0"
+          >
+            0
+          </button>
+
+          {/* Submit */}
           <button
             className={`num-btn submit-btn ${code.length === 4 ? 'ready' : ''}`}
             onClick={handleSubmit}
             disabled={code.length !== 4 || loading}
+            id="key-submit"
           >
             {loading ? (
-              <div style={{
-                width: '28px',
-                height: '28px',
-                border: '3px solid rgba(255, 255, 255, 0.3)',
-                borderTopColor: '#fff',
-                borderRadius: '50%',
-                animation: 'mimo-spin 1s linear infinite'
-              }}></div>
+              <div
+                style={{
+                  width: '26px',
+                  height: '26px',
+                  border: '3px solid rgba(255,255,255,0.25)',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  animation: 'mimo-spin 1s linear infinite',
+                }}
+              />
             ) : (
               <span className="material-symbols-outlined">check</span>
             )}
