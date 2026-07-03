@@ -564,14 +564,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       {/* ── Right circle ── */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
 
-        {/* Floating petals beside the circle */}
-        {isActive && progress < 100 && (
-          <div style={{ position: 'absolute', left: '-120px', top: '50%', transform: 'translateY(-50%)', zIndex: 1, pointerEvents: 'none' }}>
-            <div className="petal-fly">🌸</div>
-            <div className="petal-fly p2">🌺</div>
-            <div className="petal-fly p3">🌼</div>
-          </div>
-        )}
+
 
         <div
           className="circular-progress-container"
@@ -622,8 +615,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 animationTimingFunction: 'ease-in-out',
                 animationIterationCount: 'infinite',
                 textShadow: 'none',
-                /* Strip emoji colour → white petals */
-                filter: 'grayscale(1) brightness(8) drop-shadow(0 1px 4px rgba(255,255,255,0.4))',
+                /* Strip emoji colour → white petals with dark amber shadow for high visibility */
+                filter: 'grayscale(1) brightness(8) drop-shadow(0 4px 12px rgba(120, 60, 0, 0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
               }}
             >
               {note.id % 4 === 0 ? '🌸' : note.id % 4 === 1 ? '🌺' : note.id % 4 === 2 ? '🌼' : '🌷'}
