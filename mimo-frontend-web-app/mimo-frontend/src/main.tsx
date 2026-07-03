@@ -7,9 +7,9 @@ const updateScale = () => {
   const isPortrait = window.innerWidth <= 1000;
   let scale = 1;
   if (isPortrait) {
-    scale = Math.min(window.innerWidth / 794, window.innerHeight / 1333);
+    scale = Math.min(window.innerWidth / 810, window.innerHeight / 1440);
   } else {
-    scale = Math.min(window.innerWidth / 1333, window.innerHeight / 794);
+    scale = Math.min(window.innerWidth / 1440, window.innerHeight / 810);
   }
   document.documentElement.style.setProperty('--kiosk-scale', `${scale}`);
 };
