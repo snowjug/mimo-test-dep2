@@ -619,7 +619,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 filter: 'grayscale(1) brightness(8) drop-shadow(0 4px 12px rgba(120, 60, 0, 0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
               }}
             >
-              {note.id % 4 === 0 ? '🌸' : note.id % 4 === 1 ? '🌺' : note.id % 4 === 2 ? '🌼' : '🌷'}
+              <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: 'inherit' }}>
+                {note.id % 2 === 0 ? 'local_florist' : 'filter_vintage'}
+              </span>
             </div>
           ))}
 
