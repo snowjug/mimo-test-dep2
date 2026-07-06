@@ -585,6 +585,15 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
                     # Check if it ended in an error by looking at completed jobs
                     res2 = subprocess.run(["lpstat", "-W", "completed"], capture_output=True, text=True, timeout=10)
                     job_ok = job_id in res2.stdout
+                    # Also treat as success if job is gone from both not-completed AND completed:
+                    # large/slow jobs (e.g. graph PDFs) can rotate out of CUPS history by the time
+                    # we run lpstat -W completed, even though they printed successfully.
+                    if not job_ok:
+                        res3 = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True, timeout=10)
+                        if job_id not in res3.stdout:
+                            # Job is gone from all queues — treat as completed, not failed
+                            print(f"⚠️ [SYNC] CUPS job {job_id} not in completed history (rotated out), but also not in not-completed. Treating as success.")
+                            job_ok = True
                     if job_ok:
                         # Physical delay: give the printer time to actually eject the paper
                         # Brother laser: ~3s. Epson inkjet: ~15s.
@@ -908,7 +917,7 @@ def process_job(doc_snapshot):
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             
-            if ext in [".jpg", ".jpeg", ".png", ".heic"]:
+            if ext in [".jpg", ".jpeg", ".png", ".heic", ".webp"]:
                 if image_scaling == "fill":
                     pdf_path = process_image_fill(l_path, photo_layout, is_color)
                     if pdf_path: f_final = pdf_path
@@ -946,7 +955,7 @@ def process_job(doc_snapshot):
         # Ensure all files are PDFs before merging
         pdf_paths = []
         for fp in final_paths:
-            if fp.lower().endswith(('.jpg', '.jpeg', '.png', '.heic')):
+            if fp.lower().endswith(('.jpg', '.jpeg', '.png', '.heic', '.webp')):
                 pdf_fp = fp + ".pdf"
                 try:
                     from PIL import Image
