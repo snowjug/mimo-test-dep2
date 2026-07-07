@@ -1,10 +1,11 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { MainScreen } from './components/screens/MainScreen';
 import { CodeEntryScreen } from './components/screens/CodeEntryScreen';
 import { PrintingScreen } from './components/screens/PrintingScreen';
 import { SummaryScreen } from './components/screens/SummaryScreen';
 import { SystemErrorScreen } from './components/screens/SystemErrorScreen';
 import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
+import { Adds } from './components/screens/adds/Adds';
 
 export type ScreenState =
   | 'main-interface'
@@ -12,7 +13,8 @@ export type ScreenState =
   | 'printing-screen'
   | 'summary-screen'
   | 'system-error-screen'
-  | 'maintenance-screen';
+  | 'maintenance-screen'
+  | 'adds-screen';
 
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -49,6 +51,36 @@ function App() {
       toastTimerRef.current = null;
     }, 3000);
   }, []);
+
+  // ================= IDLE TIMER FOR ADS =================
+  useEffect(() => {
+    let idleTimer: number;
+
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      if (currentScreen === 'main-interface') {
+        idleTimer = window.setTimeout(() => {
+          setCurrentScreen('adds-screen');
+        }, 10000); // 10 seconds of idle time on main screen -> show ads
+      }
+    };
+
+    window.addEventListener('mousemove', resetIdleTimer);
+    window.addEventListener('touchstart', resetIdleTimer);
+    window.addEventListener('click', resetIdleTimer);
+    window.addEventListener('keypress', resetIdleTimer);
+
+    // Initial trigger
+    resetIdleTimer();
+
+    return () => {
+      clearTimeout(idleTimer);
+      window.removeEventListener('mousemove', resetIdleTimer);
+      window.removeEventListener('touchstart', resetIdleTimer);
+      window.removeEventListener('click', resetIdleTimer);
+      window.removeEventListener('keypress', resetIdleTimer);
+    };
+  }, [currentScreen]);
 
   // ================= VALIDATION + DOWNLOAD =================
   const handleValidationSuccess = useCallback(async () => {
@@ -200,6 +232,11 @@ function App() {
       )}
 
       {/* ================= SCREENS ================= */}
+      <Adds 
+        isActive={currentScreen === 'adds-screen'} 
+        onTap={() => setCurrentScreen('main-interface')} 
+      />
+
       <MainScreen
         isActive={currentScreen === 'main-interface'}
         onNext={goToCodeEntry}
