@@ -27,6 +27,10 @@ export default defineConfig({
             ];
             if (url === '/' || url === '/landing') {
               req.url = '/index.html';
+            } else if (url === '/blog') {
+              req.url = '/blog.html';
+            } else if (url && url.startsWith('/blog/')) {
+              req.url = `${url}.html`;
             } else if (url && staticRewrites.includes(url)) {
               req.url = `${url}.html`;
             } else if (url && !url.startsWith('/api') && !url.startsWith('/admin')) {
