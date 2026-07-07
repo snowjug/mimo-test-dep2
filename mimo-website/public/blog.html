@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MIMO Blog & Guides — Smart Campus Printing Insights</title>
+  <meta name="description" content="Read the latest campus printing guides, student life hacks, PDF formatting tutorials, and document security insights from the MIMO team." />
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            mimoBlue: '#4666F6',
+            mimoLightBlue: '#EEF2FF',
+            mimoDark: '#0F172A',
+          },
+          borderRadius: {
+            '3xl': '1.5rem',
+            '4xl': '2rem',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  
+  <!-- Google AdSense -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6488030243565665" crossorigin="anonymous"></script>
+
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #e8ecf5;
+      min-height: 100%;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    .page-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      width: 100%;
+    }
+    .phone-card {
+      width: 100%;
+      max-width: 430px;
+      min-height: 100vh;
+      background: linear-gradient(to bottom, #EEF2FF 0%, #F5F7FF 100%);
+      box-shadow: 0 0 80px rgba(0,0,0,0.15);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .desktop-panel {
+      display: none;
+    }
+    @media (min-width: 1024px) {
+      .page-wrap {
+        padding: 2rem 4rem;
+        gap: 3rem;
+        background: #e8ecf5;
+      }
+      .phone-card {
+        border-radius: 2rem;
+        min-height: 850px;
+        height: 850px;
+        overflow-y: auto;
+        border: 8px solid #1e293b;
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+      }
+      .desktop-panel {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        max-width: 800px;
+        background: #ffffff;
+        border-radius: 2rem;
+        padding: 3rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+        min-height: 850px;
+        border: 1px solid rgba(74, 107, 255, 0.1);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+    
+    <!-- ── MOBILE APP LAYOUT FRAME ── -->
+    <div class="phone-card scrollbar-thin">
+      
+      <!-- HEADER -->
+      <header class="flex items-center justify-between px-6 pt-8 pb-4 bg-white border-b border-slate-100">
+        <a href="/" class="flex items-center gap-2 text-[#4666F6] font-bold text-sm">
+          <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" class="w-4 h-4">
+            <path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Back
+        </a>
+        <span class="text-slate-900 font-extrabold text-lg tracking-tight">MIMO Blog</span>
+        <a href="/login" class="bg-[#4666F6] text-white font-bold text-xs px-3 py-1.5 rounded-full hover:bg-blue-600 transition-colors">
+          Print Now
+        </a>
+      </header>
+
+      <!-- HERO INTRO -->
+      <div class="px-6 py-6 bg-gradient-to-br from-indigo-50 to-indigo-100/50">
+        <span class="text-xs font-bold text-[#4666F6] uppercase tracking-wider bg-indigo-50 px-2.5 py-1 rounded-full">Guides & Insights</span>
+        <h1 class="text-3xl font-black text-slate-900 mt-2 tracking-tight">Smart Campus Printing</h1>
+        <p class="text-sm text-slate-600 mt-1 font-medium">Tips, tricks, and technology insights from the MIMO team to help you print smarter on campus.</p>
+      </div>
+
+      <!-- ARTICLES CONTAINER -->
+      <main class="flex-1 px-6 py-6 space-y-4">
+        <!-- Article 1 -->
+        <a href="/blog/how-to-print-from-mobile-phone" class="block bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-indigo-500">
+            <span>📱 Guides</span>
+            <span>•</span>
+            <span>5 min read</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mt-1.5 leading-snug">How to Print Directly from Your Mobile Phone: A Student's Guide</h3>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">A complete guide to mobile printing on campus. Upload files directly from Google Drive or iCloud in seconds.</p>
+        </a>
+
+        <!-- Article 2 -->
+        <a href="/blog/ultimate-guide-to-formatting-pdfs" class="block bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-indigo-500">
+            <span>📄 Tutorials</span>
+            <span>•</span>
+            <span>6 min read</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mt-1.5 leading-snug">The Ultimate Guide to Formatting PDFs for Flawless Printing</h3>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">Prevent margins cuts, fonts mismatches, and layout truncation. Learn how to format your files before printing.</p>
+        </a>
+
+        <!-- Article 3 -->
+        <a href="/blog/why-cashless-printing-is-changing-campuses" class="block bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-indigo-500">
+            <span>🏛️ Campus Automation</span>
+            <span>•</span>
+            <span>4 min read</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mt-1.5 leading-snug">Why Cashless, Self-Service Kiosks Are the Future of Campus Printing</h3>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">Say goodbye to exact change and long queues. Discover how self-service kiosks are automating university campuses.</p>
+        </a>
+
+        <!-- Article 4 -->
+        <a href="/blog/protecting-your-privacy-in-cloud-printing" class="block bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-indigo-500">
+            <span>🔒 Security</span>
+            <span>•</span>
+            <span>5 min read</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mt-1.5 leading-snug">Document Security in the Cloud: How to Ensure Privacy</h3>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">Concerned about your files? Learn how MIMO encrypts document uploads and deletes them immediately after printing.</p>
+        </a>
+
+        <!-- Article 5 -->
+        <a href="/blog/eco-friendly-printing-practices-for-students" class="block bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-indigo-500">
+            <span>🌿 Sustainability</span>
+            <span>•</span>
+            <span>4 min read</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mt-1.5 leading-snug">Green Printing: Eco-Friendly Tips to Reduce Paper Waste</h3>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">Small habits, big impact. Easy guidelines to save trees, reduce ink consumption, and cut costs on your assignments.</p>
+        </a>
+
+        <!-- Article 6 -->
+        <a href="/blog/common-printing-mistakes-and-how-to-avoid-them" class="block bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-indigo-500">
+            <span>⚠️ Troubleshooting</span>
+            <span>•</span>
+            <span>5 min read</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mt-1.5 leading-snug">Top 5 Campus Printing Mistakes and How to Avoid Them</h3>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">Save money and frustration. Learn the most common mistakes users make when uploading files and entering kiosk codes.</p>
+        </a>
+      </main>
+
+      <!-- FOOTER -->
+      <footer class="bg-slate-900 px-6 py-8 text-center text-xs text-slate-400 space-y-3">
+        <div>© 2026 VisionPrintt. All rights reserved.</div>
+        <div class="flex justify-center gap-4 text-[10px]">
+          <a href="/privacy" class="hover:underline">Privacy Policy</a>
+          <span>|</span>
+          <a href="/terms" class="hover:underline">Terms of Service</a>
+          <span>|</span>
+          <a href="/cookie-policy" class="hover:underline">Cookie Policy</a>
+          <span>|</span>
+          <a href="/refund-policy" class="hover:underline">Refund Policy</a>
+        </div>
+      </footer>
+    </div>
+
+    <!-- ── DESKTOP PANEL (visible only on large screens) ── -->
+    <div class="desktop-panel">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+        <div>
+          <span class="text-xs font-bold text-[#4666F6] uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full">Knowledge Hub</span>
+          <h2 class="text-4xl font-extrabold text-slate-900 mt-2 tracking-tight">MIMO Blog &amp; Guides</h2>
+          <p class="text-slate-500 text-sm mt-1">Useful guides and tips on printing, productivity, and document management.</p>
+        </div>
+        <a href="/" class="bg-[#4666F6] text-white font-bold text-sm px-6 py-2.5 rounded-full hover:bg-blue-600 transition-colors shadow-sm">
+          Go Back Home
+        </a>
+      </div>
+
+      <!-- DESKTOP BLOG GRID -->
+      <div class="grid grid-cols-2 gap-6 mt-8 overflow-y-auto pr-2" style="max-height: 600px;">
+        <!-- Card 1 -->
+        <a href="/blog/how-to-print-from-mobile-phone" class="group block bg-slate-50 rounded-2xl p-5 border border-transparent hover:bg-white hover:border-blue-100 hover:shadow-md transition-all duration-200">
+          <div class="flex items-center gap-2 text-xs font-bold text-[#4666F6]">
+            <span>📱 Mobile Guides</span>
+            <span>•</span>
+            <span>5 min read</span>
+          </div>
+          <h4 class="text-lg font-bold text-slate-800 mt-2 leading-snug group-hover:text-[#4666F6] transition-colors">How to Print Directly from Your Mobile Phone: A Complete Guide for College Students</h4>
+          <p class="text-sm text-slate-500 mt-2 leading-relaxed">Discover step-by-step how to print from your iPhone or Android browser in seconds. Works with cloud file hosting services like Google Drive, Dropbox, and OneDrive.</p>
+          <div class="mt-4 text-xs font-bold text-[#4666F6] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">Read Article →</div>
+        </a>
+
+        <!-- Card 2 -->
+        <a href="/blog/ultimate-guide-to-formatting-pdfs" class="group block bg-slate-50 rounded-2xl p-5 border border-transparent hover:bg-white hover:border-blue-100 hover:shadow-md transition-all duration-200">
+          <div class="flex items-center gap-2 text-xs font-bold text-[#4666F6]">
+            <span>📄 Formatting Tutorials</span>
+            <span>•</span>
+            <span>6 min read</span>
+          </div>
+          <h4 class="text-lg font-bold text-slate-800 mt-2 leading-snug group-hover:text-[#4666F6] transition-colors">The Ultimate Guide to Formatting PDFs for Flawless Printing</h4>
+          <p class="text-sm text-slate-500 mt-2 leading-relaxed">Formatting problems can ruin a great document. Learn how page sizes (A4), font subsetting, margins, and DPI scaling play a critical role in laser-print resolution.</p>
+          <div class="mt-4 text-xs font-bold text-[#4666F6] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">Read Article →</div>
+        </a>
+
+        <!-- Card 3 -->
+        <a href="/blog/why-cashless-printing-is-changing-campuses" class="group block bg-slate-50 rounded-2xl p-5 border border-transparent hover:bg-white hover:border-blue-100 hover:shadow-md transition-all duration-200">
+          <div class="flex items-center gap-2 text-xs font-bold text-[#4666F6]">
+            <span>🏛️ Campus Utilities</span>
+            <span>•</span>
+            <span>4 min read</span>
+          </div>
+          <h4 class="text-lg font-bold text-slate-800 mt-2 leading-snug group-hover:text-[#4666F6] transition-colors">Why Cashless, Self-Service Kiosks Are the Future of Campus Printing</h4>
+          <p class="text-sm text-slate-500 mt-2 leading-relaxed">Traditional university computer clusters and campus xerox shops lead to queues and broken machinery. Read about the economic advantages and convenience of automated kiosk zones.</p>
+          <div class="mt-4 text-xs font-bold text-[#4666F6] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">Read Article →</div>
+        </a>
+
+        <!-- Card 4 -->
+        <a href="/blog/protecting-your-privacy-in-cloud-printing" class="group block bg-slate-50 rounded-2xl p-5 border border-transparent hover:bg-white hover:border-blue-100 hover:shadow-md transition-all duration-200">
+          <div class="flex items-center gap-2 text-xs font-bold text-[#4666F6]">
+            <span>🔒 Data &amp; Security</span>
+            <span>•</span>
+            <span>5 min read</span>
+          </div>
+          <h4 class="text-lg font-bold text-slate-800 mt-2 leading-snug group-hover:text-[#4666F6] transition-colors">Document Security in the Cloud: How to Ensure Privacy When Printing</h4>
+          <p class="text-sm text-slate-500 mt-2 leading-relaxed">Where do your documents go when you hit upload? We explain HTTPS transit protocols, secure temporary folders, and why files are deleted instantly from the printer spool after print completion.</p>
+          <div class="mt-4 text-xs font-bold text-[#4666F6] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">Read Article →</div>
+        </a>
+
+        <!-- Card 5 -->
+        <a href="/blog/eco-friendly-printing-practices-for-students" class="group block bg-slate-50 rounded-2xl p-5 border border-transparent hover:bg-white hover:border-blue-100 hover:shadow-md transition-all duration-200">
+          <div class="flex items-center gap-2 text-xs font-bold text-[#4666F6]">
+            <span>🌿 Sustainability</span>
+            <span>•</span>
+            <span>4 min read</span>
+          </div>
+          <h4 class="text-lg font-bold text-slate-800 mt-2 leading-snug group-hover:text-[#4666F6] transition-colors">Green Printing: Eco-Friendly Tips to Reduce Paper Waste on Campus</h4>
+          <p class="text-sm text-slate-500 mt-2 leading-relaxed">Printing carbon footprint can add up. Discover how duplex settings, print layout scaling (2 pages per sheet), page range selections, and draft B&amp;W printing preserve resources.</p>
+          <div class="mt-4 text-xs font-bold text-[#4666F6] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">Read Article →</div>
+        </a>
+
+        <!-- Card 6 -->
+        <a href="/blog/common-printing-mistakes-and-how-to-avoid-them" class="group block bg-slate-50 rounded-2xl p-5 border border-transparent hover:bg-white hover:border-blue-100 hover:shadow-md transition-all duration-200">
+          <div class="flex items-center gap-2 text-xs font-bold text-[#4666F6]">
+            <span>⚠️ Troubleshooting</span>
+            <span>•</span>
+            <span>5 min read</span>
+          </div>
+          <h4 class="text-lg font-bold text-slate-800 mt-2 leading-snug group-hover:text-[#4666F6] transition-colors">Top 5 Campus Printing Mistakes and How to Avoid Them</h4>
+          <p class="text-sm text-slate-500 mt-2 leading-relaxed">Avoid typical print failure scenarios. Understand file size limits, print configuration verification, code activation states, and how kiosk refunds handle unexpected jams.</p>
+          <div class="mt-4 text-xs font-bold text-[#4666F6] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">Read Article →</div>
+        </a>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

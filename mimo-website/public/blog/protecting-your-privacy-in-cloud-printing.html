@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document Security in the Cloud: How to Ensure Privacy When Printing</title>
+  <meta name="description" content="Discover how MIMO safeguards your document privacy with HTTPS transit encryption, secure temporary directories, and instant file shredding after printing." />
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            mimoBlue: '#4666F6',
+            mimoLightBlue: '#EEF2FF',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet" />
+  
+  <!-- Google AdSense -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6488030243565665" crossorigin="anonymous"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f8fafc;
+      color: #334155;
+      line-height: 1.8;
+    }
+    h1, h2, h3, h4, .logo-font {
+      font-family: 'Outfit', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- Navigation Header -->
+  <header class="bg-white border-b border-slate-100 sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+      <a href="/blog" class="flex items-center gap-2 text-[#4666F6] font-bold text-sm">
+        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" class="w-4 h-4">
+          <path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Back to Blog
+      </a>
+      <a href="/" class="logo-font text-2xl font-black text-slate-800 tracking-tight">MIMO</a>
+      <a href="/login" class="bg-[#4666F6] text-white font-bold text-sm px-5 py-2 rounded-full hover:bg-blue-600 transition-colors shadow-sm">
+        Print Now
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-3xl mx-auto px-4 py-10">
+    <article>
+      <!-- Meta & Title -->
+      <div class="mb-8">
+        <span class="text-xs font-bold text-[#4666F6] uppercase tracking-wider bg-blue-50 px-3 py-1 rounded-full">Security &amp; Data Privacy</span>
+        <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 mt-4 leading-tight">Document Security in the Cloud: How to Ensure Privacy When Printing</h1>
+        
+        <div class="flex items-center gap-3 mt-6 text-sm text-slate-500">
+          <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#4666F6] to-purple-600 flex items-center justify-center text-white font-bold">M</div>
+          <div>
+            <div class="font-bold text-slate-800">MIMO Printing Team</div>
+            <div>Published on July 7, 2026 • 5 min read</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Intro -->
+      <p class="text-lg text-slate-600 font-medium mb-6">
+        When you print sensitive files—like bank statements, academic records, identity cards, or legal contracts—privacy is your highest priority. In traditional print shops, your file is loaded onto a public computer where it might sit in the "Downloads" directory or browser history for months, vulnerable to anyone who sits down next.
+      </p>
+
+      <p class="mb-6">
+        With the rise of wireless and cloud printing, files travel across the internet before reaching the printer. This prompts an important security question: **Who has access to your documents in transit and at rest?** At MIMO, we believe document privacy is a fundamental student right. Here is an in-depth explanation of how cloud printing works under the hood and what steps we take to protect your files.
+      </p>
+
+      <!-- Section 1 -->
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">1. Encryption in Transit: Keeping Interceptors Away</h2>
+      <p class="mb-6">
+        The moment you select a file and tap "Upload" on your phone at printmimo.tech, the document is sent to our servers. To make sure that nobody snooping on the campus Wi-Fi network can intercept your file, MIMO uses **HTTPS (Hypertext Transfer Protocol Secure)**.
+      </p>
+      <p class="mb-6">
+        All transmission data is encrypted using SSL/TLS protocols. This locks the file in an encrypted tunnel between your mobile device and our cloud servers, preventing packet sniffing, middleman attacks, or interceptors from extracting the payload.
+      </p>
+
+      <!-- Section 2 -->
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">2. Secure Cloud Storage and File Processing</h2>
+      <p class="mb-6">
+        Once uploaded, files are temporarily hosted in a highly secure, restricted-access bucket on Firebase Storage. 
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>No Public Access:</strong> Our backend security rules strictly forbid direct public URL access to user files. Only authenticated server routines can call download endpoints.</li>
+        <li><strong>Document Isolation:</strong> Documents are associated with unique, randomized session IDs, ensuring that one student's files cannot be accessed or indexed by other users in the system.</li>
+      </ul>
+
+      <!-- Section 3 -->
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">3. Kiosk Spooling and CUPS Management</h2>
+      <p class="mb-6">
+        When you enter your 4-digit code at the physical kiosk, the local Raspberry Pi controller queries our backend database, verifies payment authorization, and streams the document directly into memory or a temporary directory using safe HTTPS streaming connections.
+      </p>
+      <p class="mb-6">
+        The document is then passed to the local CUPS (Common UNIX Printing System) queue to feed the printer spooler. Standard printer drivers execute the print job and convert the document into raw rasterized dots on the paper.
+      </p>
+
+      <!-- Section 4 -->
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">4. The Shred Protocol: Instant File Deletion</h2>
+      <p class="mb-6">
+        This is the most critical element of document security. Once the CUPS printer daemon confirms that the pages have physically ejected from the machine:
+      </p>
+      <ol class="list-decimal pl-6 mb-6 space-y-3">
+        <li>The local Pi listener deletes the temporary downloaded spool files from its local flash disk.</li>
+        <li>It triggers a callback API on our backend that permanently deletes the corresponding file object from Firebase Cloud Storage.</li>
+        <li>The Firestore document entry's state is modified, rendering the 4-digit code inactive to prevent anyone else from reprint-hijacking your document.</li>
+      </ol>
+      <p class="mb-6">
+        If you purchase a print code but decide not to print your file, the system runs an automated cleanup script that **purges the document and triggers a full refund automatically after 24 hours**. We never save your files long-term.
+      </p>
+
+      <!-- Section 5 -->
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">5. Best Security Habits for Students</h2>
+      <p class="mb-6">
+        While MIMO enforces maximum hardware and software security protocols, you can take simple steps to ensure absolute privacy:
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>Avoid Public Shared Terminals:</strong> Always use your personal mobile phone to navigate to printmimo.tech.</li>
+        <li><strong>Clear Browser Downloads:</strong> If you downloaded a document on a shared laptop, make sure to delete it from the system downloads and empty the trash before leaving.</li>
+        <li><strong>Verify Kiosk Location:</strong> Double-check the ID of the kiosk (e.g. CV-001 or SV-002) to ensure you collect your sheets immediately, preventing papers from sitting unattended in the output tray.</li>
+      </ul>
+
+      <!-- Conclusion -->
+      <div class="bg-blue-50 border-l-4 border-[#4666F6] p-6 rounded-r-2xl my-8">
+        <h4 class="font-bold text-slate-800 mb-2">Our Privacy Promise</h4>
+        <p class="text-sm text-slate-600 mb-0">
+          MIMO does not read, index, parse, or archive document contents. We do not sell user files or demographics to advertising networks. Your files belong entirely to you, and we destroy them the second their printing job is done.
+        </p>
+      </div>
+    </article>
+
+    <!-- Author block divider -->
+    <div class="border-t border-slate-200 my-10"></div>
+
+    <!-- Related Articles -->
+    <div class="bg-slate-50 rounded-2xl p-6">
+      <h3 class="font-bold text-slate-800 mb-4 text-lg">Related Articles</h3>
+      <div class="grid md:grid-cols-2 gap-4">
+        <a href="/blog/why-cashless-printing-is-changing-campuses" class="block bg-white p-4 rounded-xl border border-slate-100 hover:border-blue-200 hover:shadow-sm transition-all">
+          <h4 class="font-bold text-slate-800 text-sm leading-snug">Why Cashless, Self-Service Kiosks Are the Future of Campus Printing</h4>
+          <span class="text-xs text-indigo-500 font-bold block mt-2">Read Article →</span>
+        </a>
+        <a href="/blog/common-printing-mistakes-and-how-to-avoid-them" class="block bg-white p-4 rounded-xl border border-slate-100 hover:border-blue-200 hover:shadow-sm transition-all">
+          <h4 class="font-bold text-slate-800 text-sm leading-snug">Top 5 Campus Printing Mistakes and How to Avoid Them</h4>
+          <span class="text-xs text-indigo-500 font-bold block mt-2">Read Article →</span>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-slate-900 py-12 text-center text-sm text-slate-400 mt-20 border-t border-slate-800">
+    <div class="max-w-4xl mx-auto px-4">
+      <div class="mb-4 font-bold text-white text-lg">MIMO</div>
+      <p class="text-xs text-slate-500 mb-6">Smart printing solutions for modern campuses. Incubated at REVA NEST.</p>
+      <div class="flex justify-center gap-6 text-xs mb-6">
+        <a href="/" class="hover:underline">Home</a>
+        <a href="/blog" class="hover:underline">Blog Hub</a>
+        <a href="/privacy" class="hover:underline">Privacy Policy</a>
+        <a href="/terms" class="hover:underline">Terms of Service</a>
+        <a href="/refund-policy" class="hover:underline">Refund Policy</a>
+      </div>
+      <p class="text-xs text-slate-600">© 2026 VisionPrintt Technologies. All rights reserved.</p>
+    </div>
+  </footer>
+
+</body>
+</html>
