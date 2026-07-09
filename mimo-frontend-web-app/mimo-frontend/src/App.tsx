@@ -58,10 +58,10 @@ function App() {
 
     const resetIdleTimer = () => {
       clearTimeout(idleTimer);
-      if (currentScreen === 'main-interface') {
+      if (currentScreen === 'main-interface' || currentScreen === 'code-entry-screen') {
         idleTimer = window.setTimeout(() => {
           setCurrentScreen('adds-screen');
-        }, 10000); // 10 seconds of idle time on main screen -> show ads
+        }, 10000); // 10 seconds of idle time -> show ads
       }
     };
 
