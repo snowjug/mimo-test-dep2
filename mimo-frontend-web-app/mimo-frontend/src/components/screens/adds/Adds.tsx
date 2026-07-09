@@ -9,7 +9,8 @@ interface AddsProps {
 const videos = [
   "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
   "/second_video.mp4",
-  "/3_video.mp4"
+  "/3_video.mp4",
+  "/4_video.mp4"
 ];
 
 export function Adds({ isActive, onTap }: AddsProps) {
