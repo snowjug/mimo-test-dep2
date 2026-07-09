@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 interface AddsProps {
@@ -5,8 +6,25 @@ interface AddsProps {
   onTap: () => void;
 }
 
+const videos = [
+  "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+  "/second_video.mp4"
+];
+
 export function Adds({ isActive, onTap }: AddsProps) {
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+
+  useEffect(() => {
+    if (isActive) {
+      setCurrentVideoIndex(0);
+    }
+  }, [isActive]);
+
   if (!isActive) return null;
+
+  const handleVideoEnd = () => {
+    setCurrentVideoIndex((prevIndex) => (prevIndex + 1) % videos.length);
+  };
 
   return createPortal(
     <div 
@@ -23,10 +41,11 @@ export function Adds({ isActive, onTap }: AddsProps) {
       }}
     >
       <video 
-        src="/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4"
+        key={currentVideoIndex}
+        src={videos[currentVideoIndex]}
         autoPlay 
-        loop 
         muted 
+        onEnded={handleVideoEnd}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
       >
         Your browser does not support the video tag.
@@ -35,4 +54,3 @@ export function Adds({ isActive, onTap }: AddsProps) {
     document.body
   );
 }
-
