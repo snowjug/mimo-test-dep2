@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -22,7 +23,7 @@ const parsePageRange = (rangeStr: string, maxPages: number): number[] => {
   const selected: number[] = [];
   const cleaned = rangeStr.replace(/\s+/g, "");
   if (!cleaned) return [];
-  
+
   const parts = cleaned.split(",");
   for (const part of parts) {
     if (!part) continue;
@@ -51,12 +52,12 @@ const parsePageRange = (rangeStr: string, maxPages: number): number[] => {
 const generatePageRange = (selectedPages: number[], maxPages: number): string => {
   if (selectedPages.length === 0) return "";
   if (selectedPages.length === maxPages) return `1-${maxPages}`;
-  
+
   const sorted = [...selectedPages].sort((a, b) => a - b);
   const ranges: string[] = [];
   let start = sorted[0];
   let end = sorted[0];
-  
+
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i] === end + 1) {
       end = sorted[i];
@@ -88,7 +89,6 @@ export function PrintOptions() {
   const [pageRange, setPageRange] = useState("");
   const [orientation, setOrientation] = useState("portrait");
   const [photoLayout, setPhotoLayout] = useState("1");
-  const [isLayoutClicked, setIsLayoutClicked] = useState(false);
   const [imageScaling, setImageScaling] = useState("fit");
   const [customScale, setCustomScale] = useState(100);
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
@@ -119,7 +119,7 @@ export function PrintOptions() {
 
     const parsedFiles = JSON.parse(storedFiles);
     setFiles(parsedFiles);
-    
+
     // Initialize configs
     const initialConfigs: Record<string, {
       pageSelection: "all" | "custom";
@@ -161,7 +161,7 @@ export function PrintOptions() {
   // Recalculate totalPages when fileConfigs or pageSelection changes
   useEffect(() => {
     if (files.length === 0 || Object.keys(fileConfigs).length === 0) return;
-    
+
     let totalPrintedPages = 0;
     files.forEach((file) => {
       const config = fileConfigs[file.name];
@@ -175,7 +175,7 @@ export function PrintOptions() {
         totalPrintedPages += (file.pageCount || 1);
       }
     });
-    
+
     setTotalPages(totalPrintedPages);
   }, [fileConfigs, pageSelection, files]);
 
@@ -184,7 +184,7 @@ export function PrintOptions() {
     setFileConfigs((prev) => {
       const config = prev[fileName];
       if (!config) return prev;
-      
+
       const maxPages = files.find(f => f.name === fileName)?.pageCount || 1;
       let newSelected = [...config.selectedPages];
       if (newSelected.includes(pageNum)) {
@@ -193,7 +193,7 @@ export function PrintOptions() {
         newSelected.push(pageNum);
       }
       newSelected.sort((a, b) => a - b);
-      
+
       return {
         ...prev,
         [fileName]: {
@@ -210,7 +210,7 @@ export function PrintOptions() {
     setFileConfigs((prev) => {
       const config = prev[fileName];
       if (!config) return prev;
-      
+
       const maxPages = files.find(f => f.name === fileName)?.pageCount || 1;
       let newSelected: number[] = [];
       if (type === "first-half") {
@@ -224,7 +224,7 @@ export function PrintOptions() {
       } else if (type === "evens") {
         for (let i = 2; i <= maxPages; i += 2) newSelected.push(i);
       }
-      
+
       return {
         ...prev,
         [fileName]: {
@@ -241,10 +241,10 @@ export function PrintOptions() {
     setFileConfigs((prev) => {
       const config = prev[fileName];
       if (!config) return prev;
-      
+
       const maxPages = files.find(f => f.name === fileName)?.pageCount || 1;
       const newSelected = parsePageRange(text, maxPages);
-      
+
       return {
         ...prev,
         [fileName]: {
@@ -308,7 +308,7 @@ export function PrintOptions() {
   const pricePerPageBW = 2.30;
   const pricePerPageColor = 10.00; // Updated as per requirements
   const basePrice = colorMode === "bw" ? pricePerPageBW : pricePerPageColor;
-  
+
   const totalCost = actualPages * (Number(copies) || 1) * basePrice;
 
   // Check if any file configured for "custom" has 0 pages selected
@@ -377,24 +377,21 @@ export function PrintOptions() {
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-3">
-        <div 
+        <div
           onClick={() => { setDirectKioskId("CV-001"); setColorMode("bw"); }}
-          className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
-            directKioskId === 'CV-001' 
-              ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]' 
-              : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
-          } active:scale-[0.99]`}
+          className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${directKioskId === 'CV-001'
+            ? 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]'
+            : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+            } active:scale-[0.99]`}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl transition-all duration-300 ${
-              directKioskId === 'CV-001' ? 'bg-[#093765] text-white shadow-sm scale-105' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
-            }`}>
+            <div className={`p-2 rounded-xl transition-all duration-300 ${directKioskId === 'CV-001' ? 'bg-[#093765] text-white shadow-sm scale-105' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
+              }`}>
               <Printer className="w-4.5 h-4.5" />
             </div>
             <div>
-              <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
-                directKioskId === 'CV-001' ? 'text-[#093765]' : 'text-slate-700'
-              }`}>
+              <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${directKioskId === 'CV-001' ? 'text-[#093765]' : 'text-slate-700'
+                }`}>
                 MIMO 1.0
                 <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
                   B&W
@@ -403,46 +400,42 @@ export function PrintOptions() {
               <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">C. V. Raman Block</p>
             </div>
           </div>
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
-            directKioskId === 'CV-001' 
-              ? 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs' 
-              : 'border-slate-200 bg-transparent'
-          }`}>
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${directKioskId === 'CV-001'
+            ? 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs'
+            : 'border-slate-200 bg-transparent'
+            }`}>
             {directKioskId === 'CV-001' && <Check className="w-3 h-3" strokeWidth={3} />}
           </div>
         </div>
 
-        <div 
-          onClick={() => { 
-            setDirectKioskId("SV-002"); 
+        <div
+          onClick={() => {
+            setDirectKioskId("SV-002");
             if (colorMode === "color") {
               setDoubleSided("single");
             }
           }}
-          className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${
-            directKioskId === 'SV-002' 
-              ? (colorMode === 'color'
-                  ? 'border-blue-400 bg-gradient-to-r from-cyan-50/40 via-blue-50/20 to-indigo-50/30 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]'
-                  : 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]')
-              : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
-          } active:scale-[0.99]`}
+          className={`group p-3 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between gap-4 ${directKioskId === 'SV-002'
+            ? (colorMode === 'color'
+              ? 'border-blue-400 bg-gradient-to-r from-cyan-50/40 via-blue-50/20 to-indigo-50/30 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]'
+              : 'border-[#093765] bg-gradient-to-r from-blue-50/30 to-slate-50/20 shadow-md hover:scale-[1.01] hover:-translate-y-[1px]')
+            : 'border-slate-300 hover:border-slate-400 bg-white hover:scale-[1.01] hover:-translate-y-[1px] hover:shadow-sm'
+            } active:scale-[0.99]`}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl transition-all duration-300 ${
-              directKioskId === 'SV-002' 
-                ? (colorMode === 'color'
-                    ? 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white shadow-sm scale-105'
-                    : 'bg-[#093765] text-white shadow-sm scale-105')
-                : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
-            }`}>
+            <div className={`p-2 rounded-xl transition-all duration-300 ${directKioskId === 'SV-002'
+              ? (colorMode === 'color'
+                ? 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white shadow-sm scale-105'
+                : 'bg-[#093765] text-white shadow-sm scale-105')
+              : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
+              }`}>
               <Printer className="w-4.5 h-4.5" />
             </div>
             <div>
-              <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${
-                directKioskId === 'SV-002' 
-                  ? (colorMode === 'color' ? 'text-blue-800' : 'text-[#093765]') 
-                  : 'text-slate-700'
-              }`}>
+              <p className={`text-sm font-bold flex items-center gap-2 transition-colors ${directKioskId === 'SV-002'
+                ? (colorMode === 'color' ? 'text-blue-800' : 'text-[#093765]')
+                : 'text-slate-700'
+                }`}>
                 MIMO 2.0
                 <span className="flex gap-1">
                   <Badge className="bg-slate-700 hover:bg-slate-800 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black tracking-wide border-0 shadow-xs">
@@ -456,13 +449,12 @@ export function PrintOptions() {
               <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">Swami Vivekananda Block</p>
             </div>
           </div>
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
-            directKioskId === 'SV-002' 
-              ? (colorMode === 'color'
-                  ? 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 border-blue-500 text-white scale-110 shadow-xs'
-                  : 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs')
-              : 'border-slate-200 bg-transparent'
-          }`}>
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${directKioskId === 'SV-002'
+            ? (colorMode === 'color'
+              ? 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 border-blue-500 text-white scale-110 shadow-xs'
+              : 'bg-[#093765] border-[#093765] text-white scale-110 shadow-xs')
+            : 'border-slate-200 bg-transparent'
+            }`}>
             {directKioskId === 'SV-002' && <Check className="w-3 h-3" strokeWidth={3} />}
           </div>
         </div>
@@ -533,634 +525,357 @@ export function PrintOptions() {
               <CardContent className="px-4 pb-4 space-y-3 -mt-4">
                 {/* Number of Copies - Responsive & Interactive */}
                 <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <div>
-                  <p className="text-sm font-bold text-slate-800">How many copies do you want?</p>
-                </div>
-                <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100 w-full sm:w-auto">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    className="h-8 w-8 rounded-lg border bg-white hover:text-[#093765] active:scale-95 transition-all cursor-pointer"
-                    onClick={decrementCopies}
-                    disabled={copies <= 1}
-                  >
-                    <Minus className="w-3 h-3" />
-                  </Button>
-                  <input
-                    type="number"
-                    value={copies}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      if (!isNaN(val) && val >= 1 && val <= 99) {
-                        setCopies(val);
-                      } else if (e.target.value === "") {
-                        setCopies("" as any);
-                      }
-                    }}
-                    onBlur={() => {
-                      if (copies === "" || isNaN(copies) || copies < 1) {
-                        setCopies(1);
-                      } else if (copies > 99) {
-                        setCopies(99);
-                      }
-                    }}
-                    className="w-12 text-center text-sm font-black text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    className="h-8 w-8 rounded-lg border bg-white hover:text-[#093765] active:scale-95 transition-all cursor-pointer"
-                    onClick={incrementCopies}
-                    disabled={copies >= 99}
-                  >
-                    <Plus className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Copies </p>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100 w-full sm:w-auto">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        className="h-8 w-8 rounded-lg border bg-white hover:text-[#093765] active:scale-95 transition-all cursor-pointer"
+                        onClick={decrementCopies}
+                        disabled={copies <= 1}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </Button>
+                      <input
+                        type="number"
+                        value={copies}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val) && val >= 1 && val <= 99) {
+                            setCopies(val);
+                          } else if (e.target.value === "") {
+                            setCopies("" as any);
+                          }
+                        }}
+                        onBlur={() => {
+                          if (String(copies) === "" || isNaN(Number(copies)) || Number(copies) < 1) {
+                            setCopies(1);
+                          } else if (copies > 99) {
+                            setCopies(99);
+                          }
+                        }}
+                        className="w-12 text-center text-sm font-black text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        className="h-8 w-8 rounded-lg border bg-white hover:text-[#093765] active:scale-95 transition-all cursor-pointer"
+                        onClick={incrementCopies}
+                        disabled={copies >= 99}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Color Mode - Coming Soon for Color only */}
                 <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <div>
-                  <p className="text-sm font-bold text-slate-800">Do you prefer B&W or color prints?</p>
-                </div>
-                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
-                  <button
-                    onClick={() => {
-                      setColorMode("bw");
-                    }}
-                    type="button"
-                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
-                      colorMode === "bw"
-                        ? "text-[#093765]"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    <div className={`w-3.5 h-3.5 rounded-full border overflow-hidden flex shrink-0 transition-all duration-300 group-hover:scale-110 ${
-                      colorMode === "bw" ? "scale-110 border-slate-600 rotate-180" : "scale-100 border-slate-400"
-                    }`}>
-                      <div className="w-1/2 h-full bg-slate-800" />
-                      <div className="w-1/2 h-full bg-white" />
-                    </div>
-                    <span>B&W</span>
-                  </button>
-                  
-                  {/* Fully Enabled Color Button */}
-                  <div className="relative flex-1 h-full group">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (directKioskId === "CV-001") {
-                          toast.info("Switched to KIOSK-002-SV for Color printing");
-                          setDirectKioskId("SV-002");
-                        }
-                        setColorMode("color");
-                        setDoubleSided("single");
-                      }}
-                      className={`control-btn w-full h-full relative z-10 text-center py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all duration-300 ${
-                        colorMode === "color" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      <div className={`w-3.5 h-3.5 rounded-full border shrink-0 transition-all duration-300 ${
-                        colorMode === "color" 
-                          ? "bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 border-blue-600 scale-110 shadow-sm" 
-                          : "bg-slate-300 border-slate-400 scale-100"
-                      }`} />
-                      <span>Color</span>
-                    </button>
-                  </div>
-
-                  {/* Sliding Background Pill */}
-                  <div
-                    className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
-                      colorMode === "bw" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
-                    }`}
-                  />
-                </div>
-              </div>
-                </div>
-
-                {hasImages && (
-                  <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
-                <div className="flex flex-col gap-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                     <div>
-                      <p className="text-sm font-bold text-slate-800">How should the image fit on A4?</p>
+                      <p className="text-sm font-bold text-slate-800"> B&W / Color </p>
                     </div>
-                    <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-72 h-11 sm:h-12 select-none">
+                    <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
                       <button
-                        onClick={() => setImageScaling("fit")}
+                        onClick={() => {
+                          setColorMode("bw");
+                        }}
                         type="button"
-                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
-                          imageScaling === "fit" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
-                        }`}
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${colorMode === "bw"
+                          ? "text-[#093765]"
+                          : "text-slate-500 hover:text-slate-700"
+                          }`}
                       >
-                        <MonitorSmartphone className="w-3 h-3 shrink-0" />
-                        <span>Fit</span>
+                        <div className={`w-3.5 h-3.5 rounded-full border overflow-hidden flex shrink-0 transition-all duration-300 group-hover:scale-110 ${colorMode === "bw" ? "scale-110 border-slate-600 rotate-180" : "scale-100 border-slate-400"
+                          }`}>
+                          <div className="w-1/2 h-full bg-slate-800" />
+                          <div className="w-1/2 h-full bg-white" />
+                        </div>
+                        <span>B&W</span>
                       </button>
-                      <button
-                        onClick={() => setImageScaling("fill")}
-                        type="button"
-                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
-                          imageScaling === "fill" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
-                        }`}
-                      >
-                        <Grid3X3 className="w-3 h-3 shrink-0" />
-                        <span>Fill</span>
-                      </button>
-                      <button
-                        onClick={() => setImageScaling("custom")}
-                        type="button"
-                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
-                          imageScaling === "custom" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
-                        }`}
-                      >
-                        <Sliders className="w-3 h-3 shrink-0" />
-                        <span>Custom</span>
-                      </button>
+
+                      {/* Fully Enabled Color Button */}
+                      <div className="relative flex-1 h-full group">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (directKioskId === "CV-001") {
+                              toast.info("Switched to KIOSK-002-SV for Color printing");
+                              setDirectKioskId("SV-002");
+                            }
+                            setColorMode("color");
+                            setDoubleSided("single");
+                          }}
+                          className={`control-btn w-full h-full relative z-10 text-center py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all duration-300 ${colorMode === "color" ? "text-[#093765]" : "text-slate-500 hover:text-slate-700"
+                            }`}
+                        >
+                          <div className={`w-3.5 h-3.5 rounded-full border shrink-0 transition-all duration-300 ${colorMode === "color"
+                            ? "bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 border-blue-600 scale-110 shadow-sm"
+                            : "bg-slate-300 border-slate-400 scale-100"
+                            }`} />
+                          <span>Color</span>
+                        </button>
+                      </div>
+
+                      {/* Sliding Background Pill */}
                       <div
-                        className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(33.33%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
-                          imageScaling === "fit" ? "translate-x-0" : imageScaling === "fill" ? "translate-x-[calc(100%+6px)]" : "translate-x-[calc(200%+12px)]"
-                        }`}
+                        className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${colorMode === "bw" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                          }`}
                       />
                     </div>
                   </div>
-                  
-                  <div className="flex flex-col items-center gap-3 w-full">
-                    {/* Custom Scale Slider */}
-                    {imageScaling === "custom" && (
-                      <div className="w-full flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm mt-1 mb-1">
-                        <span className="text-[10px] font-bold text-slate-500 w-7">{customScale}%</span>
-                        <input 
-                          type="range" 
-                          min="10" 
-                          max="100" 
-                          value={customScale} 
-                          onChange={(e) => setCustomScale(Number(e.target.value))}
-                          className="flex-1 w-full cursor-pointer accent-[#093765]"
-                        />
-                      </div>
-                    )}
-                    
-                    {/* Visual Preview */}
-                    <div className="mt-2 bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col items-center w-full">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Live Preview (A4 Ratio)</p>
-                      <div className="relative bg-white shadow-sm border border-slate-300 w-24 sm:w-32 transition-all duration-300 flex items-center justify-center overflow-hidden" style={{ aspectRatio: "1 / 1.414" }}>
-                        {actualImages[0] ? (
-                           <img 
-                             src={actualImages[0].dataUrl} 
-                             alt="Preview" 
-                             className={`w-full h-full transition-all duration-500 ${imageScaling === "fill" ? "object-cover" : "object-contain"}`}
-                             style={imageScaling === "custom" ? { transform: `scale(${customScale / 100})`, transformOrigin: "center center" } : {}}
-                           />
-                        ) : (
-                           <div className="text-slate-300"><MonitorSmartphone className="w-8 h-8 opacity-20" /></div>
-                        )}
-                      </div>
-                      <p className="text-[9px] text-slate-500 mt-3 text-center leading-tight">
-                        {imageScaling === "fit" 
-                          ? "Entire image printed. May have white borders." 
-                          : imageScaling === "fill"
-                          ? "Image zooms to fill page. Edges may be cropped."
-                          : `Image scaled to ${customScale}%. Centered on A4.`}
-                      </p>
-                    </div>
-                  </div>
                 </div>
-                  </div>
-                )}
+
+
 
                 {/* Print Layout - Responsive & Interactive Segmented Control */}
                 <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <div>
-                  <p className="text-sm font-bold text-slate-800">How do you want to print?</p>
-                </div>
-                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
-                  <button
-                    onClick={() => setDoubleSided("single")}
-                    type="button"
-                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
-                      doubleSided === "single"
-                        ? "text-[#093765]"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    <File className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
-                      doubleSided === "single" ? "scale-110 text-[#093765]" : "scale-100 text-slate-400"
-                    }`} />
-                    <span>1-Sided</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!isDuplexSupported) return;
-                      setDoubleSided("double");
-                    }}
-                    disabled={!isDuplexSupported}
-                    type="button"
-                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
-                      doubleSided === "double"
-                        ? "text-[#093765]"
-                        : "text-slate-500 hover:text-slate-700"
-                    } ${
-                      !isDuplexSupported ? "opacity-40 cursor-not-allowed bg-slate-100" : ""
-                    }`}
-                  >
-                    <Files className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
-                      doubleSided === "double" ? "scale-110 text-[#093765]" : "scale-100 text-slate-400"
-                    }`} />
-                    <span>2-Sided</span>
-                  </button>
-                  {/* Sliding Background Pill */}
-                  <div
-                    className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
-                      doubleSided === "single" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
-                    }`}
-                  />
-                </div>
-              </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Sides</p>
+                    </div>
+                    <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
+                      <button
+                        onClick={() => setDoubleSided("single")}
+                        type="button"
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${doubleSided === "single"
+                          ? "text-[#093765]"
+                          : "text-slate-500 hover:text-slate-700"
+                          }`}
+                      >
+                        <File className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${doubleSided === "single" ? "scale-110 text-[#093765]" : "scale-100 text-slate-400"
+                          }`} />
+                        <span>1-Sided</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!isDuplexSupported) return;
+                          setDoubleSided("double");
+                        }}
+                        disabled={!isDuplexSupported}
+                        type="button"
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${doubleSided === "double"
+                          ? "text-[#093765]"
+                          : "text-slate-500 hover:text-slate-700"
+                          } ${!isDuplexSupported ? "opacity-40 cursor-not-allowed bg-slate-100" : ""
+                          }`}
+                      >
+                        <Files className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${doubleSided === "double" ? "scale-110 text-[#093765]" : "scale-100 text-slate-400"
+                          }`} />
+                        <span>2-Sided</span>
+                      </button>
+                      {/* Sliding Background Pill */}
+                      <div
+                        className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${doubleSided === "single" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                          }`}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Page Selection - Responsive & Interactive Segmented Control */}
                 <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <div>
-                  <p className="text-sm font-bold text-slate-800">Which pages do you want to print?</p>
-                </div>
-                <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
-                  <button
-                    onClick={() => handlePageSelectionChange("all")}
-                    type="button"
-                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
-                      pageSelection === "all"
-                        ? "text-[#093765]"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    <Copy className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
-                      pageSelection === "all" ? "scale-110 text-[#093765]" : "scale-100 text-slate-400"
-                    }`} />
-                    <span>All Pages</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (isSinglePageDocument) return;
-                      handlePageSelectionChange("custom");
-                    }}
-                    disabled={isSinglePageDocument}
-                    type="button"
-                    className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${
-                      pageSelection === "custom"
-                        ? "text-[#093765]"
-                        : "text-slate-500 hover:text-slate-700"
-                    } ${isSinglePageDocument ? "opacity-40 cursor-not-allowed bg-slate-100" : ""}`}
-                  >
-                    <Sliders className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${
-                      pageSelection === "custom" ? "scale-110 text-[#093765] rotate-90" : "scale-100 text-slate-400"
-                    }`} />
-                    <span>Custom</span>
-                  </button>
-                  {/* Sliding Background Pill */}
-                  <div
-                    className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
-                      pageSelection === "all" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
-                    }`}
-                  />
-                </div>
-              </div>
-              
-              {pageSelection === "custom" && files.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-1 fade-in duration-200">
-                  {/* File Selector Tabs (if multiple files exist) */}
-                  {files.length > 1 && (
-                    <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/40">
-                      {files.map((file, idx) => {
-                        const isActive = activeFileIndex === idx;
-                        const config = fileConfigs[file.name];
-                        const selectedCount = config ? config.selectedPages.length : 0;
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setActiveFileIndex(idx)}
-                            className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                              isActive
-                                ? "bg-white text-[#093765] shadow-xs border border-slate-200/50"
-                                : "text-slate-500 hover:text-slate-800"
-                            }`}
-                          >
-                            <span className="truncate max-w-[100px]">{file.name}</span>
-                            <Badge className="px-1 py-0 text-[9px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold border-0">
-                              {selectedCount} pgs
-                            </Badge>
-                          </button>
-                        );
-                      })}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Select pages</p>
                     </div>
-                  )}
+                    <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
+                      <button
+                        onClick={() => handlePageSelectionChange("all")}
+                        type="button"
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${pageSelection === "all"
+                          ? "text-[#093765]"
+                          : "text-slate-500 hover:text-slate-700"
+                          }`}
+                      >
+                        <Copy className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${pageSelection === "all" ? "scale-110 text-[#093765]" : "scale-100 text-slate-400"
+                          }`} />
+                        <span>All Pages</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (isSinglePageDocument) return;
+                          handlePageSelectionChange("custom");
+                        }}
+                        disabled={isSinglePageDocument}
+                        type="button"
+                        className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-2 ${pageSelection === "custom"
+                          ? "text-[#093765]"
+                          : "text-slate-500 hover:text-slate-700"
+                          } ${isSinglePageDocument ? "opacity-40 cursor-not-allowed bg-slate-100" : ""}`}
+                      >
+                        <Sliders className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 group-hover:scale-110 ${pageSelection === "custom" ? "scale-110 text-[#093765] rotate-90" : "scale-100 text-slate-400"
+                          }`} />
+                        <span>Custom</span>
+                      </button>
+                      {/* Sliding Background Pill */}
+                      <div
+                        className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${pageSelection === "all" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+                          }`}
+                      />
+                    </div>
+                  </div>
 
-                  {/* Active File Config */}
-                  {(() => {
-                    const activeFile = files[activeFileIndex];
-                    if (!activeFile) return null;
-                    const config = fileConfigs[activeFile.name] || {
-                      pageSelection: "custom",
-                      pageRange: "",
-                      selectedPages: []
-                    };
-                    const maxPages = activeFile.pageCount || 1;
-                    const pageNumbers = Array.from({ length: maxPages }, (_, i) => i + 1);
-                    const isPdf = activeFile.name.toLowerCase().endsWith(".pdf") || activeFile.type === "application/pdf";
-
-                    return (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between pl-1">
-                          <div className="min-w-0">
-                            <p className="text-xs font-black text-slate-800 truncate pr-2" title={activeFile.name}>
-                              {activeFile.name}
-                            </p>
-                            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
-                              Select pages to print ({maxPages} total pages)
-                              {!isPdf && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const val = prompt(`Enter actual total pages for ${activeFile.name}:`, String(maxPages));
-                                    if (val) {
-                                      const num = parseInt(val);
-                                      if (!isNaN(num) && num > 0) {
-                                        handleUpdatePageCount(activeFile.name, num);
-                                      }
-                                    }
-                                  }}
-                                  className="ml-2 text-blue-600 underline font-bold hover:text-blue-800 cursor-pointer"
-                                >
-                                  Change
-                                </button>
-                              )}
-                            </p>
-                          </div>
-                          {config.selectedPages.length === 0 && (
-                            <Badge className="bg-red-100 text-red-700 border-red-200 text-[9px] uppercase font-bold shrink-0">
-                              No Pages Selected
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Interactive Page Grid */}
-                        <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-48 overflow-y-auto">
-                          {pageNumbers.map((num) => {
-                            const isSelected = config.selectedPages.includes(num);
+                  {pageSelection === "custom" && files.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-1 fade-in duration-200">
+                      {/* File Selector Tabs (if multiple files exist) */}
+                      {files.length > 1 && (
+                        <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/40">
+                          {files.map((file, idx) => {
+                            const isActive = activeFileIndex === idx;
+                            const config = fileConfigs[file.name];
+                            const selectedCount = config ? config.selectedPages.length : 0;
                             return (
                               <button
-                                key={num}
+                                key={idx}
                                 type="button"
-                                onClick={() => handleTogglePage(activeFile.name, num)}
-                                className={`h-8 w-8 text-xs font-bold rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
-                                  isSelected
-                                    ? "bg-[#093765] text-white border-[#093765] shadow-xs active:scale-95"
-                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 active:scale-95"
-                                }`}
+                                onClick={() => setActiveFileIndex(idx)}
+                                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${isActive
+                                  ? "bg-white text-[#093765] shadow-xs border border-slate-200/50"
+                                  : "text-slate-500 hover:text-slate-800"
+                                  }`}
                               >
-                                {num}
+                                <span className="truncate max-w-[100px]">{file.name}</span>
+                                <Badge className="px-1 py-0 text-[9px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold border-0">
+                                  {selectedCount} pgs
+                                </Badge>
                               </button>
                             );
                           })}
                         </div>
+                      )}
 
-                        {/* Quick Action Selection Buttons */}
-                        <div className="flex flex-wrap gap-1.5 pl-1">
-                          <button
-                            type="button"
-                            onClick={() => handleQuickSelect(activeFile.name, "first-half")}
-                            className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
-                          >
-                            First Half
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickSelect(activeFile.name, "second-half")}
-                            className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
-                          >
-                            Second Half
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickSelect(activeFile.name, "odds")}
-                            className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
-                          >
-                            Odd Pages
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickSelect(activeFile.name, "evens")}
-                            className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
-                          >
-                            Even Pages
-                          </button>
-                        </div>
+                      {/* Active File Config */}
+                      {(() => {
+                        const activeFile = files[activeFileIndex];
+                        if (!activeFile) return null;
+                        const config = fileConfigs[activeFile.name] || {
+                          pageSelection: "custom",
+                          pageRange: "",
+                          selectedPages: []
+                        };
+                        const maxPages = activeFile.pageCount || 1;
+                        const pageNumbers = Array.from({ length: maxPages }, (_, i) => i + 1);
+                        const isPdf = activeFile.name.toLowerCase().endsWith(".pdf") || activeFile.type === "application/pdf";
 
-                        {/* Synced Text Input */}
-                        <div className="flex flex-col gap-1 mt-1 pl-1">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                            Or enter page range (e.g., 1-3,5,7-9)
-                          </span>
-                          <Input
-                            type="text"
-                            placeholder="e.g. 1-5, 8, 11-13"
-                            value={config.pageRange}
-                            onChange={(e) => handleTextRangeChange(activeFile.name, e.target.value)}
-                            className="bg-slate-50 border-2 border-slate-200/80 shadow-inner h-9 w-full text-slate-800 placeholder:text-slate-400 focus-visible:ring-[#093765] focus-visible:border-[#093765] focus-visible:bg-white font-semibold text-xs rounded-lg"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-                </div>
+                        return (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between pl-1">
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-slate-800 truncate pr-2" title={activeFile.name}>
+                                  {activeFile.name}
+                                </p>
+                                <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                                  Select pages to print ({maxPages} total pages)
+                                  {!isPdf && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const val = prompt(`Enter actual total pages for ${activeFile.name}:`, String(maxPages));
+                                        if (val) {
+                                          const num = parseInt(val);
+                                          if (!isNaN(num) && num > 0) {
+                                            handleUpdatePageCount(activeFile.name, num);
+                                          }
+                                        }
+                                      }}
+                                      className="ml-2 text-blue-600 underline font-bold hover:text-blue-800 cursor-pointer"
+                                    >
+                                      Change
+                                    </button>
+                                  )}
+                                </p>
+                              </div>
+                              {config.selectedPages.length === 0 && (
+                                <Badge className="bg-red-100 text-red-700 border-red-200 text-[9px] uppercase font-bold shrink-0">
+                                  No Pages Selected
+                                </Badge>
+                              )}
+                            </div>
 
-                {/* Orientation & Layout */}
-                <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm flex flex-col gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-slate-800 mb-1">
-                      {hasImages ? "How do you want your image arranged?" : "How do you want your content arranged?"}
-                    </p>
-                  </div>
-                  
-                  <div className="flex flex-col gap-5 border-t border-slate-100 pt-3 mt-1">
-                      {/* Orientation Toggle */}
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">
-                            Orientation <span className="text-xs font-medium text-slate-500 ml-1">(page direction)</span>
-                          </p>
-                        </div>
-                        <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-60 h-11 sm:h-12 select-none">
-                          <button
-                            onClick={() => setOrientation("portrait")}
-                            type="button"
-                            className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
-                              orientation === "portrait"
-                                ? "text-[#093765]"
-                                : "text-slate-500 hover:text-slate-700"
-                            }`}
-                          >
-                            <div className={`w-3 h-4 rounded-[2px] border-2 transition-all duration-300 group-hover:scale-110 ${
-                              orientation === "portrait" ? "scale-110 border-[#093765] bg-[#093765]/10" : "scale-100 border-slate-400"
-                            }`} />
-                            Portrait
-                          </button>
-                          <button
-                            onClick={() => setOrientation("landscape")}
-                            type="button"
-                            className={`control-btn group relative z-10 flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 ${
-                              orientation === "landscape"
-                                ? "text-[#093765]"
-                                : "text-slate-500 hover:text-slate-700"
-                            }`}
-                          >
-                            <div className={`w-4 h-3 rounded-[2px] border-2 transition-all duration-300 group-hover:scale-110 ${
-                              orientation === "landscape" ? "scale-110 border-[#093765] bg-[#093765]/10" : "scale-100 border-slate-400"
-                            }`} />
-                            Landscape
-                          </button>
-                          {/* Sliding Background Pill */}
-                          <div
-                            className={`sliding-pill absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-200/50 transition-all duration-300 ${
-                              orientation === "portrait" ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
-                            }`}
-                          />
-                        </div>
-                      </div>
+                            {/* Interactive Page Grid */}
+                            <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-48 overflow-y-auto">
+                              {pageNumbers.map((num) => {
+                                const isSelected = config.selectedPages.includes(num);
+                                return (
+                                  <button
+                                    key={num}
+                                    type="button"
+                                    onClick={() => handleTogglePage(activeFile.name, num)}
+                                    className={`h-8 w-8 text-xs font-bold rounded-lg border transition-all cursor-pointer flex items-center justify-center ${isSelected
+                                      ? "bg-[#093765] text-white border-[#093765] shadow-xs active:scale-95"
+                                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 active:scale-95"
+                                      }`}
+                                  >
+                                    {num}
+                                  </button>
+                                );
+                              })}
+                            </div>
 
-                      <Separator className="opacity-50" />
+                            {/* Quick Action Selection Buttons */}
+                            <div className="flex flex-wrap gap-1.5 pl-1">
+                              <button
+                                type="button"
+                                onClick={() => handleQuickSelect(activeFile.name, "first-half")}
+                                className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
+                              >
+                                First Half
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickSelect(activeFile.name, "second-half")}
+                                className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
+                              >
+                                Second Half
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickSelect(activeFile.name, "odds")}
+                                className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
+                              >
+                                Odd Pages
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickSelect(activeFile.name, "evens")}
+                                className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
+                              >
+                                Even Pages
+                              </button>
+                            </div>
 
-                      {/* Grid Layout - Image preview for images, placeholder grid for docs */}
-                      <div className={!hasImages ? "opacity-30 pointer-events-none grayscale blur-[1px] relative select-none" : "relative"}>
-                        {!hasImages && (
-                          <div className="absolute inset-0 z-10 flex items-center justify-center">
-                            <Badge variant="secondary" className="bg-slate-800 text-white shadow-xl px-4 py-1 text-sm rounded-full pointer-events-auto">Layout only available for Images</Badge>
+                            {/* Synced Text Input */}
+                            <div className="flex flex-col gap-1 mt-1 pl-1">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                Or enter page range (e.g., 1-3,5,7-9)
+                              </span>
+                              <Input
+                                type="text"
+                                placeholder="e.g. 1-5, 8, 11-13"
+                                value={config.pageRange}
+                                onChange={(e) => handleTextRangeChange(activeFile.name, e.target.value)}
+                                className="bg-slate-50 border-2 border-slate-200/80 shadow-inner h-9 w-full text-slate-800 placeholder:text-slate-400 focus-visible:ring-[#093765] focus-visible:border-[#093765] focus-visible:bg-white font-semibold text-xs rounded-lg"
+                              />
+                            </div>
                           </div>
-                        )}
-                        <p className="text-sm font-bold text-slate-800 mb-3">Layout</p>
-
-                        <div key={`grid-${orientation}`} className="grid grid-cols-3 gap-3 sm:gap-4">
-                    {[
-                      { id: "1", label: "1 per page", cols: 1, rows: 1, desc: "Full page" },
-                      ...gridLayouts,
-                    ].map((layout) => {
-                      const isSelected = isLayoutClicked && photoLayout === layout.id;
-                      const effectiveCols = orientation === "landscape" ? layout.rows : layout.cols;
-                      const effectiveRows = orientation === "landscape" ? layout.cols : layout.rows;
-                      const cellCount = effectiveCols * effectiveRows;
-                      return (
-                        <button
-                          key={layout.id}
-                          onClick={() => {
-                            setPhotoLayout(layout.id);
-                            setIsLayoutClicked(true);
-                          }}
-                          className={`flex-1 flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
-                            isSelected
-                              ? "border-blue-500 bg-blue-50/70 shadow-md scale-[1.03]"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
-                          }`}
-                        >
-                          <div
-                            key={`${layout.id}-${orientation}`}
-                            className={`rounded border-2 p-[3px] overflow-hidden ${
-                              orientation === "landscape" ? "w-12 h-8" : "w-8 h-12"
-                            } ${
-                              isSelected ? "border-blue-400 bg-blue-100/50" : "border-slate-300 bg-white"
-                            }`}
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: `repeat(${effectiveCols}, 1fr)`,
-                              gridTemplateRows: `repeat(${effectiveRows}, 1fr)`,
-                              gap: "2px",
-                            }}
-                          >
-                            {Array.from({ length: cellCount }).map((_, i) =>
-                              hasImages ? (
-                                <div key={i} className="overflow-hidden rounded-[1px]">
-                                  <img
-                                    src={actualImages[i % actualImages.length]?.dataUrl}
-                                    alt=""
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                              ) : (
-                                <div
-                                  key={i}
-                                  className={`rounded-[2px] ${isSelected ? "bg-blue-400" : "bg-slate-300"}`}
-                                />
-                              )
-                            )}
-                          </div>
-                          <div className="text-center">
-                            <p className={`text-[10px] font-bold ${isSelected ? "text-blue-700" : "text-slate-700"}`}>
-                              {layout.label}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Live image layout preview - always show for images */}
-                  {hasImages && isLayoutClicked && (
-                    <div
-                      key={`preview-${orientation}-${photoLayout}`}
-                      className="mt-3 rounded-xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm"
-                      style={{ aspectRatio: orientation === "landscape" ? "4/3" : "3/4" }}
-                    >
-                      <div
-                        className="w-full h-full p-2"
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: `repeat(${
-                            photoLayout === "1" ? 1 : (orientation === "landscape" ? (gridLayouts.find((l) => l.id === photoLayout)?.rows ?? 1) : (gridLayouts.find((l) => l.id === photoLayout)?.cols ?? 1))
-                          }, 1fr)`,
-                          gridTemplateRows: `repeat(${
-                            photoLayout === "1" ? 1 : (orientation === "landscape" ? (gridLayouts.find((l) => l.id === photoLayout)?.cols ?? 1) : (gridLayouts.find((l) => l.id === photoLayout)?.rows ?? 1))
-                          }, 1fr)`,
-                          gap: "4px",
-                        }}
-                      >
-                        {Array.from({
-                          length:
-                            photoLayout === "1"
-                              ? 1
-                              : (gridLayouts.find((l) => l.id === photoLayout)?.cols ?? 1) *
-                                (gridLayouts.find((l) => l.id === photoLayout)?.rows ?? 1),
-                        }).map((_, i) => (
-                          <div key={i} className="overflow-hidden rounded-md bg-slate-100">
-                            <img
-                              src={actualImages[i % actualImages.length]?.dataUrl}
-                              alt="preview"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ))}
-                      </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
-              </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* File Preview */}
+              </CardContent>
+            </Card>
+
+            {/* File Preview */}
             <Card className="border-0 shadow-lg bg-white/80 backdrop-blur hover:shadow-xl transition-all duration-300 gap-0">
-              <div className="px-4 pt-2 pb-2 flex flex-col gap-1">
-                <CardTitle className="text-base">Do you want a preview?</CardTitle>
-              </div>
+
               <div className="px-4 pb-3">
                 <div className="space-y-3">
                   {files.map((file, index) => (
@@ -1246,7 +961,7 @@ export function PrintOptions() {
                   </div>
                 </div>
 
-                 <Button
+                <Button
                   className="w-full h-12 sm:h-14 bg-[#093765] hover:bg-[#052345] border border-white/10 text-white font-bold text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 hover:-translate-y-0.5 transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleContinue}
                   disabled={files.length === 0 || hasSelectionError}
@@ -1292,19 +1007,19 @@ export function PrintOptions() {
                     const previewDataUrl = previewFile?.url;
                     const isPdf = previewFile?.name.toLowerCase().endsWith(".pdf") || previewFile?.type === "application/pdf";
                     const isImage = previewFile?.type?.startsWith("image/");
-                    
+
                     if (previewDataUrl) {
                       const filterStyle = colorMode === "bw" ? "grayscale(100%) contrast(1.1)" : "none";
                       const transformStyle = orientation === "landscape" ? "rotate(-90deg) scale(0.7)" : "none";
-                      
+
                       if (isPdf) {
                         return (
                           <div className="w-full h-full flex items-center justify-center overflow-hidden bg-slate-200/50 rounded-md">
-                            <object 
-                              data={previewDataUrl} 
-                              type="application/pdf" 
+                            <object
+                              data={previewDataUrl}
+                              type="application/pdf"
                               className="w-full h-full min-h-[400px] transition-all duration-300"
-                              style={{ 
+                              style={{
                                 filter: filterStyle,
                                 transform: transformStyle,
                                 transformOrigin: "center center"
@@ -1322,9 +1037,9 @@ export function PrintOptions() {
 
                         return (
                           <div className="w-full h-full flex items-center justify-center p-2 bg-slate-200/50 rounded-md overflow-hidden">
-                            <div 
+                            <div
                               className="bg-white shadow-lg p-3 transition-all duration-300 flex items-center justify-center overflow-hidden"
-                              style={{ 
+                              style={{
                                 aspectRatio: orientation === "landscape" ? "1.414 / 1" : "1 / 1.414",
                                 maxHeight: "100%",
                                 maxWidth: "100%"
@@ -1358,7 +1073,7 @@ export function PrintOptions() {
                         );
                       }
                     }
-                    
+
                     return (
                       <div className="text-center">
                         <FileText className="w-24 h-24 mx-auto text-gray-400 mb-4" />
