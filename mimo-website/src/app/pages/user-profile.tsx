@@ -482,6 +482,12 @@ export function UserProfile() {
                           <span>{job.colorMode === "color" ? "Color" : "B&W"}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
                           <span>{job.copies || 1} {job.copies === 1 ? 'copy' : 'copies'}</span>
+                          {job.kioskId && (
+                            <>
+                              <span className="w-1 h-1 rounded-full bg-slate-300" />
+                              <span>{job.kioskId === 'CV-001' ? 'C. V. Raman Block' : job.kioskId === 'SV-002' ? 'Swami Vivekananda Block' : job.kioskId}</span>
+                            </>
+                          )}
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
                           <span>{new Date(job.date).toLocaleDateString(undefined, {
                             day: 'numeric', month: 'short', year: 'numeric'
