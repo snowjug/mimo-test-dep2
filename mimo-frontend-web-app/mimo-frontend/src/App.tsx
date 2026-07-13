@@ -5,7 +5,7 @@ import { PrintingScreen } from './components/screens/PrintingScreen';
 import { SummaryScreen } from './components/screens/SummaryScreen';
 import { SystemErrorScreen } from './components/screens/SystemErrorScreen';
 import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
-import { Adds } from './components/screens/adds/Adds';
+
 
 export type ScreenState =
   | 'main-interface'
@@ -13,8 +13,7 @@ export type ScreenState =
   | 'printing-screen'
   | 'summary-screen'
   | 'system-error-screen'
-  | 'maintenance-screen'
-  | 'adds-screen';
+  | 'maintenance-screen';
 
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -58,10 +57,10 @@ function App() {
 
     const resetIdleTimer = () => {
       clearTimeout(idleTimer);
-      if (currentScreen === 'main-interface' || currentScreen === 'code-entry-screen') {
+      if (currentScreen === 'code-entry-screen') {
         idleTimer = window.setTimeout(() => {
-          setCurrentScreen('adds-screen');
-        }, 20000); // 20 seconds of idle time -> show ads
+          setCurrentScreen('main-interface');
+        }, 20000); // 20 seconds of idle time -> reset to main interface
       }
     };
 
@@ -232,10 +231,6 @@ function App() {
       )}
 
       {/* ================= SCREENS ================= */}
-      <Adds 
-        isActive={currentScreen === 'adds-screen'} 
-        onTap={() => setCurrentScreen('main-interface')} 
-      />
 
       <MainScreen
         isActive={currentScreen === 'main-interface'}
