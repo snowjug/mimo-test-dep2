@@ -61,7 +61,7 @@ function App() {
       if (currentScreen === 'main-interface' || currentScreen === 'code-entry-screen') {
         idleTimer = window.setTimeout(() => {
           setCurrentScreen('adds-screen');
-        }, 10000); // 10 seconds of idle time -> show ads
+        }, 20000); // 20 seconds of idle time -> show ads
       }
     };
 
