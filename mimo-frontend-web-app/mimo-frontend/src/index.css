@@ -58,7 +58,7 @@ body {
     -webkit-font-smoothing: antialiased;
     width: 100%;
     height: 100%;
-    background: url('./assets/kiosk-bg.png') center center / cover no-repeat, var(--amber-mid);
+    background: var(--amber-mid);
     overflow: hidden;
     position: relative;
     flex-shrink: 0;
@@ -75,6 +75,7 @@ body {
 #root {
     width: 1440px;
     height: 810px;
+    background: url('./assets/kiosk-bg.png') center center / cover no-repeat, var(--amber-mid);
     position: absolute;
     top: 50%;
     left: 50%;
