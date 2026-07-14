@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface SystemErrorScreenProps {
     isActive: boolean;
@@ -13,8 +13,30 @@ interface SystemErrorScreenProps {
     showRefundBanner?: boolean;
 }
 
+const AUTO_RESET_SECONDS = 15;
+
 export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, jobData, onReset, onRetry, errorMsg, showRefundBanner }) => {
     const firstName = jobData?.userName?.split(' ')[0] || 'there';
+    const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
+
+    useEffect(() => {
+        if (!isActive) {
+            setCountdown(AUTO_RESET_SECONDS);
+            return;
+        }
+        setCountdown(AUTO_RESET_SECONDS);
+        const interval = setInterval(() => {
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    onReset();
+                    return AUTO_RESET_SECONDS;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [isActive, onReset]);
 
     return (
         <div 
@@ -74,6 +96,10 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
 
             {/* ── BOTTOM SECTION ── */}
             <div className="err-bottom err-a3">
+                <div className="err-auto-return">
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', opacity: 0.7 }}>schedule</span>
+                    Returning to home in <strong style={{ color: '#FFD97D' }}>{countdown}s</strong>
+                </div>
                 <div className="err-buttons">
                     {!showRefundBanner && (
                         <button
@@ -299,8 +325,18 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    gap: 40px;
+                    gap: 24px;
                     margin-bottom: 40px;
+                }
+
+                .err-auto-return {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    font-size: 22px;
+                    font-weight: 500;
+                    color: rgba(255, 255, 255, 0.55);
+                    letter-spacing: 0.01em;
                 }
 
 

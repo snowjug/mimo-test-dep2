@@ -2,6 +2,39 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
 
+const FlowerIcon1: React.FC = () => (
+  <svg 
+    viewBox="0 0 24 24" 
+    style={{ color: '#fff', width: '1em', height: '1em', display: 'block' }} 
+    fill="currentColor"
+  >
+    <circle cx="12" cy="12" r="3" />
+    <circle cx="12" cy="7" r="4" />
+    <circle cx="7.25" cy="10.45" r="4" />
+    <circle cx="9.06" cy="16.05" r="4" />
+    <circle cx="14.94" cy="16.05" r="4" />
+    <circle cx="16.75" cy="10.45" r="4" />
+  </svg>
+);
+
+const FlowerIcon2: React.FC = () => (
+  <svg 
+    viewBox="0 0 24 24" 
+    style={{ color: '#fff', width: '1em', height: '1em', display: 'block' }} 
+    fill="currentColor"
+  >
+    <circle cx="12" cy="12" r="3.5" />
+    <circle cx="12" cy="6.5" r="2.5" />
+    <circle cx="12" cy="17.5" r="2.5" />
+    <circle cx="6.5" cy="12" r="2.5" />
+    <circle cx="17.5" cy="12" r="2.5" />
+    <circle cx="15.89" cy="8.11" r="2.5" />
+    <circle cx="8.11" cy="8.11" r="2.5" />
+    <circle cx="15.89" cy="15.89" r="2.5" />
+    <circle cx="8.11" cy="15.89" r="2.5" />
+  </svg>
+);
+
 interface PrintingScreenProps {
   isActive: boolean;
   statusTitle?: string;
@@ -55,7 +88,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const isCompletingRef     = useRef(false);
   const stallTimerRef       = useRef<number | null>(null);   // stall detector
   const lastProgressRef     = useRef(0);                    // last recorded progress for stall check
-  const lastProgressTimeRef = useRef(Date.now());           // when progress last changed
+  const startTimeRef        = useRef(Date.now());           // when the print screen was activated
+  const lastSuccessfulPollTimeRef = useRef(Date.now());     // when we last successfully polled the backend
 
   const isCompleted = progress >= 100;
 
@@ -134,8 +168,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
         const data = await res.json();
 
-        // Reset stall timer on every successful poll response — the network is alive
-        lastProgressTimeRef.current = Date.now();
+        // Reset last successful poll timestamp — the network is alive
+        lastSuccessfulPollTimeRef.current = Date.now();
 
         if (data.status === 'completed' || data.isPrinted === true) {
           setPrintDone(true);
@@ -150,7 +184,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           schedulePoll(2000);
         }
       } catch {
-        // Network hiccup — retry in 4 s but do NOT reset stall timer
+        // Network hiccup — retry in 4 s
         pollTimerRef.current = window.setTimeout(() => schedulePoll(2000), 4000);
       }
     }, delayMs);
@@ -231,10 +265,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
       }
 
-      // ── Stall detector: reset timestamp whenever progress actually moves ────
       if (next !== lastProgressRef.current) {
-        lastProgressRef.current  = next;
-        lastProgressTimeRef.current = Date.now();
+        lastProgressRef.current  = progressRef.current;
       }
 
       const jitter = (Math.random() - 0.5) * delay * 0.08;
@@ -252,7 +284,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       setProgress(0);
       progressRef.current = 0;
       lastProgressRef.current = 0;
-      lastProgressTimeRef.current = Date.now();
+      startTimeRef.current = Date.now();
+      lastSuccessfulPollTimeRef.current = Date.now();
       setTypedTitle('');
       setTypedSub('');
       setPrintDone(false);
@@ -265,6 +298,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
     setTypedTitle('');
     setTypedSub('');
+    startTimeRef.current = Date.now();
+    lastSuccessfulPollTimeRef.current = Date.now();
 
     let titleIdx = 0;
     let subIdx   = 0;
@@ -308,41 +343,60 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     }
   }, [printDone, isActive, animateTo100AndComplete]);
 
-  // ── Stall detector ────────────────────────────────────────────────────────
-  // Fires every 5 seconds and checks how long ago the progress bar last moved.
-  // If it hasn't moved in 20 seconds and the print isn't completing, we surface
-  // an immediate error instead of waiting for the bar to crawl to 99%.
-  // This catches the "printer offline" scenario quickly regardless of position.
+  // ── Stall & Timeout detector ──────────────────────────────────────────────
+  // Fires every 5 seconds.
+  // 1. Connection Stall Check: If we haven't received a successful poll response
+  //    for > 45 seconds, we assume network connectivity is lost.
+  // 2. Physical Printing Timeout Check: Based on page count and color mode,
+  //    we calculate a generous print time limit (matching the backend). If the
+  //    total elapsed time exceeds this limit, we time out.
   useEffect(() => {
     if (!isActive || !printCode || printCode === '0000') return;
 
-    // Reset tracking whenever we mount/activate
-    lastProgressRef.current  = progressRef.current;
-    lastProgressTimeRef.current = Date.now();
+    const totalSheets = Math.max(1, pages * copies);
+    const isColor = colorMode === 'color';
+    const baseWarmupSec = 120; // 120 seconds base warmup/spooling time
+    const secPerPage = isColor ? 35 : 8;
+    // Timeout matching backend plus a 15 seconds buffer to prioritize backend failure message/refund trigger
+    const printTimeoutMs = (baseWarmupSec + totalSheets * secPerPage + 15) * 1000;
+    const networkStallThresholdMs = 45000; // 45 seconds with no network response
 
-    const STALL_THRESHOLD_MS = 20000; // 20 s with no progress movement = stall
-
-    const checkStall = () => {
+    const checkTimeout = () => {
       if (isCompletingRef.current) return; // already finishing — no action needed
-      const msSinceMove = Date.now() - lastProgressTimeRef.current;
-      if (msSinceMove >= STALL_THRESHOLD_MS) {
-        console.warn('[PrintingScreen] Stall detected — progress frozen for', msSinceMove, 'ms. Surfacing error.');
+
+      const elapsedMs = Date.now() - startTimeRef.current;
+      const msSinceLastPoll = Date.now() - lastSuccessfulPollTimeRef.current;
+
+      // Check for total print timeout
+      if (elapsedMs > printTimeoutMs) {
+        console.warn(`[PrintingScreen] Print timeout exceeded: ${elapsedMs}ms > ${printTimeoutMs}ms. Surfacing error.`);
         clearAllTimers();
         if (onError) {
-          onError('Printer is not responding. If you were charged, your refund will be processed automatically.');
+          onError('Print timed out. If you were charged, your refund will be processed automatically.');
         }
-        return; // don't reschedule
+        return;
       }
-      stallTimerRef.current = window.setTimeout(checkStall, 5000);
+
+      // Check for network connectivity stall
+      if (msSinceLastPoll > networkStallThresholdMs) {
+        console.warn(`[PrintingScreen] Network connection lost: no successful poll for ${msSinceLastPoll}ms. Surfacing error.`);
+        clearAllTimers();
+        if (onError) {
+          onError('Connection to printer server was lost. Please check your network and try again.');
+        }
+        return;
+      }
+
+      stallTimerRef.current = window.setTimeout(checkTimeout, 5000);
     };
 
-    // Start the first stall check after the initial warmup period (10 s)
-    stallTimerRef.current = window.setTimeout(checkStall, 10000);
+    // Start checking after 10s
+    stallTimerRef.current = window.setTimeout(checkTimeout, 10000);
 
     return () => {
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
     };
-  }, [isActive, printCode, clearAllTimers, onError]);
+  }, [isActive, printCode, pages, copies, colorMode, clearAllTimers, onError]);
 
   // ─── SVG geometry ─────────────────────────────────────────────────────────
 
@@ -615,13 +669,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 animationTimingFunction: 'ease-in-out',
                 animationIterationCount: 'infinite',
                 textShadow: 'none',
-                /* Strip emoji colour → white petals with dark amber shadow for high visibility */
-                filter: 'grayscale(1) brightness(8) drop-shadow(0 4px 12px rgba(120, 60, 0, 0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+                /* Drop shadow for high visibility */
+                filter: 'drop-shadow(0 4px 12px rgba(120, 60, 0, 0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
               }}
             >
-              <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: 'inherit' }}>
-                {note.id % 2 === 0 ? 'local_florist' : 'filter_vintage'}
-              </span>
+              {note.id % 2 === 0 ? <FlowerIcon1 /> : <FlowerIcon2 />}
             </div>
           ))}
 
