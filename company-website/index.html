@@ -2506,6 +2506,7 @@
 </div><!-- /page-wrap -->
 
 <script>
+document.addEventListener('DOMContentLoaded', () => {
   /* ── Scroll Reveal ── */
   const reveals = document.querySelectorAll('.reveal');
   const revealObserver = new IntersectionObserver((entries) => {
@@ -2541,8 +2542,9 @@
         counterObserver.unobserve(el);
       }
     });
-  }, { threshold: 0.5 });
+  }, { threshold: 0.1 });
   counters.forEach(el => counterObserver.observe(el));
+});
 
   /* ── FAQ Toggle ── */
   function toggleFaq(id) {
