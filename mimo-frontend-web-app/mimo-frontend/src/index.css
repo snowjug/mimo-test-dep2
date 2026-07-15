@@ -24,8 +24,8 @@
     --glass-border-2: rgba(255, 255, 255, 0.18);
 
     /* Keypad circles */
-    --keypad-bg:     rgba(180, 150, 100, 0.45);
-    --keypad-border: rgba(255, 255, 255, 0.22);
+    --keypad-bg:     rgba(90, 60, 5, 0.88);
+    --keypad-border: rgba(255, 255, 255, 0.35);
     --keypad-hover:  rgba(210, 180, 130, 0.60);
 
     /* Status colours */
@@ -501,10 +501,10 @@ body {
     height: 80px;
     max-width: 80px;
     border-radius: 22px;
-    background: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.45);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1.5px solid rgba(255, 255, 255, 0.40);
+    border: 2px solid rgba(255, 255, 255, 0.70);
     box-shadow:
         0 12px 30px rgba(100, 60, 0, 0.18),
         inset 0 2px 0 rgba(255, 255, 255, 0.25),
@@ -520,24 +520,24 @@ body {
 }
 
 .code-slot.active {
-    border-color: rgba(255, 230, 150, 0.80);
-    background: rgba(255, 240, 180, 0.20);
+    border-color: #ffffff;
+    background: rgba(255, 255, 255, 0.65);
     box-shadow:
-        0 0 0 2.5px rgba(255, 220, 100, 0.40),
-        0 12px 30px rgba(100, 60, 0, 0.20),
-        inset 0 0 18px rgba(255, 220, 100, 0.12);
+        0 0 0 3px rgba(255, 255, 255, 0.45),
+        0 12px 35px rgba(100, 60, 0, 0.28),
+        inset 0 0 18px rgba(255, 255, 255, 0.25);
     transform: translateY(-4px);
     animation: slot-glow-warm 2s infinite alternate;
 }
 
 @keyframes slot-glow-warm {
-    from { box-shadow: 0 0 0 2px rgba(255,210,80,0.35), 0 12px 30px rgba(100,60,0,0.18), inset 0 0 10px rgba(255,210,80,0.08); }
-    to   { box-shadow: 0 0 0 3.5px rgba(255,210,80,0.65), 0 18px 40px rgba(100,60,0,0.28), inset 0 0 28px rgba(255,210,80,0.22); }
+    from { box-shadow: 0 0 0 2px rgba(255,255,255,0.35), 0 12px 30px rgba(100,60,0,0.18), inset 0 0 10px rgba(255,255,255,0.08); }
+    to   { box-shadow: 0 0 0 4.5px rgba(255,255,255,0.70), 0 18px 40px rgba(100,60,0,0.28), inset 0 0 28px rgba(255,255,255,0.25); }
 }
 
 .code-slot.filled {
-    border-color: rgba(255, 255, 255, 0.55);
-    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.80);
+    background: rgba(255, 255, 255, 0.55);
     box-shadow:
         0 12px 28px rgba(100, 60, 0, 0.18),
         inset 0 2px 0 rgba(255, 255, 255, 0.20);
@@ -608,9 +608,9 @@ body {
 
 /* Delete button */
 .num-btn.accent-red {
-    color: rgba(255, 160, 140, 0.92);
-    border-color: rgba(255, 140, 120, 0.35);
-    background: rgba(200, 80, 60, 0.18);
+    color: #ffffff;
+    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(180, 40, 30, 0.85);
 }
 
 .num-btn.accent-red:active {
@@ -621,33 +621,33 @@ body {
 
 /* Submit button */
 .num-btn.submit-btn {
-    color: rgba(255, 255, 255, 0.28);
+    color: rgba(255, 255, 255, 0.25);
     pointer-events: none;
-    background: rgba(150, 130, 100, 0.20);
-    border-color: rgba(255,255,255,0.12);
+    background: rgba(80, 50, 20, 0.40);
+    border-color: rgba(255, 255, 255, 0.15);
 }
 
 .num-btn.submit-btn.ready {
-    color: rgba(130, 240, 140, 0.95);
-    border-color: rgba(130, 240, 140, 0.50);
-    background: rgba(76, 175, 80, 0.20);
+    color: #ffffff;
+    border-color: rgba(34, 197, 94, 0.50);
+    background: rgba(34, 197, 94, 0.85);
     pointer-events: auto;
     box-shadow:
-        0 0 0 2.5px rgba(76, 175, 80, 0.20),
-        0 6px 20px rgba(76, 175, 80, 0.15);
+        0 0 0 2.5px rgba(34, 197, 94, 0.20),
+        0 6px 20px rgba(34, 197, 94, 0.15);
     animation: submit-pulse 2.2s ease-in-out infinite;
 }
 
 @keyframes submit-pulse {
-    0%, 100% { box-shadow: 0 0 0 2.5px rgba(76,175,80,0.20), 0 6px 20px rgba(76,175,80,0.15); }
-    50%       { box-shadow: 0 0 0 5px rgba(76,175,80,0.35), 0 6px 25px rgba(76,175,80,0.30); }
+    0%, 100% { box-shadow: 0 0 0 2.5px rgba(34,197,94,0.20), 0 6px 20px rgba(34,197,94,0.15); }
+    50%       { box-shadow: 0 0 0 5px rgba(34,197,94,0.35), 0 6px 25px rgba(34,197,94,0.30); }
 }
 
 .num-btn.submit-btn.ready:active {
-    background: rgba(76, 175, 80, 0.75);
+    background: rgba(34, 197, 94, 0.75);
     color: #fff;
     transform: scale(0.90);
-    box-shadow: inset 0 3px 8px rgba(0,0,0,0.15), 0 0 28px rgba(76,175,80,0.55);
+    box-shadow: inset 0 3px 8px rgba(0,0,0,0.15), 0 0 28px rgba(34,197,94,0.55);
 }
 
 /* Back button */
