@@ -67,14 +67,15 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                marginBottom: '20px',
+                marginTop: '35px',
+                marginBottom: '10px',
                 animation: isActive ? 'fadeInUp 0.8s ease-out forwards' : 'none',
                 opacity: 0,
                 transform: 'translateY(-40px)'
             }}>
 
                 <div style={{ fontSize: '48px', fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', textShadow: '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <span style={{ color: '#FFD97D', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
+                    <span style={{ color: '#ffffff', textDecoration: 'underline', textDecorationColor: '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
                 </div>
             </div>
 
@@ -194,7 +195,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
             {/* Bottom-Centered Done Button & Message Area */}
             <div style={{
                 position: 'absolute',
-                bottom: '40px',
+                bottom: '85px',
                 left: '0',
                 right: '0',
                 display: 'flex',
