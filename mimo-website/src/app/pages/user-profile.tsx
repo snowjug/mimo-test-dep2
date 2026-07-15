@@ -58,13 +58,17 @@ export function UserProfile() {
         setPhone(profileRes.data.mobileNumber || "");
         setPhotoUrl(profileRes.data.photoUrl || null);
 
+        const settingsRes = await api.get("/api/settings").catch(() => ({ data: { pricePerPageBW: 2.3, pricePerPageColor: 10.0 } }));
+        const priceBW = settingsRes.data.pricePerPageBW || 2.3;
+        const priceColor = settingsRes.data.pricePerPageColor || 10.0;
+
         const historyRes = await api.get("/print-history");
         const validHistory = historyRes.data.filter((job: any) => job.printCode && job.printCode !== "-");
         const mappedHistory = validHistory.map((job: any) => {
            if (job.details && job.details.startsWith("0 pages")) {
              const costNum = parseFloat(job.cost.replace('₹', ''));
              const isColor = job.details.includes("Color");
-             const pricePerPage = isColor ? 9.2 : 2.3;
+             const pricePerPage = isColor ? priceColor : priceBW;
              const copies = job.copies || 1;
              if (costNum > 0) {
                const calculatedPages = Math.round(costNum / (copies * pricePerPage));
