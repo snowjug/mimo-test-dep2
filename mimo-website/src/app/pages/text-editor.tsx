@@ -21,8 +21,17 @@ export function TextEditor() {
   const [copies, setCopies] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Constants
-  const pricePerPage = 2.30; // Always B&W
+  const [pricePerPage, setPricePerPage] = useState(2.30); // Dynamic from settings
+
+  useEffect(() => {
+    api.get('/api/settings')
+      .then(res => {
+        if (res.data?.pricePerPageBW) {
+          setPricePerPage(res.data.pricePerPageBW);
+        }
+      })
+      .catch(console.error);
+  }, []);
   
   // Calculate dynamic page estimation
   // Average A4 page holds ~2500 characters at 12pt single spacing.

@@ -9,6 +9,7 @@ import { Badge } from "../components/ui/badge";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { MimoHeader } from "../components/mimo-header";
 import { ArrowLeft, FileText, Minus, Plus, Eye, Printer, Palette, Contrast, File, Files, Copy, Sliders, MapPin, Grid3X3, MonitorSmartphone, Check, Settings } from "lucide-react";
+import api from "../api";
 
 interface UploadedFile {
   name: string;
@@ -158,6 +159,23 @@ export function PrintOptions() {
   const [priceColor, setPriceColor] = useState(10.00);
   const [pricesLoaded, setPricesLoaded] = useState(false);
 
+  useEffect(() => {
+    const fetchPrices = async () => {
+      try {
+        const response = await api.get('/api/settings');
+        if (response.data) {
+          if (response.data.pricePerPageBW) setPriceBW(response.data.pricePerPageBW);
+          if (response.data.pricePerPageColor) setPriceColor(response.data.pricePerPageColor);
+        }
+      } catch (error) {
+        console.error("Failed to fetch prices:", error);
+      } finally {
+        setPricesLoaded(true);
+      }
+    };
+    fetchPrices();
+  }, []);
+
   // Recalculate totalPages when fileConfigs or pageSelection changes
   useEffect(() => {
     if (files.length === 0 || Object.keys(fileConfigs).length === 0) return;
@@ -305,9 +323,7 @@ export function PrintOptions() {
   const actualPages = doubleSided === "double" ? Math.ceil(sheetsNeeded / 2) : sheetsNeeded;
 
   // Pricing
-  const pricePerPageBW = 2.30;
-  const pricePerPageColor = 10.00; // Updated as per requirements
-  const basePrice = colorMode === "bw" ? pricePerPageBW : pricePerPageColor;
+  const basePrice = colorMode === "bw" ? priceBW : priceColor;
 
   const totalCost = actualPages * (Number(copies) || 1) * basePrice;
 

@@ -50,7 +50,9 @@ export default function AdminDashboard() {
       setRecentPrints(printsRes.data);
       setPricing({
         pricePerPageBW: settingsRes.data.pricePerPageBW || 2.30,
-        pricePerPageColor: settingsRes.data.pricePerPageColor || 10.00
+        pricePerPageColor: settingsRes.data.pricePerPageColor || 10.00,
+        pricePerPageA4: settingsRes.data.pricePerPageA4 || 2.30,
+        pricePerPageGraph: settingsRes.data.pricePerPageGraph || 2.00
       });
       setHardware(hardwareRes.data);
     } catch (err: any) {

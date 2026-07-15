@@ -16,7 +16,21 @@ export function BlankPages() {
 
   const isGraph = type === "graph";
   const label = isGraph ? "Mimo Graph Sheet" : "A4 Blank Sheet";
-  const pricePerPage = isGraph ? 2.00 : 2.30;
+  const [pricePerPageA4, setPricePerPageA4] = useState(2.30);
+  const [pricePerPageGraph, setPricePerPageGraph] = useState(2.00);
+
+  useEffect(() => {
+    api.get('/api/settings')
+      .then(res => {
+        if (res.data) {
+          if (res.data.pricePerPageA4) setPricePerPageA4(res.data.pricePerPageA4);
+          if (res.data.pricePerPageGraph) setPricePerPageGraph(res.data.pricePerPageGraph);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const pricePerPage = isGraph ? pricePerPageGraph : pricePerPageA4;
   const totalCost = pageCount * pricePerPage;
 
   const increment = () => {
