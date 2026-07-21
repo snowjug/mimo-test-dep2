@@ -276,7 +276,7 @@ export function Payment() {
           <div className="relative mb-2.5" style={{ filter: 'drop-shadow(0 15px 25px rgba(0, 0, 0, 0.08))' }}>
             {/* Order Summary - Torn Receipt Style */}
             <Card 
-              className="receipt-card border-0 bg-[#fefdfb] text-slate-900 overflow-hidden animate-in fade-in duration-500 rounded-none pt-8 pb-5 px-4 sm:pt-10 sm:pb-6 sm:px-5 font-mono relative border-x border-slate-200/40"
+              className="receipt-card border-0 bg-[#fefdfb] text-slate-900 overflow-hidden animate-in fade-in duration-500 rounded-none pt-5 pb-3 px-3 sm:pt-8 sm:pb-5 sm:px-4 font-mono relative border-x border-slate-200/40"
               style={{
                 clipPath: 'polygon(0% 12px, 2.5% 0px, 5% 12px, 7.5% 0px, 10% 12px, 12.5% 0px, 15% 12px, 17.5% 0px, 20% 12px, 22.5% 0px, 25% 12px, 27.5% 0px, 30% 12px, 32.5% 0px, 35% 12px, 37.5% 0px, 40% 12px, 42.5% 0px, 45% 12px, 47.5% 0px, 50% 12px, 52.5% 0px, 55% 12px, 57.5% 0px, 60% 12px, 62.5% 0px, 65% 12px, 67.5% 0px, 70% 12px, 72.5% 0px, 75% 12px, 77.5% 0px, 80% 12px, 82.5% 0px, 85% 12px, 87.5% 0px, 90% 12px, 92.5% 0px, 95% 12px, 97.5% 0px, 100% 12px, 100% calc(100% - 12px), 97.5% 100%, 95% calc(100% - 12px), 92.5% 100%, 90% calc(100% - 12px), 87.5% 100%, 85% calc(100% - 12px), 82.5% 100%, 80% calc(100% - 12px), 77.5% 100%, 75% calc(100% - 12px), 72.5% 100%, 70% calc(100% - 12px), 67.5% 100%, 65% calc(100% - 12px), 62.5% 100%, 60% calc(100% - 12px), 57.5% 100%, 55% calc(100% - 12px), 52.5% 100%, 50% calc(100% - 12px), 47.5% 100%, 45% calc(100% - 12px), 42.5% 100%, 40% calc(100% - 12px), 37.5% 100%, 35% calc(100% - 12px), 32.5% 100%, 30% calc(100% - 12px), 27.5% 100%, 25% calc(100% - 12px), 22.5% 100%, 20% calc(100% - 12px), 17.5% 100%, 15% calc(100% - 12px), 12.5% 100%, 10% calc(100% - 12px), 7.5% 100%, 5% calc(100% - 12px), 2.5% 100%, 0% calc(100% - 12px))',
                 fontFamily: "'Courier New', Courier, monospace"
@@ -286,22 +286,22 @@ export function Payment() {
               
               {/* Brand Header */}
               <div className="text-center mb-0 mt-0 sm:-mt-2 relative z-10">
-                <p className="font-extrabold text-lg sm:text-2xl uppercase tracking-[0.2em] text-slate-800 mb-1">
-                  <span className="font-black text-black text-2xl sm:text-4xl align-middle" style={{ fontFamily: "'Lovelo', sans-serif" }}>MIMO</span> <span className="align-middle">RECEIPT</span>
+                <p className="font-extrabold text-base sm:text-2xl uppercase tracking-[0.2em] text-slate-800 mb-0.5">
+                  <span className="font-black text-black text-xl sm:text-4xl align-middle" style={{ fontFamily: "'Lovelo', sans-serif" }}>MIMO</span> <span className="align-middle">RECEIPT</span>
                 </p>
                 <p 
-                  className="font-black text-[15px] sm:text-[17px] text-slate-800 uppercase tracking-widest mb-2"
+                  className="font-black text-[13px] sm:text-[17px] text-slate-800 uppercase tracking-widest mb-1"
                   style={{ fontFamily: "'Lovelo', sans-serif" }}
                 >
                   REVA UNIVERSITY
                 </p>
-                <div className="text-xs text-slate-500 mt-1.5 uppercase leading-relaxed font-bold mb-3">
+                <div className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase leading-relaxed font-bold mb-2">
                   <p>ADD: Yelahanka, Bangalore, Karnataka, 560064</p>
                 </div>
               </div>
 
               {/* Date, Time, and Identifiers */}
-              <div className="space-y-1.5 text-sm text-slate-700 font-bold px-1 relative z-10">
+              <div className="space-y-1 text-xs sm:text-sm text-slate-700 font-bold px-1 relative z-10">
                 <div className="flex justify-between items-center">
                   <span>Date: {getFormattedDate()}</span>
                   <span>Time: {getFormattedTime()}</span>
@@ -324,13 +324,13 @@ export function Payment() {
               <div className="border-t border-dashed border-slate-400/80 w-full my-0.5 relative z-10" />
 
               {/* Items List (Uploaded Files) */}
-              <div className="space-y-1.5 px-1 relative z-10">
+              <div className="space-y-1 px-1 relative z-10">
                 {files.map((file, i) => {
                   const filePages = getSelectedPageCount(file);
                   const fileCost = fileCosts[i] || 0;
                   const itemCopies = printOptions?.copies || 1;
                   return (
-                    <div key={i} className="flex flex-col text-sm text-slate-800 font-bold leading-tight">
+                    <div key={i} className="flex flex-col text-xs sm:text-sm text-slate-800 font-bold leading-tight">
                       <div className="flex justify-between items-start">
                         <span className="truncate max-w-[240px]">{file.name}</span>
                         <span className="shrink-0 pl-2">₹{fileCost.toFixed(2)}</span>
@@ -348,7 +348,7 @@ export function Payment() {
 
               {/* Print Configuration Metadata */}
               {printOptions && (
-                <div className="space-y-2 px-1 text-xs font-bold text-slate-500 relative z-10">
+                <div className="space-y-1 sm:space-y-2 px-1 text-[10px] sm:text-xs font-bold text-slate-500 relative z-10">
                   <div className="flex justify-between">
                     <span>Printer:</span>
                     <span className="text-slate-900">
@@ -374,8 +374,8 @@ export function Payment() {
               <div className="border-t border-dashed border-slate-400/80 w-full my-0.5 relative z-10" />
 
               {/* Pricing Details */}
-              <div className="space-y-1.5 px-1 text-sm font-bold text-slate-800 relative z-10">
-                <div className="flex justify-between text-base font-black text-slate-900">
+              <div className="space-y-1 sm:space-y-1.5 px-1 text-xs sm:text-sm font-bold text-slate-800 relative z-10">
+                <div className="flex justify-between text-sm sm:text-base font-black text-slate-900">
                   <span>Total</span>
                   <span>₹{totalAmount.toFixed(2)}</span>
                 </div>
@@ -402,7 +402,7 @@ export function Payment() {
               </div>
 
               {/* Promo Section (Integrated inside receipt) */}
-              <div className="mt-2 mb-1.5 relative z-10">
+              <div className="mt-2 mb-1 relative z-10">
                 {!appliedPromo ? (
                   <div className="relative mx-1">
                     <Input
@@ -413,7 +413,7 @@ export function Payment() {
                         setPromoCode(e.target.value);
                         setPromoError(false);
                       }}
-                      className={`h-10 pl-3 pr-20 bg-slate-100/50 border border-dashed transition-all rounded font-mono text-xs uppercase font-bold shadow-none ${
+                      className={`h-10 pl-3 pr-20 bg-slate-100/50 border border-dashed transition-all rounded font-mono text-[16px] uppercase font-bold shadow-none ${
                         promoError
                           ? "border-red-500 text-red-600 focus:border-red-600 focus:bg-red-50/50 placeholder:text-red-300"
                           : "border-slate-400 focus:border-slate-600 focus:bg-white text-slate-900 placeholder:text-slate-400"

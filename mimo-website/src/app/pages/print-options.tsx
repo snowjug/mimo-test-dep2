@@ -698,7 +698,7 @@ export function PrintOptions() {
                 <div className="p-4 sm:p-5 transition-all duration-300 bg-white rounded-2xl border-2 border-slate-300 hover:border-slate-400 shadow-sm">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                     <div>
-                      <p className="text-sm font-bold text-slate-800">Select pages</p>
+                      <p className="text-sm font-bold text-slate-800">Select custom pages</p>
                     </div>
                     <div className="relative flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full sm:w-56 h-11 sm:h-12 select-none">
                       <button
