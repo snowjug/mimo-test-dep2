@@ -285,7 +285,7 @@ export function Payment() {
       </div>
 
       {/* Scrollable Receipt Area */}
-      <div className="flex-1 overflow-y-auto px-2 sm:px-4 pb-1 scrollbar-hide">
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4 pb-1 scrollbar-hide">
         <div className="max-w-md mx-auto w-full group h-full flex flex-col justify-center py-1 sm:py-2">
           <div className="relative w-full" style={{ filter: 'drop-shadow(0 15px 25px rgba(0, 0, 0, 0.08))' }}>
             {/* Order Summary - Torn Receipt Style */}
