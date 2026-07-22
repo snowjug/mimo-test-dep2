@@ -244,7 +244,7 @@ export function Payment() {
   }
 
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-2 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4">
+    <div className="flex flex-col h-[100dvh] w-full bg-slate-50/50">
       <style>{`
         .receipt-card, .receipt-card *:not(.keep-color):not(.keep-color *) {
           color: #000000 !important;
@@ -252,8 +252,18 @@ export function Payment() {
         .receipt-card *::placeholder {
           color: #a1a1aa !important;
         }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
       `}</style>
-      <div className="mx-auto max-w-5xl space-y-1 sm:space-y-2">
+      
+      {/* Top Section (Header + Title) */}
+      <div className="shrink-0 px-2 sm:px-4 pt-0">
+        <div className="mx-auto max-w-5xl space-y-1 sm:space-y-2">
 
         {/* Header */}
         <MimoHeader />
@@ -271,9 +281,13 @@ export function Payment() {
             Secure Checkout
           </h1>
         </div>
+        </div>
+      </div>
 
-        <div className="max-w-md mx-auto w-full group">
-          <div className="relative mb-2.5" style={{ filter: 'drop-shadow(0 15px 25px rgba(0, 0, 0, 0.08))' }}>
+      {/* Scrollable Receipt Area */}
+      <div className="flex-1 overflow-y-auto px-2 sm:px-4 pb-2 scrollbar-hide">
+        <div className="max-w-md mx-auto w-full group h-full flex flex-col justify-center py-2 sm:py-4">
+          <div className="relative w-full" style={{ filter: 'drop-shadow(0 15px 25px rgba(0, 0, 0, 0.08))' }}>
             {/* Order Summary - Torn Receipt Style */}
             <Card 
               className="receipt-card border-0 bg-[#fefdfb] text-slate-900 overflow-hidden animate-in fade-in duration-500 rounded-none pt-5 pb-3 px-3 sm:pt-8 sm:pb-5 sm:px-4 font-mono relative border-x border-slate-200/40"
@@ -481,10 +495,15 @@ export function Payment() {
               </div>
             </Card>
           </div>
+        </div>
+      </div>
 
-          <div className="px-1 mb-2 animate-in fade-in duration-500 delay-150">
+      {/* Fixed Bottom Button */}
+      <div className="shrink-0 px-2 sm:px-4 pb-4 sm:pb-6 pt-2 bg-slate-50/50">
+        <div className="max-w-md mx-auto w-full">
+          <div className="px-1 animate-in fade-in duration-500 delay-150">
             <Button
-              className="w-full h-12 text-sm bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg shadow-blue-900/20 transition-all duration-200 font-black uppercase tracking-widest rounded-xl"
+              className="w-full h-14 sm:h-12 text-base sm:text-sm bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg shadow-blue-900/20 transition-all duration-200 font-black uppercase tracking-widest rounded-xl"
               onClick={handlePayment}
               disabled={isProcessing}
             >
