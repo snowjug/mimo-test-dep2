@@ -2347,15 +2347,24 @@ app.get("/kiosk/job-status", async (req, res) => {
 
     // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
     let totalPageCount = 0;
+    let totalFileSizeBytes = 0;
     currentSessionDocs.forEach(d => {
       const pCount = d.pageCount || 1;
       const copies = d.printOptions ? (d.printOptions.copies || 1) : (d.copies || 1);
       totalPageCount += pCount * copies;
+      // fileSize may be stored in bytes; add it up for large-file spooling bonus
+      totalFileSizeBytes += d.fileSize || d.fileSizeBytes || 0;
     });
 
-    const baseWarmupSec = 120; // 120 seconds base warmup/spooling time
-    const secPerPage = isColorJob ? 35 : 8; // Inkjet color prints need longer timeout headroom than B&W laser prints
-    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage) * 1000;
+    // Base warmup: 240s (4 min) — covers Pi receiving snapshot + downloading + compressing + USB spooling
+    // Previously 120s, but updatedAt is set when the user hits Print, so the clock starts BEFORE the Pi
+    // even gets the job. On a busy/RAM-constrained Pi a 6MB PDF can take 90-120s just to spool.
+    const baseWarmupSec = 240;
+    const secPerPage = isColorJob ? 35 : 10; // Inkjet color slower than B&W laser
+    // Extra timeout for large files: +1s per 100KB, capped at 120s extra
+    // This prevents large PDFs (e.g. 6MB data sheets) from timing out during USB spooling
+    const fileSizeBonusSec = Math.min(Math.floor(totalFileSizeBytes / (100 * 1024)), 120);
+    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage + fileSizeBonusSec) * 1000;
 
     let anyStuck = false;
     for (const d of currentSessionDocs) {
