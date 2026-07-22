@@ -71,93 +71,139 @@
           <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#4666F6] to-purple-600 flex items-center justify-center text-white font-bold">M</div>
           <div>
             <div class="font-bold text-slate-800">MIMO Printing Team</div>
-            <div>Published on July 7, 2026 • 6 min read</div>
+            <div>Published on July 7, 2026 • 8 min read</div>
           </div>
         </div>
       </div>
 
       <!-- Intro -->
       <p class="text-lg text-slate-600 font-medium mb-6">
-        Have you ever printed a document only to find that the text was cut off at the margins, the page breaks were completely scrambled, or the fonts look garbled? Document formatting is a science, and understanding how paper sizes, margins, and rendering drivers interact will save you from wasting paper and credit.
+        Have you ever printed a document only to find that the text was cut off at the margins, the page breaks were completely scrambled, or the fonts looked garbled and replaced with generic substitutes? Document formatting is a science, and understanding how paper sizes, margins, font embedding, and rendering drivers interact will save you from wasting paper, money, and time.
       </p>
 
       <p class="mb-6">
-        The best way to prevent printing surprises is by converting your files to PDF (Portable Document Format) before uploading them to the MIMO print network. However, simply saving as a PDF isn't always enough. In this guide, we'll explain how to set up your documents, slides, and reports for pixel-perfect results on commercial laser printers.
+        The best way to prevent printing surprises is by converting your files to PDF (Portable Document Format) before uploading them to the MIMO print network. However, simply saving as a PDF is not always enough. In this comprehensive guide, we will explain exactly how to set up your documents, slides, and reports for pixel-perfect results on commercial laser and inkjet printers — every single time.
       </p>
 
       <!-- Section 1 -->
       <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">1. Why PDF is the Gold Standard for Printing</h2>
       <p class="mb-6">
-        When you upload a Microsoft Word (.docx) or PowerPoint (.pptx) file, the formatting engine on the server must render the text using the fonts and rendering metrics available in its environment. If your file uses a font that the server doesn't have, or if you created the document in a different version of Office, elements can shift:
+        When you upload a Microsoft Word (.docx) or PowerPoint (.pptx) file directly, the formatting engine on the print server must render the text using fonts and layout metrics available in its own environment. If your file uses a custom or premium font that the server does not have installed, elements shift in unpredictable ways:
       </p>
       <ul class="list-disc pl-6 mb-6 space-y-2">
-        <li>Lines can wrap unexpectedly, pushing headers onto blank pages.</li>
-        <li>Images and charts might overlap with text blocks.</li>
-        <li>Equation symbols can render as blank rectangles.</li>
+        <li>Lines can wrap unexpectedly, pushing section headers onto blank pages or creating awkward orphaned words.</li>
+        <li>Images and charts might overlap with surrounding text blocks.</li>
+        <li>Equation symbols (common in engineering and science documents) can render as blank rectangles or question marks.</li>
+        <li>Tables might lose their borders, cell padding, or column widths entirely.</li>
+        <li>Bullet points and numbered lists may change their indentation or symbol style.</li>
       </ul>
       <p class="mb-6">
-        A PDF acts as a digital photograph of your document layout. It embeds the exact font geometry, vector graphics coordinates, and rasterized images, ensuring it looks identical on any computer, mobile device, or physical printer.
+        A PDF acts as a digital photograph of your document layout. It embeds the exact font geometry, vector graphics coordinates, and rasterized images directly inside the file, ensuring it looks absolutely identical on any computer, mobile device, or physical printer in the world. For academic documents, resumes, thesis submissions, lab reports, and anything where layout precision truly matters — always upload as PDF.
+      </p>
+      <p class="mb-6">
+        For quick notes or rough drafts where the exact layout is not critical, a Word file may be acceptable. However, for anything you are submitting for a grade or sharing professionally, PDF is non-negotiable.
       </p>
 
       <!-- Section 2 -->
       <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">2. Check Your Page Dimensions: A4 vs. US Letter</h2>
       <p class="mb-6">
-        This is the most common formatting mistake students make. By default, many word processing software templates in North America default to **US Letter** (8.5 × 11 inches). However, printing kiosks in Europe, Asia, and India operate on **A4 paper** (8.27 × 11.69 inches).
+        This is the single most common formatting mistake made by students in India. By default, Microsoft Word and Google Docs installed on devices sold or configured for North America default to <strong>US Letter</strong> size (8.5 × 11 inches). However, all MIMO kiosks — and virtually all campus printers in India — use <strong>A4 paper</strong> (210 × 297 mm, or approximately 8.27 × 11.69 inches).
       </p>
       <p class="mb-6">
-        If you print a US Letter PDF on A4 paper, the physical printer will automatically scale or crop the content to match. This can lead to:
+        The difference seems minor on paper (literally), but it causes very real problems when printing:
       </p>
       <ul class="list-disc pl-6 mb-6 space-y-2">
-        <li>The bottom 0.69 inches of your page getting cut off (since A4 is taller but narrower).</li>
-        <li>Your header or footer text falling outside the printable boundary.</li>
+        <li>Since A4 is taller than US Letter, the bottom 0.69 inches of a Letter-size document may get cropped entirely — cutting off footnotes, references, or conclusion paragraphs.</li>
+        <li>Since A4 is narrower than US Letter, wide diagrams or tables may get clipped on the right side.</li>
+        <li>Some printers will scale the document down uniformly to fit, making all your text slightly smaller than intended — which can cause issues if your professor requires a minimum font size (e.g., 12pt).</li>
       </ul>
       <p class="mb-6">
-        <strong>The Fix:</strong> In Microsoft Word or Google Docs, go to **Page Setup** and set your paper size to **A4** before you start writing or exporting your PDF. Make sure your graphics, tables, and margins are adjusted to this size.
+        <strong>How to Fix It in Microsoft Word:</strong> Go to the Layout tab (or Page Layout in older versions) → Size → A4. Alternatively, go to File → Page Setup → Paper → A4. Once changed, scroll through your entire document to check if any tables, figures, or text blocks shifted.
+      </p>
+      <p class="mb-6">
+        <strong>How to Fix It in Google Docs:</strong> Go to File → Page Setup → Paper size → A4. Click OK. Google Docs will reflow your content to the A4 dimensions.
+      </p>
+      <p class="mb-6">
+        <strong>How to Check Your Existing PDF:</strong> Open your PDF in any viewer, right-click on a page, and select "Page Properties" or check Document Properties (Ctrl+D in Acrobat Reader). The page size should read 595 × 842 points (which is A4 in PDF units, where 1 point = 1/72 inch).
       </p>
 
       <!-- Section 3 -->
       <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">3. Maintain Safe Margin Guidelines</h2>
       <p class="mb-6">
-        Printers have physical limitations. Most laser printers cannot print to the absolute edge of the paper due to the rollers that pull the sheet through the drum mechanism. The "printable area" is usually bordered by a 0.25-inch (approx. 6mm) margin.
+        Printers have hard physical limitations. Most laser printers cannot print all the way to the absolute edge of the paper because the rubber rollers and feed mechanism require a small unprintable margin to grip and pull the sheet through the drum. This unprintable margin is typically at least 4–6mm (about 0.25 inches) on all sides.
       </p>
       <p class="mb-6">
-        To prevent headers, page numbers, or footnotes from getting cut off:
+        To ensure that none of your content — including headers, footers, page numbers, or watermarks — gets cropped:
       </p>
       <ul class="list-disc pl-6 mb-6 space-y-2">
-        <li>Set your margins to at least **0.5 inches** (1.27 cm) on all sides. For binding (like thesis submissions or reports), use **1 inch** (2.54 cm) on the left margin.</li>
-        <li>Keep all text and page borders inside this boundary.</li>
-        <li>Ensure your footers aren't placed too low on the page.</li>
+        <li>Set your document margins to at least <strong>1.27 cm (0.5 inches)</strong> on all sides. This is the universally safe minimum for standard documents on any printer.</li>
+        <li>For documents that will be bound (thesis submissions, research reports, project files), set the left margin to at least <strong>2.54 cm (1 inch)</strong> so the binding doesn't obscure text near the spine.</li>
+        <li>Keep all text, ruled lines, table borders, watermarks, and page numbers entirely inside the safe margin boundary.</li>
+        <li>In Word, set your footer position to at least 1.27 cm from the bottom. In the header/footer editing mode, check the "Distance from edge" setting.</li>
+        <li>Avoid "zero margin" or "full bleed" templates unless you are specifically using the MIME Full Bleed image print mode for photos, which handles edge cropping automatically.</li>
       </ul>
 
       <!-- Section 4 -->
       <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">4. Embed Your Fonts When Exporting</h2>
       <p class="mb-6">
-        Sometimes, you might open a PDF on another machine and discover that the fonts have changed. This happens when the PDF creator does not "embed" the fonts in the file structure.
+        One of the most subtle but damaging formatting problems is font substitution. This happens when a PDF's fonts are not embedded in the file and the receiving system (the print server) does not have those fonts installed. The system then substitutes the closest available font — typically Arial or Times New Roman — which changes character spacing, line lengths, and sometimes even the overall number of pages in the document.
       </p>
       <p class="mb-6">
-        When exporting your document from Adobe InDesign, Microsoft Word, or Illustrator:
+        To ensure your fonts are properly embedded when exporting from different applications:
       </p>
-      <ol class="list-decimal pl-6 mb-6 space-y-2">
-        <li>Select the **PDF/A** archive format if available, which mandates font embedding.</li>
-        <li>In Word's PDF export options, check **"Bitmap text when fonts may not be embedded"** or **"Embed fonts in the file"**.</li>
-        <li>For designers using vector tools, convert text outlines into paths (shapes) to make them completely independent of external font files.</li>
+      <ol class="list-decimal pl-6 mb-6 space-y-3">
+        <li><strong>Microsoft Word (Windows):</strong> File → Save As → PDF → Options → check "ISO 19005-1 compliant (PDF/A)" or check "Embed fonts in the file" under the Compatibility section.</li>
+        <li><strong>Google Docs:</strong> Font embedding is automatic when you use File → Download → PDF Document (.pdf). No extra steps needed.</li>
+        <li><strong>Adobe InDesign or Illustrator:</strong> When exporting to PDF, choose Acrobat 5 (PDF 1.4) or higher compatibility, and set Subset Fonts when percentage of characters used is 0% (to embed all characters).</li>
+        <li><strong>LibreOffice:</strong> File → Export as PDF → check "Embed standard fonts" and "Export bookmarks as named destinations".</li>
+        <li><strong>Verification:</strong> After exporting, open the PDF in Adobe Acrobat Reader → File → Properties → Fonts tab. Every font listed should show "(Embedded)" or "(Embedded Subset)" next to it.</li>
       </ol>
 
       <!-- Section 5 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">5. Image Resolution and Quality (DPI)</h2>
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">5. Image Resolution and DPI Requirements</h2>
       <p class="mb-6">
-        If you include low-resolution images in your document, they will look pixelated or blurry when printed. Screens display at low resolution (72–120 DPI), but laser printers output crisp lines at **300 to 600 DPI** (dots per inch).
+        If you include low-resolution images in your document, they will look pixelated or blurry when printed. Screen resolution (what you see on your monitor) is typically 72 to 120 DPI (dots per inch), but laser printers output crisp, detailed text and images at <strong>300 to 600 DPI</strong>. An image that looks perfectly sharp on your laptop screen may print with visible pixel blocks.
       </p>
       <ul class="list-disc pl-6 mb-6 space-y-2">
-        <li><strong>Resolution Rule:</strong> Make sure images look crisp on your screen when zoomed in to 200%.</li>
-        <li><strong>Compress Images:</strong> While high resolution is good, excessively large images can make your PDF too heavy (over 25MB), slowing down upload speeds. Aim for a file size between 1MB and 15MB.</li>
+        <li><strong>Minimum Resolution:</strong> Use images at least 150 DPI at the intended print size for acceptable quality. For critical visuals (technical diagrams, lab data charts), use 300 DPI or higher.</li>
+        <li><strong>The Zoom Test:</strong> In your PDF viewer, zoom in to 200%. If the image looks pixelated or blurry at that zoom level, it will definitely print poorly.</li>
+        <li><strong>Avoid Screenshots:</strong> Screen captures are typically only 72–96 DPI and look very poor in print. Instead, export graphs and charts directly from Excel, Python (matplotlib), or Google Sheets as PDF or SVG.</li>
+        <li><strong>File Size Balance:</strong> While high resolution is important, excessively large images make your PDF over 25MB, slowing down uploads and processing. Tools like ilovepdf.com can compress image resolution to the optimal 150–300 DPI for print without visible quality loss.</li>
+        <li><strong>Vector vs. Raster:</strong> Graphs, charts, and line diagrams from Excel or Google Sheets are best exported as vector PDF rather than raster images. Vectors scale mathematically and look razor-sharp at any print size.</li>
+      </ul>
+
+      <!-- Section 6 -->
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">6. Tips for Formatting PowerPoint Slides for Print</h2>
+      <p class="mb-6">
+        Presentation files are frequently printed for study guides, handouts, or lecture reference. PowerPoint has a few unique formatting considerations when printing through MIMO:
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>Set Slide Size to A4:</strong> In PowerPoint, go to Design → Slide Size → Custom Slide Size → A4 Paper (210mm × 297mm Portrait, or 297mm × 210mm Landscape). This prevents automatic scaling during PDF conversion.</li>
+        <li><strong>Avoid Dark Backgrounds for Print:</strong> Dark presentation themes (navy blue, black, charcoal) consume enormous amounts of toner on laser printers and cost more per page. For print-only versions, switch to a white or light theme. Use "Save As" to keep the original dark version separately.</li>
+        <li><strong>Include Notes Pages if Required:</strong> Use File → Print → Print Layout → Notes Pages in PowerPoint before saving as PDF if your assignment requires notes to accompany each slide.</li>
+        <li><strong>N-Up Handout Layout:</strong> MIMO supports printing 2 or 4 slides per A4 sheet — perfect for study handouts that save paper. Choose this option in the MIMO print settings dashboard after uploading.</li>
+        <li><strong>Check Slide Transitions and Animations:</strong> These do not print — only the final state of each slide is captured in the PDF. Preview your exported PDF to ensure each slide shows the correct final content state.</li>
+      </ul>
+
+      <!-- Section 7 -->
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">7. Common Formatting Mistakes and Their Fixes</h2>
+      <p class="mb-6">
+        Here are the most frequent formatting problems students encounter and the exact steps to fix each:
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>Text clipped at the right edge:</strong> Margins are too narrow or page width is US Letter instead of A4. Fix: Change paper size to A4 and increase all margins to at least 1.27 cm.</li>
+        <li><strong>Last page is blank:</strong> There is a stray empty paragraph at the end of the document. Fix: Go to the last page in Word, place the cursor there, and delete all empty paragraphs.</li>
+        <li><strong>Fonts look completely different after printing:</strong> Fonts are not embedded in the PDF. Fix: Re-export using PDF/A format or enable the "Embed fonts" option in your PDF export settings.</li>
+        <li><strong>Images are blurry:</strong> Source images are low-resolution (under 150 DPI). Fix: Replace with higher-resolution originals, or use vector graphics (SVG, AI, EPS) where possible.</li>
+        <li><strong>Table borders are missing:</strong> The document was pasted from a website or email. Fix: Rebuild the table natively in Word or Google Docs with explicit border settings before exporting to PDF.</li>
+        <li><strong>Page numbers are wrong or duplicated:</strong> Mixed section breaks in Word can cause page numbering to restart unexpectedly. Fix: Go to Insert → Page Number → Format Page Numbers and set the numbering to "Continue from previous section".</li>
       </ul>
 
       <!-- Conclusion -->
       <div class="bg-blue-50 border-l-4 border-[#4666F6] p-6 rounded-r-2xl my-8">
         <h4 class="font-bold text-slate-800 mb-2">Did You Know?</h4>
         <p class="text-sm text-slate-600 mb-0">
-          MIMO's cloud processor optimizes your PDF file size. When you upload, the system automatically checks and scales images to 300 DPI. This speeds up the physical spooling process at the kiosk (down to under 8 seconds per document) while maintaining razor-sharp text quality.
+          MIMO's cloud processor automatically optimizes your PDF before sending it to the physical printer. When you upload, the system checks image resolution and compresses oversized images to 150 DPI for colour and 300 DPI for black &amp; white. This speeds up the physical spooling process at the kiosk while maintaining sharp, readable text quality throughout your document. Large PDFs that would otherwise take 3–5 minutes to spool are processed in under 30 seconds on our infrastructure.
         </p>
       </div>
     </article>

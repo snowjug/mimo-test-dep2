@@ -4,153 +4,154 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Document Security in the Cloud: How to Ensure Privacy When Printing</title>
-  <meta name="description" content="Discover how MIMO safeguards your document privacy with HTTPS transit encryption, secure temporary directories, and instant file shredding after printing." />
-  
-  <!-- Tailwind CSS CDN -->
+  <meta name="description" content="Learn how MIMO encrypts document uploads, prevents unauthorized access, and permanently deletes your files after printing. Understand cloud printing security in depth." />
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            mimoBlue: '#4666F6',
-            mimoLightBlue: '#EEF2FF',
-          }
-        }
-      }
-    }
-  </script>
-
-  <!-- Google Fonts -->
+  <script>tailwind.config = { theme: { extend: { colors: { mimoBlue: '#4666F6' } } } }</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet" />
-  
-  <!-- Google AdSense -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6488030243565665" crossorigin="anonymous"></script>
-
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background: #f8fafc;
-      color: #334155;
-      line-height: 1.8;
-    }
-    h1, h2, h3, h4, .logo-font {
-      font-family: 'Outfit', sans-serif;
-    }
+    body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #334155; line-height: 1.8; }
+    h1, h2, h3, h4, .logo-font { font-family: 'Outfit', sans-serif; }
   </style>
 </head>
 <body>
-  
-  <!-- Navigation Header -->
   <header class="bg-white border-b border-slate-100 sticky top-0 z-50">
     <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
       <a href="/blog" class="flex items-center gap-2 text-[#4666F6] font-bold text-sm">
-        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" class="w-4 h-4">
-          <path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" class="w-4 h-4"><path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Back to Blog
       </a>
       <a href="/" class="logo-font text-2xl font-black text-slate-800 tracking-tight">MIMO</a>
-      <a href="/login" class="bg-[#4666F6] text-white font-bold text-sm px-5 py-2 rounded-full hover:bg-blue-600 transition-colors shadow-sm">
-        Print Now
-      </a>
+      <a href="/login" class="bg-[#4666F6] text-white font-bold text-sm px-5 py-2 rounded-full hover:bg-blue-600 transition-colors shadow-sm">Print Now</a>
     </div>
   </header>
 
-  <!-- Main Content Container -->
   <main class="max-w-3xl mx-auto px-4 py-10">
     <article>
-      <!-- Meta & Title -->
       <div class="mb-8">
-        <span class="text-xs font-bold text-[#4666F6] uppercase tracking-wider bg-blue-50 px-3 py-1 rounded-full">Security &amp; Data Privacy</span>
+        <span class="text-xs font-bold text-[#4666F6] uppercase tracking-wider bg-blue-50 px-3 py-1 rounded-full">Security &amp; Privacy</span>
         <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 mt-4 leading-tight">Document Security in the Cloud: How to Ensure Privacy When Printing</h1>
-        
         <div class="flex items-center gap-3 mt-6 text-sm text-slate-500">
           <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#4666F6] to-purple-600 flex items-center justify-center text-white font-bold">M</div>
           <div>
             <div class="font-bold text-slate-800">MIMO Printing Team</div>
-            <div>Published on July 7, 2026 • 5 min read</div>
+            <div>Published on July 7, 2026 • 7 min read</div>
           </div>
         </div>
       </div>
 
-      <!-- Intro -->
       <p class="text-lg text-slate-600 font-medium mb-6">
-        When you print sensitive files—like bank statements, academic records, identity cards, or legal contracts—privacy is your highest priority. In traditional print shops, your file is loaded onto a public computer where it might sit in the "Downloads" directory or browser history for months, vulnerable to anyone who sits down next.
+        When you print sensitive files — bank statements, academic records, identity documents, medical reports, or legal contracts — privacy is your highest priority. In traditional campus print shops, your file gets loaded onto a shared public computer where it might sit in the Downloads folder or browser history for weeks, accessible to anyone who sits down next.
       </p>
-
       <p class="mb-6">
-        With the rise of wireless and cloud printing, files travel across the internet before reaching the printer. This prompts an important security question: **Who has access to your documents in transit and at rest?** At MIMO, we believe document privacy is a fundamental student right. Here is an in-depth explanation of how cloud printing works under the hood and what steps we take to protect your files.
+        With the rise of wireless and cloud printing, files travel across the internet before reaching the physical printer. This raises important questions: Who has access to your documents in transit? Where are your files stored? Who can see them? How long are they kept? At MIMO, we believe document privacy is a fundamental student right — not an optional feature. Here is an in-depth, technical explanation of how cloud printing works under the hood and exactly what steps we take to protect your files at every stage.
       </p>
 
-      <!-- Section 1 -->
       <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">1. Encryption in Transit: Keeping Interceptors Away</h2>
       <p class="mb-6">
-        The moment you select a file and tap "Upload" on your phone at printmimo.tech, the document is sent to our servers. To make sure that nobody snooping on the campus Wi-Fi network can intercept your file, MIMO uses **HTTPS (Hypertext Transfer Protocol Secure)**.
+        The moment you select a file and tap "Upload" on printmimo.tech, your document begins its journey from your phone to our cloud servers. Campus Wi-Fi networks are shared environments — potentially hundreds of other users are connected to the same network access points. Without encryption, anyone on the same network could theoretically intercept the data packets flying through the air using readily available tools.
       </p>
       <p class="mb-6">
-        All transmission data is encrypted using SSL/TLS protocols. This locks the file in an encrypted tunnel between your mobile device and our cloud servers, preventing packet sniffing, middleman attacks, or interceptors from extracting the payload.
+        MIMO uses <strong>HTTPS (Hypertext Transfer Protocol Secure)</strong> with <strong>TLS 1.3</strong> (Transport Layer Security, the current gold standard) for all data transmission. TLS 1.3 creates an encrypted tunnel between your mobile browser and our servers using 256-bit AES-GCM symmetric encryption, negotiated through an elliptic-curve Diffie-Hellman key exchange. In plain language: your file is wrapped in an unbreakable mathematical lock before it ever leaves your phone.
       </p>
-
-      <!-- Section 2 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">2. Secure Cloud Storage and File Processing</h2>
       <p class="mb-6">
-        Once uploaded, files are temporarily hosted in a highly secure, restricted-access bucket on Firebase Storage. 
+        This encryption prevents:
       </p>
       <ul class="list-disc pl-6 mb-6 space-y-2">
-        <li><strong>No Public Access:</strong> Our backend security rules strictly forbid direct public URL access to user files. Only authenticated server routines can call download endpoints.</li>
-        <li><strong>Document Isolation:</strong> Documents are associated with unique, randomized session IDs, ensuring that one student's files cannot be accessed or indexed by other users in the system.</li>
+        <li><strong>Packet Sniffing:</strong> Attackers on the same Wi-Fi network cannot intercept or read your uploaded files.</li>
+        <li><strong>Man-in-the-Middle Attacks:</strong> No third party can silently intercept and modify your data between your phone and our server.</li>
+        <li><strong>Session Hijacking:</strong> Even if someone captures your network session, they cannot reuse your authentication tokens due to TLS session binding.</li>
       </ul>
 
-      <!-- Section 3 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">3. Kiosk Spooling and CUPS Management</h2>
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">2. Secure Cloud Storage: What Happens After Upload</h2>
       <p class="mb-6">
-        When you enter your 4-digit code at the physical kiosk, the local Raspberry Pi controller queries our backend database, verifies payment authorization, and streams the document directly into memory or a temporary directory using safe HTTPS streaming connections.
+        Once uploaded, your file is stored temporarily in a highly secured, access-controlled storage bucket on Firebase Cloud Storage (operated by Google Cloud infrastructure). Here is exactly how access is restricted:
       </p>
-      <p class="mb-6">
-        The document is then passed to the local CUPS (Common UNIX Printing System) queue to feed the printer spooler. Standard printer drivers execute the print job and convert the document into raw rasterized dots on the paper.
-      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>No Public URL Access:</strong> Firebase Storage Security Rules are configured to strictly block all direct public URL access to user files. Unlike a basic file hosting service, nobody can guess your file's storage path and download it.</li>
+        <li><strong>Authenticated Access Only:</strong> Only authenticated server-side routines — running as verified service accounts — can issue download tokens for your file. These tokens are single-use and expire within minutes.</li>
+        <li><strong>Document Isolation:</strong> Your file is stored at a unique, cryptographically random path that includes your user ID, a UUID (Universally Unique Identifier), and a timestamp hash. Even a MIMO engineer cannot easily guess the storage path for a specific user's file.</li>
+        <li><strong>Server-Side Encryption at Rest:</strong> Firebase Cloud Storage automatically encrypts all stored files using AES-256 encryption at rest. The encryption keys are managed by Google Cloud KMS (Key Management Service) and rotated regularly.</li>
+        <li><strong>No Content Analysis:</strong> MIMO's backend systems never open, read, index, parse, or analyze the content of your documents. Your files are treated as opaque binary blobs — the system knows the file size, type, and name, but never the content.</li>
+      </ul>
 
-      <!-- Section 4 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">4. The Shred Protocol: Instant File Deletion</h2>
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">3. The Kiosk Download: Secure Streaming to the Printer</h2>
       <p class="mb-6">
-        This is the most critical element of document security. Once the CUPS printer daemon confirms that the pages have physically ejected from the machine:
+        When you enter your 4-digit code at the physical MIMO kiosk, the following secure sequence occurs:
       </p>
       <ol class="list-decimal pl-6 mb-6 space-y-3">
-        <li>The local Pi listener deletes the temporary downloaded spool files from its local flash disk.</li>
-        <li>It triggers a callback API on our backend that permanently deletes the corresponding file object from Firebase Cloud Storage.</li>
-        <li>The Firestore document entry's state is modified, rendering the 4-digit code inactive to prevent anyone else from reprint-hijacking your document.</li>
+        <li>The kiosk's local controller (a Raspberry Pi running a hardened Linux system) sends your 4-digit code to our backend API over an HTTPS connection with mutual TLS authentication — meaning both the server and the kiosk verify each other's identity with digital certificates.</li>
+        <li>Our backend verifies your payment status in real-time from Firestore. If payment is confirmed, it generates a short-lived, single-use signed download URL for your file. This URL expires in 60 seconds and can only be used once.</li>
+        <li>The Raspberry Pi downloads your file directly into RAM or a secured temporary directory on its local flash storage, using the signed URL.</li>
+        <li>Your file is immediately passed to the local CUPS (Common UNIX Printing System) print queue, which feeds the printer driver.</li>
+        <li>The printer driver converts your document into rasterized page data (dots per inch) and sends it to the physical printer via USB.</li>
+        <li>Your file in RAM is cleared as soon as the CUPS job starts processing. The temporary file on disk is marked for immediate deletion once the print job completes or fails.</li>
       </ol>
       <p class="mb-6">
-        If you purchase a print code but decide not to print your file, the system runs an automated cleanup script that **purges the document and triggers a full refund automatically after 24 hours**. We never save your files long-term.
+        At no point does your document reside in any accessible web-facing directory on the kiosk. The Raspberry Pi's network interface only opens outbound connections to our backend — it does not accept any inbound connections from the public internet.
       </p>
 
-      <!-- Section 5 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">5. Best Security Habits for Students</h2>
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">4. The Shred Protocol: Permanent File Deletion</h2>
       <p class="mb-6">
-        While MIMO enforces maximum hardware and software security protocols, you can take simple steps to ensure absolute privacy:
+        This is the most important part of our privacy architecture. The moment the CUPS printer daemon confirms that your pages have physically ejected from the printer:
+      </p>
+      <ol class="list-decimal pl-6 mb-6 space-y-3">
+        <li>The local Pi listener permanently deletes all temporary spool files from its local flash storage using a secure overwrite procedure.</li>
+        <li>It sends a callback to our backend API confirming print completion.</li>
+        <li>Our backend immediately invokes a Firebase Cloud Storage deletion API call that permanently removes the original uploaded file from cloud storage. This deletion is irreversible — Google Cloud Storage does not maintain a recycle bin for deleted objects.</li>
+        <li>The Firestore print job document is updated to "completed" status and the 4-digit print code is invalidated. Even if someone finds your code, it cannot be used to reprint or re-download your document.</li>
+      </ol>
+      <p class="mb-6">
+        <strong>What happens if you don't print?</strong> If you purchase a print code but never enter it at a kiosk, our automated cleanup system runs every hour and purges all files associated with expired print codes (after 24 hours). Your document is permanently deleted and a full automatic refund is triggered to your original payment method. There is no need to request deletion — it happens automatically.
+      </p>
+
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">5. Authentication and Account Security</h2>
+      <p class="mb-6">
+        Your MIMO account is secured by Firebase Authentication, which handles login sessions, password hashing, and token management using industry-standard security practices:
       </p>
       <ul class="list-disc pl-6 mb-6 space-y-2">
-        <li><strong>Avoid Public Shared Terminals:</strong> Always use your personal mobile phone to navigate to printmimo.tech.</li>
-        <li><strong>Clear Browser Downloads:</strong> If you downloaded a document on a shared laptop, make sure to delete it from the system downloads and empty the trash before leaving.</li>
-        <li><strong>Verify Kiosk Location:</strong> Double-check the ID of the kiosk (e.g. CV-001 or SV-002) to ensure you collect your sheets immediately, preventing papers from sitting unattended in the output tray.</li>
+        <li><strong>Bcrypt Password Hashing:</strong> Your password is never stored in plain text. It is hashed with bcrypt and a unique salt before storage, making it computationally infeasible to reverse even if a database were ever compromised.</li>
+        <li><strong>JWT Session Tokens:</strong> Every API request from your browser or mobile session is authenticated with a short-lived JSON Web Token (JWT). Tokens expire every hour and are automatically refreshed — a stolen token becomes useless quickly.</li>
+        <li><strong>No Cross-User Access:</strong> Backend Firestore Security Rules are configured so that each user can only read and write their own print job documents. There is no API endpoint that returns another user's files or print history.</li>
+        <li><strong>HTTPS-Only Cookies:</strong> All session cookies are marked with the Secure and HttpOnly flags, preventing JavaScript injection attacks (XSS) from stealing authentication tokens.</li>
       </ul>
 
-      <!-- Conclusion -->
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">6. What We Never Do With Your Data</h2>
+      <p class="mb-6">
+        To be completely transparent, here is a list of things MIMO will never do with your data:
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li>We never read, scan, index, or analyze the contents of your uploaded documents.</li>
+        <li>We never sell, share, or transfer your personal information or document history to third-party advertisers or data brokers.</li>
+        <li>We never retain your files beyond the immediate print transaction window.</li>
+        <li>We never store your UPI credentials, card numbers, or net banking passwords — all payment data is handled entirely by Cashfree's PCI-DSS Level 1 certified payment gateway.</li>
+        <li>We never use your documents to train AI models or improve any automated content analysis systems.</li>
+      </ul>
+
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">7. Best Security Habits for Students</h2>
+      <p class="mb-6">
+        While MIMO enforces maximum hardware and software security at every layer, here are simple habits you can adopt to ensure complete privacy on your end:
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>Always Use Your Personal Device:</strong> Never upload sensitive documents from a shared computer lab terminal. Always use your own smartphone or laptop to access printmimo.tech.</li>
+        <li><strong>Log Out After Use on Shared Devices:</strong> If you ever access MIMO from a friend's device, log out explicitly. Don't rely on session expiry alone.</li>
+        <li><strong>Collect Your Printout Promptly:</strong> Once your print code is entered and the job starts, stay near the kiosk to collect your pages immediately. Documents left in the output tray can be picked up by other students.</li>
+        <li><strong>Verify the Kiosk ID:</strong> Always note the kiosk ID (displayed on the screen, e.g., SV-002) to know exactly where to collect your printout in case there are multiple kiosks nearby.</li>
+        <li><strong>Use Strong Account Passwords:</strong> Set a unique password for your MIMO account that is different from your university login. Enable password manager autofill to avoid reuse.</li>
+        <li><strong>Check Your Print History:</strong> If you ever see an unexpected entry in your print history or notice a print job you did not initiate, contact MIMO support immediately at support@printmimo.tech.</li>
+      </ul>
+
       <div class="bg-blue-50 border-l-4 border-[#4666F6] p-6 rounded-r-2xl my-8">
         <h4 class="font-bold text-slate-800 mb-2">Our Privacy Promise</h4>
         <p class="text-sm text-slate-600 mb-0">
-          MIMO does not read, index, parse, or archive document contents. We do not sell user files or demographics to advertising networks. Your files belong entirely to you, and we destroy them the second their printing job is done.
+          MIMO does not read, index, parse, or archive document contents at any point during or after the print process. We do not sell user data or document metadata to advertising networks or any third parties. Your files belong entirely to you, and we destroy them permanently the moment your printing job is complete — with no backups, no archives, and no exceptions.
         </p>
       </div>
     </article>
 
-    <!-- Author block divider -->
     <div class="border-t border-slate-200 my-10"></div>
-
-    <!-- Related Articles -->
     <div class="bg-slate-50 rounded-2xl p-6">
       <h3 class="font-bold text-slate-800 mb-4 text-lg">Related Articles</h3>
       <div class="grid md:grid-cols-2 gap-4">
@@ -166,7 +167,6 @@
     </div>
   </main>
 
-  <!-- Footer -->
   <footer class="bg-slate-900 py-12 text-center text-sm text-slate-400 mt-20 border-t border-slate-800">
     <div class="max-w-4xl mx-auto px-4">
       <div class="mb-4 font-bold text-white text-lg">MIMO</div>
@@ -181,6 +181,5 @@
       <p class="text-xs text-slate-600">© 2026 VisionPrintt Technologies. All rights reserved.</p>
     </div>
   </footer>
-
 </body>
 </html>
