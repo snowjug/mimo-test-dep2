@@ -3,152 +3,174 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Top 5 Campus Printing Mistakes and How to Avoid Them</title>
-  <meta name="description" content="Save time, money, and frustration on campus. Discover the most common printing mistakes students make and learn how to avoid them." />
-  
-  <!-- Tailwind CSS CDN -->
+  <title>Top Campus Printing Mistakes and How to Avoid Them</title>
+  <meta name="description" content="Avoid the most common campus printing mistakes. Learn how to fix formatting errors, wrong kiosk selection, oversized files, color print delays, and printer jam scenarios." />
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            mimoBlue: '#4666F6',
-            mimoLightBlue: '#EEF2FF',
-          }
-        }
-      }
-    }
-  </script>
-
-  <!-- Google Fonts -->
+  <script>tailwind.config = { theme: { extend: { colors: { mimoBlue: '#4666F6' } } } }</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet" />
-  
-  <!-- Google AdSense -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6488030243565665" crossorigin="anonymous"></script>
-
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background: #f8fafc;
-      color: #334155;
-      line-height: 1.8;
-    }
-    h1, h2, h3, h4, .logo-font {
-      font-family: 'Outfit', sans-serif;
-    }
+    body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #334155; line-height: 1.8; }
+    h1, h2, h3, h4, .logo-font { font-family: 'Outfit', sans-serif; }
   </style>
 </head>
 <body>
-  
-  <!-- Navigation Header -->
   <header class="bg-white border-b border-slate-100 sticky top-0 z-50">
     <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
       <a href="/blog" class="flex items-center gap-2 text-[#4666F6] font-bold text-sm">
-        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" class="w-4 h-4">
-          <path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" class="w-4 h-4"><path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Back to Blog
       </a>
       <a href="/" class="logo-font text-2xl font-black text-slate-800 tracking-tight">MIMO</a>
-      <a href="/login" class="bg-[#4666F6] text-white font-bold text-sm px-5 py-2 rounded-full hover:bg-blue-600 transition-colors shadow-sm">
-        Print Now
-      </a>
+      <a href="/login" class="bg-[#4666F6] text-white font-bold text-sm px-5 py-2 rounded-full hover:bg-blue-600 transition-colors shadow-sm">Print Now</a>
     </div>
   </header>
 
-  <!-- Main Content Container -->
   <main class="max-w-3xl mx-auto px-4 py-10">
     <article>
-      <!-- Meta & Title -->
       <div class="mb-8">
         <span class="text-xs font-bold text-[#4666F6] uppercase tracking-wider bg-blue-50 px-3 py-1 rounded-full">Troubleshooting</span>
         <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 mt-4 leading-tight">Top 5 Campus Printing Mistakes and How to Avoid Them</h1>
-        
         <div class="flex items-center gap-3 mt-6 text-sm text-slate-500">
           <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#4666F6] to-purple-600 flex items-center justify-center text-white font-bold">M</div>
           <div>
             <div class="font-bold text-slate-800">MIMO Printing Team</div>
-            <div>Published on July 7, 2026 • 5 min read</div>
+            <div>Published on July 7, 2026 • 7 min read</div>
           </div>
         </div>
       </div>
 
-      <!-- Intro -->
       <p class="text-lg text-slate-600 font-medium mb-6">
-        Campus printing is supposed to be quick and easy. However, in the rush to submit an assignment before a deadline, simple oversight can lead to printing failures, formatting issues, or wasted paper.
+        Campus printing is supposed to be quick and stress-free. But in the rush to submit an assignment before a deadline, simple oversights can lead to printing failures, formatting disasters, and wasted paper or money. Understanding the most common mistakes — and knowing exactly how to avoid or recover from each one — makes your MIMO printing experience seamless every time.
+      </p>
+      <p class="mb-6">
+        At MIMO, we have designed our self-service kiosks and mobile dashboard to guide you through every step of the process. But awareness is the best prevention. In this detailed guide, we will cover the most frequent student printing mistakes, explain exactly why each one happens, and provide practical, step-by-step solutions to prevent them before they affect your day.
       </p>
 
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 1: Uploading the Wrong File Format (and Not Checking Layout)</h2>
       <p class="mb-6">
-        At MIMO, we've designed our self-service kiosks and mobile dashboard to guide you through every step. But to ensure you have a perfect experience, it helps to be aware of the most common user pitfalls. In this guide, we'll cover the top five printing mistakes students make and provide practical solutions to keep your printouts seamless.
+        The most common and costly printing mistake is uploading a Microsoft Word (.docx) or Google Slides file without first converting it to PDF. While MIMO's cloud processor accepts Word and PowerPoint files and converts them automatically, there is an inherent risk in this conversion: font substitution.
+      </p>
+      <p class="mb-6">
+        If your document uses a custom font that the conversion server does not have installed (such as premium design fonts or downloaded third-party typefaces), the server substitutes the nearest available system font — typically Arial or Times New Roman. This substitution changes character spacing, which can cascade across the entire document, causing:
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li>Lines of text rewrapping incorrectly, pushing sections onto the wrong pages.</li>
+        <li>Headers appearing on blank pages while the content sits elsewhere.</li>
+        <li>Tables overflowing their column boundaries.</li>
+        <li>Math equations rendered as placeholder squares.</li>
+        <li>A 10-page document suddenly becoming 12 pages.</li>
+      </ul>
+      <p class="mb-6">
+        <strong>The Fix:</strong> Always export your document as a <strong>PDF</strong> before uploading. Open the PDF on your phone to visually verify the layout on a few pages before paying. Ensure your page size is A4 and margins are at least 1.27 cm on all sides. Once you've confirmed the PDF looks correct, your printout will match exactly.
+      </p>
+      <p class="mb-6">
+        <strong>How to Export to PDF:</strong>
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>Microsoft Word:</strong> File → Save As → PDF. Or File → Export → Create PDF/XPS.</li>
+        <li><strong>Google Docs:</strong> File → Download → PDF Document (.pdf).</li>
+        <li><strong>PowerPoint:</strong> File → Export → Create PDF/XPS. Make sure to set slide size to A4 first under Design → Slide Size.</li>
+        <li><strong>Google Slides:</strong> File → Download → PDF Document (.pdf).</li>
+      </ul>
+
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 2: Going to the Wrong Kiosk for Colour Prints</h2>
+      <p class="mb-6">
+        MIMO kiosks on campus are not all identical — each physical terminal has a specific hardware configuration. Understanding which kiosk has which printer is essential for getting the right output, especially for colour jobs.
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>Kiosk CV-001:</strong> This is a high-speed monochrome laser printer terminal, configured exclusively for black &amp; white laser prints. It is the fastest kiosk on campus, capable of spooling a standard 10-page document in under 8 seconds. However, it cannot process colour print jobs.</li>
+        <li><strong>Kiosk SV-002:</strong> This kiosk is equipped with dual printers — a monochrome laser printer for B&amp;W jobs and an Epson inkjet printer for full-colour output. All colour print jobs must be collected from this kiosk specifically.</li>
+      </ul>
+      <p class="mb-6">
+        If you purchase a colour print job but go to CV-001 to collect it, your print code will not work there. The code is linked to a specific kiosk configuration. Conversely, if you accidentally select the wrong kiosk ID during checkout, contact support immediately — do not enter the code at the wrong kiosk.
+      </p>
+      <p class="mb-6">
+        <strong>The Fix:</strong> Before confirming your print job and paying, look at the kiosk selection screen in the MIMO dashboard and make sure you choose the kiosk you plan to physically walk to. For colour prints, always select SV-002. Verify the kiosk ID label on the physical terminal before entering your 4-digit code.
       </p>
 
-      <!-- Section 1 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 1: Not Reviewing File Formats and Margins</h2>
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 3: Uploading Oversized Files Over Mobile Data</h2>
       <p class="mb-6">
-        While our cloud processors accept Word (.doc, .docx) and image formats, these files are subject to minor spacing shifts depending on the system font libraries. If your file contains custom fonts, icons, tables, or math formulas, they might not align correctly.
+        Students frequently try to upload scanned booklets, high-resolution photo collections, or presentation files with embedded 4K images that result in PDF sizes of 40MB, 60MB, or even larger. While MIMO's servers can technically receive these files, uploading them over a 4G mobile data connection on campus creates several problems:
       </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>Slow upload times:</strong> A 50MB file over a typical campus 4G connection (3–5 Mbps) can take 80–130 seconds to upload — during which you're standing waiting, or the connection may drop and force a restart.</li>
+        <li><strong>Slow kiosk download:</strong> The Raspberry Pi kiosk controller then needs to download this large file before it can spool it to the printer. A 50MB file can take 45–60 seconds to download over Wi-Fi, creating a delay between code entry and paper output that can confuse or frustrate students who expect near-instant printing.</li>
+        <li><strong>Potential timeout errors:</strong> Very large files may exceed the kiosk's local processing timeout, causing the job to fail even after a successful upload and payment.</li>
+      </ul>
       <p class="mb-6">
-        <strong>The Fix:</strong> Always export your document as a **PDF** before uploading. Open the PDF on your phone to verify the layout, and ensure your page margins are set to at least **0.5 inches** (1.27 cm) so the physical printer rollers don't crop your margins.
+        <strong>The Fix:</strong> Before uploading, compress your PDF to under <strong>15MB</strong> using free tools:
       </p>
-
-      <!-- Section 2 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 2: Mixing Up Kiosk Configurations (B&amp;W vs. Color)</h2>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>ilovepdf.com/compress_pdf:</strong> Free, fast, browser-based. No registration required. Reduces file size by 60-80% with minimal visible quality loss for standard documents.</li>
+        <li><strong>Smallpdf.com:</strong> Similar free compression tool with a clean mobile interface.</li>
+        <li><strong>Adobe Acrobat Reader (mobile):</strong> Has a built-in Reduce File Size option in the free version for PDFs under a certain size.</li>
+        <li><strong>Google Drive:</strong> Uploading to Google Drive and then downloading as a Google-compressed PDF can sometimes reduce file size automatically.</li>
+      </ul>
       <p class="mb-6">
-        On campus, different kiosks house different hardware configurations. For example, Kiosk **CV-001** is a high-speed monochrome laser printer built for quick black and white sheets. Kiosk **SV-002** is configured with dual printers to support both monochrome laser and vibrant Epson inkjet color printing.
-      </p>
-      <p class="mb-6">
-        If you purchase a color print, the system expects you to collect it from a kiosk equipped with a color printer (SV-002).
-      </p>
-      <p class="mb-6">
-        <strong>The Fix:</strong> Verify the kiosk name on the physical station. Select your settings in the mobile dashboard accordingly, and make sure you walk to the correct kiosk to enter your 4-digit code.
-      </p>
-
-      <!-- Section 3 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 3: Uploading Files that Exceed Size Limits</h2>
-      <p class="mb-6">
-        Students occasionally try to upload slides or scan booklets that are extremely heavy (sometimes over 40MB). While our servers can hold these files, they trigger slow upload times over cellular data, and can take up to 2 minutes to download onto the physical kiosk controller.
-      </p>
-      <p class="mb-6">
-        <strong>The Fix:</strong> If your PDF is too large, use a free online PDF compressor (like Adobe PDF Compressor or Smallpdf) to reduce the file size to under **15MB**. This speeds up transmission times, allowing your print code to generate instantly.
+        Also, whenever possible, upload on campus Wi-Fi rather than mobile data. Campus Wi-Fi typically offers 20–50 Mbps speeds that reduce a 15MB upload to under 3 seconds, making the experience instant.
       </p>
 
-      <!-- Section 4 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 4: Not Staying at the Kiosk During Color Prints</h2>
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 4: Walking Away During Colour Inkjet Printing</h2>
       <p class="mb-6">
-        Black &amp; white laser prints spool and eject near-instantly (under 8 seconds). Color inkjet printers, however, operate differently. Inkjets (like the Epson L3250) execute automated print-head maintenance cycles upon wake-up, taking about 30 seconds to initialize before ejecting color pages.
+        Black &amp; white laser prints are genuinely near-instant — a standard 10-page document is typically fully ejected in under 8 seconds from the moment you enter your code. However, colour inkjet printing operates on a fundamentally different technology and timeline.
       </p>
       <p class="mb-6">
-        Students sometimes see the kiosk progress bar hit 100%, assume the print failed because no paper came out immediately, and walk away—leaving their printed sheets in the public output tray.
+        Inkjet printers (like the Epson L3250 at SV-002) use liquid ink deposited through microscopic print heads that must be precisely aligned and primed before each print session. After a period of inactivity, inkjet printers run an automatic maintenance cycle that includes:
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li>Print head cleaning — flushing ink through the nozzles to clear any dried residue.</li>
+        <li>Nozzle alignment calibration — ensuring all colour channels are precisely aligned.</li>
+        <li>Ink level verification — checking that all four cartridges have sufficient ink.</li>
+      </ul>
+      <p class="mb-6">
+        This initialization cycle takes approximately 25–40 seconds. During this time, the kiosk progress bar may appear to reach 100% while no paper has yet emerged from the output tray. Many students interpret this as a print failure and walk away — leaving their colour prints uncollected in the output tray, where other students may pick them up.
       </p>
       <p class="mb-6">
-        <strong>The Fix:</strong> When printing color documents, check the kiosk screen overlay. The interface displays a countdown telling you to stay at the printer. Wait for the countdown to expire and collect your color sheets.
-      </p>
-
-      <!-- Section 5 -->
-      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 5: Panicking If the Printer Jams or Runs Out of Paper</h2>
-      <p class="mb-6">
-        If the kiosk jams, disconnects, or runs out of paper mid-job, some students worry that they have lost their money and need to file manual complaints.
-      </p>
-      <p class="mb-6">
-        <strong>The Fix:</strong> Relax! MIMO has a built-in safety net. Our Raspberry Pi listeners monitor CUPS queue states in real-time. If the printer encounters a hardware error, the listener flags the job as a failure, and our server triggers an **automatic, instant refund** directly back to your UPI account or debit card. You'll see a green "Refund in Progress" alert, ensuring you never pay for a failed transaction.
+        <strong>The Fix:</strong> When printing colour documents, wait at the kiosk until physical paper appears in the output tray. The MIMO kiosk screen displays a status message like "Inkjet initializing — please wait 30 seconds" or shows a countdown timer during the maintenance cycle. Never walk away until you physically see your pages ejecting or the screen confirms completion. If more than 90 seconds pass without any output and the screen shows no activity, press the Help button on the kiosk screen.
       </p>
 
-      <!-- Conclusion -->
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Mistake 5: Panicking When the Printer Jams or Fails Mid-Job</h2>
+      <p class="mb-6">
+        Hardware failures happen — paper jams, toner running out, connectivity issues, or the printer going offline unexpectedly mid-job. When this occurs, students sometimes assume they have permanently lost their money and spent the next hour trying to find a staff member to help them.
+      </p>
+      <p class="mb-6">
+        The reality is much simpler and more reassuring than most students expect. MIMO's Raspberry Pi kiosk controller monitors the CUPS (Common UNIX Printing System) print queue status in real time, every few seconds. When a hardware error is detected:
+      </p>
+      <ol class="list-decimal pl-6 mb-6 space-y-3">
+        <li>The Pi listener immediately detects the CUPS job status changing to "error" or "aborted".</li>
+        <li>It updates the print job status in our Firestore database to "failed".</li>
+        <li>Our backend Cloud Function triggers automatically and calls the Cashfree Refund API within seconds.</li>
+        <li>Your original payment method (UPI, debit card, or net banking) receives the full refund within 5–7 business days, depending on your bank's processing time.</li>
+        <li>You receive a "Refund in Progress" notification visible in your MIMO dashboard under your print history.</li>
+      </ol>
+      <p class="mb-6">
+        <strong>The Fix:</strong> Do not panic. Do not attempt to re-enter your print code at another kiosk — this could cause a second charge. Simply open your MIMO dashboard on your phone and check the status of the print job. If it shows "failed" or "refund in progress", the refund is already being processed. If the dashboard shows "processing" for more than 5 minutes with no output from the kiosk, contact MIMO support.
+      </p>
+
+      <h2 class="text-2xl font-bold text-slate-900 mt-10 mb-4">Bonus: Other Common Issues Students Encounter</h2>
+      <p class="mb-6">
+        Beyond the top five, here are several other mistakes worth being aware of:
+      </p>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>Expired print codes:</strong> Your 4-digit code is valid for 24 hours from time of purchase. If it expires, your file is automatically deleted from our servers and a full refund is issued. You will need to re-upload and pay again for a fresh code if you still need the printout.</li>
+        <li><strong>Wrong page count:</strong> Always check the page count shown in the MIMO dashboard after uploading. If the count seems unexpectedly high, open your PDF and look for accidental blank pages, particularly at the end of the document.</li>
+        <li><strong>Selecting duplex for single-page documents:</strong> Enabling double-sided printing on a 1-page document has no effect (there is only one side to print), but it's good practice to turn duplex off for cover pages or single-sheet documents to avoid confusion.</li>
+        <li><strong>Uploading password-protected PDFs:</strong> MIMO cannot process PDFs that have owner-level printing restrictions or password protection. Remove the password using tools like ilovepdf.com before uploading.</li>
+        <li><strong>Missing your file after upload:</strong> If you accidentally close the browser mid-upload, your file may not have completed uploading. Always wait for the upload progress indicator to show 100% and display a file confirmation before navigating away from the upload page.</li>
+      </ul>
+
       <div class="bg-blue-50 border-l-4 border-[#4666F6] p-6 rounded-r-2xl my-8">
         <h4 class="font-bold text-slate-800 mb-2">Need Immediate Help?</h4>
         <p class="text-sm text-slate-600 mb-0">
-          Our support channels are open during campus hours. If a code is invalid, or if you paid but didn't receive your code, simply message our campus support team via WhatsApp at **+91 93640 28349**. We resolve transaction queries within minutes.
+          Our support channels are open during campus hours. If your code is invalid, if you paid but did not receive your print code, or if you have any questions about a transaction, reach out to our campus support team via the Contact page at printmimo.tech/contact. We resolve all transaction queries within minutes during operating hours. For urgent issues, WhatsApp support is available during peak campus hours at the number displayed on each kiosk.
         </p>
       </div>
     </article>
 
-    <!-- Author block divider -->
     <div class="border-t border-slate-200 my-10"></div>
-
-    <!-- Related Articles -->
     <div class="bg-slate-50 rounded-2xl p-6">
       <h3 class="font-bold text-slate-800 mb-4 text-lg">Related Articles</h3>
       <div class="grid md:grid-cols-2 gap-4">
@@ -164,7 +186,6 @@
     </div>
   </main>
 
-  <!-- Footer -->
   <footer class="bg-slate-900 py-12 text-center text-sm text-slate-400 mt-20 border-t border-slate-800">
     <div class="max-w-4xl mx-auto px-4">
       <div class="mb-4 font-bold text-white text-lg">MIMO</div>
@@ -179,6 +200,5 @@
       <p class="text-xs text-slate-600">© 2026 VisionPrintt Technologies. All rights reserved.</p>
     </div>
   </footer>
-
 </body>
 </html>
