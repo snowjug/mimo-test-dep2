@@ -858,8 +858,10 @@ def process_job(doc_snapshot):
     is_blank_sheet = print_options.get("isBlankSheet", False)
     page_selection = print_options.get("pageSelection") or print_options.get("pagesToPrint") or "all"
     page_range = None
-    if page_selection == "custom":
+    if str(page_selection).lower() == "custom":
         page_range = print_options.get("pageRange") or print_options.get("customPageRange")
+    elif str(page_selection).lower() == "all":
+        page_range = None
 
     files = doc.get("files")
     if not files:
@@ -1346,7 +1348,7 @@ def watchdog_loop():
                     updated_at = data.get("updatedAt")
                     if updated_at:
                         now = datetime.now(updated_at.tzinfo)
-                        if (now - updated_at) > timedelta(minutes=15):
+                        if (now - updated_at) > timedelta(hours=24):
                             continue
                     print(f"\n⚠️ Fallback detected stuck job: {doc.id}")
                     active_jobs.add(doc.id)
