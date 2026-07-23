@@ -44,6 +44,8 @@ PRINTER_USB_IDS = {
 
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
+if not os.path.exists(PRE_FETCH_DIR):
+    os.makedirs(PRE_FETCH_DIR)
 
 # ── Ghostscript compression presets ──
 # /ebook  → downsample images to 150 DPI; great for B&W laser (small spool, fast USB transfer)
@@ -890,7 +892,12 @@ def process_job(doc_snapshot):
             """Download one file entry and return (f_dict, local_path, error)."""
             f_url  = f.get("url")
             f_name = f.get("name", "document.pdf")
-            path = download_file(f_url, f_name)
+            cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}.pdf")
+            if os.path.exists(cache_path):
+                print(f"⚡ [INSTANT PRINT] Job {doc_id} found in pre-fetch edge cache! Using cached file (0s download delay).")
+                path = cache_path
+            else:
+                path = download_file(f_url, f_name)
             if not path:
                 return f, None, f"Failed to download {f_name}"
             # Pre-flight compression (currently a no-op, but keep the hook)
@@ -1372,6 +1379,35 @@ def ping_printer_raw(printer_name, payload):
     except Exception as e:
         print(f"⚠️ Failed to ping printer {printer_name}: {e}")
 
+def prefetch_job(doc_snapshot):
+    try:
+        doc = doc_snapshot.to_dict()
+        doc_id = doc_snapshot.id
+        file_url = doc.get("fileUrl")
+        file_name = doc.get("fileName", "document.pdf")
+        
+        if not file_url:
+            return
+            
+        cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}.pdf")
+        if os.path.exists(cache_path):
+            return
+            
+        print(f"🚀 [PRE-FETCH] Pre-downloading job {doc_id} ({file_name}) in background...")
+        downloaded = download_file(file_url, file_name)
+        if downloaded and os.path.exists(downloaded):
+            os.rename(downloaded, cache_path)
+            print(f"⚡ [PRE-FETCH CACHED] Job {doc_id} pre-downloaded & cached → {cache_path}")
+    except Exception as e:
+        print(f"⚠️ [PRE-FETCH] Failed to pre-fetch job: {e}")
+
+def on_prefetch_snapshot(doc_snapshot, changes, read_time):
+    for change in changes:
+        if change.type.name in ['ADDED', 'MODIFIED']:
+            doc = change.document.to_dict()
+            if doc.get("status") in ["paid", "pending"]:
+                threading.Thread(target=prefetch_job, args=(change.document,), daemon=True).start()
+
 def keep_warm_loop():
     # Wait 60 seconds after startup before first ping to allow systems to settle
     time.sleep(60)
@@ -1380,11 +1416,6 @@ def keep_warm_loop():
             requests.get("https://api-upqxuj7evq-uc.a.run.app/", timeout=10)
         except:
             pass
-
-        # We no longer send raw print jobs to printers to prevent deep sleep,
-        # as this can trigger unwanted blank/PJL page printouts on driverless 
-        # printers (like Brother HL-L2440DW). Printer reachability is kept
-        # active via lpstat checks in the watchdog and heartbeat loops.
         time.sleep(600)
 
 # Start background threads
@@ -1394,10 +1425,14 @@ threading.Thread(target=keep_warm_loop, daemon=True).start()
 
 print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
 print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")
+print(f"📡 Edge Pre-Fetch Cache Active: {PRE_FETCH_DIR}")
 print(f"📡 Waiting for jobs (status: 'printing', kioskId: '{KIOSK_ID}')...")
 
 query = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
 query_watch = query.on_snapshot(on_snapshot)
+
+query_prefetch = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'paid')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
+query_prefetch_watch = query_prefetch.on_snapshot(on_prefetch_snapshot)
 
 try:
     while True:
