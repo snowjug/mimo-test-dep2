@@ -19,22 +19,30 @@ This repository contains the MIMO printing platform split into three parts:
 
 The system supports user login, payment verification, print job creation, and kiosk-based printing workflows.
 
-## Hardware Topology & Kiosk Configurations
+## Hardware Topology & Production Servers
 
 The platform coordinates printing operations across two physical Kiosk stations:
 
-### 1. Kiosk CV-001 (MIMO 1.0)
-- **Configuration Host:** `printpi@printpi`
-- **Supported Printers:**
-  - `Brother_HL_L5210DN_series_USB` (Monochrome, supports Duplex/double-sided printing)
-- **Key Details:** Served as a high-speed black and white print kiosk.
+### 1. Kiosk SV-002 (MIMO 2.0)
+- **Host & User:** `pi@100.107.95.16`
+- **Hostname:** `pi`
+- **Tailscale IP:** `100.107.95.16`
+- **Local IP:** `192.168.8.197`
+- **`mimo-listener` Service Status:** `running`
+- **Configured Identity:** `SV-002`
+- **Target Printers:**
+  - **Monochrome (B&W):** `Brother_HL_L2440DW_series` (supports Duplex/double-sided printing)
+  - **Color:** `Epson_L3250` (all color print jobs automatically route to this printer)
 
-### 2. Kiosk SV-002 (MIMO 2.0)
-- **Configuration Host:** `pi@pi`
-- **Supported Printers:**
-  - `Brother_HL_L2440DW_series` (Monochrome, supports Duplex/double-sided printing)
-  - `Epson_L3250` (Color printing)
-- **Key Details:** All color print jobs in the system are automatically routed by the backend to this kiosk (`SV-002`) to print on the Epson color printer.
+### 2. Kiosk CV-001 (MIMO 1.0)
+- **Host & User:** `printpi@100.70.107.44`
+- **Hostname:** `printpi`
+- **Tailscale IP:** `100.70.107.44`
+- **Local IP:** `10.108.2.19`
+- **`mimo-listener` Service Status:** `running`
+- **Configured Identity:** `CV-001`
+- **Target Printers:**
+  - **Monochrome (B&W):** `Brother_HL_L5210DN_series` (supports Duplex/double-sided high-speed printing)
 
 
 ## Live Deployments
