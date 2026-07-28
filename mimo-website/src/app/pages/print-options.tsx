@@ -572,7 +572,7 @@ export function PrintOptions() {
                             setCopies(99);
                           }
                         }}
-                        className="w-12 text-center text-sm font-black text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-12 text-center text-[16px] sm:text-sm font-black text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <Button
                         variant="ghost"
@@ -874,7 +874,7 @@ export function PrintOptions() {
                                 placeholder="e.g. 1-5, 8, 11-13"
                                 value={config.pageRange}
                                 onChange={(e) => handleTextRangeChange(activeFile.name, e.target.value)}
-                                className="bg-slate-50 border-2 border-slate-200/80 shadow-inner h-9 w-full text-slate-800 placeholder:text-slate-400 focus-visible:ring-[#093765] focus-visible:border-[#093765] focus-visible:bg-white font-semibold text-xs rounded-lg"
+                                className="bg-slate-50 border-2 border-slate-200/80 shadow-inner h-9 w-full text-slate-800 placeholder:text-slate-400 focus-visible:ring-[#093765] focus-visible:border-[#093765] focus-visible:bg-white font-semibold text-[16px] sm:text-xs rounded-lg"
                               />
                             </div>
                           </div>
