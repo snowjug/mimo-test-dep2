@@ -427,7 +427,7 @@ export function Payment() {
                         setPromoCode(e.target.value);
                         setPromoError(false);
                       }}
-                      className={`h-8 pl-2 pr-14 bg-slate-100/50 border border-dashed transition-all rounded font-mono text-[11px] uppercase font-bold shadow-none ${
+                      className={`h-9 sm:h-8 pl-2 pr-14 bg-slate-100/50 border border-dashed transition-all rounded font-mono text-[16px] sm:text-[11px] uppercase font-bold shadow-none ${
                         promoError
                           ? "border-red-500 text-red-600 focus:border-red-600 focus:bg-red-50/50 placeholder:text-red-300"
                           : "border-slate-400 focus:border-slate-600 focus:bg-white text-slate-900 placeholder:text-slate-400"
@@ -437,7 +437,7 @@ export function Payment() {
                       type="button"
                       onClick={handleApplyPromo}
                       variant="ghost"
-                      className="absolute right-1 top-1 h-6 px-2 text-slate-700 hover:text-slate-900 hover:bg-slate-200 font-bold text-[10px] tracking-wider rounded transition-all active:scale-95 font-mono"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-6 px-2 text-slate-700 hover:text-slate-900 hover:bg-slate-200 font-bold text-[10px] tracking-wider rounded transition-all active:scale-95 font-mono"
                     >
                       APPLY
                     </Button>
