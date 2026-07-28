@@ -350,7 +350,6 @@ export function TextEditor() {
                             B&W
                           </Badge>
                         </p>
-                        <p className="text-xs text-slate-500 font-medium leading-none mt-1">C. V. Raman Block</p>
                       </div>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
@@ -386,7 +385,6 @@ export function TextEditor() {
                             B&W
                           </Badge>
                         </p>
-                        <p className="text-xs text-slate-500 font-medium leading-none mt-1">Swami Vivekananda Block</p>
                       </div>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${

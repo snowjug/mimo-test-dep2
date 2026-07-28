@@ -195,7 +195,6 @@ export function BlankPages() {
                         B&W
                       </Badge>
                     </p>
-                    <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">C. V. Raman Block</p>
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
@@ -236,7 +235,6 @@ export function BlankPages() {
                         </Badge>
                       </span>
                     </p>
-                    <p className="text-sm font-medium text-slate-500 leading-normal mt-0.5 pb-0.5">Swami Vivekananda Block</p>
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
