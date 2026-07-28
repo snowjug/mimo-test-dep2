@@ -52,8 +52,8 @@ The platform coordinates printing operations across two physical Kiosk stations:
 | **Main Website** | https://printmimo.tech |
 | **Landing Page** | https://printmimo.tech/landing |
 | **Kiosk App (all kiosks)** | https://kisokmechine.vercel.app |
-| **Kiosk SV-002** | https://kisokmechine.vercel.app/?kioskId=SV-002 |
-| **Kiosk CV-001** | https://kisokmechine.vercel.app/?kioskId=CV-001 |
+| **Kiosk MIMO-2.0** | https://kisokmechine.vercel.app/?kioskId=SV-002 |
+| **Kiosk MIMO-1.0** | https://kisokmechine.vercel.app/?kioskId=CV-001 |
 | **Admin Dashboard** | https://printmimo.tech/admin |
 | **Firebase Functions API** | https://api-upqxuj7evq-uc.a.run.app |
 
