@@ -27,7 +27,7 @@ def main():
             sys.exit(0)
     except Exception as e:
         log(f"⚠️ Warning: Failed to check printer status: {e}")
-
+                   
     # 2. Generate raw ESC/P head-clean bytes
     # Enter remote mode, run CH command, exit remote mode
     raw_data = b'\x1b(R\x08\x00\x00REMOTE1' + b'CH\x02\x00\x00\x00' + b'\x1b\x00\x00\x00'
