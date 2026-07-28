@@ -88,6 +88,11 @@ function App() {
     return new Promise<void>((resolve, reject) => {
       validationTimerRef.current = window.setTimeout(async () => {
         try {
+          const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID;
+          if (!dynamicKioskId && code !== "0000" && code !== "9999") {
+            throw new Error("Kiosk ID not configured on this device (?kioskId= missing)");
+          }
+
           // 🔐 VERIFY CODE
           let data;
           if (code === "0000") {
@@ -120,7 +125,7 @@ function App() {
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ printCode: code }),
+              body: JSON.stringify({ printCode: code, kioskId: dynamicKioskId }),
             });
 
             data = await res.json();
@@ -151,8 +156,6 @@ function App() {
             try {
               // Read specific Kiosk ID from URL so one Vercel deployment supports infinite kiosks!
               // Example: printmimo.tech/kiosk?kioskId=SV-002
-              const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID || "CV-001";
-
               const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
                 method: "POST",
                 headers: {

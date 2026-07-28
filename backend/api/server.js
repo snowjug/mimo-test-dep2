@@ -872,7 +872,8 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
 
     jobsToUpdate.forEach((doc) => {
       const data = doc.data();
-      const directKioskId = data.printOptions?.directKioskId;
+      const directKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
+      const targetKiosk = directKioskId || "CV-001";
       totalAmountForCoins += (data.pageCount || 0) * 2.3; // Defaulting to BW price for coins
       
       if (directKioskId) {
@@ -882,6 +883,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       
       batch.update(doc.ref, {
         status: "paid",
+        kioskId: targetKiosk,
         "paymentStatus.status": "completed",
         "paymentStatus.paidAt": admin.firestore.FieldValue.serverTimestamp(),
         paymentTime: admin.firestore.FieldValue.serverTimestamp(),
@@ -2277,11 +2279,14 @@ app.post("/kiosk/report-failure", async (req, res) => {
 // ================= PRINT BY CODE =================
 app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
   try {
-    const { printCode } = req.body;
+    const { printCode, kioskId } = req.body;
     const now = new Date();
 
     if (!printCode) {
       return res.status(400).json({ error: "Print code required" });
+    }
+    if (!kioskId) {
+      return res.status(400).json({ error: "Kiosk ID required" });
     }
 
     const snapshot = await db
@@ -2308,10 +2313,17 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       return res.status(404).json({ error: "Invalid code" });
     }
 
+    // ✅ Strict Machine Binding validation
+    const firstDoc = snapshot.docs[0].data();
+    const targetKioskId = firstDoc.kioskId || firstDoc.printOptions?.directKioskId || firstDoc.settings?.directKioskId || "CV-001";
+    if (targetKioskId !== kioskId) {
+      const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
+      return res.status(400).json({ error: `This code belongs to another printer. Please use ${machineName}.` });
+    }
+
     const validDocs = [];
 
     // ✅ FIX: define firstDoc FIRST
-    const firstDoc = snapshot.docs[0].data();
     const userId = firstDoc.userId;
 
     // Fetch user name using Firestore doc ID (since auth now resolves to doc ID)
@@ -2460,66 +2472,83 @@ app.post("/mark-printed", authenticateToken, async (req, res) => {
 // Called by kiosk after user confirms. Backend calls Pi, Pi prints via CUPS.
 app.post("/kiosk/print", kioskLimiter, async (req, res) => {
   try {
-    const { printCode, kioskId = "KIOSK_1" } = req.body;
+    const { printCode, kioskId } = req.body;
     if (!printCode) return res.status(400).json({ error: "Print code required" });
+    if (!kioskId) return res.status(400).json({ error: "Kiosk ID required" });
 
     // Dynamic routing configuration based on which kiosk is calling
     const targetPiUrl = process.env[`${kioskId}_PI_URL`] || process.env.PI_BASE_URL;
     const targetPrinterName = process.env[`${kioskId}_PRINTER_NAME`] || process.env.PRINTER_NAME;
 
+    const now = new Date();
+    let transactionFailedError = null;
+    let targetKioskId = kioskId;
+
+    try {
+      await db.runTransaction(async (transaction) => {
+        const querySnap = await transaction.get(
+          db.collection("print_jobs").where("printCode", "==", printCode)
+        );
+
+        if (querySnap.empty) {
+          transactionFailedError = { status: 404, message: "Invalid or already used print code" };
+          throw new Error("TX_ABORT");
+        }
+
+        const firstData = querySnap.docs[0].data();
+        targetKioskId = firstData.kioskId || firstData.printOptions?.directKioskId || firstData.settings?.directKioskId || "CV-001";
+        
+        // Strict machine binding validation inside transaction
+        if (targetKioskId !== kioskId) {
+          const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
+          transactionFailedError = { status: 400, message: `This code belongs to another printer. Please use ${machineName}.` };
+          throw new Error("TX_ABORT");
+        }
+
+        for (const doc of querySnap.docs) {
+          const data = doc.data();
+          if (data.status !== "paid") {
+            if (data.status === "printing" || data.status === "completed" || data.isPrinted) {
+              transactionFailedError = { status: 409, message: "Print code already used or currently printing." };
+            } else {
+              transactionFailedError = { status: 400, message: `Job not ready for printing (status: ${data.status}).` };
+            }
+            throw new Error("TX_ABORT");
+          }
+
+          if (data.codeExpiresAt && (data.codeExpiresAt.toDate ? data.codeExpiresAt.toDate() : new Date(data.codeExpiresAt)) < now) {
+            transaction.update(doc.ref, { status: "expired", printerStatus: "Expired" });
+            transactionFailedError = { status: 400, message: "Print code has expired." };
+            throw new Error("TX_ABORT");
+          }
+
+          transaction.update(doc.ref, {
+            status: "printing",
+            printerStatus: "Sending to Pi...",
+            kioskId: targetKioskId,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      });
+    } catch (txErr) {
+      if (txErr.message === "TX_ABORT" && transactionFailedError) {
+        return res.status(transactionFailedError.status).json({ error: transactionFailedError.message });
+      }
+      throw txErr;
+    }
+
     const snapshot = await db
       .collection("print_jobs")
       .where("printCode", "==", printCode)
-      .where("status", "in", ["paid", "printing"])
+      .where("status", "==", "printing")
       .get();
 
-    if (snapshot.empty) {
-      return res.status(404).json({ error: "Invalid or already used print code" });
-    }
-
-    const now = new Date();
     const results = [];
 
     for (const doc of snapshot.docs) {
       const data = doc.data();
       const fileName = data.fileName || "file";
-
-      // Skip expired
-      if (data.codeExpiresAt && data.codeExpiresAt.toDate() < now) {
-        await doc.ref.update({ status: "expired", printerStatus: "Expired" });
-        results.push({ file: fileName, status: "expired" });
-        continue;
-      }
-
-      // Skip already printed
-      if (data.isPrinted) {
-        results.push({ file: fileName, status: "already_printed" });
-        continue;
-      }
-
-      const colorMode = data.colorMode || data.printOptions?.colorMode;
-      const isColor = colorMode === "color" || data.color === true || data.printOptions?.colorMode === "color";
-      
-      // Determine the true destination kiosk
-      const directKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
-      let finalKioskId = kioskId || "CV-001";
-      if (directKioskId) {
-        finalKioskId = directKioskId;
-      } else if (isColor) {
-        // Color printing only supported on SV-002 (Epson)
-        finalKioskId = "SV-002";
-      } else {
-        // B&W printing supported on both - use physical kiosk where user is currently standing
-        finalKioskId = kioskId || "CV-001";
-      }
-
-      // Mark sending to Pi
-      await doc.ref.update({
-        status: "printing",
-        printerStatus: "Sending to Pi...",
-        kioskId: finalKioskId,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      const finalKioskId = targetKioskId;
 
       try {
         const opts = data.printOptions || {};
