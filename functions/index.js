@@ -792,6 +792,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       duplex: printOptions?.doubleSided === "double",
       finalCost: jobCost,
       totalCost: jobCost,
+      kioskId: printOptions?.directKioskId || "CV-001",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -1174,8 +1175,9 @@ app.post("/check-status", async (req, res) => {
 // ================= KIOSK: GET DOCUMENTS BY CODE =================
 app.post("/get-documents-by-code", async (req, res) => {
   try {
-    const { printCode } = req.body;
+    const { printCode, kioskId } = req.body;
     if (!printCode) return res.status(400).json({ error: "printCode required" });
+    if (!kioskId) return res.status(400).json({ error: "Kiosk ID required" });
 
     const snapshot = await db.collection("print_jobs")
       .where("printCode", "==", printCode)
@@ -1199,8 +1201,14 @@ app.post("/get-documents-by-code", async (req, res) => {
       return res.status(404).json({ error: "Invalid or expired print code" });
     }
 
-    // Get user info from first job
+    // ✅ Strict Machine Binding validation
     const firstJob = snapshot.docs[0].data();
+    const targetKioskId = firstJob.kioskId || firstJob.printOptions?.directKioskId || firstJob.settings?.directKioskId || "CV-001";
+    if (targetKioskId !== kioskId) {
+      const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
+      return res.status(400).json({ error: `This code belongs to another printer. Please use ${machineName}.` });
+    }
+
     const userId = firstJob.userId;
 
     let userName = "User";
@@ -1270,11 +1278,13 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
     jobsToUpdate.forEach((doc) => {
       const data = doc.data();
       const jobKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
+      const targetKiosk = jobKioskId || "CV-001";
       if (jobKioskId) {
         directKioskId = jobKioskId;
       }
       batch.update(doc.ref, {
         status: "paid",
+        kioskId: targetKiosk,
         paymentTime: admin.firestore.FieldValue.serverTimestamp(),
         printCode,
         codeCreatedAt: now,
@@ -2437,47 +2447,65 @@ app.get("/kiosk/job-status", async (req, res) => {
 // ================= KIOSK: TRIGGER PI PRINT =================
 app.post("/kiosk/print", async (req, res) => {
   try {
-    const { printCode, kioskId = "KIOSK_1" } = req.body;
+    const { printCode, kioskId } = req.body;
     if (!printCode) return res.status(400).json({ error: "Print code required" });
-    const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).where("status", "==", "paid").get();
-    if (snapshot.empty) return res.status(400).json({ error: "No paid job found for this code" });
-    
-    // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
-    const sortedDocs = snapshot.docs.sort((a, b) => {
-      const timeA = a.data().createdAt?.toDate().getTime() || 0;
-      const timeB = b.data().createdAt?.toDate().getTime() || 0;
-      return timeB - timeA;
-    });
-    
-    const jobDoc = sortedDocs[0];
-    const jobData = jobDoc.data();
-    
-    const colorMode = jobData?.colorMode || jobData?.printOptions?.colorMode;
-    const isColor = colorMode === "color" || jobData?.color === true || jobData?.printOptions?.colorMode === "color";
-    
-    const directKioskId = jobData?.printOptions?.directKioskId || jobData?.settings?.directKioskId || jobData?.kioskId;
-    let finalKioskId = kioskId || "CV-001";
-    if (directKioskId) {
-      finalKioskId = directKioskId;
-    } else if (isColor) {
-      // Color printing only supported on SV-002 (Epson)
-      finalKioskId = "SV-002";
-    } else {
-      // B&W printing supported on both - use physical kiosk where user is currently standing
-      finalKioskId = kioskId || "CV-001";
+    if (!kioskId) return res.status(400).json({ error: "Kiosk ID required" });
+
+    let targetKioskId = kioskId;
+    let transactionFailedError = null;
+    let updatedJobData = null;
+
+    try {
+      await db.runTransaction(async (transaction) => {
+        const querySnap = await transaction.get(
+          db.collection("print_jobs").where("printCode", "==", printCode)
+        );
+        if (querySnap.empty) {
+          transactionFailedError = { status: 404, message: "No paid job found for this code" };
+          throw new Error("TX_ABORT");
+        }
+
+        // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
+        const sortedDocs = querySnap.docs.sort((a, b) => {
+          const timeA = a.data().createdAt?.toDate ? a.data().createdAt.toDate().getTime() : 0;
+          const timeB = b.data().createdAt?.toDate ? b.data().createdAt.toDate().getTime() : 0;
+          return timeB - timeA;
+        });
+        
+        const jobDoc = sortedDocs[0];
+        const jobData = jobDoc.data();
+        targetKioskId = jobData?.kioskId || jobData?.printOptions?.directKioskId || jobData?.settings?.directKioskId || "CV-001";
+
+        if (targetKioskId !== kioskId) {
+          const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
+          transactionFailedError = { status: 400, message: `This code belongs to another printer. Please use ${machineName}.` };
+          throw new Error("TX_ABORT");
+        }
+
+        if (jobData.status !== "paid") {
+          transactionFailedError = { status: 400, message: "Print code already redeemed or job not paid" };
+          throw new Error("TX_ABORT");
+        }
+        
+        // Set status to printing so the Pi's firebase_listener.py picks it up
+        transaction.update(jobDoc.ref, { 
+          status: "printing", 
+          printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
+          kioskId: targetKioskId 
+        });
+        updatedJobData = { ...jobData, status: "printing", kioskId: targetKioskId };
+      });
+    } catch (txErr) {
+      if (txErr.message === "TX_ABORT" && transactionFailedError) {
+        return res.status(transactionFailedError.status).json({ error: transactionFailedError.message });
+      }
+      throw txErr;
     }
-    
-    // Set status to printing so the Pi's firebase_listener.py picks it up
-    await jobDoc.ref.update({ 
-      status: "printing", 
-      printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
-      kioskId: finalKioskId 
-    });
 
     // PULL ARCHITECTURE: We just return success immediately.
     // The Pi's mimo-listener.service will poll this document, download the PDF, and print it.
     // The Kiosk UI will poll /kiosk/job-status until the Pi updates it to 'completed'.
-    return res.json({ success: true, message: "Print job enqueued successfully", job: jobData });
+    return res.json({ success: true, message: "Print job enqueued successfully", job: updatedJobData });
     
   } catch (err) {
     console.error("❌ KIOSK PRINT ERROR:", err);
