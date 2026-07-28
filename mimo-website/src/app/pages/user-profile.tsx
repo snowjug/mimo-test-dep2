@@ -489,7 +489,7 @@ export function UserProfile() {
                           {job.kioskId && (
                             <>
                               <span className="w-1 h-1 rounded-full bg-slate-300" />
-                              <span>{job.kioskId === 'CV-001' ? 'C. V. Raman Block' : job.kioskId === 'SV-002' ? 'Swami Vivekananda Block' : job.kioskId}</span>
+                              <span>{job.kioskId === 'CV-001' ? 'MIMO 1.0' : job.kioskId === 'SV-002' ? 'MIMO 2.0' : job.kioskId}</span>
                             </>
                           )}
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
