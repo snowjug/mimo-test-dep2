@@ -35,6 +35,18 @@ const FlowerIcon2: React.FC = () => (
   </svg>
 );
 
+const MusicNoteIcon1: React.FC = () => (
+  <svg viewBox="0 0 24 24" style={{ width: '1em', height: '1em', display: 'block' }} fill="currentColor">
+    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+  </svg>
+);
+
+const MusicNoteIcon2: React.FC = () => (
+  <svg viewBox="0 0 24 24" style={{ width: '1em', height: '1em', display: 'block' }} fill="currentColor">
+    <path d="M21 3H10v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h9V10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V3z"/>
+  </svg>
+);
+
 interface PrintingScreenProps {
   isActive: boolean;
   statusTitle?: string;
@@ -46,6 +58,7 @@ interface PrintingScreenProps {
   printCode?: string;       // ← needed to poll real status
   manualProgress?: number;  // ← optional override for testing
   colorMode?: 'color' | 'bw';
+  kioskId?: string | null;
 }
 
 /**
@@ -70,7 +83,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   printCode,
   manualProgress,
   colorMode = 'bw',
+  kioskId,
 }) => {
+  const isCV001 = kioskId === 'CV-001';
   const [progress, setProgress]         = useState(0);
   const [typedTitle, setTypedTitle]     = useState('');
   const [typedSub, setTypedSub]         = useState('');
@@ -494,6 +509,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           0%,100% { filter: drop-shadow(0 0 15px rgba(200,134,10,0.4)); }
           50%      { filter: drop-shadow(0 0 35px rgba(232,184,109,0.9)); }
         }
+        @keyframes text-glow-pulse-cyan {
+          0%,100% { filter: drop-shadow(0 0 15px rgba(0,229,255,0.4)); }
+          50%      { filter: drop-shadow(0 0 35px rgba(0,229,255,0.9)); }
+        }
         .petal-fly {
           position: absolute;
           font-size: 28px;
@@ -608,7 +627,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             {typedSub}
           </p>
           {!isCompleted && (
-            <p style={{ color: '#FFD97D', fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: '0 0 16px rgba(200,134,10,0.5)', minHeight: '36px' }}>
+            <p style={{ color: isCV001 ? '#80efff' : '#FFD97D', fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: isCV001 ? '0 0 16px rgba(0,229,255,0.6)' : '0 0 16px rgba(200,134,10,0.5)', minHeight: '36px' }}>
               {statusMsg}
             </p>
           )}
@@ -617,44 +636,41 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
       {/* ── Right circle ── */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
-
-
-
         <div
           className="circular-progress-container"
           style={{ position: 'relative', width: '380px', height: '380px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          {/* Gold glow background — grows with progress */}
+          {/* Glow background — grows with progress */}
           <div style={{
             position: 'absolute',
             width: '300px',
             height: '300px',
             borderRadius: '50%',
-            background: '#C8860A',
+            background: isCV001 ? '#0077b6' : '#C8860A',
             filter: 'blur(70px)',
             opacity: 0.10 + (progress / 100) * 0.22,
             transition: 'opacity 0.3s',
             pointerEvents: 'none',
           }} />
 
-          {/* Gold pulse-ring halos */}
+          {/* Pulse-ring halos */}
           {isActive && progress < 100 && (
             <>
               <div style={{
                 position: 'absolute', inset: '45px', borderRadius: '50%',
-                border: '2px solid rgba(232,184,109,0.6)',
+                border: isCV001 ? '2px solid rgba(0,229,255,0.6)' : '2px solid rgba(232,184,109,0.6)',
                 animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite',
                 pointerEvents: 'none',
               }} />
               <div style={{
                 position: 'absolute', inset: '45px', borderRadius: '50%',
-                border: '2px solid rgba(200,134,10,0.28)',
+                border: isCV001 ? '2px solid rgba(0,180,216,0.35)' : '2px solid rgba(200,134,10,0.28)',
                 animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite 1.5s',
                 pointerEvents: 'none',
               }} />
             </>
           )}
-          {/* ── Floating petal orbit particles — white ── */}
+          {/* ── Floating particles (Music notes for CV-001, Petals for standard) ── */}
           {isActive && noteParticles.map(note => (
             <div
               key={note.id}
@@ -669,11 +685,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 animationTimingFunction: 'ease-in-out',
                 animationIterationCount: 'infinite',
                 textShadow: 'none',
-                /* Drop shadow for high visibility */
-                filter: 'drop-shadow(0 4px 12px rgba(120, 60, 0, 0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+                color: isCV001 ? '#80efff' : '#fff',
+                filter: isCV001 ? 'drop-shadow(0 0 10px rgba(0, 229, 255, 0.8))' : 'drop-shadow(0 4px 12px rgba(120, 60, 0, 0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
               }}
             >
-              {note.id % 2 === 0 ? <FlowerIcon1 /> : <FlowerIcon2 />}
+              {isCV001 
+                ? (note.id % 2 === 0 ? <MusicNoteIcon1 /> : <MusicNoteIcon2 />)
+                : (note.id % 2 === 0 ? <FlowerIcon1 /> : <FlowerIcon2 />)}
             </div>
           ))}
 
@@ -683,6 +701,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 <stop offset="0%"   stopColor="#FFD97D" />
                 <stop offset="50%"  stopColor="#E8B86D" />
                 <stop offset="100%" stopColor="#C8860A" />
+              </linearGradient>
+              <linearGradient id="progressGradientCyber" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%"   stopColor="#ffffff" />
+                <stop offset="50%"  stopColor="#80efff" />
+                <stop offset="100%" stopColor="#00b4d8" />
               </linearGradient>
               <filter id="neonGlow" x="-30%" y="-30%" width="160%" height="160%">
                 <feGaussianBlur stdDeviation="6" result="blur" />
@@ -702,19 +725,19 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
             {/* Outer dashed ring — slow clockwise spin */}
             <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow 24s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="176" fill="transparent" stroke="rgba(255,255,255,0.08)" strokeWidth="3" strokeDasharray="12 18" />
+              <circle cx="190" cy="190" r="176" fill="transparent" stroke={isCV001 ? "rgba(0,229,255,0.15)" : "rgba(255,255,255,0.08)"} strokeWidth="3" strokeDasharray="12 18" />
             </g>
 
-            {/* Inner dotted ring — slow counter-clockwise spin, gold */}
+            {/* Inner dotted ring — slow counter-clockwise spin */}
             <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow-reverse 18s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="105" fill="transparent" stroke="rgba(232,184,109,0.22)" strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
+              <circle cx="190" cy="190" r="105" fill="transparent" stroke={isCV001 ? "rgba(0,229,255,0.35)" : "rgba(232,184,109,0.22)"} strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
             </g>
 
-            {/* Glassmorphic warm-dark circle background */}
-            <circle cx="190" cy="190" r="130" fill="rgba(30, 18, 0, 0.62)" stroke="rgba(200,134,10,0.20)" strokeWidth="2" />
+            {/* Glassmorphic center circle background */}
+            <circle cx="190" cy="190" r="130" fill={isCV001 ? "rgba(0, 20, 45, 0.65)" : "rgba(30, 18, 0, 0.62)"} stroke={isCV001 ? "rgba(0,229,255,0.35)" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
 
             {/* Static background track */}
-            <circle cx="190" cy="190" r={radius} fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
+            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isCV001 ? "rgba(0,229,255,0.10)" : "rgba(255,255,255,0.05)"} strokeWidth="10" />
 
             {/* Center Percentage Display */}
             <text
@@ -723,11 +746,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               dominantBaseline="middle"
               style={{
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
-                animation: isActive && progress < 100 ? 'text-glow-pulse 2s infinite alternate' : 'none',
+                animation: isActive && progress < 100 ? (isCV001 ? 'text-glow-pulse-cyan 2s infinite alternate' : 'text-glow-pulse 2s infinite alternate') : 'none',
               }}
             >
               <tspan fontSize="92px" fontWeight="800" fill="#ffffff" letterSpacing="-2px" style={{ fontFeatureSettings: '"tnum"', fontVariantNumeric: 'tabular-nums' }}>{progress}</tspan>
-              <tspan fontSize="32px" fontWeight="700" fill="#FFD97D" dx="4">%</tspan>
+              <tspan fontSize="32px" fontWeight="700" fill={isCV001 ? "#00e5ff" : "#FFD97D"} dx="4">%</tspan>
             </text>
 
             {/* Rotated group for progress arc and comet tail */}
@@ -736,7 +759,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               <circle
                 cx="190" cy="190" r={radius}
                 fill="transparent"
-                stroke="url(#progressGradient)"
+                stroke={isCV001 ? "url(#progressGradientCyber)" : "url(#progressGradient)"}
                 strokeWidth="10"
                 strokeDasharray={progress === 100 ? 'none' : circumference}
                 strokeDashoffset={progress === 100 ? 0 : strokeDashoffset}
@@ -757,20 +780,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 opacity="0.8"
                 style={{ transition: 'stroke-dashoffset 0.18s linear' }}
               />
-
-              {/* Comet tail is rendered OUTSIDE this group — see below */}
             </g>
 
-            {/* Comet tail — rendered in root SVG space (coordinates already account for -90° start).
-                Must be outside the rotate(-90deg) group to avoid double-rotation, and placed last
-                so it paints on top of the arc line. */}
+            {/* Comet tail */}
             {cometTailPoints.map(pt => (
               <circle
                 key={pt.key}
                 cx={pt.x}
                 cy={pt.y}
                 r={Math.max(0.5, pt.r)}
-                fill={pt.key === 0 ? '#ffffff' : '#E8B86D'}
+                fill={pt.key === 0 ? '#ffffff' : (isCV001 ? '#00e5ff' : '#E8B86D')}
                 opacity={pt.opacity * (pt.key === 0 ? 1 : 0.65)}
                 filter={pt.key <= 2 ? 'url(#cometGlow)' : undefined}
                 style={{ transition: 'cx 0.18s linear, cy 0.18s linear' }}

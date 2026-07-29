@@ -7,6 +7,7 @@ interface CodeEntryScreenProps {
   code: string;
   setCode: React.Dispatch<React.SetStateAction<string>>;
   hasError?: boolean;
+  kioskId?: string | null;
 }
 
 export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
@@ -16,7 +17,9 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
   code,
   setCode,
   hasError,
+  kioskId,
 }) => {
+  const isCV001 = kioskId === 'CV-001';
   const [isShaking, setIsShaking] = useState(false);
   const [loading, setLoading] = useState(false);
 

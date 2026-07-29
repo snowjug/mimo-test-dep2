@@ -5,6 +5,7 @@ import { PrintingScreen } from './components/screens/PrintingScreen';
 import { SummaryScreen } from './components/screens/SummaryScreen';
 import { SystemErrorScreen } from './components/screens/SystemErrorScreen';
 import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
+import { CV001Background } from './components/screens/CV001Background';
 
 
 export type ScreenState =
@@ -18,6 +19,18 @@ export type ScreenState =
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const currentKioskId = urlParams.get("kioskId");
+  const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID;
+
+  useEffect(() => {
+    const rootEl = document.getElementById('root');
+    if (dynamicKioskId === 'CV-001') {
+      document.body.classList.add('theme-cv001');
+      rootEl?.classList.add('theme-cv001');
+    } else {
+      document.body.classList.remove('theme-cv001');
+      rootEl?.classList.remove('theme-cv001');
+    }
+  }, [dynamicKioskId]);
 
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('main-interface');
   const [code, setCode] = useState('');
@@ -88,7 +101,6 @@ function App() {
     return new Promise<void>((resolve, reject) => {
       validationTimerRef.current = window.setTimeout(async () => {
         try {
-          const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID;
           if (!dynamicKioskId && code !== "0000" && code !== "9999") {
             throw new Error("Kiosk ID not configured on this device (?kioskId= missing)");
           }
@@ -234,10 +246,12 @@ function App() {
       )}
 
       {/* ================= SCREENS ================= */}
+      {dynamicKioskId === 'CV-001' && <CV001Background />}
 
       <MainScreen
         isActive={currentScreen === 'main-interface'}
         onNext={goToCodeEntry}
+        kioskId={dynamicKioskId}
       />
 
       <CodeEntryScreen
@@ -247,6 +261,7 @@ function App() {
         onSuccess={handleValidationSuccess}
         onBack={handleReset}
         hasError={toastError && currentScreen === 'code-entry-screen'}
+        kioskId={dynamicKioskId}
       />
 
       <PrintingScreen
@@ -267,6 +282,7 @@ function App() {
         copies={jobData?.copies || 1}
         printCode={code}
         colorMode={jobData?.mode?.toLowerCase().includes('color') ? 'color' : 'bw'}
+        kioskId={dynamicKioskId}
         onComplete={() => {
           setPrintStatus('completed');
           goToSummary();
@@ -291,6 +307,7 @@ function App() {
         isActive={currentScreen === 'summary-screen'}
         onReset={handleReset}
         jobData={jobData}
+        kioskId={dynamicKioskId}
       />
 
       <SystemErrorScreen
@@ -300,11 +317,13 @@ function App() {
         onRetry={handleRetry}
         errorMsg={printError}
         showRefundBanner={showRefundBanner}
+        kioskId={dynamicKioskId}
       />
 
       <MaintenanceScreen
         isActive={currentScreen === 'maintenance-screen'}
         onReset={handleReset}
+        kioskId={dynamicKioskId}
       />
 
       {/* DEBUG BUTTON */}
