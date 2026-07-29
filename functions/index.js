@@ -766,6 +766,9 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     // Handle double-sided
     if (printOptions?.doubleSided === "double") {
       actualPages = Math.ceil(actualPages / 2);
+      if (colorMode === "bw") {
+        pricePerPage = 3.00;
+      }
     }
 
     const jobCost = actualPages * copies * pricePerPage;
