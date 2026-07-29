@@ -533,14 +533,20 @@ def pre_rasterize_pdf_for_color(pdf_path, is_color):
 
 
 def is_printer_online(printer_name):
-    """Check if the CUPS printer queue is enabled and accepting jobs, and physically connected via USB."""
+    """Check if the CUPS printer queue is enabled and accepting jobs, and physically connected via USB (or IPP network)."""
     usb_id = PRINTER_USB_IDS.get(printer_name)
     if usb_id:
         try:
-            lsusb_out = subprocess.run(["lsusb"], capture_output=True, text=True, timeout=5).stdout
-            if usb_id not in lsusb_out:
-                print(f"❌ Printer {printer_name} USB ID ({usb_id}) NOT found in lsusb! Printer is physically off/disconnected.")
-                return False
+            # Check if printer is configured as a network/wireless printer in CUPS (ipp://, http://, socket://, lpd://)
+            lp_dev = subprocess.run(["lpstat", "-v", printer_name], capture_output=True, text=True, timeout=2).stdout.lower()
+            is_network = any(proto in lp_dev for proto in ["ipp://", "http://", "https://", "socket://", "lpd://"])
+            if not is_network:
+                lsusb_out = subprocess.run(["lsusb"], capture_output=True, text=True, timeout=5).stdout
+                if usb_id not in lsusb_out:
+                    print(f"❌ Printer {printer_name} USB ID ({usb_id}) NOT found in lsusb! Printer is physically off/disconnected.")
+                    return False
+            else:
+                print(f"ℹ️ Printer {printer_name} is configured as a network/wireless IPP printer. Skipping lsusb check.")
         except Exception as e:
             print(f"⚠️ lsusb check failed: {e}")
 
