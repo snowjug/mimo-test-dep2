@@ -667,6 +667,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
     """
     Submits job to CUPS. If doc_ref is given, a background thread will poll CUPS
     for physical completion and update Firestore (status sync with actual print).
+    """
     import re, sys
     try:
         # ── Validate files ──
