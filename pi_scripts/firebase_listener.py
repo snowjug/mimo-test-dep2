@@ -548,7 +548,20 @@ def is_printer_online(printer_name):
         res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=2)
         output = res.stdout.lower()
         if "disabled" in output or "stopped" in output or "not accepting" in output:
-            print(f"❌ Printer {printer_name} is OFFLINE/DISABLED")
+            print(f"⚠️ Printer {printer_name} is OFFLINE/DISABLED in CUPS. Attempting automatic queue healing...")
+            try:
+                subprocess.run(["sudo", "-S", "cupsenable", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
+                subprocess.run(["sudo", "-S", "cupsaccept", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
+                subprocess.run(["cupsenable", printer_name], capture_output=True, timeout=5)
+                subprocess.run(["cupsaccept", printer_name], capture_output=True, timeout=5)
+                time.sleep(1)
+                res2 = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=2)
+                if "idle" in res2.stdout.lower() or "enabled" in res2.stdout.lower() or "printing" in res2.stdout.lower():
+                    print(f"✅ Automatically recovered CUPS printer queue {printer_name}!")
+                    return True
+            except Exception as recover_err:
+                print(f"⚠️ Auto-recovery failed: {recover_err}")
+            print(f"❌ Printer {printer_name} remains OFFLINE/DISABLED")
             return False
         if res.returncode != 0 or "is idle" not in output and "now printing" not in output and "enabled" not in output:
             print(f"⚠️ Could not verify printer {printer_name} status: {res.stdout.strip()}")
