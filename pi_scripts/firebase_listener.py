@@ -941,6 +941,7 @@ def process_job(doc_snapshot):
         def _download_one(f):
             """Download one file entry and return (f_dict, local_path, error)."""
             f_url  = f.get("url")
+            f_name = f.get("name", "document.pdf")
             ext = os.path.splitext(f_name)[1].lower() or ".pdf"
             cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}{ext}")
             if os.path.exists(cache_path):
