@@ -982,7 +982,7 @@ def process_job(doc_snapshot):
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             
-            if ext in [".jpg", ".jpeg", ".png", ".heic", ".webp"]:
+            if ext in [".jpg", ".jpeg", ".png", ".heic", ".webp", ".img", ".bmp", ".tiff", ".tif", ".gif", ".jfif"]:
                 if image_scaling == "fill":
                     pdf_path = process_image_fill(l_path, photo_layout, is_color)
                     if pdf_path: f_final = pdf_path
@@ -994,7 +994,7 @@ def process_job(doc_snapshot):
                     pdf_path = convert_image_to_pdf_fit(l_path, is_color)
                     if pdf_path: f_final = pdf_path
                     
-            elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
+            elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".txt", ".rtf", ".csv", ".odt", ".ods", ".odp"]:
                 pdf_path = convert_to_pdf(l_path)
                 if pdf_path: f_final = pdf_path
                 else:
@@ -1020,7 +1020,7 @@ def process_job(doc_snapshot):
         # Ensure all files are PDFs before merging
         pdf_paths = []
         for fp in final_paths:
-            if fp.lower().endswith(('.jpg', '.jpeg', '.png', '.heic', '.webp')):
+            if fp.lower().endswith(('.jpg', '.jpeg', '.png', '.heic', '.webp', '.img', '.bmp', '.tiff', '.tif', '.gif', '.jfif')):
                 pdf_fp = fp + ".pdf"
                 try:
                     from PIL import Image
