@@ -103,6 +103,7 @@ body {
     inset: 0;
     z-index: 0;
     pointer-events: none;
+    background: url('./assets/kiosk-bg.png') center center / cover no-repeat;
 }
 
 /* Removed .kiosk-bg::after vignette to prevent seams */
