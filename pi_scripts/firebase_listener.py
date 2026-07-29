@@ -74,17 +74,23 @@ def convert_to_pdf(input_path):
     try:
         print(f"⏳ Converting {input_path} to PDF via LibreOffice...")
         subprocess.run([
-            "libreoffice", "--headless", "--convert-to", "pdf",
+            "libreoffice", "--headless", "--nologo", "--nodefault", "--nofirststartwizard", "--convert-to", "pdf",
             "--outdir", TEMP_DIR, input_path
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
         
-        pdf_path = os.path.splitext(input_path)[0] + ".pdf"
-        if os.path.exists(pdf_path):
-            print(f"✅ Conversion successful: {pdf_path}")
-            return pdf_path
+        base_name = os.path.splitext(os.path.basename(input_path))[0] + ".pdf"
+        outdir_pdf_path = os.path.join(TEMP_DIR, base_name)
+        same_dir_pdf_path = os.path.splitext(input_path)[0] + ".pdf"
+        
+        if os.path.exists(outdir_pdf_path):
+            print(f"✅ Conversion successful: {outdir_pdf_path}")
+            return outdir_pdf_path
+        elif os.path.exists(same_dir_pdf_path):
+            print(f"✅ Conversion successful: {same_dir_pdf_path}")
+            return same_dir_pdf_path
         else:
-            raise Exception("PDF file not found after conversion")
-    except subprocess.CalledProcessError as e:
+            raise Exception(f"PDF file not found after conversion (checked {outdir_pdf_path} and {same_dir_pdf_path})")
+    except Exception as e:
         print(f"❌ Conversion failed: {e}")
         return None
 
