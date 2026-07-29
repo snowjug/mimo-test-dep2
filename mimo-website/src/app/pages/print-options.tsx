@@ -322,8 +322,8 @@ export function PrintOptions() {
   }
   const actualPages = doubleSided === "double" ? Math.ceil(sheetsNeeded / 2) : sheetsNeeded;
 
-  // Pricing
-  const basePrice = colorMode === "bw" ? priceBW : priceColor;
+  // Pricing: 3.00 Rs per double-sided sheet in B&W, otherwise standard price per sheet
+  const basePrice = colorMode === "bw" ? (doubleSided === "double" ? 3.00 : priceBW) : priceColor;
 
   const totalCost = actualPages * (Number(copies) || 1) * basePrice;
 
