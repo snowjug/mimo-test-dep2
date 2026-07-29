@@ -63,15 +63,17 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
 
   return (
     <div
-      className={`screen code-entry-wrap ${isActive ? 'visible' : ''}`}
+      className={`screen code-entry-wrap ${isActive ? 'visible' : ''} ${isCV001 ? 'cv001-code-entry' : ''}`}
       style={{ display: isActive ? 'flex' : 'none' }}
     >
       {/* Botanical background shared layer */}
-      <div className="kiosk-bg" />
-
-      {/* Ambient warm glows */}
-      <div className="ambient-glow glow-1" />
-      <div className="ambient-glow glow-2" />
+      {!isCV001 && (
+        <>
+          <div className="kiosk-bg" />
+          <div className="ambient-glow glow-1" />
+          <div className="ambient-glow glow-2" />
+        </>
+      )}
 
       {/* Back button */}
       <button
