@@ -3,9 +3,11 @@ import React, { useState, useRef } from 'react';
 interface MaintenanceScreenProps {
     isActive: boolean;
     onReset: () => void;
+    kioskId?: string;
 }
 
-export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ isActive, onReset }) => {
+export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ isActive, onReset, kioskId }) => {
+    const isCV001 = kioskId === 'CV-001';
     const [adminCounter, setAdminCounter] = useState(0);
     const resetTimerRef = useRef<number | null>(null);
 
@@ -52,8 +54,8 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ isActive, 
             onPointerDown={handleScreenTouch}
             style={{ touchAction: 'none', display: isActive ? 'flex' : 'none' }}
         >
-            {/* Botanical background */}
-            <div className="kiosk-bg" style={{ filter: 'brightness(0.85)' }} />
+            {/* Botanical background only on standard kiosk */}
+            {!isCV001 && <div className="kiosk-bg" style={{ filter: 'brightness(0.85)' }} />}
             <div className="ambient-glow glow-1" />
             <div className="ambient-glow glow-2" />
 

@@ -11,11 +11,13 @@ interface SystemErrorScreenProps {
     onRetry: () => void;
     errorMsg?: string;
     showRefundBanner?: boolean;
+    kioskId?: string;
 }
 
 const AUTO_RESET_SECONDS = 15;
 
-export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, jobData, onReset, onRetry, errorMsg, showRefundBanner }) => {
+export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, jobData, onReset, onRetry, errorMsg, showRefundBanner, kioskId }) => {
+    const isCV001 = kioskId === 'CV-001';
     const firstName = jobData?.userName?.split(' ')[0] || 'there';
     const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
 
@@ -43,8 +45,8 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
             className={`screen err-screen ${isActive ? 'visible' : ''}`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
-            {/* Botanical background */}
-            <div className="kiosk-bg" />
+            {/* Botanical background only for standard kiosk */}
+            {!isCV001 && <div className="kiosk-bg" />}
             <div className="ambient-glow glow-1" />
             <div className="ambient-glow glow-2" />
 
@@ -98,7 +100,7 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
             <div className="err-bottom err-a3">
                 <div className="err-auto-return">
                     <span className="material-symbols-outlined" style={{ fontSize: '20px', opacity: 0.7 }}>schedule</span>
-                    Returning to home in <strong style={{ color: '#FFD97D' }}>{countdown}s</strong>
+                    Returning to home in <strong style={{ color: isCV001 ? '#00e5ff' : '#FFD97D' }}>{countdown}s</strong>
                 </div>
                 <div className="err-buttons">
                     {!showRefundBanner && (
@@ -186,7 +188,7 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     top: 0;
                     bottom: 0;
                     width: 8px;
-                    background: linear-gradient(to bottom, #ff9d00, #ff5e00);
+                    background: ${isCV001 ? 'linear-gradient(to bottom, #00e5ff, #0077ff)' : 'linear-gradient(to bottom, #ff9d00, #ff5e00)'};
                     opacity: 0.8;
                 }
 
@@ -278,7 +280,7 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     align-items: center;
                     gap: 22px;
                     padding: 16px 40px;
-                    background: linear-gradient(135deg, rgba(255, 77, 77, 0.95), rgba(255, 120, 60, 0.95));
+                    background: ${isCV001 ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95))' : 'linear-gradient(135deg, rgba(255, 77, 77, 0.95), rgba(255, 120, 60, 0.95))'};
                     border-radius: 100px;
                     box-shadow: 0 20px 60px rgba(255, 77, 77, 0.35), 0 0 0 6px rgba(255, 255, 255, 0.1);
                     animation: pop-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -308,7 +310,7 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     transform: translateX(-50%);
                     width: 700px;
                     height: 180px;
-                    background: radial-gradient(ellipse at center, rgba(255, 160, 50, 0.1) 0%, transparent 70%);
+                    background: ${isCV001 ? 'radial-gradient(ellipse at center, rgba(0, 229, 255, 0.15) 0%, transparent 70%)' : 'radial-gradient(ellipse at center, rgba(255, 160, 50, 0.1) 0%, transparent 70%)'};
                     pointer-events: none;
                     z-index: 5;
                     opacity: 0.8;

@@ -1185,3 +1185,252 @@ body {
     -webkit-text-fill-color: transparent;
     background-clip: text;
 }
+
+/* ================================================
+/* ================================================
+   CV-001 DEEP AZURE & ROYAL BLUE THEME
+   Inspired by vibrant electric royal blue & crisp white/cyan UI
+   ================================================ */
+
+/* Override root variables when theme-cv001 is active */
+body.theme-cv001,
+#root.theme-cv001 {
+    background: #005ce6 !important;
+    color: #ffffff;
+
+    --amber-deep:    #002280;
+    --amber-mid:     #001a66;
+    --amber-warm:    #00b4d8;
+    --amber-light:   #00e5ff;
+    --amber-pale:    #eef6ff;
+    --gold-accent:   #00e5ff;
+
+    --glass-warm:    rgba(0, 150, 255, 0.25);
+    --glass-warm-2:  rgba(0, 150, 255, 0.15);
+    --glass-border:  rgba(255, 255, 255, 0.35);
+    --glass-border-2: rgba(255, 255, 255, 0.20);
+
+    --keypad-bg:     rgba(0, 45, 150, 0.50);
+    --keypad-border: rgba(255, 255, 255, 0.35);
+    --keypad-hover:  rgba(0, 229, 255, 0.30);
+}
+
+/* Hide legacy botanical bg and warm ambient glows in CV-001 theme */
+.theme-cv001 .kiosk-bg,
+.theme-cv001 .ambient-glow {
+    display: none !important;
+}
+
+/* CV-001 Ambient Cyan Glows */
+.cv001-ambient-glow {
+    position: absolute;
+    width: 650px;
+    height: 650px;
+    border-radius: 50%;
+    filter: blur(100px);
+    pointer-events: none;
+    z-index: 0;
+    animation: cv001-pulse-glow 8s infinite alternate ease-in-out;
+}
+
+.glow-top-right {
+    top: -15%;
+    right: -10%;
+    background: radial-gradient(circle, rgba(0, 229, 255, 0.35) 0%, rgba(0, 119, 182, 0.15) 60%, transparent 100%);
+    animation-delay: 0s;
+}
+
+.glow-bottom-right {
+    bottom: -15%;
+    right: -5%;
+    background: radial-gradient(circle, rgba(0, 200, 255, 0.30) 0%, transparent 70%);
+    animation-delay: -3s;
+}
+
+.glow-center-left {
+    top: 25%;
+    left: -15%;
+    width: 750px;
+    height: 750px;
+    background: radial-gradient(circle, rgba(0, 180, 255, 0.25) 0%, transparent 70%);
+    animation-delay: -5s;
+}
+
+@keyframes cv001-pulse-glow {
+    0%   { transform: scale(1) translate(0, 0); opacity: 0.85; }
+    100% { transform: scale(1.1) translate(-25px, 20px); opacity: 1; }
+}
+
+/* CV-001 Terminal Top Badge */
+.cv001-terminal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 24px;
+    border-radius: 100px;
+    background: rgba(0, 45, 160, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1.5px solid rgba(0, 229, 255, 0.55);
+    box-shadow: 
+        0 0 25px rgba(0, 180, 255, 0.35),
+        inset 0 0 12px rgba(255, 255, 255, 0.15);
+    margin-bottom: 24px;
+    transform: translateY(-20px);
+    animation: cv001-badge-float 4s ease-in-out infinite alternate;
+}
+
+@keyframes cv001-badge-float {
+    from { transform: translateY(-20px); box-shadow: 0 0 20px rgba(0, 229, 255, 0.3); }
+    to   { transform: translateY(-25px); box-shadow: 0 0 35px rgba(0, 229, 255, 0.5); }
+}
+
+.status-pulse-cyan {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #00e5ff;
+    box-shadow: 0 0 10px #00e5ff, 0 0 20px #00e5ff;
+    animation: cyan-dot-pulse 1.5s infinite;
+}
+
+@keyframes cyan-dot-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.3); opacity: 0.6; }
+}
+
+.cv001-terminal-badge .badge-text {
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    color: #ffffff;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+}
+
+/* Neon Cyan Highlight Text */
+.neon-cyan-text {
+    color: #00e5ff !important;
+    font-weight: 800;
+    text-shadow: 0 0 20px rgba(0, 229, 255, 0.6), 0 0 40px rgba(0, 180, 216, 0.35);
+}
+
+/* CV-001 Customized Swipe Track & Solid White Pill Thumb */
+.cv001-track {
+    background: rgba(0, 80, 220, 0.35) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+    backdrop-filter: blur(25px) !important;
+    -webkit-backdrop-filter: blur(25px) !important;
+    box-shadow: 
+        0 20px 50px rgba(0, 20, 110, 0.45),
+        0 0 30px rgba(0, 160, 255, 0.25),
+        inset 0 0 30px rgba(255, 255, 255, 0.15) !important;
+}
+
+.cv001-swipe-fill {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, rgba(0, 229, 255, 0.4) 100%) !important;
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+}
+
+.cv001-thumb {
+    background: linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%) !important;
+    border: none !important;
+    box-shadow: 
+        0 12px 32px rgba(0, 35, 140, 0.45),
+        0 2px 6px rgba(0, 0, 0, 0.12) !important;
+}
+
+.cv001-thumb .thumb-text {
+    color: #0056f5 !important;
+    font-weight: 800 !important;
+    letter-spacing: 2px !important;
+    text-shadow: none !important;
+}
+
+.cv001-thumb .arrow-circle {
+    background: #e6f0ff !important;
+    border: 1px solid rgba(0, 86, 245, 0.2) !important;
+    box-shadow: 0 4px 10px rgba(0, 86, 245, 0.18) !important;
+}
+
+.cv001-thumb .arrow-circle span {
+    color: #0056f5 !important;
+    font-weight: 800;
+}
+
+.cv001-chevrons {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.15) 0%,
+        #00e5ff 45%,
+        #ffffff 50%,
+        #00e5ff 55%,
+        rgba(255, 255, 255, 0.15) 100%
+    ) !important;
+    background-size: 200% 100% !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.5)) !important;
+}
+
+/* CV-001 Keypad & Code Slot Adjustments */
+.theme-cv001 .code-slot {
+    background: rgba(0, 40, 140, 0.40);
+    border: 2px solid rgba(0, 229, 255, 0.50);
+    color: #ffffff;
+    box-shadow: 0 15px 35px rgba(0, 20, 100, 0.35), inset 0 2px 10px rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+}
+
+.theme-cv001 .code-slot.active {
+    border-color: #00e5ff;
+    background: rgba(0, 60, 180, 0.55);
+    box-shadow: 
+        0 0 0 3px rgba(0, 229, 255, 0.45),
+        0 0 35px rgba(0, 229, 255, 0.6),
+        inset 0 0 20px rgba(0, 229, 255, 0.35);
+    animation: slot-glow-cyan 1.5s infinite alternate;
+}
+
+@keyframes slot-glow-cyan {
+    from { box-shadow: 0 0 0 2px rgba(0,229,255,0.4), 0 0 20px rgba(0,229,255,0.35), inset 0 0 15px rgba(0,229,255,0.25); }
+    to   { box-shadow: 0 0 0 4.5px rgba(0,229,255,0.8), 0 0 40px rgba(0,229,255,0.65), inset 0 0 30px rgba(0,229,255,0.45); }
+}
+
+.theme-cv001 .num-btn {
+    background: rgba(0, 45, 150, 0.45);
+    border: 1.5px solid rgba(255, 255, 255, 0.30);
+    color: #ffffff;
+    box-shadow: 0 10px 25px rgba(0, 20, 100, 0.35), inset 0 1.5px 5px rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+}
+
+.theme-cv001 .num-btn:active {
+    background: #ffffff !important;
+    color: #0056f5 !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 0 35px rgba(255, 255, 255, 0.85) !important;
+}
+
+.theme-cv001 .num-btn.submit-btn.ready {
+    background: linear-gradient(135deg, #00e5ff 0%, #0088ff 100%);
+    border-color: #ffffff;
+    color: #001540;
+    font-weight: 900;
+    box-shadow: 0 0 40px rgba(0, 229, 255, 0.7);
+}
+
+.theme-cv001 .kiosk-back-btn {
+    background: rgba(0, 45, 150, 0.45);
+    border-color: rgba(255, 255, 255, 0.35);
+    color: #ffffff;
+    box-shadow: 0 0 20px rgba(0, 150, 255, 0.25);
+}
+
+.theme-cv001 .kiosk-back-btn:active {
+    background: rgba(255, 255, 255, 0.30);
+}
+
