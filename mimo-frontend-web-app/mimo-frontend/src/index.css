@@ -50,7 +50,7 @@ html {
     justify-content: center;
     overflow: hidden;
     position: relative;
-    background: #005ce6 !important;
+    background: var(--amber-mid);
 }
 
 body {
@@ -58,7 +58,7 @@ body {
     -webkit-font-smoothing: antialiased;
     width: 100%;
     height: 100%;
-    background: #005ce6 !important;
+    background: var(--amber-mid);
     overflow: hidden;
     position: relative;
     flex-shrink: 0;
@@ -75,7 +75,7 @@ body {
 #root {
     width: 1440px;
     height: 810px;
-    background: #005ce6 !important;
+    background: url('./assets/kiosk-bg.png') center center / cover no-repeat, var(--amber-mid);
     position: absolute;
     top: 50%;
     left: 50%;
@@ -95,10 +95,14 @@ body {
 }
 
 /* ================================================
-   SHARED FLORAL BACKGROUND LAYER (Disabled for solid plain color design)
+   SHARED FLORAL BACKGROUND LAYER
+   Every screen renders this behind its content.
    ================================================ */
 .kiosk-bg {
-    display: none !important;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
 }
 
 /* Removed .kiosk-bg::after vignette to prevent seams */
