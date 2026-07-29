@@ -6,7 +6,7 @@ import time
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-LOCAL_LISTENER_PATH = r"C:\Users\HP\Desktop\mimo-test-dep2\pi_scripts\firebase_listener.py"
+LOCAL_LISTENER_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pi_scripts", "firebase_listener.py")
 
 def deploy_sv002_base64():
     print("\n=== Deploying via Base64 SSH to SV-002 (pi@100.107.95.16) ===")
