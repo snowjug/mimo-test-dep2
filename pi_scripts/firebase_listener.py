@@ -941,8 +941,14 @@ def process_job(doc_snapshot):
         def _download_one(f):
             """Download one file entry and return (f_dict, local_path, error)."""
             f_url  = f.get("url")
-            f_name = f.get("name", "document.pdf")
-            cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}.pdf")
+            ext = os.path.splitext(f_name)[1].lower() or ".pdf"
+            cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}{ext}")
+            if os.path.exists(cache_path):
+                if cache_path.lower().endswith(".pdf"):
+                    with open(cache_path, "rb") as test_f:
+                        if not test_f.read(8).startswith(b'%PDF'):
+                            print(f"⚠️ [CACHE INVALID] Cached file {cache_path} is not a valid PDF. Purging from cache...")
+                            os.remove(cache_path)
             if os.path.exists(cache_path):
                 print(f"⚡ [INSTANT PRINT] Job {doc_id} found in pre-fetch edge cache! Using cached file (0s download delay).")
                 path = cache_path
@@ -1439,7 +1445,13 @@ def prefetch_job(doc_snapshot):
         if not file_url:
             return
             
-        cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}.pdf")
+        ext = os.path.splitext(file_name)[1].lower() or ".pdf"
+        cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}{ext}")
+        if os.path.exists(cache_path):
+            if cache_path.lower().endswith(".pdf"):
+                with open(cache_path, "rb") as test_f:
+                    if not test_f.read(8).startswith(b'%PDF'):
+                        os.remove(cache_path)
         if os.path.exists(cache_path):
             return
             
