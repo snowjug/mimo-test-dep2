@@ -22,11 +22,6 @@ function App() {
   const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID;
 
   useEffect(() => {
-    if (dynamicKioskId) {
-      document.title = `MIMO – Kiosk ${dynamicKioskId}`;
-    } else {
-      document.title = 'MIMO – Self-Service Printing Kiosk';
-    }
     const rootEl = document.getElementById('root');
     if (dynamicKioskId === 'CV-001') {
       document.body.classList.add('theme-cv001');

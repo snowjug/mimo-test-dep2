@@ -183,24 +183,6 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                         </h2>
                     </div>
                     <p className="brand-desc">Fast, secure document printing via Mimo code.</p>
-                    {kioskId && (
-                        <div style={{
-                            marginTop: '16px',
-                            display: 'inline-block',
-                            padding: '6px 18px',
-                            borderRadius: '20px',
-                            backgroundColor: isCV001 ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.2)',
-                            border: isCV001 ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid rgba(255,255,255,0.2)',
-                            backdropFilter: 'blur(8px)',
-                            fontSize: '15px',
-                            fontWeight: 600,
-                            letterSpacing: '1.5px',
-                            color: isCV001 ? '#ffffff' : '#fde68a',
-                            textTransform: 'uppercase'
-                        }}>
-                            Terminal : {kioskId}
-                        </div>
-                    )}
                 </section>
 
                 <section className="action-panel">
