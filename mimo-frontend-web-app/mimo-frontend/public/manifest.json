@@ -1,0 +1,17 @@
+{
+  "short_name": "MIMO Kiosk",
+  "name": "MIMO Self-Service Printing Kiosk",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/?kioskId=CV-001",
+  "background_color": "#1A56DB",
+  "theme_color": "#1A56DB",
+  "display": "fullscreen",
+  "orientation": "landscape"
+}
