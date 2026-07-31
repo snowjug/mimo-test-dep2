@@ -2167,7 +2167,7 @@ app.post("/kiosk/report-failure", async (req, res) => {
       if (!snap.empty) {
         ordSnap = snap;
         const od = snap.docs[0].data();
-        orderAmount = od.amount || od.totals?.totalAmount || 0;
+        orderAmount = od.amount || od.totals?.totalAmount || od.totalCost || od.order_amount || od.price || 0;
       }
     }
 
@@ -2483,6 +2483,23 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
     const now = new Date();
     let transactionFailedError = null;
     let targetKioskId = kioskId;
+
+    try {
+      const statusDoc = await db.collection("system_status").doc(kioskId).get();
+      if (statusDoc.exists) {
+        const statusData = statusDoc.data();
+        const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
+        if (lastSeen && (Date.now() - lastSeen.getTime() > 75000)) {
+          return res.status(400).json({ error: "Printer Not Working: Kiosk is currently offline or disconnected." });
+        }
+        const printerStatusStr = statusData.printerStatus || "";
+        if (printerStatusStr.includes("Paused/Error") || printerStatusStr.includes("lpstat failed")) {
+          return res.status(400).json({ error: "Printer Not Working: Printer queue is offline or in error state." });
+        }
+      }
+    } catch (statusErr) {
+      console.error("⚠️ Pre-flight health check error:", statusErr);
+    }
 
     try {
       await db.runTransaction(async (transaction) => {

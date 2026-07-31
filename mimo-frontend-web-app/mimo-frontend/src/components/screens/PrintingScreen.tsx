@@ -137,36 +137,21 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     if (isCompletingRef.current) return;
     isCompletingRef.current = true;
 
-    // Clear the slow tick — we'll drive progress ourselves now
+    // Clear timers
     if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
+    if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
     tickTimerRef.current = null;
+    stallTimerRef.current = null;
 
-    setStatusMsg('Finishing up…');
+    // Snap progress directly to 100% and display clear confirmation
+    progressRef.current = 100;
+    setProgress(100);
+    setStatusMsg('Print Completed ✅');
 
-    const finish = () => {
-      const currentProgress = progressRef.current;
-      if (currentProgress >= 100) {
-        setStatusMsg('Print complete!');
-
-        // Proceed to completion immediately for all print types
-        completionTimerRef.current = window.setTimeout(() => {
-          onComplete();
-        }, fast ? 500 : 1500);
-        return;
-      }
-
-      const next = currentProgress + 1;
-      progressRef.current = next;
-      setProgress(next);
-
-      // If fast mode, animate at 10ms per step. Otherwise 400ms.
-      const delay = fast ? 10 : 400;
-      tickTimerRef.current = window.setTimeout(finish, delay);
-
-      // Update status message as we near the end
-      if (next >= 95) setStatusMsg('Almost done…');
-    };
-    finish();
+    // Hold for 2.5 seconds before transitioning to summary screen
+    completionTimerRef.current = window.setTimeout(() => {
+      onComplete();
+    }, 2500);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onComplete, colorMode]);
 

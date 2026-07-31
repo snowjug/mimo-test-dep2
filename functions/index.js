@@ -892,6 +892,26 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    let customerPhone = req.body?.customerPhone || "9999999999";
+    let customerName = req.body?.customerName || "Mimo User";
+    let customerEmail = req.body?.customerEmail || "user@printmimo.tech";
+    try {
+      const uDoc = await db.collection("users").doc(userId).get();
+      if (uDoc.exists) {
+        const uData = uDoc.data();
+        if (uData.mobileNumber || uData.phone) {
+          const digits = (uData.mobileNumber || uData.phone).toString().replace(/[^\d]/g, "");
+          if (digits.length >= 10) customerPhone = digits.slice(-10);
+        }
+        if (uData.name || uData.displayName || uData.fullName || uData.username) {
+          customerName = uData.name || uData.displayName || uData.fullName || uData.username;
+        }
+        if (uData.email) customerEmail = uData.email;
+      }
+    } catch (uErr) {
+      console.warn("Could not fetch user details for cashfree order:", uErr);
+    }
+
     const response = await axios.post(
       `${CASHFREE_BASE_URL}/orders`,
       {
@@ -900,7 +920,9 @@ app.post("/create-order", authMiddleware, async (req, res) => {
         order_currency: "INR",
         customer_details: {
           customer_id: userId,
-          customer_phone: "9999999999",
+          customer_phone: customerPhone,
+          customer_name: customerName,
+          customer_email: customerEmail,
         },
         order_meta: {
           return_url: `https://printmimo.tech/payment-verify?order_id={order_id}`
@@ -2205,8 +2227,8 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
       link_currency: "INR",
       link_purpose: "Mimo Print Order",
       customer_details: {
-        customer_phone: "9999999999",
-        customer_name: session.userId || "WA User"
+        customer_phone: from.toString().replace(/[^\d]/g, "").slice(-10) || "9999999999",
+        customer_name: session.userName || session.userId || "WA User"
       },
       link_meta: {
         return_url: `https://api-upqxuj7evq-uc.a.run.app/wa-pay-success/${orderId}`,
@@ -2459,6 +2481,23 @@ app.post("/kiosk/print", async (req, res) => {
     let updatedJobData = null;
 
     try {
+      const statusDoc = await db.collection("system_status").doc(kioskId).get();
+      if (statusDoc.exists) {
+        const statusData = statusDoc.data();
+        const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
+        if (lastSeen && (Date.now() - lastSeen.getTime() > 75000)) {
+          return res.status(400).json({ error: "Printer Not Working: Kiosk is currently offline or disconnected." });
+        }
+        const printerStatusStr = statusData.printerStatus || "";
+        if (printerStatusStr.includes("Paused/Error") || printerStatusStr.includes("lpstat failed")) {
+          return res.status(400).json({ error: "Printer Not Working: Printer queue is offline or in error state." });
+        }
+      }
+    } catch (statusErr) {
+      console.error("⚠️ Pre-flight health check error:", statusErr);
+    }
+
+    try {
       await db.runTransaction(async (transaction) => {
         const querySnap = await transaction.get(
           db.collection("print_jobs").where("printCode", "==", printCode)
@@ -2516,6 +2555,111 @@ app.post("/kiosk/print", async (req, res) => {
   }
 });
 
+// ================= AUTO-REFUND KIOSK FAILURE ENDPOINT =================
+app.post("/kiosk/report-failure", async (req, res) => {
+  try {
+    const { jobId, reason, secret } = req.body;
+    if (secret !== process.env.INTERNAL_WEBHOOK_SECRET && secret !== "mimo_secret_123") {
+      console.warn("[AUTO-REFUND] Unauthorized report-failure call");
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+    if (!jobId) return res.status(400).json({ error: "jobId required" });
+
+    const jobRef = db.collection("print_jobs").doc(jobId);
+    const jobSnap = await jobRef.get();
+    if (!jobSnap.exists) return res.status(404).json({ error: "Job not found" });
+
+    const job = jobSnap.data();
+    const orderId = job.orderId;
+    const userId  = job.userId;
+    const failReason = reason || "Print failed at kiosk";
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const paidStatuses = ["paid", "printing"];
+    if (!paidStatuses.includes(job.status)) {
+      return res.json({ skipped: true, reason: `Job status "${job.status}" is not refundable` });
+    }
+    if (job.refundId || job.status === "refunded") {
+      return res.json({ skipped: true, reason: "Already refunded" });
+    }
+
+    let ordSnap = null;
+    let orderAmount = 0;
+    if (orderId) {
+      let snap = await db.collection("orders").where("orderId", "==", orderId).get();
+      if (snap.empty) snap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      if (!snap.empty) {
+        ordSnap = snap;
+        const od = snap.docs[0].data();
+        orderAmount = od.amount || od.totals?.totalAmount || od.totalCost || od.order_amount || od.price || 0;
+      }
+    }
+
+    if (orderAmount <= 0) {
+      await jobRef.update({ status: "failed", printerStatus: failReason, failedAt: now });
+      return res.json({ refunded: false, reason: "Free order — no refund needed" });
+    }
+
+    const refundId = `autorefund_${jobId}_${Date.now()}`;
+    let cashfreeRefundResponse = null;
+    let cashfreeError = null;
+
+    try {
+      const cfRes = await axios.post(
+        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        {
+          refund_amount: orderAmount,
+          refund_id: refundId,
+          refund_note: `Auto-refund: ${failReason}`,
+        },
+        { headers: cashfreeHeaders, timeout: 15000 }
+      );
+      cashfreeRefundResponse = cfRes.data;
+      console.log(`✅ [AUTO-REFUND] Cashfree refund initiated: ${refundId} — ₹${orderAmount}`);
+    } catch (cfErr) {
+      cashfreeError = cfErr.response?.data?.message || cfErr.message;
+      console.error(`❌ [AUTO-REFUND] Cashfree refund API failed: ${cashfreeError}`);
+    }
+
+    const batch = db.batch();
+    batch.update(jobRef, {
+      status: cashfreeRefundResponse ? "refunded" : "failed",
+      printerStatus: failReason,
+      failedAt: now,
+      refundId: cashfreeRefundResponse ? refundId : null,
+      refundedAt: cashfreeRefundResponse ? now : null,
+      autoRefundAttempted: true,
+      autoRefundError: cashfreeError || null,
+    });
+
+    if (ordSnap) {
+      ordSnap.forEach((doc) => {
+        batch.update(doc.ref, {
+          status: cashfreeRefundResponse ? "REFUNDED" : "FAILED",
+          orderStatus: cashfreeRefundResponse ? "refunded" : "failed",
+          refundId: refundId,
+          refundedAt: now,
+          refundAmount: orderAmount,
+        });
+      });
+    }
+
+    const refundDocRef = db.collection("refunds").doc(refundId);
+    batch.set(refundDocRef, {
+      refundId, orderId: orderId || null, jobId, userId, refundAmount: orderAmount,
+      status: cashfreeRefundResponse ? (cashfreeRefundResponse.refund_status || "PENDING") : "CASHFREE_FAILED",
+      cashfreeRefundId: cashfreeRefundResponse?.cf_refund_id || null,
+      cashfreeError: cashfreeError || null, reason: failReason, triggeredBy: "auto", initiatedAt: now,
+    });
+
+    await batch.commit();
+    res.json({ refunded: !!cashfreeRefundResponse, refundId, amount: orderAmount, error: cashfreeError || null });
+  } catch (err) {
+    console.error("[AUTO-REFUND] Unexpected error:", err);
+    res.status(500).json({ error: "Auto-refund processing failed" });
+  }
+});
+
 
 exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
 
@@ -2552,7 +2696,8 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
     }
 
     // Skip refund if the amount is zero (100% discount or free order)
-    if (!orderData.amount || orderData.amount <= 0) {
+    const refundAmount = orderData.amount || orderData.totals?.totalAmount || orderData.totalCost || orderData.order_amount || orderData.price || 0;
+    if (refundAmount <= 0) {
       console.log(`[REFUND] Order ${orderId} has a zero amount. Skipping Cashfree refund API call.`);
       await orderDoc.ref.update({
         refundStatus: "SUCCESS",
@@ -2568,7 +2713,7 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
       const response = await axios.post(
         `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
         {
-          refund_amount: orderData.amount,
+          refund_amount: refundAmount,
           refund_id: refundId,
           refund_note: `Auto-refund for failed print job ${event.params.jobId}`
         },

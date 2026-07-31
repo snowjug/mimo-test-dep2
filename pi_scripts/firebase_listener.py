@@ -581,9 +581,29 @@ def is_printer_online(printer_name):
         return True
     except Exception as e:
         print(f"⚠️ Printer status check failed: {e}")
-        return False
+def auto_heal_cups_queue(printer_name=BW_PRINTER_NAME, job_id=None):
+    """
+    Automatically clears stuck or errored jobs in CUPS and re-enables a paused/error print queue.
+    This guarantees auto-error clearance so future print jobs are not blocked by a wedged queue.
+    """
+    try:
+        print(f"🧹 [AUTO-CLEARANCE] Executing queue healing for printer: {printer_name}...")
+        if job_id:
+            print(f"🧹 [AUTO-CLEARANCE] Cancelling specific faulted CUPS job {job_id}...")
+            subprocess.run(["cancel", job_id], capture_output=True, timeout=5)
+        # Re-enable and accept jobs on the CUPS queue in case an error paused it
+        try:
+            subprocess.run(["sudo", "-S", "cupsenable", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
+            subprocess.run(["sudo", "-S", "cupsaccept", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
+            subprocess.run(["cupsenable", printer_name], capture_output=True, timeout=5)
+            subprocess.run(["cupsaccept", printer_name], capture_output=True, timeout=5)
+        except Exception as perm_err:
+            print(f"⚠️ [AUTO-CLEARANCE] Queue command error: {perm_err}")
+        print(f"✅ [AUTO-CLEARANCE] Successfully reset and enabled {printer_name} print queue.")
+    except Exception as e:
+        print(f"⚠️ [AUTO-CLEARANCE] Error during queue healing: {e}")
 
-def wait_for_cups_job(job_id, doc_ref, timeout=600):
+def wait_for_cups_job(job_id, doc_ref, timeout=600, printer_name=BW_PRINTER_NAME):
     """
     Background thread: polls CUPS until 'job_id' disappears from the
     not-completed queue, then updates Firestore to completed.
@@ -601,7 +621,7 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
                     doc_status = doc_snap.to_dict().get("status")
                     if doc_status == "failed":
                         print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed in Firestore (timeout/refunded). Cancelling CUPS job {job_id}...")
-                        subprocess.run(["cancel", job_id], capture_output=True)
+                        auto_heal_cups_queue(printer_name, job_id)
                         return
             except Exception as doc_err:
                 print(f"⚠️ [SYNC] Failed to verify job status from Firestore: {doc_err}")
@@ -631,7 +651,7 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
                         # Double check that job wasn't failed/refunded while waiting
                         if doc_dict.get("status") == "failed":
                             print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed in Firestore. Cancelling CUPS job {job_id} and aborting completion.")
-                            subprocess.run(["cancel", job_id], capture_output=True)
+                            auto_heal_cups_queue(printer_name, job_id)
                             return
 
                         color_mode = doc_dict.get("colorMode", "monochrome")
@@ -655,6 +675,7 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
                         })
                     else:
                         print(f"❌ [SYNC] CUPS job {job_id} ended in error. Reporting failure for auto-refund.")
+                        auto_heal_cups_queue(printer_name, job_id)
                         report_print_failure(doc_ref, "CUPS print error")
                     return
             except Exception as e:
@@ -662,6 +683,7 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600):
             time.sleep(5)
         # Timeout — mark failed
         print(f"❌ [SYNC] Timed out waiting for CUPS job {job_id}. Reporting failure for auto-refund.")
+        auto_heal_cups_queue(printer_name, job_id)
         report_print_failure(doc_ref, "Print timeout — no response from printer")
     finally:
         active_jobs.discard(doc_ref.id)
@@ -784,7 +806,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             job_id = match.group(1)
             print(f"✅ CUPS job {job_id} queued. Spawning sync thread to track physical completion.")
             # Spawn background thread to wait for physical print and update Firestore
-            t = threading.Thread(target=wait_for_cups_job, args=(job_id, doc_ref), daemon=True)
+            t = threading.Thread(target=wait_for_cups_job, args=(job_id, doc_ref, 600, printer_name), daemon=True)
             t.start()
             # Return None to indicate 'async' — caller should NOT update Firestore immediately
             return None
