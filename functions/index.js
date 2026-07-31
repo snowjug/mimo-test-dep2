@@ -1519,6 +1519,24 @@ app.get("/api/settings", async (req, res) => {
   }
 });
 
+app.get("/api/screensaver", async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("screensaver").get();
+    res.json(doc.exists ? doc.data() : {
+      videos: [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: true,
+      idleTimeoutSeconds: 60
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/admin/settings", adminAuthMiddleware, async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("pricing").get();
@@ -1536,6 +1554,43 @@ app.post("/admin/settings", adminAuthMiddleware, async (req, res) => {
       pricePerPageColor: Number(pricePerPageColor),
       pricePerPageA4: Number(pricePerPageA4 || 2.30),
       pricePerPageGraph: Number(pricePerPageGraph || 2.00)
+    }, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/screensaver", adminAuthMiddleware, async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("screensaver").get();
+    res.json(doc.exists ? doc.data() : {
+      videos: [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: true,
+      idleTimeoutSeconds: 60
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/screensaver", adminAuthMiddleware, async (req, res) => {
+  try {
+    const { videos, playSound, idleTimeoutSeconds } = req.body;
+    await db.collection("mimo_settings").doc("screensaver").set({
+      videos: Array.isArray(videos) ? videos : [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: Boolean(playSound),
+      idleTimeoutSeconds: Number(idleTimeoutSeconds || 60)
     }, { merge: true });
     res.json({ success: true });
   } catch (err) {

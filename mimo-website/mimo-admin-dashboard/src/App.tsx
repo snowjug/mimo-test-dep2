@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   Building, LogOut, Loader2, Printer, RefreshCcw, Tag,
-  Home, Ticket, Search, User, Zap, Activity, Settings, Cpu,
+  Home, Ticket, Search, User, Zap, Activity, Settings, Cpu, Tv,
   Droplets, Layers, Save, CheckCircle2, Sun, Moon, Bell, BarChart2 as BarIcon
 } from 'lucide-react';
 import api from './api';
@@ -64,6 +64,19 @@ export default function AdminDashboard() {
   const [isResetting, setIsResetting]   = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savedSettings, setSavedSettings]   = useState(false);
+  const [screensaver, setScreensaver]       = useState({
+    videos: [
+      "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+      "/second_video.mp4",
+      "/3_video.mp4",
+      "/4_video.mp4"
+    ],
+    playSound: true,
+    idleTimeoutSeconds: 60,
+  });
+  const [newVideoUrl, setNewVideoUrl]       = useState('');
+  const [savingScreensaver, setSavingScreensaver] = useState(false);
+  const [savedScreensaver, setSavedScreensaver]   = useState(false);
 
   const T = dark ? DARK : LIGHT;
   const toggleTheme = () => setDark(d => { const n = !d; localStorage.setItem('adminTheme', n ? 'dark' : 'light'); return n; });
@@ -75,12 +88,13 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       const h = { Authorization: `Bearer ${token}` };
-      const [mR, cR, pR, sR, hwR] = await Promise.all([
+      const [mR, cR, pR, sR, hwR, ssR] = await Promise.all([
         api.get('/admin/metrics',       { headers: h }),
         api.get('/admin/coupons',       { headers: h }),
         api.get('/admin/recent-prints', { headers: h }).catch(() => ({ data: [] })),
         api.get('/admin/settings',      { headers: h }).catch(() => ({ data: {} })),
         api.get('/admin/hardware',      { headers: h }).catch(() => ({ data: {} })),
+        api.get('/admin/screensaver',   { headers: h }).catch(() => ({ data: {} })),
       ]);
       setMetrics(mR.data);
       setCoupons(cR.data);
@@ -92,6 +106,13 @@ export default function AdminDashboard() {
         pricePerPageColor: sR.data.pricePerPageColor || 10.00,
       });
       setHardware(hwR.data);
+      if (ssR.data && ssR.data.videos) {
+        setScreensaver({
+          videos: ssR.data.videos,
+          playSound: ssR.data.playSound ?? true,
+          idleTimeoutSeconds: ssR.data.idleTimeoutSeconds || 60,
+        });
+      }
     } catch (err: any) {
       if (err.response?.status === 401 || err.response?.status === 403) logout();
     }
@@ -116,6 +137,12 @@ export default function AdminDashboard() {
     setSavingSettings(true);
     try { await api.post('/admin/settings', pricing, { headers: { Authorization: `Bearer ${token}` } }); setSavedSettings(true); setTimeout(() => setSavedSettings(false), 3000); fetchData(); }
     catch { alert('Failed.'); } finally { setSavingSettings(false); }
+  };
+
+  const saveScreensaver = async () => {
+    setSavingScreensaver(true);
+    try { await api.post('/admin/screensaver', screensaver, { headers: { Authorization: `Bearer ${token}` } }); setSavedScreensaver(true); setTimeout(() => setSavedScreensaver(false), 3000); fetchData(); }
+    catch { alert('Failed to save screen saver settings.'); } finally { setSavingScreensaver(false); }
   };
 
   const updateHardwareLevel = async (id: string, u: any) => {
@@ -224,6 +251,7 @@ export default function AdminDashboard() {
     { id: 'hardware',  icon: <Cpu size={17} />,  label: 'Hardware Logs' },
     { id: 'coupons',   icon: <Ticket size={17} />, label: 'Coupons' },
     { id: 'settings',  icon: <Settings size={17} />, label: 'Settings' },
+    { id: 'screensaver', icon: <Tv size={17} />, label: 'Screen Saver' },
   ];
 
   // ── MAIN LAYOUT ──────────────────────────────────────────────────────────
@@ -523,6 +551,65 @@ export default function AdminDashboard() {
                   <button onClick={saveSettings} disabled={savingSettings} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.875rem 2rem', borderRadius: '.875rem', border: 'none', cursor: 'pointer', fontWeight: 800, background: savedSettings ? '#10b981' : T.accent, color: dark ? '#0b1929' : '#fff' }}>
                     {savingSettings ? <Loader2 size={17} style={{ animation: 'spin 1s linear infinite' }} /> : savedSettings ? <CheckCircle2 size={17} /> : <Save size={17} />}
                     {savedSettings ? 'Saved!' : 'Save Settings'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── SCREENSAVER ────────────────────────────────────────────── */}
+          {activeTab === 'screensaver' && (
+            <div style={{ maxWidth: 750 }}>
+              <div style={{ ...card({ padding: '2rem' }) }}>
+                <div style={{ fontWeight: 800, fontSize: '1.05rem', color: T.text, marginBottom: '.4rem' }}>Motion Graphics & Screen Saver Configuration</div>
+                <p style={{ fontSize: '.83rem', color: T.sub, marginBottom: '1.75rem' }}>Configure idle screen saver video playlist, sound playback, and idle timers for kiosk tablets.</p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.75rem' }}>
+                  <div style={{ background: T.inputBg, border: `1.5px solid ${T.inputBord}`, borderRadius: '.875rem', padding: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: '.75rem', fontWeight: 800, color: T.text, textTransform: 'uppercase', letterSpacing: '.05em' }}>Audio Playback</div>
+                      <div style={{ fontSize: '.8rem', color: T.sub, marginTop: '.2rem' }}>Play sound with video</div>
+                    </div>
+                    <button type="button" onClick={() => setScreensaver({ ...screensaver, playSound: !screensaver.playSound })}
+                      style={{ padding: '.5rem 1rem', borderRadius: '.625rem', border: 'none', fontWeight: 800, cursor: 'pointer', background: screensaver.playSound ? T.accent : (dark ? '#334155' : '#e2e8f0'), color: screensaver.playSound ? (dark ? '#0b1929' : '#fff') : T.sub }}>
+                      {screensaver.playSound ? 'Sound ON 🔊' : 'Muted 🔇'}
+                    </button>
+                  </div>
+
+                  <div style={{ background: T.inputBg, border: `1.5px solid ${T.inputBord}`, borderRadius: '.875rem', padding: '1.1rem' }}>
+                    <label style={{ display: 'block', fontSize: '.67rem', fontWeight: 800, color: T.sub, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.6rem' }}>Idle Timeout (Seconds)</label>
+                    <input type="number" min="10" max="600" value={screensaver.idleTimeoutSeconds} onChange={e => setScreensaver({ ...screensaver, idleTimeoutSeconds: parseInt(e.target.value) || 60 })}
+                      style={{ width: '100%', padding: '10px 14px', borderRadius: '.625rem', border: `1.5px solid ${T.inputBord}`, background: T.cardBg, color: T.text, fontSize: '1.1rem', fontWeight: 800, outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+
+                <div style={{ fontWeight: 800, fontSize: '.95rem', color: T.text, marginBottom: '.75rem' }}>Video Playlist URLs</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem', marginBottom: '1.5rem' }}>
+                  {screensaver.videos.map((url, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', background: T.inputBg, border: `1px solid ${T.inputBord}`, padding: '.75rem 1rem', borderRadius: '.75rem' }}>
+                      <span style={{ fontWeight: 800, color: T.sub, fontSize: '.85rem', minWidth: 20 }}>{i + 1}.</span>
+                      <span style={{ color: T.text, fontSize: '.85rem', flex: 1, wordBreak: 'break-all', fontWeight: 600 }}>{url}</span>
+                      <button type="button" onClick={() => setScreensaver({ ...screensaver, videos: screensaver.videos.filter((_, idx) => idx !== i) })}
+                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: 'none', padding: '.4rem .7rem', borderRadius: '.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '.75rem' }}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  {screensaver.videos.length === 0 && <div style={{ color: T.sub, fontSize: '.85rem', fontStyle: 'italic' }}>No videos configured. Default kiosk videos will be played.</div>}
+                </div>
+
+                <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1.75rem' }}>
+                  <input type="text" placeholder="Paste Video URL (e.g. https://.../video.mp4 or /second_video.mp4)" value={newVideoUrl} onChange={e => setNewVideoUrl(e.target.value)} style={{ ...inp(), flex: 1 }} />
+                  <button type="button" onClick={() => { if (newVideoUrl.trim()) { setScreensaver({ ...screensaver, videos: [...screensaver.videos, newVideoUrl.trim()] }); setNewVideoUrl(''); } }}
+                    style={{ background: dark ? '#1e293b' : '#e2e8f0', color: T.text, border: `1px solid ${T.inputBord}`, fontWeight: 800, padding: '0 1.25rem', borderRadius: '.625rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    + Add Video
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '1.25rem', borderTop: `1px solid ${T.divider}` }}>
+                  <button onClick={saveScreensaver} disabled={savingScreensaver} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.875rem 2rem', borderRadius: '.875rem', border: 'none', cursor: 'pointer', fontWeight: 800, background: savedScreensaver ? '#10b981' : T.accent, color: dark ? '#0b1929' : '#fff' }}>
+                    {savingScreensaver ? <Loader2 size={17} style={{ animation: 'spin 1s linear infinite' }} /> : savedScreensaver ? <CheckCircle2 size={17} /> : <Save size={17} />}
+                    {savedScreensaver ? 'Saved!' : 'Save Screen Saver Settings'}
                   </button>
                 </div>
               </div>

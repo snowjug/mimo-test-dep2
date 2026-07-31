@@ -6,6 +6,7 @@ import { SummaryScreen } from './components/screens/SummaryScreen';
 import { SystemErrorScreen } from './components/screens/SystemErrorScreen';
 import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
 import { CV001Background } from './components/screens/CV001Background';
+import { Adds } from './components/screens/adds/Adds';
 
 
 export type ScreenState =
@@ -39,6 +40,8 @@ function App() {
   const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>('idle');
   const [printError, setPrintError] = useState<string | undefined>(undefined);
   const [showRefundBanner, setShowRefundBanner] = useState(false);
+  const [showScreensaver, setShowScreensaver] = useState(false);
+  const [idleTimeout, setIdleTimeout] = useState(60);
 
   const [jobData, setJobData] = useState<{
     userName: string;
@@ -64,16 +67,21 @@ function App() {
     }, 3000);
   }, []);
 
-  // ================= IDLE TIMER FOR ADS =================
+  // ================= IDLE TIMER FOR ADS & SCREENSAVER =================
   useEffect(() => {
     let idleTimer: number;
 
     const resetIdleTimer = () => {
       clearTimeout(idleTimer);
+      setShowScreensaver(false);
       if (currentScreen === 'code-entry-screen') {
         idleTimer = window.setTimeout(() => {
           setCurrentScreen('main-interface');
         }, 20000); // 20 seconds of idle time -> reset to main interface
+      } else if (currentScreen === 'main-interface') {
+        idleTimer = window.setTimeout(() => {
+          setShowScreensaver(true);
+        }, idleTimeout * 1000);
       }
     };
 
@@ -92,7 +100,7 @@ function App() {
       window.removeEventListener('click', resetIdleTimer);
       window.removeEventListener('keypress', resetIdleTimer);
     };
-  }, [currentScreen]);
+  }, [currentScreen, idleTimeout]);
 
   // ================= VALIDATION + DOWNLOAD =================
   const handleValidationSuccess = useCallback(async () => {
@@ -248,6 +256,13 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* ================= SCREENSAVER ================= */}
+      <Adds 
+        isActive={showScreensaver} 
+        onTap={() => setShowScreensaver(false)} 
+        onTimeoutChange={(sec) => setIdleTimeout(sec)} 
+      />
 
       {/* ================= SCREENS ================= */}
       {dynamicKioskId === 'CV-001' && <CV001Background />}
