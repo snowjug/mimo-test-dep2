@@ -133,7 +133,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     collectTimerRef.current    = null;
   }, []);
 
-  const animateTo100AndComplete = useCallback((fast = false) => {
+  const animateTo100AndComplete = useCallback((_fast = false) => {
     if (isCompletingRef.current) return;
     isCompletingRef.current = true;
 
