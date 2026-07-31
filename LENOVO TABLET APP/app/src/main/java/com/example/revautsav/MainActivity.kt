@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var connectivityManager: ConnectivityManager
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var isLoadedSuccessfully = false
-    private val kioskUrl = "https://kisokmechine.vercel.app/"
+    private val kioskUrl = "https://mimo-kiosk-app.vercel.app/"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
