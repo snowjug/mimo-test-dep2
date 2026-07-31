@@ -157,7 +157,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
-  const schedulePoll = useCallback((delayMs = 2000) => {
+  const schedulePoll = useCallback((delayMs = 1000) => {
     if (!printCode || printCode === '0000' || !isActive) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
@@ -180,12 +180,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           clearAllTimers();
           if (onError) onError(errMsg);
         } else {
-          // Still printing — poll again in 2 s (fast enough to catch physical completion)
-          schedulePoll(2000);
+          // Still printing — poll again in 1 s for immediate completion sync
+          schedulePoll(1000);
         }
       } catch {
-        // Network hiccup — retry in 4 s
-        pollTimerRef.current = window.setTimeout(() => schedulePoll(2000), 4000);
+        // Network hiccup — retry in 2 s
+        pollTimerRef.current = window.setTimeout(() => schedulePoll(1000), 2000);
       }
     }, delayMs);
   }, [printCode, isActive, onError, clearAllTimers]);
@@ -198,16 +198,15 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     const totalSheets = Math.max(1, pages * copies);
 
     // ── Target total time for the 0→99% animation ─────────────────────────────
-    // Progress is intentionally smooth & reasonably quick so the user sees real
-    // activity. When the Pi confirms completion, animateTo100AndComplete(true)
-    // snaps the bar to 100% at 10ms/step, giving a satisfying rush at the end.
-    // B&W laser:    ~25s total (base 15s + 8s per sheet)
-    // Color inkjet: ~50s total (base 15s + 30s per sheet)
+    // Calibrated to match actual physical printer speeds so progress reaches
+    // ~95% exactly as the physical paper emerges from the machine.
+    // B&W laser:    ~8s total for 1 sheet (base 4s + 4s per sheet)
+    // Color inkjet: ~17s total for 1 sheet (base 5s + 12s per sheet)
     const isColor = colorMode === 'color';
-    const baseWarmup  = 15000;
-    const speedFactor = isColor ? 30000 : 8000;
+    const baseWarmup  = isColor ? 5000 : 4000;
+    const speedFactor = isColor ? 12000 : 4000;
     const totalAnimMs = baseWarmup + totalSheets * speedFactor;
-    const baseDelay   = Math.max(80, totalAnimMs / 99); // ms per 1% step
+    const baseDelay   = Math.max(50, totalAnimMs / 99); // ms per 1% step
 
     const tick = () => {
       if (isCompletingRef.current) return;
