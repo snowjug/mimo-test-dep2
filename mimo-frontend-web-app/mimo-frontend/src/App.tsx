@@ -160,14 +160,10 @@ function App() {
           };
 
           setJobData(job);
-          setPrintStatus("printing");
-          setCurrentScreen("printing-screen");
 
-          // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS (Pi listener picks it up via Firestore)
+          // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS FIRST (pre-flight health check & enqueue)
           if (code !== "0000" && code !== "9999") {
             try {
-              // Read specific Kiosk ID from URL so one Vercel deployment supports infinite kiosks!
-              // Example: printmimo.tech/kiosk?kioskId=SV-002
               const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
                 method: "POST",
                 headers: {
@@ -182,14 +178,22 @@ function App() {
               const printData = await printRes.json();
               
               if (!printRes.ok) {
-                // Log but don't show error - Pi listener handles printing independently
                 console.warn("kiosk/print API warning:", printData.error);
+                // If printer/kiosk health check failed, display immediately without loading animations!
+                if (printData.error && (printData.error.toLowerCase().includes("not working") || printData.error.toLowerCase().includes("offline") || printData.error.toLowerCase().includes("error"))) {
+                  setPrintError(printData.error);
+                  setCurrentScreen("system-error-screen");
+                  resolve();
+                  return;
+                }
               }
             } catch (printErr: any) {
-              // Network error calling kiosk/print - Pi listener will still handle it
               console.warn("kiosk/print network warning:", printErr.message);
             }
           }
+
+          setPrintStatus("printing");
+          setCurrentScreen("printing-screen");
 
           resolve();
         } catch (err: any) {

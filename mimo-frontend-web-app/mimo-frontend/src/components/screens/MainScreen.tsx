@@ -253,7 +253,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
             </main>
 
             <footer className="kiosk-footer" style={{ position: 'relative', zIndex: 10 }}>
-                Software designed and developed by <strong>Rathindra.</strong><br />
+                Crafted with innovation by <strong>Md Huzaif, Rathin &amp; Atharv.</strong><br />
                 &copy; 2026 <strong>VisionPrintt</strong>. All rights reserved.
             </footer>
         </div>
