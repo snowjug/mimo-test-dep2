@@ -1,194 +1,157 @@
-# MIMO V2
+# 🚀 MIMO V2 — Intelligent Print Platform
 
-This repository contains the MIMO printing platform split into three parts:
+Welcome to the **MIMO Printing Platform** repository! This project powers automated print kiosks, customer web applications, administration dashboards, and backend printing services.
 
-- `backend/` - Node.js and Express API with Firebase Admin, Firestore, and Cashfree payment handling.
-- `mimo-website/` - Main Vite + React web app for the customer experience.
-- `mimo-frontend-web-app/mimo-frontend/` - Kiosk-style Vite + React app for printing and device flows.
+---
 
-## Branch Overview
+## 🔗 Environment Variables & Secure Credentials
+
+> [!IMPORTANT]
+> **Environment Variables Download**: Real environment variables and service account keys are stored securely on Google Drive. Interns and developers must download credentials from this link:
+> 
+> 📁 **[Download Environment Variables (GDrive)](https://drive.google.com/file/d/1VURWsFEovVIUPC2dxNqrPfkcpAye42IU/view?usp=sharing)**
+> 
+> Do **NOT** commit raw `.env` files or secret keys to GitHub.
+
+---
+
+## 🏗️ Repository & Architecture Overview
+
+The repository is structured into 3 core services:
+
+- `backend/` — Node.js & Express REST API managing authentication, Firestore DB, Cashfree payments, and print job queues.
+- `mimo-website/` — Main Vite + React customer web application (Document upload, payments, user account, admin dashboard).
+- `mimo-frontend-web-app/mimo-frontend/` — Kiosk UI Vite + React application running on physical kiosk touchscreens.
+- `functions/` — Firebase Cloud Functions for WhatsApp Cloud API, email OTPs, and background webhooks.
+- `pi-listener/` / `pi_scripts/` — Python listener services running on Raspberry Pi hardware to receive print jobs and send them to CUPS printers.
+
+---
+
+## 🌿 Git Branch Topology
 
 | Branch | Description |
 |---|---|
-| `main` | Production branch — MIMO web platform (backend + frontend + Pi listeners) |
+| `main` | **Production branch** — Core website, backend API, kiosk UI, and Pi listeners |
 | `atharv-changes` | Feature branch synced with main |
 | `madhan` | Feature branch synced with main |
-| `revautsav-android` | **Android kiosk app (REVAUTSAV)** — isolated orphan branch, no shared history with `main` |
+| `revautsav-android` | **Android Kiosk App (REVAUTSAV)** — Isolated branch for Android Studio deployment |
 
-## Project Overview
+---
 
-The system supports user login, payment verification, print job creation, and kiosk-based printing workflows.
+## 🛠️ Required Tools & System Requirements
 
-## Hardware Topology & Production Servers
+Before starting development, ensure you have installed:
 
-The platform coordinates printing operations across two physical Kiosk stations:
+1. **Node.js**: `v18.x` or higher ([Node.js Download](https://nodejs.org/))
+2. **Package Manager**: `npm` (comes with Node.js)
+3. **Git**: Latest version ([Git Download](https://git-scm.com/))
+4. **Python 3**: `v3.9+` (required for running Pi print listener scripts)
+5. **Firebase CLI**: Install globally via `npm install -g firebase-tools`
+6. **Android Studio** *(Optional)*: Required only if working on the `revautsav-android` branch.
 
-### 1. Kiosk SV-002 (MIMO 2.0)
-- **Host & User:** `pi@100.107.95.16`
-- **Hostname:** `pi`
-- **Tailscale IP:** `100.107.95.16`
-- **Local IP:** `192.168.8.197`
-- **`mimo-listener` Service Status:** `running`
-- **Configured Identity:** `SV-002`
-- **Target Printers:**
-  - **Monochrome (B&W):** `Brother_HL_L2440DW_series` (supports Duplex/double-sided printing)
-  - **Color:** `Epson_L3250` (all color print jobs automatically route to this printer)
+---
 
-### 2. Kiosk CV-001 (MIMO 1.0)
-- **Host & User:** `printpi@100.70.107.44`
-- **Hostname:** `printpi`
-- **Tailscale IP:** `100.70.107.44`
-- **Local IP:** `10.108.2.19`
-- **`mimo-listener` Service Status:** `running`
-- **Configured Identity:** `CV-001`
-- **Target Printers:**
-  - **Monochrome (B&W):** `Brother_HL_L5210DN_series` (supports Duplex/double-sided high-speed printing)
+## 🚀 Intern Onboarding Guide & How to Proceed
 
+Follow these step-by-step instructions to get your local environment running:
 
-## Live Deployments
-
-| Service | URL |
-|---|---|
-| **Main Website** | https://printmimo.tech |
-| **Landing Page** | https://printmimo.tech/landing |
-| **Kiosk App (all kiosks)** | https://kisokmechine.vercel.app |
-| **Kiosk MIMO-2.0** | https://kisokmechine.vercel.app/?kioskId=SV-002 |
-| **Kiosk MIMO-1.0** | https://kisokmechine.vercel.app/?kioskId=CV-001 |
-| **Admin Dashboard** | https://printmimo.tech/admin |
-| **Firebase Functions API** | https://api-upqxuj7evq-uc.a.run.app |
-
-> **Note:** The kiosk app is a single Vercel deployment that supports unlimited physical kiosks via the `?kioskId=` URL parameter. The Pi autostart file on each device sets the correct `kioskId` for its location.
-
-Key backend responsibilities include:
-
-- authentication and session handling
-- payment order creation and verification
-- Firestore reads and writes
-- print job lifecycle updates
-- webhook handling for payment confirmation
-
-## Recent Features & Optimizations
-
-### 🛡️ Production Hardening & Reliability (v2.0)
-- **Automatic Payment Refunds**: Deployed a secure, serverless auto-refund hook. When a physical print fails on the Pi (out of paper, disconnected, CUPS/conversion error), it calls `/kiosk/report-failure` to immediately trigger a Cashfree API refund, and displays a user-friendly pulsing **"💚 Refund in Progress"** status screen.
-- **Robust Multi-File State Syncing**: The user upload dashboard now dynamically syncs with Firestore and session storage. Deleting a file in the UI calls `/finalize-upload` to remove its document in Firestore, avoiding ghost charges, and session storage is auto-cleared on checkout popstate to prevent completed files from leaking into new sessions.
-- **Re-entered Code Detection**: Improved NumPad validation. Re-entering a print code that has already printed/refunded now queries Firestore history to display a clear `"Print code already used"` error instead of a generic 404 page.
-- **Async File Processing**: Document uploads now instantly queue as `pending_conversion` instead of blocking Node.js, resolving Out-of-Memory crashes.
-- **Direct PDF Streaming**: Kiosk PDF downloads use Node.js `ReadStreams` bypassing RAM buffers entirely.
-- **In-Memory Cache**: 200MB maximum LRU Cache stores recent Kiosk PDFs ensuring fast downloads while strictly preventing memory leaks.
-- **Mimo Coins & Print History**: Fully functional backend integration for displaying previous prints and managing virtual currency. Print History gracefully filters and maps data in-memory to bypass Firebase composite index limits.
-- **Profile Enhancements**: Added secure profile photo uploads directly to Firebase Storage using long-lived Signed URLs.
-- **Brute Force Protection**: Rate limiters added to Kiosk API endpoints (20 req/min).
-
-### ⚡ High-Speed Print & Performance Wins
-- **Parallel Document Downloads**: Refactored the Pi's `firebase_listener.py` to use a `ThreadPoolExecutor` to download files in parallel rather than sequentially, slicing wait times for multi-document print jobs.
-- **Instant Printer Spooling**: Reduced the local `lpstat` printer online check timeout from 5s to 2s, allowing the printer to wake up and spool print jobs near-instantly.
-- **300 DPI High-Speed Rendering**: Customized the Brother printer's PPD configuration file (`/etc/cups/ppd/Brother_HL_L5210DN_series.ppd`) on CV-001 to render at 300 DPI (down from the default 600 DPI). This reduced processed bitmap sizes by **4x**, cutting CPU rasterizing and USB spool times to **under 8 seconds**.
-- **Bypassed CPU-Heavy Pre-Compression**: Disabled slow on-Pi PDF pre-compression (which spooled through Ghostscript on the weak Pi CPU), allowing raw optimized PDFs to feed directly to the printer spooler.
-- **Kiosk Progress Fast-Finish**: Optimized the NumPad print progress bar to fast-finish (10ms per percent) the moment CUPS signals print success, letting users retrieve their papers without waiting on fake animations.
-- **2× Faster Kiosk Progress Bar**: Reduced B&W animation baseline from `30s + 15s/sheet` to `15s + 8s/sheet`. Color inkjet from `30s + 60s/sheet` to `15s + 30s/sheet`. Exponential creep near completion replaced with a gentle deceleration starting at 85% (previously 80%), making the bar feel fluid instead of frozen.
-
-### 🔧 Kiosk UX Bug Fixes (v2.1)
-- **Printer Offline → Instant Error (was: stuck at ~93%)**: Replaced the old stall-check that only triggered at 99% with a **20-second progress-movement detector**. If the progress bar hasn't moved for 20 consecutive seconds (at *any* percentage), the kiosk immediately surfaces a `"Printer is not responding"` error screen. Previously, users were silently stuck watching the bar crawl for minutes before anything happened. Every successful API poll resets the stall clock; network failures do not, so a dead connection is correctly treated as a stall.
-- **Color Print "Ghost Complete" Fix — Epson L3250 Ejection Hold**: Users reported the kiosk showing 100% complete but no paper coming out for color jobs. Root cause: the Epson L3250 inkjet runs a **head initialization / maintenance cycle** on wake-up. CUPS spools the job and marks it "completed" in its queue while the printer is still in its cleaning cycle — the Pi's `wait_for_cups_job` thread sees CUPS completed, waits 15s, then sets `isPrinted: True` in Firestore. The kiosk polls, sees done, shows 100%, and the user walks away before paper physically ejects (30–60s later). **Fix:** After a color job hits 100%, the kiosk now shows a full-screen **"🖨️ Collecting your pages…"** overlay with a pulsing printer icon and a **25-second live countdown**, telling the user to stay at the printer. B&W laser prints are unaffected.
-
-
-## Folder Structure
-
-```text
-backend/
-mimo-website/
-mimo-frontend-web-app/mimo-frontend/
-docs/
+### Step 1: Clone the Repository
+```bash
+git clone https://github.com/madhans7/mimo-test-dep2.git
+cd mimo-test-dep2
 ```
 
-## Local Setup
+### Step 2: Download & Setup Environment Files
+1. Access the **[GDrive Environment Variables Link](https://drive.google.com/file/d/1VURWsFEovVIUPC2dxNqrPfkcpAye42IU/view?usp=sharing)**.
+2. Download the `.env` configuration.
+3. Create the following files locally:
+   - Place backend credentials in `backend/.env`
+   - Place Cloud Functions credentials in `functions/.env`
+   - Place `serviceAccountKey.json` in the project root / `backend/`
 
-### Backend
+### Step 3: Install Dependencies
 
+**Backend API:**
 ```bash
 cd backend
 npm install
-npm start
 ```
 
-Useful backend scripts:
-
-- `npm start` - run the Express server
-- `npm run seed:firestore` - seed Firestore collections
-
-### Main Website
-
+**Main Website & Admin Dashboard:**
 ```bash
-cd mimo-website
+cd ../mimo-website
 npm install
-npm run dev
 ```
 
-Build:
-
+**Kiosk Web Frontend:**
 ```bash
-npm run build
-```
-
-### Kiosk Frontend
-
-```bash
-cd mimo-frontend-web-app/mimo-frontend
+cd ../mimo-frontend-web-app/mimo-frontend
 npm install
-npm run dev
 ```
 
-Build:
+### Step 4: Run Local Development Servers
 
-```bash
-npm run build
-```
+- **Run Backend API** (Terminal 1):
+  ```bash
+  cd backend
+  npm start
+  ```
+  *(Server runs on `http://localhost:3000`)*
 
-### Android Kiosk App (REVAUTSAV)
+- **Run Customer Website** (Terminal 2):
+  ```bash
+  cd mimo-website
+  npm run dev
+  ```
+  *(Website runs on `http://localhost:5173`)*
 
-The Android app lives on the `revautsav-android` branch (orphan — no shared history with `main`).
+- **Run Kiosk App** (Terminal 3):
+  ```bash
+  cd mimo-frontend-web-app/mimo-frontend
+  npm run dev
+  ```
 
-```bash
-# Switch to the Android branch
-git checkout revautsav-android
-```
+---
 
-Open the project in **Android Studio** and build/deploy to the kiosk device.
-Refer to `KIOSK_GUIDE.md` and `ADB_Commands.md` in that branch for full setup and ADB commands.
+## 🖥️ Production Kiosk Hardware Topology
 
-## Environment Variables
+The platform coordinates real-time printing across physical kiosk stations:
 
-The backend expects Firebase and payment credentials in `backend/.env`.
+| Kiosk ID | Station Name | Tailscale IP | Local IP | Monochrome Printer | Color Printer |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **SV-002** | MIMO 2.0 | `100.107.95.16` | `192.168.8.197` | Brother HL-L2440DW | Epson L3250 |
+| **CV-001** | MIMO 1.0 | `100.70.107.44` | `10.108.2.19` | Brother HL-L5210DN | Brother IPP |
 
-Important values include:
+---
 
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_PRIVATE_KEY`
-- `FIREBASE_CLIENT_EMAIL`
-- `JWT_SECRET`
-- `CASHFREE_APP_ID`
-- `CASHFREE_SECRET_KEY`
-- `FRONTEND_URL`
+## 🌐 Live Production Deployments
 
-Do not commit secrets to the repository.
+- **Customer Web App**: [https://printmimo.tech](https://printmimo.tech)
+- **Kiosk Interface**: [https://kisokmechine.vercel.app](https://kisokmechine.vercel.app)
+- **Admin Dashboard**: [https://printmimo.tech/admin](https://printmimo.tech/admin)
+- **Cloud Backend API**: [https://api-upqxuj7evq-uc.a.run.app](https://api-upqxuj7evq-uc.a.run.app)
 
-## Firebase
+---
 
-The repo includes Firebase configuration files in `backend/`:
+## ❓ Intern FAQs & Troubleshooting
 
-- `firebase.json`
-- `firestore.rules`
-- `firestore.indexes.json`
-- `.firebaserc`
+### Q1: How do print jobs get from the web app to physical printers?
+1. User uploads document on `mimo-website` and completes payment via Cashfree.
+2. Backend creates a print job in Firestore with status `"paid"` and a 4-digit `printCode`.
+3. User enters the code on the Kiosk touchscreen.
+4. Status changes to `"printing"`. The Pi listener running `firebase_listener.py` receives the event, downloads the PDF signed URL, and sends it to CUPS (`lpr`).
 
-Deploy Firestore rules and indexes from the `backend/` directory:
+### Q2: What happens if a printer runs out of paper or shows an error?
+- The listener runs an **Auto-Error Clearance** watchdog: it automatically executes `cupsenable` and `cupsaccept`, clears stuck queues, and resets kiosk error flags.
+- If the hardware is physically broken, the backend automatically calls Cashfree's refund API (`/request-refund`) to refund the customer.
 
-```bash
-firebase deploy --only firestore:rules,firestore:indexes --config firebase.json --project mimo-v2-11868
-```
+### Q3: What should I do before pushing code to GitHub?
+- Never commit `.env` or secret `.json` files.
+- Test your changes locally (`npm run build`).
+- Create a feature branch (e.g. `git checkout -b intern/your-name-feature`) and create a Pull Request against `main`.
 
-## Notes
+---
 
-- The main website uses SPA routing, so direct route reloads should be handled by Vercel rewrites.
-- Firestore seeding requires a service account with write permissions for the `mimo-v2-11868` project.
+## 🔒 Security Best Practices
+- Always maintain `.env` files in `.gitignore`.
+- Use `.env.example` as a template for adding any new environment key names.
