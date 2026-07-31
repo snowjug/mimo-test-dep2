@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import {
   Building, LogOut, Loader2, Printer, RefreshCcw, Tag,
-  Home, BarChart2, Ticket, Search, User, Zap, Activity, Settings, Cpu, Droplets, Layers, Save, CheckCircle2, Clock, Menu, X, Crown
+  Home, BarChart2, Ticket, Search, User, Zap, Activity, Settings, Cpu, Droplets, Layers, Save, CheckCircle2, Clock, Menu, X, Crown, Tv
 } from 'lucide-react';
 import api from '../../api';
 
@@ -26,6 +26,19 @@ export default function AdminDashboard() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [savedSettings, setSavedSettings] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [screensaver, setScreensaver] = useState({
+    videos: [
+      "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+      "/second_video.mp4",
+      "/3_video.mp4",
+      "/4_video.mp4"
+    ],
+    playSound: true,
+    idleTimeoutSeconds: 60,
+  });
+  const [newVideoUrl, setNewVideoUrl] = useState('');
+  const [savingScreensaver, setSavingScreensaver] = useState(false);
+  const [savedScreensaver, setSavedScreensaver] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -38,12 +51,13 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [metricsRes, couponsRes, printsRes, settingsRes, hardwareRes] = await Promise.all([
+      const [metricsRes, couponsRes, printsRes, settingsRes, hardwareRes, screensaverRes] = await Promise.all([
         api.get('/admin/metrics', { headers }),
         api.get('/admin/coupons', { headers }),
         api.get('/admin/recent-prints', { headers }).catch(() => ({ data: [] })),
         api.get('/admin/settings', { headers }).catch(() => ({ data: { pricePerPageBW: 2.30, pricePerPageColor: 10.0 } })),
-        api.get('/admin/hardware', { headers }).catch(() => ({ data: {} }))
+        api.get('/admin/hardware', { headers }).catch(() => ({ data: {} })),
+        api.get('/admin/screensaver', { headers }).catch(() => ({ data: {} }))
       ]);
       setMetrics(metricsRes.data);
       setCoupons(couponsRes.data);
@@ -55,6 +69,13 @@ export default function AdminDashboard() {
         pricePerPageGraph: settingsRes.data.pricePerPageGraph || 2.00
       });
       setHardware(hardwareRes.data);
+      if (screensaverRes.data && screensaverRes.data.videos) {
+        setScreensaver({
+          videos: screensaverRes.data.videos,
+          playSound: screensaverRes.data.playSound ?? true,
+          idleTimeoutSeconds: screensaverRes.data.idleTimeoutSeconds || 60,
+        });
+      }
     } catch (err: any) {
       if (err.response?.status === 401 || err.response?.status === 403) {
         logout();
@@ -111,6 +132,20 @@ export default function AdminDashboard() {
       alert('Failed to save settings');
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const saveScreensaver = async () => {
+    setSavingScreensaver(true);
+    try {
+      await api.post('/admin/screensaver', screensaver, { headers: { Authorization: `Bearer ${token}` } });
+      setSavedScreensaver(true);
+      setTimeout(() => setSavedScreensaver(false), 3000);
+      fetchData();
+    } catch (err) {
+      alert('Failed to save screen saver settings');
+    } finally {
+      setSavingScreensaver(false);
     }
   };
 
@@ -308,6 +343,12 @@ export default function AdminDashboard() {
             className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${activeTab === 'settings' ? 'bg-[#6EE7B7] text-[#112F4B]' : 'text-[#6EE7B7] hover:bg-white/5'}`}
           >
             <Settings className="w-5 h-5" /> Settings
+          </button>
+          <button
+            onClick={() => { setActiveTab('screensaver'); setIsMobileMenuOpen(false); }}
+            className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${activeTab === 'screensaver' ? 'bg-[#6EE7B7] text-[#112F4B]' : 'text-[#6EE7B7] hover:bg-white/5'}`}
+          >
+            <Tv className="w-5 h-5" /> Screen Saver
           </button>
         </nav>
 
@@ -795,6 +836,71 @@ export default function AdminDashboard() {
                     </button>
                  </div>
                </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── SCREENSAVER TAB ─────────────────────────── */}
+        {activeTab === 'screensaver' && (
+          <div className="space-y-8 animate-in fade-in max-w-3xl">
+            <div className="bg-[#112F4B] p-8 rounded-xl border border-[#1A4971] shadow-sm">
+              <h2 className="text-xl font-normal text-white mb-2">Motion Graphics & Screen Saver Configuration</h2>
+              <p className="text-sm text-[#8AA1B9] mb-8">Configure idle screen saver video playlist, sound playback, and idle timers for kiosk tablets.</p>
+
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="p-6 bg-[#041E34] rounded-xl border border-[#1A4971] flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-semibold text-[#6EE7B7] uppercase tracking-wider mb-1">Audio Playback</div>
+                      <div className="text-sm text-[#8AA1B9]">Play sound with video</div>
+                    </div>
+                    <button type="button" onClick={() => setScreensaver({ ...screensaver, playSound: !screensaver.playSound })}
+                      className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${screensaver.playSound ? 'bg-[#6EE7B7] text-[#112F4B]' : 'bg-[#1E3A5F] text-[#8AA1B9]'}`}>
+                      {screensaver.playSound ? 'Sound ON 🔊' : 'Muted 🔇'}
+                    </button>
+                  </div>
+
+                  <div className="p-6 bg-[#041E34] rounded-xl border border-[#1A4971]">
+                    <label className="text-xs font-semibold text-[#6EE7B7] uppercase tracking-wider mb-3 block">Idle Timeout (Seconds)</label>
+                    <input type="number" min="10" max="600" value={screensaver.idleTimeoutSeconds} onChange={e => setScreensaver({ ...screensaver, idleTimeoutSeconds: parseInt(e.target.value) || 60 })}
+                      className="w-full px-4 py-3 rounded-lg bg-[#112F4B] border border-[#1A4971] text-xl font-normal text-white focus:ring-2 focus:ring-[#6EE7B7] outline-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-3">Video Playlist URLs</h3>
+                  <div className="space-y-3 mb-4">
+                    {screensaver.videos.map((url, i) => (
+                      <div key={i} className="flex items-center gap-3 bg-[#041E34] border border-[#1A4971] px-4 py-3 rounded-lg">
+                        <span className="font-bold text-[#8AA1B9] text-sm">{i + 1}.</span>
+                        <span className="text-white text-sm flex-1 break-all">{url}</span>
+                        <button type="button" onClick={() => setScreensaver({ ...screensaver, videos: screensaver.videos.filter((_, idx) => idx !== i) })}
+                          className="bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 font-semibold px-3 py-1.5 rounded text-xs transition-colors">
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    {screensaver.videos.length === 0 && <div className="text-[#8AA1B9] text-sm italic">No videos configured. Default kiosk videos will be played.</div>}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <input type="text" placeholder="Paste Video URL (e.g. https://.../video.mp4)" value={newVideoUrl} onChange={e => setNewVideoUrl(e.target.value)}
+                      className="flex-1 px-4 py-3 rounded-lg bg-[#041E34] border border-[#1A4971] text-sm text-white outline-none focus:ring-2 focus:ring-[#6EE7B7]" />
+                    <button type="button" onClick={() => { if (newVideoUrl.trim()) { setScreensaver({ ...screensaver, videos: [...screensaver.videos, newVideoUrl.trim()] }); setNewVideoUrl(''); } }}
+                      className="bg-[#1E3A5F] hover:bg-[#284B7A] text-white font-semibold px-5 rounded-lg text-sm transition-colors whitespace-nowrap">
+                      + Add Video
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-[#1A4971] flex justify-end">
+                  <button onClick={saveScreensaver} disabled={savingScreensaver}
+                    className={`flex items-center gap-2 font-medium px-8 py-4 rounded-lg transition-all ${savedScreensaver ? 'bg-emerald-500 text-white' : 'bg-[#6EE7B7] hover:bg-[#A7F3D0] text-[#112F4B]'}`}>
+                    {savingScreensaver ? <Loader2 className="w-5 h-5 animate-spin" /> : savedScreensaver ? <CheckCircle2 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+                    {savedScreensaver ? 'Saved Successfully' : 'Save Screen Saver Settings'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

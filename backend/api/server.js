@@ -1331,6 +1331,24 @@ app.get("/api/settings", async (req, res) => {
   }
 });
 
+app.get("/api/screensaver", async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("screensaver").get();
+    res.json(doc.exists ? doc.data() : {
+      videos: [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: true,
+      idleTimeoutSeconds: 60
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ================= CREATE ORDER =================
 app.post("/create-order", authenticateToken, async (req, res) => {
   try {
@@ -3066,6 +3084,43 @@ app.post("/admin/settings", authenticateAdmin, async (req, res) => {
     if (pricePerPageGraph !== undefined) updateData.pricePerPageGraph = Number(pricePerPageGraph);
 
     await db.collection("mimo_settings").doc("pricing").set(updateData, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/screensaver", authenticateAdmin, async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("screensaver").get();
+    res.json(doc.exists ? doc.data() : {
+      videos: [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: true,
+      idleTimeoutSeconds: 60
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/screensaver", authenticateAdmin, async (req, res) => {
+  try {
+    const { videos, playSound, idleTimeoutSeconds } = req.body;
+    await db.collection("mimo_settings").doc("screensaver").set({
+      videos: Array.isArray(videos) ? videos : [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: Boolean(playSound),
+      idleTimeoutSeconds: Number(idleTimeoutSeconds || 60)
+    }, { merge: true });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
