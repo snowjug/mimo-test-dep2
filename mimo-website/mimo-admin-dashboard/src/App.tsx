@@ -9,7 +9,8 @@ import {
   Droplets, Layers, Save, CheckCircle2, Sun, Moon, Bell, BarChart2 as BarIcon, Upload
 } from 'lucide-react';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { storage } from './lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { storage, db } from './lib/firebase';
 import api from './api';
 
 // ─── colour helpers ──────────────────────────────────────────────────────────
@@ -132,11 +133,22 @@ export default function AdminDashboard() {
         pricePerPageColor: sR.data.pricePerPageColor || 10.00,
       });
       setHardware(hwR.data);
-      if (ssR.data && ssR.data.videos) {
+      let ssData = ssR.data;
+      if (!ssData || !ssData.videos || ssData.videos.length === 0) {
+        try {
+          const sDoc = await getDoc(doc(db, 'mimo_settings', 'screensaver'));
+          if (sDoc.exists()) {
+            ssData = sDoc.data();
+          }
+        } catch (fErr) {
+          console.warn('Firestore screensaver fetch fallback error:', fErr);
+        }
+      }
+      if (ssData && ssData.videos) {
         setScreensaver({
-          videos: ssR.data.videos,
-          playSound: ssR.data.playSound ?? true,
-          idleTimeoutSeconds: ssR.data.idleTimeoutSeconds || 60,
+          videos: ssData.videos,
+          playSound: ssData.playSound ?? true,
+          idleTimeoutSeconds: ssData.idleTimeoutSeconds || 60,
         });
       }
     } catch (err: any) {
@@ -167,8 +179,26 @@ export default function AdminDashboard() {
 
   const saveScreensaver = async () => {
     setSavingScreensaver(true);
-    try { await api.post('/admin/screensaver', screensaver, { headers: { Authorization: `Bearer ${token}` } }); setSavedScreensaver(true); setTimeout(() => setSavedScreensaver(false), 3000); fetchData(); }
-    catch { alert('Failed to save screen saver settings.'); } finally { setSavingScreensaver(false); }
+    try {
+      try {
+        await api.post('/admin/screensaver', screensaver, { headers: { Authorization: `Bearer ${token}` } });
+      } catch (apiErr) {
+        console.warn('API /admin/screensaver failed, updating Firestore directly:', apiErr);
+        await setDoc(doc(db, 'mimo_settings', 'screensaver'), {
+          videos: screensaver.videos,
+          playSound: Boolean(screensaver.playSound),
+          idleTimeoutSeconds: Number(screensaver.idleTimeoutSeconds || 60),
+        }, { merge: true });
+      }
+      setSavedScreensaver(true);
+      setTimeout(() => setSavedScreensaver(false), 3000);
+      fetchData();
+    } catch (err) {
+      console.error('Failed to save screensaver settings:', err);
+      alert('Failed to save screen saver settings.');
+    } finally {
+      setSavingScreensaver(false);
+    }
   };
 
   const updateHardwareLevel = async (id: string, u: any) => {
