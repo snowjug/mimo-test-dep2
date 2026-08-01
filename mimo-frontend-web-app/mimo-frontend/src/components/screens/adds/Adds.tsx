@@ -57,8 +57,32 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
     }
   }, [isActive]);
 
+  const isImageUrl = (url: string) => {
+    if (!url) return false;
+    const cleanUrl = url.split('?')[0].toLowerCase();
+    return cleanUrl.endsWith('.jpg') || 
+           cleanUrl.endsWith('.jpeg') || 
+           cleanUrl.endsWith('.png') || 
+           cleanUrl.endsWith('.webp') || 
+           cleanUrl.endsWith('.gif') || 
+           cleanUrl.includes('/images/') || 
+           cleanUrl.includes('image_');
+  };
+
   useEffect(() => {
-    if (isActive && videoRef.current) {
+    if (!isActive || videos.length === 0) return;
+    const currentUrl = videos[currentVideoIndex];
+    if (isImageUrl(currentUrl)) {
+      const timer = setTimeout(() => {
+        setCurrentVideoIndex((prevIndex) => (prevIndex + 1) % videos.length);
+      }, 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [isActive, currentVideoIndex, videos]);
+
+  useEffect(() => {
+    const currentUrl = videos[currentVideoIndex];
+    if (isActive && videoRef.current && !isImageUrl(currentUrl)) {
       const vid = videoRef.current;
       vid.muted = !playSound || isMutedFallback;
       vid.play().catch((err) => {
@@ -71,13 +95,16 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
         }
       });
     }
-  }, [isActive, currentVideoIndex, playSound, isMutedFallback]);
+  }, [isActive, currentVideoIndex, playSound, isMutedFallback, videos]);
 
   if (!isActive || videos.length === 0) return null;
 
   const handleVideoEnd = () => {
     setCurrentVideoIndex((prevIndex) => (prevIndex + 1) % videos.length);
   };
+
+  const currentMediaUrl = videos[currentVideoIndex];
+  const isImage = isImageUrl(currentMediaUrl);
 
   return createPortal(
     <div 
@@ -98,18 +125,27 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
         overflow: 'hidden'
       }}
     >
-      <video 
-        ref={videoRef}
-        key={`${currentVideoIndex}-${videos[currentVideoIndex]}`}
-        src={videos[currentVideoIndex]}
-        autoPlay 
-        muted={!playSound || isMutedFallback}
-        playsInline
-        onEnded={handleVideoEnd}
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-      >
-        Your browser does not support the video tag.
-      </video>
+      {isImage ? (
+        <img
+          key={`${currentVideoIndex}-${currentMediaUrl}`}
+          src={currentMediaUrl}
+          alt="Screen Saver"
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      ) : (
+        <video 
+          ref={videoRef}
+          key={`${currentVideoIndex}-${currentMediaUrl}`}
+          src={currentMediaUrl}
+          autoPlay 
+          muted={!playSound || isMutedFallback}
+          playsInline
+          onEnded={handleVideoEnd}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        >
+          Your browser does not support the video tag.
+        </video>
+      )}
 
       {/* Touch prompt banner */}
       <div style={{
