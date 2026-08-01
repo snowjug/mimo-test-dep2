@@ -20,7 +20,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [videos, setVideos] = useState<string[]>(defaultVideos);
   const [playSound, setPlaySound] = useState(true);
-  const [isMutedFallback, setIsMutedFallback] = useState(false);
+  const [isMutedFallback, setIsMutedFallback] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -53,13 +53,12 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
   useEffect(() => {
     if (isActive) {
       setCurrentVideoIndex(0);
-      setIsMutedFallback(false);
     }
   }, [isActive]);
 
   const isImageUrl = (url: string) => {
     if (!url) return false;
-    const cleanUrl = url.split('?')[0].toLowerCase();
+    const cleanUrl = decodeURIComponent(url.split('?')[0]).toLowerCase();
     return cleanUrl.endsWith('.jpg') || 
            cleanUrl.endsWith('.jpeg') || 
            cleanUrl.endsWith('.png') || 
@@ -69,15 +68,20 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
            cleanUrl.includes('image_');
   };
 
+  const handleVideoEnd = () => {
+    setCurrentVideoIndex((prevIndex) => (prevIndex + 1) % videos.length);
+  };
+
+  // Watchdog timer: 8s for images, 60s max for videos to prevent stuck black screens
   useEffect(() => {
     if (!isActive || videos.length === 0) return;
     const currentUrl = videos[currentVideoIndex];
-    if (isImageUrl(currentUrl)) {
-      const timer = setTimeout(() => {
-        setCurrentVideoIndex((prevIndex) => (prevIndex + 1) % videos.length);
-      }, 8000);
-      return () => clearTimeout(timer);
-    }
+    const isImg = isImageUrl(currentUrl);
+    const timeoutMs = isImg ? 8000 : 60000;
+    const timer = setTimeout(() => {
+      handleVideoEnd();
+    }, timeoutMs);
+    return () => clearTimeout(timer);
   }, [isActive, currentVideoIndex, videos]);
 
   useEffect(() => {
@@ -85,23 +89,22 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
     if (isActive && videoRef.current && !isImageUrl(currentUrl)) {
       const vid = videoRef.current;
       vid.muted = !playSound || isMutedFallback;
-      vid.play().catch((err) => {
-        // If unmuted autoplay is blocked by browser policy before first interaction, fallback to muted autoplay
-        if (!vid.muted) {
-          console.warn("Unmuted autoplay blocked by browser policy, falling back to muted autoplay:", err);
+      const playPromise = vid.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn("Autoplay attempt failed, falling back to muted play:", err);
           vid.muted = true;
           setIsMutedFallback(true);
-          vid.play().catch(e => console.error("Autoplay failed:", e));
-        }
-      });
+          vid.play().catch(e => {
+            console.error("Muted autoplay also failed, skipping video:", e);
+            handleVideoEnd();
+          });
+        });
+      }
     }
   }, [isActive, currentVideoIndex, playSound, isMutedFallback, videos]);
 
   if (!isActive || videos.length === 0) return null;
-
-  const handleVideoEnd = () => {
-    setCurrentVideoIndex((prevIndex) => (prevIndex + 1) % videos.length);
-  };
 
   const currentMediaUrl = videos[currentVideoIndex];
   const isImage = isImageUrl(currentMediaUrl);
@@ -130,6 +133,10 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
           key={`${currentVideoIndex}-${currentMediaUrl}`}
           src={currentMediaUrl}
           alt="Screen Saver"
+          onError={() => {
+            console.warn("Image failed to load, skipping:", currentMediaUrl);
+            handleVideoEnd();
+          }}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
       ) : (
@@ -141,6 +148,10 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
           muted={!playSound || isMutedFallback}
           playsInline
           onEnded={handleVideoEnd}
+          onError={() => {
+            console.warn("Video failed to play/load, skipping:", currentMediaUrl);
+            handleVideoEnd();
+          }}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         >
           Your browser does not support the video tag.
