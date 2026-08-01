@@ -24,8 +24,31 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
-    // Fetch dynamic screen saver configuration from admin backend
+    // Fetch dynamic screen saver configuration directly from Firestore or admin backend
     const fetchScreenSaverConfig = async () => {
+      try {
+        const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mimo-v2-11868/databases/(default)/documents/mimo_settings/screensaver");
+        if (fsRes.ok) {
+          const docData = await fsRes.json();
+          if (docData.fields && docData.fields.videos && docData.fields.videos.arrayValue && docData.fields.videos.arrayValue.values) {
+            const videoUrls = docData.fields.videos.arrayValue.values.map((v: any) => v.stringValue).filter(Boolean);
+            if (videoUrls.length > 0) {
+              setVideos(videoUrls);
+            }
+          }
+          if (docData.fields?.playSound && typeof docData.fields.playSound.booleanValue === 'boolean') {
+            setPlaySound(docData.fields.playSound.booleanValue);
+          }
+          if (docData.fields?.idleTimeoutSeconds && onTimeoutChange) {
+            const sec = parseInt(docData.fields.idleTimeoutSeconds.integerValue || '60', 10);
+            if (sec > 0) onTimeoutChange(sec);
+          }
+          return;
+        }
+      } catch (fsErr) {
+        console.warn("Firestore REST fetch error, falling back to backend API:", fsErr);
+      }
+
       try {
         const res = await fetch(`${BACKEND_URL}/api/screensaver`);
         if (res.ok) {
@@ -46,7 +69,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
     };
 
     fetchScreenSaverConfig();
-    const interval = setInterval(fetchScreenSaverConfig, 60000); // Re-check config every minute
+    const interval = setInterval(fetchScreenSaverConfig, 30000); // Re-check config every 30 seconds
     return () => clearInterval(interval);
   }, [onTimeoutChange]);
 
