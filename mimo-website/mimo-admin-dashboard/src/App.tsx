@@ -6,8 +6,10 @@ import {
 import {
   Building, LogOut, Loader2, Printer, RefreshCcw, Tag,
   Home, Ticket, Search, User, Zap, Activity, Settings, Cpu, Tv,
-  Droplets, Layers, Save, CheckCircle2, Sun, Moon, Bell, BarChart2 as BarIcon
+  Droplets, Layers, Save, CheckCircle2, Sun, Moon, Bell, BarChart2 as BarIcon, Upload
 } from 'lucide-react';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from './lib/firebase';
 import api from './api';
 
 // ─── colour helpers ──────────────────────────────────────────────────────────
@@ -77,6 +79,30 @@ export default function AdminDashboard() {
   const [newVideoUrl, setNewVideoUrl]       = useState('');
   const [savingScreensaver, setSavingScreensaver] = useState(false);
   const [savedScreensaver, setSavedScreensaver]   = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia]   = useState(false);
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingMedia(true);
+    try {
+      const storageRef = ref(storage, `screensaver/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      await new Promise((resolve, reject) => {
+        uploadTask.on('state_changed', null, (err) => reject(err), async () => {
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          setScreensaver((prev) => ({ ...prev, videos: [...prev.videos, downloadUrl] }));
+          resolve(downloadUrl);
+        });
+      });
+    } catch (err) {
+      console.error('Failed to upload screensaver media:', err);
+      alert('Failed to upload file from gallery.');
+    } finally {
+      setIsUploadingMedia(false);
+      e.target.value = '';
+    }
+  };
 
   const T = dark ? DARK : LIGHT;
   const toggleTheme = () => setDark(d => { const n = !d; localStorage.setItem('adminTheme', n ? 'dark' : 'light'); return n; });
@@ -598,12 +624,23 @@ export default function AdminDashboard() {
                   {screensaver.videos.length === 0 && <div style={{ color: T.sub, fontSize: '.85rem', fontStyle: 'italic' }}>No videos configured. Default kiosk videos will be played.</div>}
                 </div>
 
-                <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1.75rem' }}>
-                  <input type="text" placeholder="Paste Video URL (e.g. https://.../video.mp4 or /second_video.mp4)" value={newVideoUrl} onChange={e => setNewVideoUrl(e.target.value)} style={{ ...inp(), flex: 1 }} />
+                <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
+                  <input type="text" placeholder="Paste Media URL (e.g. https://.../video.mp4 or image.jpg)" value={newVideoUrl} onChange={e => setNewVideoUrl(e.target.value)} style={{ ...inp(), flex: 1, minWidth: '220px' }} />
                   <button type="button" onClick={() => { if (newVideoUrl.trim()) { setScreensaver({ ...screensaver, videos: [...screensaver.videos, newVideoUrl.trim()] }); setNewVideoUrl(''); } }}
-                    style={{ background: dark ? '#1e293b' : '#e2e8f0', color: T.text, border: `1px solid ${T.inputBord}`, fontWeight: 800, padding: '0 1.25rem', borderRadius: '.625rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    + Add Video
+                    style={{ background: dark ? '#1e293b' : '#e2e8f0', color: T.text, border: `1px solid ${T.inputBord}`, fontWeight: 800, padding: '0.625rem 1.25rem', borderRadius: '.625rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    + Add URL
                   </button>
+                  <label style={{ background: T.accent, color: dark ? '#0b1929' : '#fff', fontWeight: 800, padding: '0.625rem 1.25rem', borderRadius: '.625rem', cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '.5rem' }}>
+                    {isUploadingMedia ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={16} />}
+                    {isUploadingMedia ? 'Uploading...' : '📁 Upload File from Gallery'}
+                    <input 
+                      type="file" 
+                      accept="video/*,image/*" 
+                      style={{ display: 'none' }} 
+                      disabled={isUploadingMedia} 
+                      onChange={handleMediaUpload} 
+                    />
+                  </label>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '1.25rem', borderTop: `1px solid ${T.divider}` }}>

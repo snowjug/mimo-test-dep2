@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import {
   Building, LogOut, Loader2, Printer, RefreshCcw, Tag,
-  Home, BarChart2, Ticket, Search, User, Zap, Activity, Settings, Cpu, Droplets, Layers, Save, CheckCircle2, Clock, Menu, X, Crown, Tv
+  Home, BarChart2, Ticket, Search, User, Zap, Activity, Settings, Cpu, Droplets, Layers, Save, CheckCircle2, Clock, Menu, X, Crown, Tv, Upload
 } from 'lucide-react';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../../lib/firebase';
 import api from '../../api';
 
 export default function AdminDashboard() {
@@ -39,6 +41,30 @@ export default function AdminDashboard() {
   const [newVideoUrl, setNewVideoUrl] = useState('');
   const [savingScreensaver, setSavingScreensaver] = useState(false);
   const [savedScreensaver, setSavedScreensaver] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingMedia(true);
+    try {
+      const storageRef = ref(storage, `screensaver/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      await new Promise((resolve, reject) => {
+        uploadTask.on('state_changed', null, (err) => reject(err), async () => {
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          setScreensaver((prev) => ({ ...prev, videos: [...prev.videos, downloadUrl] }));
+          resolve(downloadUrl);
+        });
+      });
+    } catch (err) {
+      console.error('Failed to upload screensaver media:', err);
+      alert('Failed to upload file from gallery.');
+    } finally {
+      setIsUploadingMedia(false);
+      e.target.value = '';
+    }
+  };
 
   useEffect(() => {
     if (token) {
@@ -883,13 +909,24 @@ export default function AdminDashboard() {
                     {screensaver.videos.length === 0 && <div className="text-[#8AA1B9] text-sm italic">No videos configured. Default kiosk videos will be played.</div>}
                   </div>
 
-                  <div className="flex gap-3">
-                    <input type="text" placeholder="Paste Video URL (e.g. https://.../video.mp4)" value={newVideoUrl} onChange={e => setNewVideoUrl(e.target.value)}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input type="text" placeholder="Paste Media URL (e.g. https://.../video.mp4 or image.jpg)" value={newVideoUrl} onChange={e => setNewVideoUrl(e.target.value)}
                       className="flex-1 px-4 py-3 rounded-lg bg-[#041E34] border border-[#1A4971] text-sm text-white outline-none focus:ring-2 focus:ring-[#6EE7B7]" />
                     <button type="button" onClick={() => { if (newVideoUrl.trim()) { setScreensaver({ ...screensaver, videos: [...screensaver.videos, newVideoUrl.trim()] }); setNewVideoUrl(''); } }}
-                      className="bg-[#1E3A5F] hover:bg-[#284B7A] text-white font-semibold px-5 rounded-lg text-sm transition-colors whitespace-nowrap">
-                      + Add Video
+                      className="bg-[#1E3A5F] hover:bg-[#284B7A] text-white font-semibold px-5 py-3 rounded-lg text-sm transition-colors whitespace-nowrap">
+                      + Add URL
                     </button>
+                    <label className="bg-[#6EE7B7]/10 hover:bg-[#6EE7B7]/20 text-[#6EE7B7] border border-[#6EE7B7]/30 font-semibold px-5 py-3 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap">
+                      {isUploadingMedia ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                      {isUploadingMedia ? 'Uploading...' : '📁 Upload File from Gallery'}
+                      <input 
+                        type="file" 
+                        accept="video/*,image/*" 
+                        className="hidden" 
+                        disabled={isUploadingMedia} 
+                        onChange={handleMediaUpload} 
+                      />
+                    </label>
                   </div>
                 </div>
 
