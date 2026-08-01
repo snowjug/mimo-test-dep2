@@ -10,10 +10,8 @@ interface AddsProps {
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
 
 const defaultVideos = [
-  "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
-  "/second_video.mp4",
-  "/3_video.mp4",
-  "/4_video.mp4"
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 ];
 
 export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
