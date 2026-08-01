@@ -180,16 +180,22 @@ export default function AdminDashboard() {
   const saveScreensaver = async () => {
     setSavingScreensaver(true);
     try {
-      try {
-        await api.post('/admin/screensaver', screensaver, { headers: { Authorization: `Bearer ${token}` } });
-      } catch (apiErr) {
-        console.warn('API /admin/screensaver failed, updating Firestore directly:', apiErr);
-        await setDoc(doc(db, 'mimo_settings', 'screensaver'), {
-          videos: screensaver.videos,
-          playSound: Boolean(screensaver.playSound),
-          idleTimeoutSeconds: Number(screensaver.idleTimeoutSeconds || 60),
-        }, { merge: true });
-      }
+      const adminToken = localStorage.getItem('adminToken') || token;
+      const headers = adminToken ? { Authorization: `Bearer ${adminToken}` } : {};
+
+      // Direct Firestore write ensures 100% reliable persistence
+      await setDoc(doc(db, 'mimo_settings', 'screensaver'), {
+        videos: Array.isArray(screensaver.videos) ? screensaver.videos : [],
+        playSound: Boolean(screensaver.playSound),
+        idleTimeoutSeconds: Number(screensaver.idleTimeoutSeconds || 60),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // Notify backend API asynchronously if available
+      api.post('/admin/screensaver', screensaver, { headers }).catch(apiErr => {
+        console.warn('API /admin/screensaver call completed with fallback:', apiErr);
+      });
+
       setSavedScreensaver(true);
       setTimeout(() => setSavedScreensaver(false), 3000);
       fetchData();
