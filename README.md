@@ -86,7 +86,6 @@ mimo-test-dep2/
 |---|---|---|
 | `main` | Team | **Production** — all stable, tested code lives here |
 | `atharv-changes` | Atharv | Feature development branch |
-| `madhan` | Madhan | Feature development branch |
 | `revautsav-android` | Revautsav | Android kiosk app (separate history, Android Studio project) |
 
 > [!TIP]
