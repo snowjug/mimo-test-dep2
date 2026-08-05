@@ -12,7 +12,7 @@ export function BlankPages() {
   const [searchParams] = useSearchParams();
   const type = searchParams.get("type") || "a4"; // "a4" or "graph"
   const [pageCount, setPageCount] = useState(1);
-  const [directKioskId, setDirectKioskId] = useState<string | null>("CV-001");
+  const [directKioskId, setDirectKioskId] = useState<string | null>(null);
 
   const isGraph = type === "graph";
   const label = isGraph ? "Mimo Graph Sheet" : "A4 Blank Sheet";
@@ -305,14 +305,21 @@ export function BlankPages() {
             </CardContent>
           </Card>
 
-          <div className="pt-4 pb-8">
+          <div className="pt-4 pb-8 space-y-2">
             <Button
-              className="w-full h-14 text-base bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-xl shadow-blue-900/20 transition-all duration-300 font-bold uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2"
+              className="w-full h-14 text-base bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-xl shadow-blue-900/20 transition-all duration-300 font-bold uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleContinue}
-              disabled={isProcessing}
+              disabled={isProcessing || !directKioskId}
             >
               {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : "Continue to Checkout"}
             </Button>
+            {!directKioskId && (
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <span className="text-[11px] text-amber-600 font-bold bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20 shadow-sm">
+                  ⚠️ Please select a printer machine above to continue
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

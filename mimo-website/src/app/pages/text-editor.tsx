@@ -17,7 +17,7 @@ export function TextEditor() {
   const [alignment, setAlignment] = useState("left");
   const [pageSize, setPageSize] = useState("A4");
   const [margins, setMargins] = useState("medium");
-  const [directKioskId, setDirectKioskId] = useState("CV-001");
+  const [directKioskId, setDirectKioskId] = useState<string | null>(null);
   const [copies, setCopies] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -430,8 +430,8 @@ export function TextEditor() {
 
                 {/* Continue button */}
                 <Button
-                  className="w-full h-12 text-sm font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl mt-4 cursor-pointer"
-                  disabled={isProcessing || !textContent.trim()}
+                  className="w-full h-12 text-sm font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl mt-4 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isProcessing || !textContent.trim() || !directKioskId}
                   onClick={handleContinue}
                 >
                   {isProcessing ? (
@@ -443,6 +443,14 @@ export function TextEditor() {
                     "Pay & Print"
                   )}
                 </Button>
+
+                {!directKioskId && (
+                  <div className="flex items-center justify-center gap-2 pt-3">
+                    <span className="text-[11px] text-amber-600 font-bold bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20 shadow-sm">
+                      ⚠️ Please select a machine above to continue
+                    </span>
+                  </div>
+                )}
 
               </CardContent>
             </Card>
