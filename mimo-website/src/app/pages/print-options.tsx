@@ -93,7 +93,7 @@ export function PrintOptions() {
   const [imageScaling, setImageScaling] = useState("fit");
   const [customScale, setCustomScale] = useState(100);
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
-  const [directKioskId, setDirectKioskId] = useState<string | null>("CV-001");
+  const [directKioskId, setDirectKioskId] = useState<string | null>(null);
 
   const [activeFileIndex, setActiveFileIndex] = useState(0);
   const [fileConfigs, setFileConfigs] = useState<Record<string, {
@@ -477,7 +477,7 @@ export function PrintOptions() {
   );
 
   const isSinglePageDocument = files.reduce((sum, f) => sum + (f.pageCount || 1), 0) <= 1;
-  const isDuplexSupported = (directKioskId === "SV-002" || directKioskId === "CV-001") && colorMode === "bw";
+  const isDuplexSupported = (!directKioskId || directKioskId === "SV-002" || directKioskId === "CV-001") && colorMode === "bw";
 
   useEffect(() => {
     if (!isDuplexSupported) {
@@ -978,10 +978,18 @@ export function PrintOptions() {
                 <Button
                   className="w-full h-12 sm:h-14 bg-[#093765] hover:bg-[#052345] border border-white/10 text-white font-bold text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 hover:-translate-y-0.5 transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleContinue}
-                  disabled={files.length === 0 || hasSelectionError}
+                  disabled={files.length === 0 || hasSelectionError || !directKioskId}
                 >
                   Continue to Pay
                 </Button>
+
+                {!directKioskId && !hasSelectionError && (
+                  <div className="flex items-center justify-center gap-2 pt-1">
+                    <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
+                      ⚠️ Please select a machine above to continue
+                    </span>
+                  </div>
+                )}
 
                 {hasSelectionError && (
                   <div className="flex items-center justify-center gap-2 pt-1">
