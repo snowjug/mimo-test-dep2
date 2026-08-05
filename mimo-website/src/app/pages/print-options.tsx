@@ -524,8 +524,22 @@ export function PrintOptions() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Options Panel */}
-          <div className="lg:col-span-2 space-y-3 sm:space-y-4">
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur hover:shadow-md transition-all duration-300 overflow-hidden">
+          <div className="lg:col-span-2 relative">
+            {!directKioskId && (
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-4 sm:p-6 text-center bg-slate-900/10 backdrop-blur-[3px] rounded-3xl animate-in fade-in duration-300">
+                <div className="bg-gradient-to-br from-[#093765] via-[#0b4780] to-blue-700 text-white p-6 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xl border border-white/20 max-w-md mx-auto transform hover:scale-[1.02] transition-all duration-300">
+                  <div className="w-14 h-14 mx-auto mb-4 bg-white/10 rounded-2xl flex items-center justify-center border border-white/15 shadow-inner">
+                    <Printer className="w-7 h-7 text-cyan-300 animate-pulse" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black mb-2 tracking-tight">Select a Printer Machine</h3>
+                  <p className="text-xs sm:text-sm text-blue-100/90 font-medium leading-relaxed">
+                    Please select your target printer (<span className="text-cyan-300 font-bold">MIMO 1.0</span> or <span className="text-cyan-300 font-bold">MIMO 2.0</span>) to view and modify your print configurations.
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className={`space-y-3 sm:space-y-4 transition-all duration-500 ${!directKioskId ? 'filter blur-[5px] pointer-events-none opacity-50 select-none' : ''}`}>
+              <Card className="border-0 shadow-sm bg-white/80 backdrop-blur hover:shadow-md transition-all duration-300 overflow-hidden">
               <CardHeader className="px-4 pt-4 pb-0 flex flex-row items-start gap-3 space-y-0">
                 <div className="p-2 bg-blue-50/80 rounded-xl shrink-0 -mt-0.5">
                   <Sliders className="w-5 h-5 text-blue-600" />
@@ -918,6 +932,7 @@ export function PrintOptions() {
                 </div>
               </div>
             </Card>
+            </div>
           </div>
 
           {/* Sidebar (Destination & Cost Summary) */}
