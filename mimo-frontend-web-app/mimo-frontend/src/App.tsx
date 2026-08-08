@@ -300,7 +300,7 @@ function App() {
         pages={jobData?.pages || 1}
         copies={jobData?.copies || 1}
         printCode={code}
-        colorMode={jobData?.mode?.toLowerCase().includes('color') ? 'color' : 'bw'}
+        colorMode={jobData?.mode?.toLowerCase().match(/color|colour/) ? 'color' : 'bw'}
         kioskId={dynamicKioskId}
         onComplete={() => {
           setPrintStatus('completed');

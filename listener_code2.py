@@ -145,6 +145,15 @@ def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAM
                 return False
 
         print(f"🖨️  Sending to CUPS Printer [{printer_name}]: {file_path} ({copies} copies, pages: {page_range or 'all'})")
+        
+        # SIMULATION MODE: Bypass physical printing
+        if os.environ.get("SIMULATE_PRINT", "true").lower() == "true":
+            print(f"🛠️  SIMULATION MODE: Pretending print succeeded.")
+            import time
+            time.sleep(2)
+            print("✅ Print job spooled successfully! Returning immediately for FAST UI response.")
+            return True
+
         cmd = ["lp", "-d", printer_name, "-n", str(copies)]
         if page_range:
             cmd.extend(["-P", str(page_range)])
@@ -224,7 +233,7 @@ def process_job(doc_snapshot):
     final_path = None
 
     # Dynamic Printer Selection
-    target_printer = COLOR_PRINTER_NAME if color_mode.lower() == "color" else BW_PRINTER_NAME
+    target_printer = COLOR_PRINTER_NAME if color_mode.lower() in ["color", "colour"] else BW_PRINTER_NAME
 
     try:
         local_path = download_file(file_url, file_name)
