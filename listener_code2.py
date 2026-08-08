@@ -130,7 +130,7 @@ def process_image_custom(input_path, scale_pct):
         print(f"❌ Image custom scale processing failed: {e}")
         return None
 
-def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None):
+def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, color_mode="monochrome"):
     try:
         file_size = os.path.getsize(file_path)
         if file_size < 100:
@@ -159,6 +159,12 @@ def print_file(file_path, copies=1, page_range=None, printer_name=BW_PRINTER_NAM
             cmd.extend(["-P", str(page_range)])
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             cmd.extend(["-o", f"number-up={photo_layout}"])
+            
+        if color_mode.lower() in ["color", "colour"]:
+            cmd.extend(["-o", "ColorModel=Color", "-o", "print-color-mode=color", "-o", "Color=True"])
+        else:
+            cmd.extend(["-o", "ColorModel=Gray", "-o", "print-color-mode=monochrome", "-o", "Color=False"])
+            
         cmd.append(file_path)
         
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
@@ -262,7 +268,7 @@ def process_job(doc_snapshot):
                 doc_ref.update({"status": "failed", "printerStatus": "LibreOffice conversion failed"})
                 return
 
-        success = print_file(final_path, copies, page_range, target_printer, photo_layout)
+        success = print_file(final_path, copies, page_range, target_printer, photo_layout, color_mode)
         
         if success:
             doc_ref.update({
