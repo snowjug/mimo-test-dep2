@@ -371,7 +371,7 @@ def impose_nup(input_pdf, output_pdf, layout_num):
         print(f"❌ impose_nup (GS+Pillow) failed: {e}")
         return False
 
-def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
+def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False, color_mode="monochrome"):
     try:
         total_size = sum(os.path.getsize(p) for p in file_paths)
         if total_size < 100:
@@ -412,6 +412,11 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             cmd.extend(["-o", "sides=two-sided-long-edge", "-o", "Duplex=DuplexNoTumble", "-o", "BRDuplex=DuplexNoTumble"])
         else:
             cmd.extend(["-o", "sides=one-sided", "-o", "Duplex=None", "-o", "BRDuplex=None"])
+            
+        if color_mode.lower() in ["color", "colour"]:
+            cmd.extend(["-o", "ColorModel=Color", "-o", "print-color-mode=color", "-o", "Color=True"])
+        else:
+            cmd.extend(["-o", "ColorModel=Gray", "-o", "print-color-mode=monochrome", "-o", "Color=False"])
         
         cmd.extend(file_paths)
         
@@ -499,7 +504,7 @@ def process_job(doc_snapshot):
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
     color_mode = doc.get("colorMode", "monochrome")
-    is_color = color_mode.lower() == "color"
+    is_color = color_mode.lower() in ["color", "colour"]
     
     print_options = doc.get("printOptions", {})
     # Read copies from printOptions (where frontend stores it), fallback to top-level
@@ -522,7 +527,7 @@ def process_job(doc_snapshot):
     final_paths = []
 
     # Dynamic Printer Selection
-    target_printer = COLOR_PRINTER_NAME if color_mode.lower() == "color" else BW_PRINTER_NAME
+    target_printer = COLOR_PRINTER_NAME if is_color else BW_PRINTER_NAME
 
     try:
         for f in files:
@@ -658,7 +663,7 @@ def process_job(doc_snapshot):
             target_printer = "Brother_HL_L5210DN_series_USB"
 
 
-        success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
+        success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet, color_mode)
         
         if success:
             doc_ref.update({
