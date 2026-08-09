@@ -52,11 +52,15 @@ if not os.path.exists(PRE_FETCH_DIR):
 # /ebook  → downsample images to 150 DPI; great for B&W laser (small spool, fast USB transfer)
 # /screen → 72 DPI (too low for print quality)
 # /printer → 300 DPI (keeps full quality but no size reduction)
+#
+# NOTE: Epson L3250 PPD PLAIN_NORMAL is patched to 180x180 DPI (was 360x360 before July 15 CUPS
+# update). CUPS gstoraster renders at the PPD HWResolution. Keeping color images at 180 DPI matches
+# the PPD and keeps the CUPS raster stream to ~9 MB instead of 37.5 MB → fast USB transfer.
 GS_BW_COMPRESS  = ["-dPDFSETTINGS=/ebook",  "-dCompatibilityLevel=1.4",
                    "-dEmbedAllFonts=true",   "-dSubsetFonts=true"]
 GS_COLOR_COMPRESS = ["-dPDFSETTINGS=/ebook",
-                     "-dColorImageDownsampleType=/Bicubic", "-dColorImageResolution=100",
-                     "-dGrayImageDownsampleType=/Bicubic", "-dGrayImageResolution=100",
+                     "-dColorImageDownsampleType=/Bicubic", "-dColorImageResolution=180",
+                     "-dGrayImageDownsampleType=/Bicubic", "-dGrayImageResolution=180",
                      "-dCompatibilityLevel=1.4", "-dEmbedAllFonts=true", "-dSubsetFonts=true"]
 
 # Initialize Firebase
@@ -471,8 +475,17 @@ def get_pdf_page_count(pdf_path):
 
 def pre_rasterize_pdf_for_color(pdf_path, is_color):
     """
-    Pre-rasterize complex color PDFs using pdftoppm at 150 DPI to bypass
-    expensive vector rendering filters on the Pi's CPU at print time.
+    Pre-rasterize ALL color PDFs using pdftoppm at 180 DPI and JPEG compression.
+
+    WHY 180 DPI:
+      The Epson L3250 PPD PLAIN_NORMAL mode is patched to HWResolution[180 180].
+      CUPS gstoraster renders at the PPD HWResolution. A PNG-embedded PDF at 180 DPI
+      gives CUPS gstoraster almost nothing to do — it just decompresses JPEG and streams
+      the pixels at the target DPI. This drops the USB payload from 37.5 MB to ~2.3 MB.
+
+    WHY JPEG:
+      Pillow's PDF save with JPEG reduces each A4 page at 180 DPI from ~7 MB (uncompressed)
+      to ~150-300 KB, resulting in a PDF CUPS can process in seconds instead of minutes.
     """
     if not is_color:
         return pdf_path
@@ -481,62 +494,67 @@ def pre_rasterize_pdf_for_color(pdf_path, is_color):
         import subprocess
         import glob
 
-        size_mb = os.path.getsize(pdf_path) / (1024 * 1024)
-        if size_mb < 1.0:  # Skip small PDFs
-            return pdf_path
-            
         pages = get_pdf_page_count(pdf_path)
-        if pages > 5:
-            print(f"📄 Color PDF has {pages} pages (exceeds threshold of 5). Skipping pre-rasterization to prevent overhead.")
+        if pages > 10:
+            print(f"📄 Color PDF has {pages} pages (exceeds threshold of 10). Skipping pre-rasterization.")
             return pdf_path
-            
-        print(f"📄 Color PDF size is {size_mb:.2f}MB ({pages} page(s)). Pre-rasterizing via pdftoppm to speed up print...")
+
+        size_mb = os.path.getsize(pdf_path) / (1024 * 1024)
+        print(f"📄 Pre-rasterizing color PDF ({size_mb:.2f}MB, {pages}p) at 180 DPI with JPEG compression...")
         prefix = os.path.splitext(pdf_path)[0] + "_raster"
         rasterized_pdf = os.path.splitext(pdf_path)[0] + "_rasterized.pdf"
-        
-        # Convert PDF to PNGs at 150 DPI
-        cmd = ["pdftoppm", "-png", "-r", "150", pdf_path, prefix]
-        subprocess.run(cmd, check=True, timeout=120)
-        
-        # Merge PNGs back to PDF using system python (which has Pillow compiled with JPEG support)
-        py_cmd = [
-            "/usr/bin/python3", "-c",
+
+        # Convert PDF pages to JPEGs at 180 DPI (much smaller than PNGs)
+        cmd = ["pdftoppm", "-jpeg", "-r", "180", "-jpegopt", "quality=88", pdf_path, prefix]
+        result = subprocess.run(cmd, capture_output=True, timeout=120)
+        if result.returncode != 0:
+            # Fallback: try PNG if JPEG flag not supported
+            print(f"⚠️ pdftoppm JPEG failed, trying PNG fallback...")
+            cmd = ["pdftoppm", "-png", "-r", "180", pdf_path, prefix]
+            subprocess.run(cmd, check=True, timeout=120)
+
+        # Find all output images (jpgs or pngs)
+        img_files = sorted(glob.glob(prefix + "-*.jpg") + glob.glob(prefix + "-*.jpeg") + glob.glob(prefix + "-*.png"))
+        if not img_files:
+            print(f"⚠️ Pre-rasterization produced no images — skipping.")
+            return pdf_path
+
+        # Merge images back to a JPEG-compressed PDF using Pillow
+        py_script = (
             "import glob, os; from PIL import Image; "
-            f"png_files = sorted(glob.glob('{prefix}-*.png')); "
-            "if not png_files: raise Exception('No PNGs generated'); "
-            "images = [Image.open(pf).convert('RGB') for pf in png_files]; "
-            f"images[0].save('{rasterized_pdf}', save_all=True, append_images=images[1:])"
-        ]
-        subprocess.run(py_cmd, check=True, timeout=120)
-        
-        if os.path.exists(rasterized_pdf):
-            print(f"✅ Pre-rasterized PDF created: {rasterized_pdf}")
-            
-            # Clean up temp PNGs
-            png_files = sorted(glob.glob(prefix + "-*.png"))
-            for pf in png_files:
-                try:
-                    os.remove(pf)
-                except:
-                    pass
+            f"img_files = sorted(glob.glob('{prefix}-*.jpg') + glob.glob('{prefix}-*.jpeg') + glob.glob('{prefix}-*.png')); "
+            "if not img_files: raise Exception('No images found'); "
+            "images = [Image.open(f).convert('RGB') for f in img_files]; "
+            f"images[0].save('{rasterized_pdf}', save_all=True, append_images=images[1:], "
+            "format='PDF', resolution=180.0)"
+        )
+        subprocess.run(["/usr/bin/python3", "-c", py_script], check=True, timeout=120)
+
+        if os.path.exists(rasterized_pdf) and os.path.getsize(rasterized_pdf) > 1000:
+            new_size_mb = os.path.getsize(rasterized_pdf) / (1024 * 1024)
+            print(f"✅ Pre-rasterized: {size_mb:.2f}MB → {new_size_mb:.2f}MB at 180 DPI ({rasterized_pdf})")
+            # Clean up temp images
+            for pf in img_files:
+                try: os.remove(pf)
+                except: pass
             # Remove original vector PDF to save disk space
-            try:
-                os.remove(pdf_path)
-            except:
-                pass
+            try: os.remove(pdf_path)
+            except: pass
             return rasterized_pdf
-            
+        else:
+            print(f"⚠️ Pre-rasterized file too small or missing — using original.")
+
     except Exception as e:
         print(f"⚠️ Pre-rasterization failed: {e}")
-        # Clean up any leftover PNGs
+        # Clean up any leftover images
         try:
             prefix = os.path.splitext(pdf_path)[0] + "_raster"
-            png_files = glob.glob(prefix + "-*.png")
-            for pf in png_files:
-                os.remove(pf)
+            for pf in glob.glob(prefix + "-*"):
+                try: os.remove(pf)
+                except: pass
         except:
             pass
-            
+
     return pdf_path
 
 
@@ -1205,7 +1223,20 @@ def process_job(doc_snapshot):
                     normalized_paths.append(fp)
             final_paths = normalized_paths
 
+        # ── Color PDF Pre-Rasterization ──
+        # Convert normalized color PDFs to 180 DPI JPEG-compressed images embedded in PDF.
+        # This bypasses the slow CUPS gstoraster 360 DPI re-rasterization step that was
+        # introduced by the July 15 CUPS deb13u2 update. Without this, CUPS generates a
+        # 37.5 MB uncompressed raster stream for every A4 color page → USB transfer takes 9+ min.
+        # With pre-rasterization at 180 DPI + JPEG: payload drops to ~2.3 MB → under 60 sec total.
+        if is_color:
+            rasterized_paths = []
+            for fp in final_paths:
+                rasterized_paths.append(pre_rasterize_pdf_for_color(fp, is_color=True))
+            final_paths = rasterized_paths
+
         # ── Submit to CUPS ──
+
         # Pass doc_ref so print_file can spawn the background sync thread
         async_spawned = False
         result = print_file(final_paths, copies, None if any_file_sliced else page_range, target_printer, photo_layout, double_sided, is_blank_sheet, doc_ref=doc_ref)
