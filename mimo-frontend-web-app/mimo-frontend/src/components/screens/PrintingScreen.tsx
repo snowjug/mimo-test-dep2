@@ -223,14 +223,27 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         return;
       }
 
-      const next = currentProgress + 1;
+      const next = Math.min(cap, currentProgress + 1);
       progressRef.current = next;
       setProgress(next);
+
+      if (next >= cap) {
+        if (!printCode || printCode === '0000') {
+          animateTo100AndComplete();
+        } else {
+          setStatusMsg(
+            totalSheets > 1
+              ? `Ejecting final page (${totalSheets} of ${totalSheets})…`
+              : `Completing print job…`
+          );
+        }
+        return;
+      }
 
       // ── Phase-based delay multipliers & status text ────────────────────────
       let delay: number;
       if (next <= 20) {
-        // Warm-up (0→20%): 1.4× — visible hesitation while drum heats up
+        // Warm-up (0→20%): 1.4× — visible hesitation while drum/inkjet warms up
         delay = baseDelay * 1.4;
         setStatusMsg('Warming up printer…');
       } else if (next <= 35) {
@@ -238,37 +251,40 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         delay = baseDelay * 0.75;
         setStatusMsg('Spooling document…');
       } else {
-        // Printing (35→99%): base pace
+        // Printing (35→85%): base pace with page count calculation
         delay = baseDelay;
-        const printingPct  = next - 35;           // 0…64
+        const printingPct  = next - 35;           // 0…50
         const currentPage  = Math.min(
           totalSheets,
-          Math.ceil((printingPct / 64) * totalSheets)
+          Math.ceil((printingPct / 50) * totalSheets)
         );
         setStatusMsg(
           totalSheets === 1
-            ? `Printing…`
+            ? `Printing document…`
             : `Printing page ${currentPage} of ${totalSheets}…`
         );
       }
 
-      // Gentle deceleration from 85% onward so the bar waits for the Pi's signal
-      // without feeling completely frozen. Exponent kept low so it doesn't stall.
+      // Smooth creeping deceleration from 85% to 99% so progress stays alive
       if (next > 85 && next < 99) {
-        const factor = 1 + Math.pow((next - 85) / 7, 1.6);
+        const factor = 1 + Math.pow((next - 85) / 5, 1.2);
         delay = delay * factor;
+        const currEjectPage = Math.min(
+          totalSheets,
+          Math.ceil(((next - 35) / 64) * totalSheets)
+        );
         setStatusMsg(
           totalSheets === 1
-            ? `Finishing print…`
-            : `Ejecting page ${totalSheets} of ${totalSheets}…`
+            ? `Ejecting paper…`
+            : `Printing page ${currEjectPage} of ${totalSheets}…`
         );
       }
 
       if (next !== lastProgressRef.current) {
-        lastProgressRef.current  = progressRef.current;
+        lastProgressRef.current = progressRef.current;
       }
 
-      const jitter = (Math.random() - 0.5) * delay * 0.08;
+      const jitter = (Math.random() - 0.5) * delay * 0.05;
       tickTimerRef.current = window.setTimeout(tick, Math.max(100, delay + jitter));
     };
 
