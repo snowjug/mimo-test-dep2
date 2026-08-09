@@ -354,11 +354,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
     const totalSheets = Math.max(1, pages * copies);
     const isColor = colorMode === 'color';
-    const baseWarmupSec = 120; // 120 seconds base warmup/spooling time
-    const secPerPage = isColor ? 35 : 8;
-    // Timeout matching backend plus a 15 seconds buffer to prioritize backend failure message/refund trigger
-    const printTimeoutMs = (baseWarmupSec + totalSheets * secPerPage + 15) * 1000;
-    const networkStallThresholdMs = 45000; // 45 seconds with no network response
+    const baseWarmupSec = 600; // 600 seconds (10 min) base warmup/spooling/rendering time
+    const secPerPage = isColor ? 360 : 20; // 360s (6 min) per color page for EcoTank inkjet; 20s/page for B&W laser
+    // Timeout matching backend plus a 30 seconds buffer to prioritize backend failure message/refund trigger
+    const printTimeoutMs = (baseWarmupSec + totalSheets * secPerPage + 30) * 1000;
+    const networkStallThresholdMs = 90000; // 90 seconds with no network response (for large rendering operations)
 
     const checkTimeout = () => {
       if (isCompletingRef.current) return; // already finishing — no action needed
