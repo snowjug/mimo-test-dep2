@@ -151,7 +151,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
         left: 0, 
         width: '100vw', 
         height: '100vh', 
-        backgroundColor: '#000', 
+        backgroundColor: 'transparent', 
         zIndex: 9999, 
         cursor: 'pointer',
         display: 'flex',
