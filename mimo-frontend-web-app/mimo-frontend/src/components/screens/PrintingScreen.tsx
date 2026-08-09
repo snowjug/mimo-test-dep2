@@ -212,13 +212,17 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (isCompletingRef.current) return;
 
       const currentProgress = progressRef.current;
-      const cap = (printCode && printCode !== '0000') ? 99 : 100;
+      const cap = (printCode && printCode !== '0000') ? 98 : 100;
 
       if (currentProgress >= cap) {
         if (!printCode || printCode === '0000') {
           animateTo100AndComplete();
         } else {
-          setStatusMsg('Completing print job…');
+          setStatusMsg(
+            totalSheets > 1
+              ? `Ejecting final page (${totalSheets} of ${totalSheets})…`
+              : `Completing print job…`
+          );
         }
         return;
       }
@@ -265,13 +269,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
       }
 
-      // Smooth creeping deceleration from 85% to 99% so progress stays alive
-      if (next > 85 && next < 99) {
-        const factor = 1 + Math.pow((next - 85) / 5, 1.2);
+      // Continuous creeping from 85% to 98% so progress stays alive without stalling
+      if (next > 85 && next < 98) {
+        const factor = 1 + Math.pow((next - 85) / 4, 1.3);
         delay = delay * factor;
         const currEjectPage = Math.min(
           totalSheets,
-          Math.ceil(((next - 35) / 64) * totalSheets)
+          Math.ceil(((next - 35) / 50) * totalSheets)
         );
         setStatusMsg(
           totalSheets === 1
