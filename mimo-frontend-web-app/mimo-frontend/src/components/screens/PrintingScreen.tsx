@@ -200,11 +200,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     // ── Target total time for the 0→99% animation ─────────────────────────────
     // Calibrated to match actual physical printer speeds so progress reaches
     // ~95% exactly as the physical paper emerges from the machine.
-    // B&W laser:    ~1.8s per sheet (Brother HL-L2440DW prints at 32 ppm)
-    // Color inkjet: ~6s per sheet (Epson L3250 EcoTank)
+    // B&W laser:    ~1.5s per sheet (Brother HL-L2440DW prints at 32 ppm)
+    // Color inkjet: ~180s per sheet (Epson L3250 EcoTank physical inkjet speed)
     const isColor = colorMode === 'color';
-    const baseWarmup  = isColor ? 3000 : 2000;
-    const speedFactor = isColor ? 6000 : 1500;
+    const baseWarmup  = isColor ? 5000 : 2000;
+    const speedFactor = isColor ? 180000 : 1500;
     const totalAnimMs = baseWarmup + totalSheets * speedFactor;
     const baseDelay   = Math.max(40, totalAnimMs / 99); // ms per 1% step
 
