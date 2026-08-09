@@ -1295,6 +1295,8 @@ def reset_printer_usb(printer_name):
         # Run usbreset with piped password
         res = subprocess.run(f"echo 'printpi' | sudo -S usbreset {usb_id}", shell=True, capture_output=True, text=True)
         print(f"USB reset output: {res.stdout.strip()} | Error: {res.stderr.strip()}")
+        # Restart CUPS to immediately re-claim USB interface and prevent usbfs detach hangs
+        subprocess.run(f"echo 'printpi' | sudo -S systemctl restart cups", shell=True, capture_output=True)
         return True
     else:
         print(f"⚠️ No USB ID found for printer {printer_name}")
