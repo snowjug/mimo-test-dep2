@@ -16,6 +16,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
   const [videos, setVideos] = useState<string[]>(defaultVideos);
   const [playSound, setPlaySound] = useState(true);
   const [isMutedFallback, setIsMutedFallback] = useState(true);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -72,7 +73,8 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
     if (isActive) {
       setCurrentVideoIndex(0);
     }
-  }, [isActive]);
+    setIsVideoReady(false);
+  }, [isActive, currentVideoIndex]);
 
   const isImageUrl = (url: string) => {
     if (!url) return false;
@@ -179,11 +181,18 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
           autoPlay 
           muted={!playSound || isMutedFallback}
           playsInline
+          onCanPlay={() => setIsVideoReady(true)}
           onEnded={handleVideoEnd}
           onError={() => {
+            setIsVideoReady(false);
             handleMediaError(currentMediaUrl);
           }}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          style={{ 
+            width: '100%', 
+            height: '100%', 
+            objectFit: 'cover',
+            display: isVideoReady ? 'block' : 'none'
+          }}
         >
           Your browser does not support the video tag.
         </video>
