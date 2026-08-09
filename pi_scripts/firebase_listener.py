@@ -519,16 +519,31 @@ def pre_rasterize_pdf_for_color(pdf_path, is_color):
             print(f"⚠️ Pre-rasterization produced no images — skipping.")
             return pdf_path
 
-        # Merge images back to a JPEG-compressed PDF using Pillow
-        py_script = (
-            "import glob, os; from PIL import Image; "
-            f"img_files = sorted(glob.glob('{prefix}-*.jpg') + glob.glob('{prefix}-*.jpeg') + glob.glob('{prefix}-*.png')); "
-            "if not img_files: raise Exception('No images found'); "
-            "images = [Image.open(f).convert('RGB') for f in img_files]; "
-            f"images[0].save('{rasterized_pdf}', save_all=True, append_images=images[1:], "
-            "format='PDF', resolution=180.0)"
-        )
-        subprocess.run(["/usr/bin/python3", "-c", py_script], check=True, timeout=120)
+        # Merge images back to a JPEG-compressed PDF using Pillow.
+        # IMPORTANT: We write a temp script file instead of a one-liner because glob
+        # patterns with '*' inside subprocess -c arguments cause SyntaxError on the Pi.
+        merge_script = f"""
+import glob, os
+from PIL import Image
+img_files = sorted(
+    glob.glob({repr(prefix + '-*.jpg')}) +
+    glob.glob({repr(prefix + '-*.jpeg')}) +
+    glob.glob({repr(prefix + '-*.png')})
+)
+if not img_files:
+    raise Exception('No images found after pdftoppm')
+images = [Image.open(f).convert('RGB') for f in img_files]
+images[0].save({repr(rasterized_pdf)}, save_all=True, append_images=images[1:], format='PDF', resolution=180.0)
+print(f'Merged {{len(images)}} image(s) into PDF: {rasterized_pdf}')
+"""
+        merge_script_path = pdf_path + "_merge.py"
+        with open(merge_script_path, "w") as f:
+            f.write(merge_script)
+        subprocess.run(["/usr/bin/python3", merge_script_path], check=True, timeout=120)
+        try:
+            os.remove(merge_script_path)
+        except:
+            pass
 
         if os.path.exists(rasterized_pdf) and os.path.getsize(rasterized_pdf) > 1000:
             new_size_mb = os.path.getsize(rasterized_pdf) / (1024 * 1024)
