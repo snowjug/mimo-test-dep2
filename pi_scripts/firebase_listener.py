@@ -603,11 +603,11 @@ def auto_heal_cups_queue(printer_name=BW_PRINTER_NAME, job_id=None):
     except Exception as e:
         print(f"⚠️ [AUTO-CLEARANCE] Error during queue healing: {e}")
 
-def wait_for_cups_job(job_id, doc_ref, timeout=600, printer_name=BW_PRINTER_NAME):
+def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAME):
     """
     Background thread: polls CUPS until 'job_id' disappears from the
     not-completed queue, then updates Firestore to completed.
-    timeout: max seconds to wait (default 10 min).
+    timeout: max seconds to wait (default 30 min).
     """
     import re
     start = time.time()
@@ -652,8 +652,8 @@ def wait_for_cups_job(job_id, doc_ref, timeout=600, printer_name=BW_PRINTER_NAME
                             auto_heal_cups_queue(printer_name, job_id)
                             return
 
-                        # Minimal 1s completion buffer so Firestore updates instantly as physical printing finishes
-                        paper_exit_delay = 1
+                        # 3s for color inkjet, 1s for laser so Firestore updates instantly as physical printing finishes
+                        paper_exit_delay = 3 if ("epson" in str(printer_name).lower() or "color" in str(printer_name).lower()) else 1
                         print(f"⏳ [SYNC] CUPS job {job_id} done in queue. Finalizing physical completion ({paper_exit_delay}s)...")
                         time.sleep(paper_exit_delay)
 

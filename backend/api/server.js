@@ -2042,15 +2042,19 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
 
     // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
     let totalPageCount = 0;
+    let totalFileSizeBytes = 0;
     currentSessionDocs.forEach(d => {
       const pCount = d.pageCount || 1;
       const copies = d.printOptions ? (d.printOptions.copies || 1) : (d.copies || 1);
       totalPageCount += pCount * copies;
+      totalFileSizeBytes += d.fileSize || d.fileSizeBytes || 0;
     });
 
-    const baseWarmupSec = 120; // 120 seconds base warmup/spooling time
-    const secPerPage = isColorJob ? 35 : 8; // Inkjet color prints need longer timeout headroom than B&W laser prints
-    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage) * 1000;
+    // Base warmup: 600s (10 min) — covers download + rendering + Ghostscript + CUPS spooling for large files/color
+    const baseWarmupSec = 600;
+    const secPerPage = isColorJob ? 360 : 15; // Epson EcoTank inkjet color needs ~5 min/page; B&W laser ~15s/page
+    const fileSizeBonusSec = Math.min(Math.floor(totalFileSizeBytes / (100 * 1024)), 600); // Up to 10 min bonus for 100MB files
+    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage + fileSizeBonusSec) * 1000;
 
     let anyStuck = false;
     for (const d of currentSessionDocs) {

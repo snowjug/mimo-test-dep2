@@ -148,10 +148,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     setProgress(100);
     setStatusMsg('Print Completed ✅');
 
-    // Hold for 2.5 seconds before transitioning to summary screen
+    // Hold for 1.0 second before transitioning to summary screen
     completionTimerRef.current = window.setTimeout(() => {
       onComplete();
-    }, 2500);
+    }, 1000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onComplete, colorMode]);
 
@@ -200,13 +200,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     // ── Target total time for the 0→99% animation ─────────────────────────────
     // Calibrated to match actual physical printer speeds so progress reaches
     // ~95% exactly as the physical paper emerges from the machine.
-    // B&W laser:    ~8s total for 1 sheet (base 4s + 4s per sheet)
-    // Color inkjet: ~17s total for 1 sheet (base 5s + 12s per sheet)
+    // B&W laser:    ~1.8s per sheet (Brother HL-L2440DW prints at 32 ppm)
+    // Color inkjet: ~6s per sheet (Epson L3250 EcoTank)
     const isColor = colorMode === 'color';
-    const baseWarmup  = isColor ? 5000 : 4000;
-    const speedFactor = isColor ? 12000 : 4000;
+    const baseWarmup  = isColor ? 3000 : 2000;
+    const speedFactor = isColor ? 6000 : 1500;
     const totalAnimMs = baseWarmup + totalSheets * speedFactor;
-    const baseDelay   = Math.max(50, totalAnimMs / 99); // ms per 1% step
+    const baseDelay   = Math.max(40, totalAnimMs / 99); // ms per 1% step
 
     const tick = () => {
       if (isCompletingRef.current) return;
