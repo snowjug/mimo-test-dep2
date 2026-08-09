@@ -87,13 +87,27 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
   };
 
   const handleVideoEnd = () => {
+    if (videos.length === 0) return;
     setCurrentVideoIndex((prevIndex) => (prevIndex + 1) % videos.length);
+  };
+
+  const handleMediaError = (failedUrl: string) => {
+    console.warn("Media failed to play/load, removing broken URL:", failedUrl);
+    setVideos((prev) => {
+      const updated = prev.filter((url) => url !== failedUrl);
+      if (updated.length === 0 && onTap) {
+        onTap(); // Dismiss screensaver overlay immediately if all URLs 404/fail
+      }
+      return updated;
+    });
+    setCurrentVideoIndex(0);
   };
 
   // Watchdog timer: 8s for images, 60s max for videos to prevent stuck black screens
   useEffect(() => {
     if (!isActive || videos.length === 0) return;
     const currentUrl = videos[currentVideoIndex];
+    if (!currentUrl) return;
     const isImg = isImageUrl(currentUrl);
     const timeoutMs = isImg ? 8000 : 60000;
     const timer = setTimeout(() => {
@@ -104,7 +118,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
 
   useEffect(() => {
     const currentUrl = videos[currentVideoIndex];
-    if (isActive && videoRef.current && !isImageUrl(currentUrl)) {
+    if (isActive && videoRef.current && currentUrl && !isImageUrl(currentUrl)) {
       const vid = videoRef.current;
       vid.muted = !playSound || isMutedFallback;
       const playPromise = vid.play();
@@ -115,7 +129,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
           setIsMutedFallback(true);
           vid.play().catch(e => {
             console.error("Muted autoplay also failed, skipping video:", e);
-            handleVideoEnd();
+            handleMediaError(currentUrl);
           });
         });
       }
@@ -125,6 +139,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
   if (!isActive || videos.length === 0) return null;
 
   const currentMediaUrl = videos[currentVideoIndex];
+  if (!currentMediaUrl) return null;
   const isImage = isImageUrl(currentMediaUrl);
 
   return createPortal(
@@ -152,8 +167,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
           src={currentMediaUrl}
           alt="Screen Saver"
           onError={() => {
-            console.warn("Image failed to load, skipping:", currentMediaUrl);
-            handleVideoEnd();
+            handleMediaError(currentMediaUrl);
           }}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
@@ -167,8 +181,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
           playsInline
           onEnded={handleVideoEnd}
           onError={() => {
-            console.warn("Video failed to play/load, skipping:", currentMediaUrl);
-            handleVideoEnd();
+            handleMediaError(currentMediaUrl);
           }}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         >
