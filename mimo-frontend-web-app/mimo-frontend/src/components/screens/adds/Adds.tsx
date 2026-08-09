@@ -9,10 +9,7 @@ interface AddsProps {
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
 
-const defaultVideos = [
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-];
+const defaultVideos: string[] = [];
 
 export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
