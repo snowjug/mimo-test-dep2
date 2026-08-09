@@ -54,8 +54,10 @@ if not os.path.exists(PRE_FETCH_DIR):
 # /printer → 300 DPI (keeps full quality but no size reduction)
 GS_BW_COMPRESS  = ["-dPDFSETTINGS=/ebook",  "-dCompatibilityLevel=1.4",
                    "-dEmbedAllFonts=true",   "-dSubsetFonts=true"]
-GS_COLOR_COMPRESS = ["-dPDFSETTINGS=/ebook", "-dCompatibilityLevel=1.4",
-                     "-dEmbedAllFonts=true",    "-dSubsetFonts=true"]
+GS_COLOR_COMPRESS = ["-dPDFSETTINGS=/ebook",
+                     "-dColorImageDownsampleType=/Bicubic", "-dColorImageResolution=100",
+                     "-dGrayImageDownsampleType=/Bicubic", "-dGrayImageResolution=100",
+                     "-dCompatibilityLevel=1.4", "-dEmbedAllFonts=true", "-dSubsetFonts=true"]
 
 # Initialize Firebase
 try:
