@@ -212,17 +212,22 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (isCompletingRef.current) return;
 
       const currentProgress = progressRef.current;
-      const cap = (printCode && printCode !== '0000') ? 98 : 100;
+      const cap = (printCode && printCode !== '0000') ? 85 : 100;
 
       if (currentProgress >= cap) {
         if (!printCode || printCode === '0000') {
           animateTo100AndComplete();
         } else {
+          // Creep very slowly above 85% so it never looks frozen
+          const nextCreep = Math.min(94, currentProgress + 1);
+          progressRef.current = nextCreep;
+          setProgress(nextCreep);
           setStatusMsg(
             totalSheets > 1
-              ? `Ejecting final page (${totalSheets} of ${totalSheets})…`
-              : `Completing print job…`
+              ? `Ejecting paper (${totalSheets} of ${totalSheets})…`
+              : `Ejecting paper into tray…`
           );
+          tickTimerRef.current = window.setTimeout(tick, 8000); // 8 seconds per 1% creep
         }
         return;
       }
@@ -231,36 +236,32 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       progressRef.current = next;
       setProgress(next);
 
-      if (next >= cap) {
-        if (!printCode || printCode === '0000') {
-          animateTo100AndComplete();
-        } else {
-          setStatusMsg(
-            totalSheets > 1
-              ? `Ejecting final page (${totalSheets} of ${totalSheets})…`
-              : `Completing print job…`
-          );
-        }
-        return;
-      }
-
       // ── Phase-based delay multipliers & status text ────────────────────────
       let delay: number;
       if (next <= 20) {
-        // Warm-up (0→20%): 1.4× — visible hesitation while drum/inkjet warms up
-        delay = baseDelay * 1.4;
+        // Warm-up (0→20%): 1.1× — warm-up & feed
+        delay = baseDelay * 1.1;
         setStatusMsg('Warming up printer…');
-      } else if (next <= 35) {
-        // Spooling / RIP (20→35%): 0.75× — data transfers fast
-        delay = baseDelay * 0.75;
-        setStatusMsg('Spooling document…');
-      } else {
-        // Printing (35→85%): base pace with page count calculation
-        delay = baseDelay;
-        const printingPct  = next - 35;           // 0…50
-        const currentPage  = Math.min(
+      } else if (next <= 50) {
+        // Normal pace (20→50%): 0.85× — active spooling and print start
+        delay = baseDelay * 0.85;
+        const printingPct = next - 20; // 0…30
+        const currentPage = Math.min(
           totalSheets,
-          Math.ceil((printingPct / 50) * totalSheets)
+          Math.ceil((printingPct / 30) * Math.ceil(totalSheets / 2))
+        );
+        setStatusMsg(
+          totalSheets === 1
+            ? `Printing document…`
+            : `Printing page ${currentPage} of ${totalSheets}…`
+        );
+      } else {
+        // Slowing pace (50→85%): 1.6× to 2.8× — physical paper passage
+        const slowFactor = 1.6 + ((next - 50) / 35) * 1.2;
+        delay = baseDelay * slowFactor;
+        const currentPage = Math.min(
+          totalSheets,
+          Math.ceil(((next - 20) / 65) * totalSheets)
         );
         setStatusMsg(
           totalSheets === 1
@@ -269,20 +270,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
       }
 
-      // Continuous creeping from 85% to 98% so progress stays alive without stalling
-      if (next > 85 && next < 98) {
-        const factor = 1 + Math.pow((next - 85) / 4, 1.3);
-        delay = delay * factor;
-        const currEjectPage = Math.min(
-          totalSheets,
-          Math.ceil(((next - 35) / 50) * totalSheets)
-        );
-        setStatusMsg(
-          totalSheets === 1
-            ? `Ejecting paper…`
-            : `Printing page ${currEjectPage} of ${totalSheets}…`
-        );
+      if (next !== lastProgressRef.current) {
+        lastProgressRef.current = progressRef.current;
       }
+
+      const jitter = (Math.random() - 0.5) * delay * 0.05;
+      tickTimerRef.current = window.setTimeout(tick, Math.max(100, delay + jitter));
+    };
 
       if (next !== lastProgressRef.current) {
         lastProgressRef.current = progressRef.current;
