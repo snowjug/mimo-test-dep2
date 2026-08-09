@@ -773,10 +773,12 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         else:
             cmd.extend(["-o", "print-scaling=none"])
 
-        # ── Print quality ──
-        # B&W laser: Normal (300×300 dpi) is plenty and keeps spool data half the size of High (1200dpi).
-        # Color inkjet: always Normal — High (1200dpi) massively slows Epson inkjet jobs.
-        cmd.extend(["-o", "cupsPrintQuality=Normal"])
+        # ── Print quality & media type ──
+        if is_color:
+            # Epson L3250 PPD option for standard plain paper speed: PLAIN_NORMAL
+            cmd.extend(["-o", "MediaType=PLAIN_NORMAL"])
+        else:
+            cmd.extend(["-o", "cupsPrintQuality=Normal"])
 
         # N-up safety guard (should never run — impose_nup pre-processes):
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
