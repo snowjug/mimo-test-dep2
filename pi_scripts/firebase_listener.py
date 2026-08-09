@@ -963,12 +963,13 @@ def process_job(doc_snapshot):
         # as a single-file job (limited only by the slowest individual download).
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        def _download_one(f):
+        def _download_one(f_tuple):
             """Download one file entry and return (f_dict, local_path, error)."""
+            f_idx, f = f_tuple
             f_url  = f.get("url")
             f_name = f.get("name", "document.pdf")
             ext = os.path.splitext(f_name)[1].lower() or ".pdf"
-            cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}{ext}")
+            cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}_{f_idx}{ext}")
             if os.path.exists(cache_path):
                 if cache_path.lower().endswith(".pdf"):
                     with open(cache_path, "rb") as test_f:
@@ -976,7 +977,7 @@ def process_job(doc_snapshot):
                             print(f"⚠️ [CACHE INVALID] Cached file {cache_path} is not a valid PDF. Purging from cache...")
                             os.remove(cache_path)
             if os.path.exists(cache_path):
-                print(f"⚡ [INSTANT PRINT] Job {doc_id} found in pre-fetch edge cache! Using cached file (0s download delay).")
+                print(f"⚡ [INSTANT PRINT] Job {doc_id} (file {f_idx+1}) found in pre-fetch edge cache! Using cached file (0s download delay).")
                 path = cache_path
             else:
                 path = download_file(f_url, f_name)
@@ -991,7 +992,7 @@ def process_job(doc_snapshot):
         # Run downloads in parallel — cap at 4 threads to avoid Pi memory pressure
         download_results = [None] * len(files)  # preserve file order
         with ThreadPoolExecutor(max_workers=min(4, len(files))) as pool:
-            future_to_idx = {pool.submit(_download_one, f): i for i, f in enumerate(files)}
+            future_to_idx = {pool.submit(_download_one, (i, f)): i for i, f in enumerate(files)}
             for future in as_completed(future_to_idx):
                 idx = future_to_idx[future]
                 f_entry, l_path, err = future.result()
@@ -1470,24 +1471,30 @@ def prefetch_job(doc_snapshot):
         file_url = doc.get("fileUrl")
         file_name = doc.get("fileName", "document.pdf")
         
-        if not file_url:
-            return
+        files = doc.get("files")
+        if not files:
+            files = [{"url": file_url, "name": file_name}]
             
-        ext = os.path.splitext(file_name)[1].lower() or ".pdf"
-        cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}{ext}")
-        if os.path.exists(cache_path):
-            if cache_path.lower().endswith(".pdf"):
-                with open(cache_path, "rb") as test_f:
-                    if not test_f.read(8).startswith(b'%PDF'):
-                        os.remove(cache_path)
-        if os.path.exists(cache_path):
-            return
-            
-        print(f"🚀 [PRE-FETCH] Pre-downloading job {doc_id} ({file_name}) in background...")
-        downloaded = download_file(file_url, file_name)
-        if downloaded and os.path.exists(downloaded):
-            os.rename(downloaded, cache_path)
-            print(f"⚡ [PRE-FETCH CACHED] Job {doc_id} pre-downloaded & cached → {cache_path}")
+        for f_idx, f in enumerate(files):
+            f_url = f.get("url")
+            f_name = f.get("name", "document.pdf")
+            if not f_url:
+                continue
+            ext = os.path.splitext(f_name)[1].lower() or ".pdf"
+            cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}_{f_idx}{ext}")
+            if os.path.exists(cache_path):
+                if cache_path.lower().endswith(".pdf"):
+                    with open(cache_path, "rb") as test_f:
+                        if not test_f.read(8).startswith(b'%PDF'):
+                            os.remove(cache_path)
+            if os.path.exists(cache_path):
+                continue
+                
+            print(f"🚀 [PRE-FETCH] Pre-downloading file {f_idx+1}/{len(files)} for job {doc_id} ({f_name}) in background...")
+            downloaded = download_file(f_url, f_name)
+            if downloaded and os.path.exists(downloaded):
+                os.rename(downloaded, cache_path)
+                print(f"⚡ [PRE-FETCH CACHED] Job {doc_id} (file {f_idx+1}) pre-downloaded & cached → {cache_path}")
     except Exception as e:
         print(f"⚠️ [PRE-FETCH] Failed to pre-fetch job: {e}")
 
