@@ -801,9 +801,12 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         match = re.search(r'request id is (\S+)', lp_output)
         if match and doc_ref:
             job_id = match.group(1)
-            print(f"✅ CUPS job {job_id} queued. Spawning sync thread to track physical completion.")
+            # Calculate dynamic timeout: 600s base + 360s per color page (or 30s per B&W page)
+            page_count = sum(get_pdf_page_count(f) for f in file_paths if f.endswith(".pdf")) or 1
+            cups_timeout = (600 + page_count * copies * (360 if is_color else 30))
+            print(f"✅ CUPS job {job_id} queued. Spawning sync thread to track physical completion (timeout: {cups_timeout}s).")
             # Spawn background thread to wait for physical print and update Firestore
-            t = threading.Thread(target=wait_for_cups_job, args=(job_id, doc_ref, 600, printer_name), daemon=True)
+            t = threading.Thread(target=wait_for_cups_job, args=(job_id, doc_ref, cups_timeout, printer_name), daemon=True)
             t.start()
             # Return None to indicate 'async' — caller should NOT update Firestore immediately
             return None

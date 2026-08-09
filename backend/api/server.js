@@ -2016,24 +2016,8 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
           }
 
           // B. Printer Offline/Disabled Check
-          const printerStatusStr = statusData.printerStatus || "";
-          if (isColorJob) {
-            if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
-              return res.json({
-                status: "failed",
-                isPrinted: false,
-                printerStatus: "Printer error: Color printer is offline or disabled"
-              });
-            }
-          } else {
-            if (printerStatusStr.includes("B&W: Paused/Error") || printerStatusStr.includes("B&W: lpstat failed")) {
-              return res.json({
-                status: "failed",
-                isPrinted: false,
-                printerStatus: "Printer error: B&W printer is offline or disabled"
-              });
-            }
-          }
+          // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
+          // should not block active print jobs from being processed.
         }
       } catch (statusErr) {
         console.error("⚠️ Error checking system status:", statusErr);
@@ -2059,7 +2043,8 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     let anyStuck = false;
     for (const d of currentSessionDocs) {
       if (d.status === "printing") {
-        const updatedAt = d.updatedAt ? (d.updatedAt.toDate ? d.updatedAt.toDate() : new Date(d.updatedAt)) : new Date();
+        const startTimestamp = d.printStartedAt || d.updatedAt;
+        const updatedAt = startTimestamp ? (startTimestamp.toDate ? startTimestamp.toDate() : new Date(startTimestamp)) : new Date();
         const elapsedMs = new Date().getTime() - updatedAt.getTime();
         if (elapsedMs > timeoutMs) {
           anyStuck = true;
@@ -2512,12 +2497,8 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         const statusData = statusDoc.data();
         const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
         if (lastSeen && (Date.now() - lastSeen.getTime() > 75000)) {
-          return res.status(400).json({ error: "Printer Not Working: Kiosk is currently offline or disconnected." });
-        }
-        const printerStatusStr = statusData.printerStatus || "";
-        if (printerStatusStr.includes("Paused/Error") || printerStatusStr.includes("lpstat failed")) {
-          return res.status(400).json({ error: "Printer Not Working: Printer queue is offline or in error state." });
-        }
+        // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
+        // should not block active print jobs from being enqueued.
       }
     } catch (statusErr) {
       console.error("⚠️ Pre-flight health check error:", statusErr);
