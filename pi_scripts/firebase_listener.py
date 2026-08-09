@@ -687,9 +687,23 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             auto_heal_cups_queue(printer_name, job_id)
                             return
 
-                        # 3s for color inkjet, 1s for laser so Firestore updates instantly as physical printing finishes
-                        paper_exit_delay = 3 if ("epson" in str(printer_name).lower() or "color" in str(printer_name).lower()) else 1
-                        print(f"⏳ [SYNC] CUPS job {job_id} done in queue. Finalizing physical completion ({paper_exit_delay}s)...")
+                        # For Epson color inkjets, wait for the physical printer queue status to return to 'idle'
+                        # and apply a realistic paper exit buffer (~20s per page) so Firestore updates ONLY
+                        # when paper physically drops into the exit tray (preventing premature 100% UI completion).
+                        if ("epson" in str(printer_name).lower() or "color" in str(printer_name).lower()):
+                            print(f"⏳ [SYNC] CUPS job {job_id} cleared buffer. Polling physical Epson hardware completion...")
+                            # Poll up to 120s for printer queue to become idle
+                            idle_start = time.time()
+                            while time.time() - idle_start < 120:
+                                p_stat = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=5).stdout.lower()
+                                if "idle" in p_stat and "now printing" not in p_stat:
+                                    break
+                                time.sleep(2)
+                            paper_exit_delay = 18
+                        else:
+                            paper_exit_delay = 1
+
+                        print(f"⏳ [SYNC] Hardware printhead complete. Finalizing physical paper ejection ({paper_exit_delay}s)...")
                         time.sleep(paper_exit_delay)
 
                         # Final status check after completion buffer
