@@ -574,7 +574,7 @@ print(f'Merged {{len(images)}} image(s) into PDF: {rasterized_pdf}')
 
 
 def is_printer_online(printer_name):
-    """Check if the CUPS printer queue is enabled and accepting jobs, and physically connected via USB (or IPP network)."""
+    """Check if the CUPS printer queue is enabled, accepting jobs, physically connected via USB/network, and free of hardware errors (out-of-paper, jam, door-open)."""
     usb_id = PRINTER_USB_IDS.get(printer_name)
     if usb_id:
         try:
@@ -585,16 +585,30 @@ def is_printer_online(printer_name):
                 lsusb_out = subprocess.run(["lsusb"], capture_output=True, text=True, timeout=5).stdout
                 if usb_id not in lsusb_out:
                     print(f"❌ Printer {printer_name} USB ID ({usb_id}) NOT found in lsusb! Printer is physically off/disconnected.")
-                    return False
+                    return False, f"Printer {printer_name} is physically off or disconnected"
             else:
                 print(f"ℹ️ Printer {printer_name} is configured as a network/wireless IPP printer. Skipping lsusb check.")
         except Exception as e:
             print(f"⚠️ lsusb check failed: {e}")
 
     try:
-        res = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=2)
-        output = res.stdout.lower()
-        if "disabled" in output or "stopped" in output or "not accepting" in output:
+        # Check lpstat -l -p for hardware alerts (out of paper, paper jam, door open)
+        res_l = subprocess.run(["lpstat", "-l", "-p", printer_name], capture_output=True, text=True, timeout=3)
+        l_out = res_l.stdout.lower()
+
+        if "media-empty" in l_out or "media-needed" in l_out or "out-of-paper" in l_out or "out of paper" in l_out:
+            print(f"❌ Printer {printer_name} reported OUT OF PAPER (media-empty-error) in CUPS!")
+            return False, f"Printer {printer_name} is out of paper. Please add paper to the tray."
+
+        if "media-jam" in l_out or "paper-jam" in l_out:
+            print(f"❌ Printer {printer_name} reported PAPER JAM (media-jam-error) in CUPS!")
+            return False, f"Printer {printer_name} has a paper jam. Please clear paper jam."
+
+        if "door-open" in l_out or "cover-open" in l_out:
+            print(f"❌ Printer {printer_name} reported DOOR OPEN in CUPS!")
+            return False, f"Printer {printer_name} cover/door is open."
+
+        if "disabled" in l_out or "stopped" in l_out or "not accepting" in l_out:
             print(f"⚠️ Printer {printer_name} is OFFLINE/DISABLED in CUPS. Attempting automatic queue healing...")
             try:
                 subprocess.run(["sudo", "-S", "cupsenable", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
@@ -605,17 +619,20 @@ def is_printer_online(printer_name):
                 res2 = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=2)
                 if "idle" in res2.stdout.lower() or "enabled" in res2.stdout.lower() or "printing" in res2.stdout.lower():
                     print(f"✅ Automatically recovered CUPS printer queue {printer_name}!")
-                    return True
+                    return True, "Online"
             except Exception as recover_err:
                 print(f"⚠️ Auto-recovery failed: {recover_err}")
             print(f"❌ Printer {printer_name} remains OFFLINE/DISABLED")
-            return False
-        if res.returncode != 0 or "is idle" not in output and "now printing" not in output and "enabled" not in output:
-            print(f"⚠️ Could not verify printer {printer_name} status: {res.stdout.strip()}")
-            return False
-        return True
+            return False, f"Printer {printer_name} queue is disabled or offline"
+
+        if res_l.returncode != 0 or ("is idle" not in l_out and "now printing" not in l_out and "enabled" not in l_out):
+            print(f"⚠️ Could not verify printer {printer_name} status: {res_l.stdout.strip()}")
+            return False, f"Printer {printer_name} status check failed"
+
+        return True, "Online"
     except Exception as e:
         print(f"⚠️ Printer status check failed: {e}")
+        return False, f"Printer status check error: {e}"
 def auto_heal_cups_queue(printer_name=BW_PRINTER_NAME, job_id=None):
     """
     Automatically clears stuck or errored jobs in CUPS and re-enables a paused/error print queue.
@@ -662,6 +679,14 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                 print(f"⚠️ [SYNC] Failed to verify job status from Firestore: {doc_err}")
 
             try:
+                # Check for hardware error alerts (out-of-paper, paper jam, door open) while job is queued
+                chk_ok, chk_reason = is_printer_online(printer_name)
+                if not chk_ok and "printing" not in chk_reason.lower():
+                    print(f"❌ [SYNC] Printer hardware alert during printing: {chk_reason}. Aborting CUPS job {job_id}...")
+                    auto_heal_cups_queue(printer_name, job_id)
+                    report_print_failure(doc_ref, chk_reason)
+                    return
+
                 res = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True, timeout=10)
                 if job_id not in res.stdout:
                     # Job finished (printed or error)
@@ -726,7 +751,7 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                     return
             except Exception as e:
                 print(f"⚠️ [SYNC] lpstat poll error: {e}")
-            time.sleep(1)
+            time.sleep(2)
         # Timeout — mark failed
         print(f"❌ [SYNC] Timed out waiting for CUPS job {job_id}. Reporting failure for auto-refund.")
         auto_heal_cups_queue(printer_name, job_id)
@@ -759,9 +784,10 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                     return False
 
         # ── Printer online guard ──
-        if not is_printer_online(printer_name):
-            if os.environ.get("SIMULATE_DEV", "true").lower() == "true" or sys.platform == "darwin":
-                print(f"⚠️ [DEV SIMULATION] Printer {printer_name} offline or mac dev setup detected. Simulating print job success over 6 seconds...")
+        online_ok, online_reason = is_printer_online(printer_name)
+        if not online_ok:
+            if os.environ.get("SIMULATE_DEV", "false").lower() == "true":
+                print(f"⚠️ [DEV SIMULATION] Printer {printer_name} offline ({online_reason}). Simulating print job success over 6 seconds...")
                 if doc_ref:
                     def simulate_job():
                         time.sleep(6)
@@ -777,7 +803,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                     return None
                 return True
 
-            print(f"❌ Aborting: printer {printer_name} is offline. Cancelling any queued CUPS jobs to prevent ghost prints.")
+            print(f"❌ Aborting: printer {printer_name} is offline ({online_reason}). Reporting failure for auto-refund.")
             # Cancel all queued jobs for this printer so they don't spool when printer comes back
             try:
                 stale_res = subprocess.run(["lpstat", "-o"], capture_output=True, text=True)
@@ -790,6 +816,9 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                             subprocess.run(["cancel", stale_job_id], capture_output=True)
             except Exception as cancel_err:
                 print(f"⚠️ Failed to cancel queued CUPS jobs: {cancel_err}")
+
+            if doc_ref:
+                report_print_failure(doc_ref, online_reason)
             return False
 
         # ── Page range slicing ──
@@ -867,7 +896,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             return True
 
     except (subprocess.CalledProcessError, Exception) as e:
-        if os.environ.get("SIMULATE_DEV", "true").lower() == "true" or sys.platform == "darwin":
+        if os.environ.get("SIMULATE_DEV", "false").lower() == "true":
             print(f"⚠️ [DEV SIMULATION] Print execution error ({e}). Simulating successful print job over 6 seconds...")
             if doc_ref:
                 def simulate_job_err():
@@ -884,6 +913,8 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                 return None
             return True
         print(f"❌ Print error: {e}")
+        if doc_ref:
+            report_print_failure(doc_ref, f"Print command execution error: {e}")
         return False
 
 def download_file(file_url, file_name):
