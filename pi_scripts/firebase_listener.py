@@ -698,14 +698,23 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                     res2 = subprocess.run(["lpstat", "-W", "completed"], capture_output=True, text=True, timeout=10)
                     job_ok = job_id in res2.stdout
                     # Also treat as success if job is gone from both not-completed AND completed:
-                    # large/slow jobs (e.g. graph PDFs) can rotate out of CUPS history by the time
-                    # we run lpstat -W completed, even though they printed successfully.
                     if not job_ok:
                         res3 = subprocess.run(["lpstat", "-W", "not-completed"], capture_output=True, text=True, timeout=10)
                         if job_id not in res3.stdout:
-                            # Job is gone from all queues — treat as completed, not failed
-                            print(f"⚠️ [SYNC] CUPS job {job_id} not in completed history (rotated out), but also not in not-completed. Treating as success.")
+                            print(f"⚠️ [SYNC] CUPS job {job_id} not in completed history (rotated out), but also not in not-completed.")
                             job_ok = True
+
+                    # Verify no silent filter crash occurred in /var/log/cups/error_log for this job
+                    if job_ok:
+                        try:
+                            job_num = job_id.split("-")[-1]
+                            err_log_check = subprocess.run(["sudo", "grep", "-a", f"[Job {job_num}]", "/var/log/cups/error_log"], capture_output=True, text=True, timeout=3).stdout
+                            if "**** ERROR ****" in err_log_check or "signal 13" in err_log_check or "exited with error" in err_log_check:
+                                print(f"❌ [SYNC] Detected silent CUPS filter crash for job {job_id} in error_log! Failing job for auto-refund.")
+                                job_ok = False
+                        except Exception as filter_chk_err:
+                            print(f"⚠️ [SYNC] Could not check error_log for filter crash: {filter_chk_err}")
+
                     if job_ok:
                         doc_snap_latest = doc_ref.get()
                         doc_dict = doc_snap_latest.to_dict() or {} if doc_snap_latest.exists else {}
