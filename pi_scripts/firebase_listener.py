@@ -655,7 +655,7 @@ def auto_heal_cups_queue(printer_name=BW_PRINTER_NAME, job_id=None):
     except Exception as e:
         print(f"⚠️ [AUTO-CLEARANCE] Error during queue healing: {e}")
 
-def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAME):
+def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAME, page_count=1, copies=1):
     """
     Background thread: polls CUPS until 'job_id' disappears from the
     not-completed queue, then updates Firestore to completed.
@@ -663,7 +663,9 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
     """
     import re
     start = time.time()
-    print(f"⏳ [SYNC] Waiting for CUPS job {job_id} to physically finish printing...")
+    total_sheets = max(1, page_count * copies)
+    is_color_printer = ("epson" in str(printer_name).lower() or "color" in str(printer_name).lower())
+    print(f"⏳ [SYNC] Waiting for CUPS job {job_id} ({total_sheets} sheet(s)) to physically finish printing on {printer_name}...")
     try:
         while time.time() - start < timeout:
             # Check if the Firestore document status has changed to "failed" (timed out / cancelled / refunded)
@@ -712,21 +714,23 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             auto_heal_cups_queue(printer_name, job_id)
                             return
 
-                        # For Epson color inkjets, wait for the physical printer queue status to return to 'idle'
-                        # and apply a realistic paper exit buffer (~20s per page) so Firestore updates ONLY
-                        # when paper physically drops into the exit tray (preventing premature 100% UI completion).
-                        if ("epson" in str(printer_name).lower() or "color" in str(printer_name).lower()):
-                            print(f"⏳ [SYNC] CUPS job {job_id} cleared buffer. Polling physical Epson hardware completion...")
-                            # Poll up to 120s for printer queue to become idle
+                        # Calculate dynamic physical paper exit delay based on sheet count
+                        # Color Epson inkjet: ~22s per sheet for physical printhead sweep & paper ejection
+                        # B&W Brother laser: ~2s per sheet
+                        if is_color_printer:
+                            paper_exit_delay = max(18, total_sheets * 22)
+                            print(f"⏳ [SYNC] CUPS job {job_id} cleared queue. Waiting {paper_exit_delay}s for physical ejection of {total_sheets} color sheet(s)...")
+                            # Poll up to paper_exit_delay for printer queue to become idle
                             idle_start = time.time()
-                            while time.time() - idle_start < 120:
+                            while time.time() - idle_start < paper_exit_delay:
                                 p_stat = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=5).stdout.lower()
-                                if "idle" in p_stat and "now printing" not in p_stat:
-                                    break
+                                # Keep waiting if hardware is actively printing pages
+                                if "now printing" in p_stat:
+                                    time.sleep(3)
+                                    continue
                                 time.sleep(2)
-                            paper_exit_delay = 18
                         else:
-                            paper_exit_delay = 1
+                            paper_exit_delay = max(2, total_sheets * 2)
 
                         print(f"⏳ [SYNC] Hardware printhead complete. Finalizing physical paper ejection ({paper_exit_delay}s)...")
                         time.sleep(paper_exit_delay)
@@ -886,7 +890,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             cups_timeout = (600 + page_count * copies * (360 if is_color else 30))
             print(f"✅ CUPS job {job_id} queued. Spawning sync thread to track physical completion (timeout: {cups_timeout}s).")
             # Spawn background thread to wait for physical print and update Firestore
-            t = threading.Thread(target=wait_for_cups_job, args=(job_id, doc_ref, cups_timeout, printer_name), daemon=True)
+            t = threading.Thread(target=wait_for_cups_job, args=(job_id, doc_ref, cups_timeout, printer_name, page_count, copies), daemon=True)
             t.start()
             # Return None to indicate 'async' — caller should NOT update Firestore immediately
             return None
