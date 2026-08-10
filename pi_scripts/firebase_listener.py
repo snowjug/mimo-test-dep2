@@ -844,6 +844,9 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                "-o", "page-left=0", "-o", "page-right=0",
                "-o", "page-top=0", "-o", "page-bottom=0"]
 
+        if not is_color:
+            cmd.extend(["-o", "InputSlot=Main"])
+
         # fit-to-page is skipped for:
         #  - blank sheets / graph paper (print at exact size)
         #  - N-up imposed PDFs (geometry is pre-computed)
