@@ -1,4 +1,4 @@
-// Deploy trigger: 2026-06-29 13:06:50
+// Deploy trigger: 2026-08-10 12:28:00
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const express = require("express");
@@ -7,19 +7,21 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
-const { OAuth2Client } = require("google-auth-library");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
+const { OAuth2Client } = require("google-auth-library");
 const { PDFDocument } = require("pdf-lib");
 
-// Nodemailer Transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "visionprintt@gmail.com",
-    pass: process.env.GMAIL_APP_PASSWORD || "placeholder_pass" // Expected from Firebase config
-  }
-});
+// Lazy-loaded Nodemailer Transporter helper
+function getTransporter() {
+  const nodemailer = require("nodemailer");
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: "visionprintt@gmail.com",
+      pass: process.env.GMAIL_APP_PASSWORD || "placeholder_pass"
+    }
+  });
+}
 
 // ================= WHATSAPP CONFIG =================
 const WA_PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || "943206795552432";
