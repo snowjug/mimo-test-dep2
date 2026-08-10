@@ -1617,6 +1617,16 @@ def keep_warm_loop():
             pass
         time.sleep(600)
 
+def startup_purge_cups():
+    """Cancel all stale queued CUPS jobs on listener startup to prevent ghost prints when paper is refilled."""
+    try:
+        print("🧹 [STARTUP] Clearing stale CUPS queues to prevent ghost prints...")
+        subprocess.run(["cancel", "-a", "-x"], capture_output=True, timeout=5)
+    except Exception as e:
+        print(f"⚠️ [STARTUP] Failed to purge stale CUPS queues: {e}")
+
+startup_purge_cups()
+
 # Start background threads
 threading.Thread(target=heartbeat_loop, daemon=True).start()
 threading.Thread(target=watchdog_loop, daemon=True).start()
