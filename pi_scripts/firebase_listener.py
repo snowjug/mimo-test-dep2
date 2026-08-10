@@ -708,11 +708,18 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                     if job_ok:
                         try:
                             job_num = job_id.split("-")[-1]
-                            err_log_check = subprocess.run(["sudo", "grep", "-a", f"[Job {job_num}]", "/var/log/cups/error_log"], capture_output=True, text=True, timeout=3).stdout
-                            # Check specifically for driver filter crashes or non-zero filter exits
-                            if "SetupJobAttrib" in err_log_check or "signal 13" in err_log_check or "exited with error" in err_log_check or "exited with status" in err_log_check:
+                            # Use -F (fixed string) to match exact literal [Job N] without regex bracket interpretation
+                            err_log_check = subprocess.run(
+                                ["sudo", "grep", "-a", "-F", f"[Job {job_num}]", "/var/log/cups/error_log"],
+                                capture_output=True, text=True, timeout=5
+                            ).stdout
+                            # Check specifically for driver filter crashes only (SetupJobAttrib = escpr crash, signal 13 = SIGPIPE crash)
+                            # Note: "exited with no errors" is SUCCESS — do NOT flag it
+                            if "SetupJobAttrib" in err_log_check or ("signal 13" in err_log_check and "no errors" not in err_log_check):
                                 print(f"❌ [SYNC] Detected silent CUPS filter crash for job {job_id} in error_log! Failing job for auto-refund.")
                                 job_ok = False
+                            else:
+                                print(f"✅ [SYNC] CUPS error_log verified clean for job {job_id} — no filter crashes detected.")
                         except Exception as filter_chk_err:
                             print(f"⚠️ [SYNC] Could not check error_log for filter crash: {filter_chk_err}")
 
