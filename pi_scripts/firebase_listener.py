@@ -709,7 +709,8 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                         try:
                             job_num = job_id.split("-")[-1]
                             err_log_check = subprocess.run(["sudo", "grep", "-a", f"[Job {job_num}]", "/var/log/cups/error_log"], capture_output=True, text=True, timeout=3).stdout
-                            if "**** ERROR ****" in err_log_check or "signal 13" in err_log_check or "exited with error" in err_log_check:
+                            # Check specifically for driver filter crashes or non-zero filter exits
+                            if "SetupJobAttrib" in err_log_check or "signal 13" in err_log_check or "exited with error" in err_log_check or "exited with status" in err_log_check:
                                 print(f"❌ [SYNC] Detected silent CUPS filter crash for job {job_id} in error_log! Failing job for auto-refund.")
                                 job_ok = False
                         except Exception as filter_chk_err:
