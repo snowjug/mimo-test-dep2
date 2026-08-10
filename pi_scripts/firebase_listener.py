@@ -592,23 +592,25 @@ def is_printer_online(printer_name):
             print(f"⚠️ lsusb check failed: {e}")
 
     try:
-        # Check lpstat -l -p for hardware alerts (out of paper, paper jam, door open)
-        res_l = subprocess.run(["lpstat", "-l", "-p", printer_name], capture_output=True, text=True, timeout=3)
-        l_out = res_l.stdout.lower()
+        # Check lpstat -p (without -l) for LIVE printer status & active hardware error states.
+        # Note: Do NOT use -l because lpstat -l -p prints static PPD capability strings like 'Alerts: media-empty-error'.
+        res_p = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=3)
+        p_out = res_p.stdout.lower()
 
-        if "media-empty" in l_out or "media-needed" in l_out or "out-of-paper" in l_out or "out of paper" in l_out:
-            print(f"❌ Printer {printer_name} reported OUT OF PAPER (media-empty-error) in CUPS!")
+        # Parse live error states from lpstat -p output
+        if "media-empty" in p_out or "out-of-paper" in p_out or "out of paper" in p_out:
+            print(f"❌ Printer {printer_name} reported LIVE OUT OF PAPER (media-empty-error) in CUPS!")
             return False, f"Printer {printer_name} is out of paper. Please add paper to the tray."
 
-        if "media-jam" in l_out or "paper-jam" in l_out:
-            print(f"❌ Printer {printer_name} reported PAPER JAM (media-jam-error) in CUPS!")
+        if "media-jam" in p_out or "paper-jam" in p_out:
+            print(f"❌ Printer {printer_name} reported LIVE PAPER JAM (media-jam-error) in CUPS!")
             return False, f"Printer {printer_name} has a paper jam. Please clear paper jam."
 
-        if "door-open" in l_out or "cover-open" in l_out:
-            print(f"❌ Printer {printer_name} reported DOOR OPEN in CUPS!")
+        if "door-open" in p_out or "cover-open" in p_out:
+            print(f"❌ Printer {printer_name} reported LIVE DOOR OPEN in CUPS!")
             return False, f"Printer {printer_name} cover/door is open."
 
-        if "disabled" in l_out or "stopped" in l_out or "not accepting" in l_out:
+        if "disabled" in p_out or "stopped" in p_out or "not accepting" in p_out:
             print(f"⚠️ Printer {printer_name} is OFFLINE/DISABLED in CUPS. Attempting automatic queue healing...")
             try:
                 subprocess.run(["sudo", "-S", "cupsenable", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
@@ -625,8 +627,8 @@ def is_printer_online(printer_name):
             print(f"❌ Printer {printer_name} remains OFFLINE/DISABLED")
             return False, f"Printer {printer_name} queue is disabled or offline"
 
-        if res_l.returncode != 0 or ("is idle" not in l_out and "now printing" not in l_out and "enabled" not in l_out):
-            print(f"⚠️ Could not verify printer {printer_name} status: {res_l.stdout.strip()}")
+        if res_p.returncode != 0 or ("is idle" not in p_out and "now printing" not in p_out and "enabled" not in p_out):
+            print(f"⚠️ Could not verify printer {printer_name} status: {res_p.stdout.strip()}")
             return False, f"Printer {printer_name} status check failed"
 
         return True, "Online"
