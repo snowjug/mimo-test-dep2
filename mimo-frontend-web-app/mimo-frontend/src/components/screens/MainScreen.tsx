@@ -126,11 +126,11 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                     </div>
 
                     <div className="main-heading">
-                        <svg width="620" height="155" viewBox="0 0 620 155" style={{ overflow: 'visible', filter: isCV001 ? 'drop-shadow(0 16px 36px rgba(0, 20, 110, 0.55))' : 'drop-shadow(0 10px 22px rgba(80,40,0,0.38))' }}>
+                        <svg width="820" height="180" viewBox="0 0 820 180" style={{ overflow: 'visible', filter: isCV001 ? 'drop-shadow(0 16px 36px rgba(0, 20, 110, 0.55))' : 'drop-shadow(0 10px 22px rgba(80,40,0,0.38))' }}>
                             <defs>
                                 <linearGradient id="mimoBotanicalGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%"   stopColor="#ffffff" />
-                                    <stop offset="100%" stopColor="#fde68a" />
+                                    <stop offset="0%"   stopColor="#ffd97d" />
+                                    <stop offset="100%" stopColor="#b78c43" />
                                 </linearGradient>
                                 <linearGradient id="mimoCyberGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%"   stopColor="#ffffff" />
@@ -152,7 +152,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                     letterSpacing: '4px'
                                 }}
                             >
-                                MIMO
+                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">2.0</tspan>
                             </text>
 
                             {/* Main text */}
@@ -172,7 +172,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                     letterSpacing: '4px'
                                 }}
                             >
-                                MIMO
+                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">2.0</tspan>
                             </text>
                         </svg>
                     </div>

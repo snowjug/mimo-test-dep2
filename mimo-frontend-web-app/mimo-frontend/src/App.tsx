@@ -24,12 +24,16 @@ function App() {
 
   useEffect(() => {
     const rootEl = document.getElementById('root');
+    // Clear themes first
+    document.body.classList.remove('theme-cv001', 'theme-sv002');
+    rootEl?.classList.remove('theme-cv001', 'theme-sv002');
+
     if (dynamicKioskId === 'CV-001') {
       document.body.classList.add('theme-cv001');
       rootEl?.classList.add('theme-cv001');
-    } else {
-      document.body.classList.remove('theme-cv001');
-      rootEl?.classList.remove('theme-cv001');
+    } else if (dynamicKioskId === 'SV-002') {
+      document.body.classList.add('theme-sv002');
+      rootEl?.classList.add('theme-sv002');
     }
   }, [dynamicKioskId]);
 

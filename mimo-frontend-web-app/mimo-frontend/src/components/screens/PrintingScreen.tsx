@@ -86,6 +86,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   kioskId,
 }) => {
   const isCV001 = kioskId === 'CV-001';
+  const isSV002 = kioskId === 'SV-002';
   const [progress, setProgress]         = useState(0);
   const [typedTitle, setTypedTitle]     = useState('');
   const [typedSub, setTypedSub]         = useState('');
@@ -269,14 +270,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             : `Printing page ${currentPage} of ${totalSheets}…`
         );
       }
-
-      if (next !== lastProgressRef.current) {
-        lastProgressRef.current = progressRef.current;
-      }
-
-      const jitter = (Math.random() - 0.5) * delay * 0.05;
-      tickTimerRef.current = window.setTimeout(tick, Math.max(100, delay + jitter));
-    };
 
       if (next !== lastProgressRef.current) {
         lastProgressRef.current = progressRef.current;
@@ -609,23 +602,25 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '30px',
         flex: 1, textAlign: 'left', maxWidth: '750px', zIndex: 10,
-        background: 'rgba(0,0,0,0.22)',
+        background: isSV002 ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0,0,0,0.22)',
         backdropFilter: 'blur(18px)',
         WebkitBackdropFilter: 'blur(18px)',
-        border: '1px solid rgba(255,255,255,0.14)',
+        border: isSV002 ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.14)',
         borderRadius: '28px',
         padding: '40px 48px',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+        boxShadow: isSV002 ? '0 10px 40px rgba(0,0,0,0.06)' : '0 8px 40px rgba(0,0,0,0.18)',
       }}>
         <div style={{ minHeight: '180px' }}>
-          <h2 style={{ fontSize: '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-3px', lineHeight: '1.05', display: 'flex', textShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
-            <span className={isActive ? "data-text-highlight" : ""}>{typedTitle}</span>
+          <h2 style={{ fontSize: isSV002 ? '80px' : '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-2px', lineHeight: '1.05', display: 'flex', flexDirection: 'column', textShadow: isSV002 ? 'none' : '0 4px 24px rgba(0,0,0,0.4)' }}>
+            <span style={{ color: isSV002 ? 'var(--text-primary)' : 'inherit' }}>
+              {typedTitle}
+            </span>
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.95)', fontSize: '36px', fontWeight: 600, lineHeight: '1.4', whiteSpace: 'pre-line', marginBottom: '15px', textShadow: '0 2px 12px rgba(0,0,0,0.3)' }}>
+          <p style={{ color: isSV002 ? '#777777' : 'rgba(255,255,255,0.95)', fontSize: isSV002 ? '28px' : '36px', fontWeight: isSV002 ? 500 : 600, lineHeight: '1.5', whiteSpace: 'pre-line', marginBottom: '15px', textShadow: isSV002 ? 'none' : '0 2px 12px rgba(0,0,0,0.3)' }}>
             {typedSub}
           </p>
           {!isCompleted && (
-            <p style={{ color: isCV001 ? '#80efff' : '#FFD97D', fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: isCV001 ? '0 0 16px rgba(0,229,255,0.6)' : '0 0 16px rgba(200,134,10,0.5)', minHeight: '36px' }}>
+            <p style={{ color: isSV002 ? 'var(--amber-warm)' : (isCV001 ? '#80efff' : '#FFD97D'), fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: isSV002 ? 'none' : (isCV001 ? '0 0 16px rgba(0,229,255,0.6)' : '0 0 16px rgba(200,134,10,0.5)'), minHeight: '36px' }}>
               {statusMsg}
             </p>
           )}
@@ -639,20 +634,22 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           style={{ position: 'relative', width: '380px', height: '380px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           {/* Glow background — grows with progress */}
-          <div style={{
-            position: 'absolute',
-            width: '300px',
-            height: '300px',
-            borderRadius: '50%',
-            background: isCV001 ? '#0077b6' : '#C8860A',
-            filter: 'blur(70px)',
-            opacity: 0.10 + (progress / 100) * 0.22,
-            transition: 'opacity 0.3s',
-            pointerEvents: 'none',
-          }} />
+          {!isSV002 && (
+            <div style={{
+              position: 'absolute',
+              width: '300px',
+              height: '300px',
+              borderRadius: '50%',
+              background: isCV001 ? '#0077b6' : '#C8860A',
+              filter: 'blur(70px)',
+              opacity: 0.10 + (progress / 100) * 0.22,
+              transition: 'opacity 0.3s',
+              pointerEvents: 'none',
+            }} />
+          )}
 
           {/* Pulse-ring halos */}
-          {isActive && progress < 100 && (
+          {isActive && progress < 100 && !isSV002 && (
             <>
               <div style={{
                 position: 'absolute', inset: '45px', borderRadius: '50%',
@@ -669,7 +666,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             </>
           )}
           {/* ── Floating particles (Music notes for CV-001, Petals for standard) ── */}
-          {isActive && noteParticles.map(note => (
+          {isActive && !isSV002 && noteParticles.map(note => (
             <div
               key={note.id}
               className="music-note-particle"
@@ -693,7 +690,49 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             </div>
           ))}
 
-          <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2, overflow: 'visible' }}>
+          {isSV002 ? (
+            <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2, overflow: 'visible' }}>
+              <circle cx="190" cy="190" r="190" fill="#ffffff" opacity="0.95" />
+              
+              <circle cx="190" cy="190" r={radius} fill="transparent" stroke="#f0ede6" strokeWidth="14" />
+              
+              <circle cx="190" cy="190" r={radius - 24} fill="transparent" stroke="#e0d5c1" strokeWidth="2" strokeDasharray="4 16" />
+              
+              <text x="190" y="175" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                <tspan fontSize="88px" fontWeight="700" fill="#111111" letterSpacing="-2px">{progress}</tspan>
+                <tspan fontSize="52px" fontWeight="600" fill="#111111">%</tspan>
+              </text>
+              <text x="190" y="245" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '18px', fontWeight: 500, fill: '#666666' }}>
+                {statusMsg}
+              </text>
+
+              <g style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+                <circle
+                  cx="190" cy="190" r={radius}
+                  fill="transparent"
+                  stroke="#ba924b"
+                  strokeWidth="14"
+                  strokeDasharray={progress === 100 ? 'none' : circumference}
+                  strokeDashoffset={progress === 100 ? 0 : strokeDashoffset}
+                  strokeLinecap="round"
+                  style={{ transition: 'stroke-dashoffset 0.18s linear' }}
+                />
+              </g>
+
+              {progress > 0 && progress < 100 && cometTailPoints[0] && (
+                <circle
+                  cx={cometTailPoints[0].x}
+                  cy={cometTailPoints[0].y}
+                  r="12"
+                  fill="#ba924b"
+                  stroke="#ffffff"
+                  strokeWidth="4"
+                  style={{ transition: 'cx 0.18s linear, cy 0.18s linear', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
+                />
+              )}
+            </svg>
+          ) : (
+            <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2, overflow: 'visible' }}>
             <defs>
               <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%"   stopColor="#FFD97D" />
@@ -794,6 +833,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               />
             ))}
           </svg>
+          )}
         </div>
       </div>
     </div>

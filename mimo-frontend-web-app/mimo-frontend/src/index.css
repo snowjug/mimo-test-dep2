@@ -1438,3 +1438,211 @@ body.theme-cv001,
     background: rgba(255, 255, 255, 0.30);
 }
 
+/* ================================================
+   THEME: SV-002 (Elegant White Lily)
+   ================================================ */
+/* Override root variables when theme-sv002 is active */
+body.theme-sv002,
+#root.theme-sv002 {
+    /* Elegant light palette */
+    --amber-deep:    #8a6327;
+    --amber-mid:     #ffffff;
+    --amber-warm:    #b78c43;
+    --amber-light:   #d4af73;
+    --amber-pale:    #f5ecd6;
+    --gold-accent:   #b78c43;
+
+    /* Glass / overlay for light background */
+    --glass-warm:    rgba(255, 255, 255, 0.6);
+    --glass-warm-2:  rgba(255, 255, 255, 0.4);
+    --glass-border:  rgba(0, 0, 0, 0.08);
+    --glass-border-2: rgba(0, 0, 0, 0.05);
+
+    /* Keypad circles */
+    --keypad-bg:     rgba(255, 255, 255, 0.85);
+    --keypad-border: rgba(183, 140, 67, 0.2);
+    --keypad-hover:  rgba(245, 236, 214, 0.9);
+
+    /* Status colours */
+    --green:         #2e7d32;
+    --green-bright:  #4caf50;
+    --red-soft:      #d32f2f;
+    --teal:          #00838f;
+    --teal-bright:   #00bcd4;
+
+    /* Text */
+    --text-primary:  #111111;
+    --text-muted:    #666666;
+    --text-faint:    #aaaaaa;
+    
+    background: var(--amber-mid);
+}
+
+/* The floral background for SV-002 */
+.theme-sv002 .kiosk-bg {
+    background: url('./assets/sv002-bg.jpg') center center / cover no-repeat;
+    opacity: 1;
+}
+
+/* Adjust text shadows and text colours globally for sv002 */
+.theme-sv002 .tag-line,
+.theme-sv002 .sub-heading,
+.theme-sv002 .brand-desc,
+.theme-sv002 .swipe-right-text,
+.theme-sv002 .kiosk-footer,
+.theme-sv002 .kiosk-footer strong,
+.theme-sv002 .entry-instruction h2,
+.theme-sv002 .entry-instruction p,
+.theme-sv002 .percentage-text,
+.theme-sv002 .summary-title,
+.theme-sv002 .summary-value,
+.theme-sv002 .summary-label,
+.theme-sv002 .maintenance-heading {
+    color: var(--text-primary);
+    text-shadow: none;
+}
+
+.theme-sv002 .sub-heading .cyan-text {
+    color: var(--text-primary);
+    font-weight: 400;
+}
+
+.theme-sv002 .kiosk-footer {
+    background: transparent;
+}
+
+.theme-sv002 .brand-desc,
+.theme-sv002 .entry-instruction p {
+    color: var(--text-muted);
+}
+
+/* Swipe Track Adjustments */
+.theme-sv002 .swipe-track-glass {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+.theme-sv002 .swipe-pill-thumb {
+    background: #ffffff;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.theme-sv002 .swipe-pill-thumb .thumb-text {
+    color: var(--amber-warm);
+}
+
+.theme-sv002 .swipe-pill-thumb .arrow-circle {
+    background: rgba(45, 106, 59, 0.1);
+}
+
+.theme-sv002 .swipe-pill-thumb .arrow-circle .material-symbols-outlined {
+    color: var(--amber-warm);
+}
+
+/* Code Slots */
+.theme-sv002 .code-slot {
+    background: rgba(255, 255, 255, 0.7);
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    color: var(--text-primary);
+    text-shadow: none;
+}
+
+.theme-sv002 .code-slot.active {
+    border-color: var(--amber-warm);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 3px rgba(45, 106, 59, 0.2), 0 8px 25px rgba(0,0,0,0.08);
+}
+
+.theme-sv002 .code-slot.filled {
+    border-color: rgba(45, 106, 59, 0.5);
+}
+
+/* Keypad Buttons */
+.theme-sv002 .num-btn {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1.5px solid rgba(0, 0, 0, 0.08);
+    color: var(--text-primary);
+    text-shadow: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.theme-sv002 .num-btn:active {
+    background: rgba(230, 245, 235, 1);
+    border-color: rgba(45, 106, 59, 0.3);
+    color: var(--amber-warm);
+}
+
+.theme-sv002 .num-btn.submit-btn {
+    background: rgba(255, 255, 255, 0.5);
+    color: rgba(0, 0, 0, 0.2);
+}
+
+.theme-sv002 .num-btn.submit-btn.ready {
+    background: var(--green-bright);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+.theme-sv002 .num-btn.accent-red {
+    background: #ffebee;
+    color: #d32f2f;
+    border-color: rgba(211, 47, 47, 0.2);
+}
+
+.theme-sv002 .num-btn.accent-red:active {
+    background: #ffcdd2;
+    color: #b71c1c;
+}
+
+/* Back Button */
+.theme-sv002 .kiosk-back-btn {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: var(--text-primary);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.theme-sv002 .kiosk-back-btn:active {
+    background: #f0f0f0;
+}
+
+/* Summary Card */
+.theme-sv002 .summary-ticket {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+}
+
+.theme-sv002 .summary-row {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.theme-sv002 .error-card {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(211, 47, 47, 0.2);
+    box-shadow: 0 10px 30px rgba(211, 47, 47, 0.1);
+    color: var(--text-primary);
+}
+
+.theme-sv002 .error-card h1 {
+    color: #d32f2f;
+}
+
+.theme-sv002 .error-card p {
+    color: var(--text-muted);
+}
+
+.theme-sv002 .error-icon {
+    color: #d32f2f;
+}
+
+.theme-sv002 .retry-btn {
+    background: var(--amber-warm);
+    color: #ffffff;
+    border-color: transparent;
+}
+
+
