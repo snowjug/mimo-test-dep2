@@ -8,6 +8,13 @@ from datetime import datetime, timedelta
 import threading
 import requests
 
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    print("✅ Registered pillow_heif opener")
+except ImportError:
+    print("⚠️ pillow_heif not installed. HEIC image support will be disabled.")
+
 active_jobs = set()
 
 # ================= CONFIGURATION =================
@@ -381,7 +388,7 @@ def process_job(doc_snapshot):
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             
-            if ext in [".jpg", ".jpeg", ".png"]:
+            if ext in [".jpg", ".jpeg", ".png", ".heic"]:
                 # ALL images get converted to PDF so CUPS number-up works reliably
                 pdf_path = convert_image_to_pdf(l_path, image_scaling, custom_scale, is_color)
                 if pdf_path:
@@ -410,7 +417,7 @@ def process_job(doc_snapshot):
         # Ensure all files are PDFs
         pdf_paths = []
         for fp in final_paths:
-            if fp.lower().endswith(('.jpg', '.jpeg', '.png')):
+            if fp.lower().endswith(('.jpg', '.jpeg', '.png', '.heic')):
                 pdf_fp = fp + ".pdf"
                 try:
                     from PIL import Image

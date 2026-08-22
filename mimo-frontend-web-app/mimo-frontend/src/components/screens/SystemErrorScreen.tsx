@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface SystemErrorScreenProps {
     isActive: boolean;
@@ -9,16 +9,46 @@ interface SystemErrorScreenProps {
     } | null;
     onReset: () => void;
     onRetry: () => void;
+    errorMsg?: string;
+    showRefundBanner?: boolean;
+    kioskId?: string;
 }
 
-export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, jobData, onReset, onRetry }) => {
+const AUTO_RESET_SECONDS = 15;
+
+export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, jobData, onReset, onRetry, errorMsg, showRefundBanner, kioskId }) => {
+    const isCV001 = kioskId === 'CV-001';
     const firstName = jobData?.userName?.split(' ')[0] || 'there';
+    const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
+
+    useEffect(() => {
+        if (!isActive) {
+            setCountdown(AUTO_RESET_SECONDS);
+            return;
+        }
+        setCountdown(AUTO_RESET_SECONDS);
+        const interval = setInterval(() => {
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    onReset();
+                    return AUTO_RESET_SECONDS;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [isActive, onReset]);
 
     return (
         <div 
             className={`screen err-screen ${isActive ? 'visible' : ''}`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
+            {/* Botanical background only for standard kiosk */}
+            {!isCV001 && <div className="kiosk-bg" />}
+            <div className="ambient-glow glow-1" />
+            <div className="ambient-glow glow-2" />
 
             <div className="err-pop-badge-container err-a1">
                 <div className="err-pop-badge">
@@ -41,10 +71,25 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                 <div className="err-glass-card">
                     <div className="err-card-border" />
                     <div className="err-apology-content">
-                        <p className="err-apology-main">We apologize for the inconvenience. Something went wrong while printing your document.</p>
-                        <p className="err-retry-line">PLEASE TRY AGAIN.</p>
+                        <p className="err-apology-main">
+                            {errorMsg || 'We apologize for the inconvenience. Something went wrong while printing your document.'}
+                        </p>
+                        {!showRefundBanner && (
+                            <p className="err-retry-line">PLEASE TRY AGAIN.</p>
+                        )}
                     </div>
                 </div>
+
+                {/* ── Refund Banner ── */}
+                {showRefundBanner && (
+                    <div className="err-refund-banner err-a2">
+                        <div className="err-refund-icon">💚</div>
+                        <div className="err-refund-text">
+                            <strong>Refund in Progress</strong>
+                            <span>If you were charged, your payment will be refunded within 5–7 business days.</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
 
@@ -53,19 +98,25 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
 
             {/* ── BOTTOM SECTION ── */}
             <div className="err-bottom err-a3">
+                <div className="err-auto-return">
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', opacity: 0.7 }}>schedule</span>
+                    Returning to home in <strong style={{ color: isCV001 ? '#00e5ff' : '#FFD97D' }}>{countdown}s</strong>
+                </div>
                 <div className="err-buttons">
+                    {!showRefundBanner && (
+                        <button
+                            className="err-btn-white"
+                            onClick={onRetry}
+                            onPointerDown={e => (e.currentTarget.style.transform = 'scale(0.95)')}
+                            onPointerUp={e => (e.currentTarget.style.transform = '')}
+                            onPointerLeave={e => (e.currentTarget.style.transform = '')}
+                        >
+                            <span className="material-symbols-outlined err-spin">refresh</span>
+                            Try Again
+                        </button>
+                    )}
                     <button
-                        className="err-btn-white"
-                        onClick={onRetry}
-                        onPointerDown={e => (e.currentTarget.style.transform = 'scale(0.95)')}
-                        onPointerUp={e => (e.currentTarget.style.transform = '')}
-                        onPointerLeave={e => (e.currentTarget.style.transform = '')}
-                    >
-                        <span className="material-symbols-outlined err-spin">refresh</span>
-                        Try Again
-                    </button>
-                    <button
-                        className="err-btn-glass"
+                        className={showRefundBanner ? 'err-btn-white' : 'err-btn-glass'}
                         onClick={onReset}
                         onPointerDown={e => (e.currentTarget.style.transform = 'scale(0.95)')}
                         onPointerUp={e => (e.currentTarget.style.transform = '')}
@@ -137,7 +188,7 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     top: 0;
                     bottom: 0;
                     width: 8px;
-                    background: linear-gradient(to bottom, #ff9d00, #ff5e00);
+                    background: ${isCV001 ? 'linear-gradient(to bottom, #00e5ff, #0077ff)' : 'linear-gradient(to bottom, #ff9d00, #ff5e00)'};
                     opacity: 0.8;
                 }
 
@@ -169,6 +220,54 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     opacity: 1;
                 }
 
+                /* ── Refund Banner ── */
+                .err-refund-banner {
+                    display: flex;
+                    align-items: center;
+                    gap: 24px;
+                    padding: 24px 40px;
+                    background: linear-gradient(135deg, rgba(0, 200, 140, 0.18), rgba(0, 242, 180, 0.10));
+                    border: 1.5px solid rgba(0, 230, 160, 0.45);
+                    border-radius: 24px;
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
+                    box-shadow: 0 0 40px rgba(0, 200, 140, 0.18), inset 0 1px 0 rgba(255,255,255,0.08);
+                    max-width: 900px;
+                    animation: refund-glow-pulse 3s ease-in-out infinite;
+                }
+
+                @keyframes refund-glow-pulse {
+                    0%, 100% { box-shadow: 0 0 30px rgba(0, 200, 140, 0.15), inset 0 1px 0 rgba(255,255,255,0.08); }
+                    50%       { box-shadow: 0 0 60px rgba(0, 200, 140, 0.32), inset 0 1px 0 rgba(255,255,255,0.08); }
+                }
+
+                .err-refund-icon {
+                    font-size: 48px;
+                    flex-shrink: 0;
+                    filter: drop-shadow(0 0 10px rgba(0, 230, 160, 0.6));
+                }
+
+                .err-refund-text {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    text-align: left;
+                }
+
+                .err-refund-text strong {
+                    font-size: 32px;
+                    font-weight: 800;
+                    color: #00e6a0;
+                    letter-spacing: 0.01em;
+                }
+
+                .err-refund-text span {
+                    font-size: 26px;
+                    font-weight: 400;
+                    color: rgba(255, 255, 255, 0.75);
+                    line-height: 1.4;
+                }
+
                 /* ── POP BADGE ── */
                 .err-pop-badge-container {
                     margin-top: 18px;
@@ -181,7 +280,7 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     align-items: center;
                     gap: 22px;
                     padding: 16px 40px;
-                    background: linear-gradient(135deg, rgba(255, 77, 77, 0.95), rgba(255, 120, 60, 0.95));
+                    background: ${isCV001 ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95))' : 'linear-gradient(135deg, rgba(255, 77, 77, 0.95), rgba(255, 120, 60, 0.95))'};
                     border-radius: 100px;
                     box-shadow: 0 20px 60px rgba(255, 77, 77, 0.35), 0 0 0 6px rgba(255, 255, 255, 0.1);
                     animation: pop-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -211,7 +310,7 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     transform: translateX(-50%);
                     width: 700px;
                     height: 180px;
-                    background: radial-gradient(ellipse at center, rgba(255, 160, 50, 0.1) 0%, transparent 70%);
+                    background: ${isCV001 ? 'radial-gradient(ellipse at center, rgba(0, 229, 255, 0.15) 0%, transparent 70%)' : 'radial-gradient(ellipse at center, rgba(255, 160, 50, 0.1) 0%, transparent 70%)'};
                     pointer-events: none;
                     z-index: 5;
                     opacity: 0.8;
@@ -228,8 +327,18 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, 
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    gap: 40px;
+                    gap: 24px;
                     margin-bottom: 40px;
+                }
+
+                .err-auto-return {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    font-size: 22px;
+                    font-weight: 500;
+                    color: rgba(255, 255, 255, 0.55);
+                    letter-spacing: 0.01em;
                 }
 
 

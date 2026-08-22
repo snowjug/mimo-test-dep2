@@ -1,10 +1,13 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { MainScreen } from './components/screens/MainScreen';
 import { CodeEntryScreen } from './components/screens/CodeEntryScreen';
 import { PrintingScreen } from './components/screens/PrintingScreen';
 import { SummaryScreen } from './components/screens/SummaryScreen';
 import { SystemErrorScreen } from './components/screens/SystemErrorScreen';
 import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
+import { CV001Background } from './components/screens/CV001Background';
+import { Adds } from './components/screens/adds/Adds';
+
 
 export type ScreenState =
   | 'main-interface'
@@ -17,12 +20,32 @@ export type ScreenState =
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const currentKioskId = urlParams.get("kioskId");
+  const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID;
+
+  useEffect(() => {
+    const rootEl = document.getElementById('root');
+    // Clear themes first
+    document.body.classList.remove('theme-cv001', 'theme-sv002');
+    rootEl?.classList.remove('theme-cv001', 'theme-sv002');
+
+    if (dynamicKioskId === 'CV-001') {
+      document.body.classList.add('theme-cv001');
+      rootEl?.classList.add('theme-cv001');
+    } else if (dynamicKioskId === 'SV-002') {
+      document.body.classList.add('theme-sv002');
+      rootEl?.classList.add('theme-sv002');
+    }
+  }, [dynamicKioskId]);
 
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('main-interface');
   const [code, setCode] = useState('');
   const [toastMsg, setToastMsg] = useState('');
   const [toastError, setToastError] = useState(false);
   const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>('idle');
+  const [printError, setPrintError] = useState<string | undefined>(undefined);
+  const [showRefundBanner, setShowRefundBanner] = useState(false);
+  const [showScreensaver, setShowScreensaver] = useState(false);
+  const [idleTimeout, setIdleTimeout] = useState(60);
 
   const [jobData, setJobData] = useState<{
     userName: string;
@@ -48,6 +71,41 @@ function App() {
     }, 3000);
   }, []);
 
+  // ================= IDLE TIMER FOR ADS & SCREENSAVER =================
+  useEffect(() => {
+    let idleTimer: number;
+
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      setShowScreensaver(false);
+      if (currentScreen === 'code-entry-screen') {
+        idleTimer = window.setTimeout(() => {
+          setCurrentScreen('main-interface');
+        }, 20000); // 20 seconds of idle time -> reset to main interface
+      } else if (currentScreen === 'main-interface') {
+        idleTimer = window.setTimeout(() => {
+          setShowScreensaver(true);
+        }, idleTimeout * 1000);
+      }
+    };
+
+    window.addEventListener('mousemove', resetIdleTimer);
+    window.addEventListener('touchstart', resetIdleTimer);
+    window.addEventListener('click', resetIdleTimer);
+    window.addEventListener('keypress', resetIdleTimer);
+
+    // Initial trigger
+    resetIdleTimer();
+
+    return () => {
+      clearTimeout(idleTimer);
+      window.removeEventListener('mousemove', resetIdleTimer);
+      window.removeEventListener('touchstart', resetIdleTimer);
+      window.removeEventListener('click', resetIdleTimer);
+      window.removeEventListener('keypress', resetIdleTimer);
+    };
+  }, [currentScreen, idleTimeout]);
+
   // ================= VALIDATION + DOWNLOAD =================
   const handleValidationSuccess = useCallback(async () => {
     if (validationTimerRef.current) clearTimeout(validationTimerRef.current);
@@ -55,6 +113,10 @@ function App() {
     return new Promise<void>((resolve, reject) => {
       validationTimerRef.current = window.setTimeout(async () => {
         try {
+          if (!dynamicKioskId && code !== "0000" && code !== "9999") {
+            throw new Error("Kiosk ID not configured on this device (?kioskId= missing)");
+          }
+
           // 🔐 VERIFY CODE
           let data;
           if (code === "0000") {
@@ -68,13 +130,26 @@ function App() {
                 }
               ]
             };
+          } else if (code === "9999") {
+            // 🧪 Developer test code — simulates a color print demo, no backend calls
+            data = {
+              userName: "Dev Tester",
+              documents: [
+                {
+                  file: "test_color_demo.pdf",
+                  pages: 2,
+                  copies: 1,
+                  colorMode: "color"
+                }
+              ]
+            };
           } else {
             const res = await fetch("https://api-upqxuj7evq-uc.a.run.app/get-documents-by-code", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ printCode: code }),
+              body: JSON.stringify({ printCode: code, kioskId: dynamicKioskId }),
             });
 
             data = await res.json();
@@ -93,20 +168,14 @@ function App() {
             fileName: doc.file || doc.fileName || "Document",
             pages: doc.pages || doc.pageCount || 1,
             copies: doc.copies || 1,
-            mode: "Black & White",
+            mode: doc.colorMode || data.colorMode || "Black & White",
           };
 
           setJobData(job);
-          setPrintStatus("printing");
-          setCurrentScreen("printing-screen");
 
-          // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS (Pi listener picks it up via Firestore)
-          if (code !== "0000") {
+          // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS FIRST (pre-flight health check & enqueue)
+          if (code !== "0000" && code !== "9999") {
             try {
-              // Read specific Kiosk ID from URL so one Vercel deployment supports infinite kiosks!
-              // Example: printmimo.tech/kiosk?kioskId=SV-002
-              const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID || "CV-001";
-
               const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
                 method: "POST",
                 headers: {
@@ -121,14 +190,22 @@ function App() {
               const printData = await printRes.json();
               
               if (!printRes.ok) {
-                // Log but don't show error - Pi listener handles printing independently
                 console.warn("kiosk/print API warning:", printData.error);
+                // If printer/kiosk health check failed, display immediately without loading animations!
+                if (printData.error && (printData.error.toLowerCase().includes("not working") || printData.error.toLowerCase().includes("offline") || printData.error.toLowerCase().includes("error"))) {
+                  setPrintError(printData.error);
+                  setCurrentScreen("system-error-screen");
+                  resolve();
+                  return;
+                }
               }
             } catch (printErr: any) {
-              // Network error calling kiosk/print - Pi listener will still handle it
               console.warn("kiosk/print network warning:", printErr.message);
             }
           }
+
+          setPrintStatus("printing");
+          setCurrentScreen("printing-screen");
 
           resolve();
         } catch (err: any) {
@@ -154,6 +231,8 @@ function App() {
     setCode('');
     setJobData(null);
     setPrintStatus('idle');
+    setPrintError(undefined);
+    setShowRefundBanner(false);
     setCurrentScreen('main-interface');
   }, []);
 
@@ -182,10 +261,20 @@ function App() {
         </div>
       )}
 
+      {/* ================= SCREENSAVER ================= */}
+      <Adds 
+        isActive={showScreensaver} 
+        onTap={() => setShowScreensaver(false)} 
+        onTimeoutChange={(sec) => setIdleTimeout(sec)} 
+      />
+
       {/* ================= SCREENS ================= */}
+      {dynamicKioskId === 'CV-001' && <CV001Background />}
+
       <MainScreen
         isActive={currentScreen === 'main-interface'}
         onNext={goToCodeEntry}
+        kioskId={dynamicKioskId}
       />
 
       <CodeEntryScreen
@@ -195,6 +284,7 @@ function App() {
         onSuccess={handleValidationSuccess}
         onBack={handleReset}
         hasError={toastError && currentScreen === 'code-entry-screen'}
+        kioskId={dynamicKioskId}
       />
 
       <PrintingScreen
@@ -214,14 +304,25 @@ function App() {
         pages={jobData?.pages || 1}
         copies={jobData?.copies || 1}
         printCode={code}
+        colorMode={jobData?.mode?.toLowerCase().match(/color|colour/) ? 'color' : 'bw'}
+        kioskId={dynamicKioskId}
         onComplete={() => {
           setPrintStatus('completed');
           goToSummary();
         }}
         onError={(errMsg?: string) => {
           setPrintStatus('idle');
-          setCurrentScreen('code-entry-screen');
-          showToast(errMsg || 'Printer reported an error processing your document.', true);
+          setCode('');
+          // Determine if this is a print failure that may involve a refund
+          const isRefundCase = !!(errMsg && (
+            errMsg.toLowerCase().includes('refund') ||
+            errMsg.toLowerCase().includes('timed out') ||
+            errMsg.toLowerCase().includes('timeout') ||
+            errMsg.toLowerCase().includes('charged')
+          ));
+          setPrintError(errMsg || 'Something went wrong while printing your document.');
+          setShowRefundBanner(isRefundCase);
+          setCurrentScreen('system-error-screen');
         }}
       />
 
@@ -229,6 +330,7 @@ function App() {
         isActive={currentScreen === 'summary-screen'}
         onReset={handleReset}
         jobData={jobData}
+        kioskId={dynamicKioskId}
       />
 
       <SystemErrorScreen
@@ -236,11 +338,15 @@ function App() {
         jobData={jobData}
         onReset={handleReset}
         onRetry={handleRetry}
+        errorMsg={printError}
+        showRefundBanner={showRefundBanner}
+        kioskId={dynamicKioskId}
       />
 
       <MaintenanceScreen
         isActive={currentScreen === 'maintenance-screen'}
         onReset={handleReset}
+        kioskId={dynamicKioskId}
       />
 
       {/* DEBUG BUTTON */}

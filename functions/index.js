@@ -1,3 +1,4 @@
+// Deploy trigger: 2026-08-10 12:28:00
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const express = require("express");
@@ -6,19 +7,21 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
-const { OAuth2Client } = require("google-auth-library");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
+const { OAuth2Client } = require("google-auth-library");
 const { PDFDocument } = require("pdf-lib");
 
-// Nodemailer Transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "visionprintt@gmail.com",
-    pass: process.env.GMAIL_APP_PASSWORD || "placeholder_pass" // Expected from Firebase config
-  }
-});
+// Lazy-loaded Nodemailer Transporter helper
+function getTransporter() {
+  const nodemailer = require("nodemailer");
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: "visionprintt@gmail.com",
+      pass: process.env.GMAIL_APP_PASSWORD || "placeholder_pass"
+    }
+  });
+}
 
 // ================= WHATSAPP CONFIG =================
 const WA_PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || "943206795552432";
@@ -481,6 +484,84 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
   }
 });
 
+// ================= GENERATE TEXT PDF =================
+app.post("/generate-text-pdf", authMiddleware, async (req, res, next) => {
+  try {
+    const { textContent, fontFamily, fontSize, lineSpacing, alignment, pageSize, margins } = req.body;
+    if (!textContent) {
+      return res.status(400).send("Text content is required");
+    }
+
+    // Map margin options
+    let marginValue = 54; // default medium (0.75 inch)
+    if (margins === "small") marginValue = 36; // 0.5 inch
+    else if (margins === "large") marginValue = 72; // 1.0 inch
+
+    // Map font family
+    let mappedFont = "Helvetica";
+    const fontLower = (fontFamily || "").toLowerCase();
+    if (fontLower.includes("times") || fontLower.includes("georgia") || fontLower.includes("serif")) {
+      mappedFont = "Times-Roman";
+    } else if (fontLower.includes("courier") || fontLower.includes("mono")) {
+      mappedFont = "Courier";
+    }
+
+    // Map line gap (PDFKit lineGap is extra space between lines in points)
+    const size = Number(fontSize || 12);
+    const lineGapValue = (parseFloat(lineSpacing || 1.15) - 1.0) * size;
+
+    const PDFDocumentKit = require("pdfkit");
+
+    // Generate PDF via PDFKit
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const doc = new PDFDocumentKit({
+        size: pageSize === "Letter" ? "LETTER" : "A4",
+        margin: marginValue,
+        autoFirstPage: true
+      });
+      const chunks = [];
+      doc.on("data", chunk => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", err => reject(err));
+
+      doc.font(mappedFont)
+         .fontSize(size)
+         .lineGap(lineGapValue)
+         .text(textContent, {
+           align: alignment === "justify" ? "justify" : alignment === "center" ? "center" : alignment === "right" ? "right" : "left"
+         });
+
+      doc.end();
+    });
+
+    // Get page count using pdf-lib
+    const pdfLibDoc = await PDFDocument.load(pdfBuffer);
+    const pageCount = pdfLibDoc.getPageCount();
+
+    // Upload to Firebase Storage
+    const bucket = admin.storage().bucket();
+    const safeFileName = "custom_document.pdf";
+    const fileName = `files/${Date.now()}_${safeFileName}`;
+    const fileUpload = bucket.file(fileName);
+    await fileUpload.save(pdfBuffer, {
+      contentType: "application/pdf",
+      metadata: { cacheControl: "public, max-age=86400" },
+    });
+    const fileUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+
+    res.json({
+      name: "custom_document.pdf",
+      url: fileUrl,
+      type: "application/pdf",
+      size: pdfBuffer.length,
+      pageCount: pageCount
+    });
+
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ================= CREATE BLANK JOB =================
 app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
   try {
@@ -687,6 +768,9 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     // Handle double-sided
     if (printOptions?.doubleSided === "double") {
       actualPages = Math.ceil(actualPages / 2);
+      if (colorMode === "bw") {
+        pricePerPage = 3.00;
+      }
     }
 
     const jobCost = actualPages * copies * pricePerPage;
@@ -713,6 +797,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       duplex: printOptions?.doubleSided === "double",
       finalCost: jobCost,
       totalCost: jobCost,
+      kioskId: printOptions?.directKioskId || "CV-001",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -809,6 +894,26 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    let customerPhone = req.body?.customerPhone || "9999999999";
+    let customerName = req.body?.customerName || "Mimo User";
+    let customerEmail = req.body?.customerEmail || "user@printmimo.tech";
+    try {
+      const uDoc = await db.collection("users").doc(userId).get();
+      if (uDoc.exists) {
+        const uData = uDoc.data();
+        if (uData.mobileNumber || uData.phone) {
+          const digits = (uData.mobileNumber || uData.phone).toString().replace(/[^\d]/g, "");
+          if (digits.length >= 10) customerPhone = digits.slice(-10);
+        }
+        if (uData.name || uData.displayName || uData.fullName || uData.username) {
+          customerName = uData.name || uData.displayName || uData.fullName || uData.username;
+        }
+        if (uData.email) customerEmail = uData.email;
+      }
+    } catch (uErr) {
+      console.warn("Could not fetch user details for cashfree order:", uErr);
+    }
+
     const response = await axios.post(
       `${CASHFREE_BASE_URL}/orders`,
       {
@@ -817,7 +922,9 @@ app.post("/create-order", authMiddleware, async (req, res) => {
         order_currency: "INR",
         customer_details: {
           customer_id: userId,
-          customer_phone: "9999999999",
+          customer_phone: customerPhone,
+          customer_name: customerName,
+          customer_email: customerEmail,
         },
         order_meta: {
           return_url: `https://printmimo.tech/payment-verify?order_id={order_id}`
@@ -886,7 +993,7 @@ app.get("/verify-payment/:orderId", async (req, res) => {
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         const internalRes = await axios.post(
           `http://localhost:${process.env.PORT || 8080}/payment-success`,
-          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
         printCode = internalRes.data.printCode;
@@ -987,7 +1094,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
           const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
           await axios.post(
             `http://localhost:${process.env.PORT || 8080}/payment-success`,
-            { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+            { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
             { headers: { Authorization: `Bearer ${dummyToken}` } }
           );
         } catch (internalErr) {
@@ -1095,18 +1202,40 @@ app.post("/check-status", async (req, res) => {
 // ================= KIOSK: GET DOCUMENTS BY CODE =================
 app.post("/get-documents-by-code", async (req, res) => {
   try {
-    const { printCode } = req.body;
+    const { printCode, kioskId } = req.body;
     if (!printCode) return res.status(400).json({ error: "printCode required" });
+    if (!kioskId) return res.status(400).json({ error: "Kiosk ID required" });
 
     const snapshot = await db.collection("print_jobs")
       .where("printCode", "==", printCode)
-      .where("status", "in", ["paid", "printing", "completed"])
+      .where("status", "==", "paid")
       .get();
 
-    if (snapshot.empty) return res.status(404).json({ error: "Invalid or expired print code" });
+    if (snapshot.empty) {
+      // Secondary check: was this code already used (completed / refunded / printing)?
+      const usedSnap = await db.collection("print_jobs")
+        .where("printCode", "==", printCode)
+        .where("status", "in", ["completed", "printing", "refunded", "printed", "expired"])
+        .limit(1)
+        .get();
+      if (!usedSnap.empty) {
+        const usedStatus = usedSnap.docs[0].data().status || "used";
+        const msg = usedStatus === "refunded"
+          ? "This print code has been refunded and can no longer be used."
+          : "Print code already used. Your document has already been printed with this code.";
+        return res.status(409).json({ error: msg });
+      }
+      return res.status(404).json({ error: "Invalid or expired print code" });
+    }
 
-    // Get user info from first job
+    // ✅ Strict Machine Binding validation
     const firstJob = snapshot.docs[0].data();
+    const targetKioskId = firstJob.kioskId || firstJob.printOptions?.directKioskId || firstJob.settings?.directKioskId || "CV-001";
+    if (targetKioskId !== kioskId) {
+      const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
+      return res.status(400).json({ error: `This code belongs to another printer. Please use ${machineName}.` });
+    }
+
     const userId = firstJob.userId;
 
     let userName = "User";
@@ -1162,17 +1291,27 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
     if (jobsToUpdate.length === 0) {
       const recentJob = snapshot.docs.find(doc => doc.data().printCode);
       if (recentJob) {
-        return res.json({ printCode: recentJob.data().printCode });
+        const jobData = recentJob.data();
+        const directKioskId = jobData.printOptions?.directKioskId || jobData.settings?.directKioskId || jobData.kioskId || null;
+        return res.json({ printCode: recentJob.data().printCode, directKioskId });
       }
       return res.status(400).json({ error: "No pending jobs without code" });
     }
 
     const printCode = Math.floor(1000 + Math.random() * 9000).toString();
+    let directKioskId = null;
 
     const batch = db.batch();
     jobsToUpdate.forEach((doc) => {
+      const data = doc.data();
+      const jobKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
+      const targetKiosk = jobKioskId || "CV-001";
+      if (jobKioskId) {
+        directKioskId = jobKioskId;
+      }
       batch.update(doc.ref, {
         status: "paid",
+        kioskId: targetKiosk,
         paymentTime: admin.firestore.FieldValue.serverTimestamp(),
         printCode,
         codeCreatedAt: now,
@@ -1236,7 +1375,7 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
       console.error("[WHATSAPP] Paid order notification failed:", waErr);
     }
 
-    res.json({ message: "Payment success", printCode });
+    res.json({ message: "Payment success", printCode, directKioskId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Payment update failed" });
@@ -1382,6 +1521,24 @@ app.get("/api/settings", async (req, res) => {
   }
 });
 
+app.get("/api/screensaver", async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("screensaver").get();
+    res.json(doc.exists ? doc.data() : {
+      videos: [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: true,
+      idleTimeoutSeconds: 60
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/admin/settings", adminAuthMiddleware, async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("pricing").get();
@@ -1399,6 +1556,43 @@ app.post("/admin/settings", adminAuthMiddleware, async (req, res) => {
       pricePerPageColor: Number(pricePerPageColor),
       pricePerPageA4: Number(pricePerPageA4 || 2.30),
       pricePerPageGraph: Number(pricePerPageGraph || 2.00)
+    }, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/screensaver", adminAuthMiddleware, async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("screensaver").get();
+    res.json(doc.exists ? doc.data() : {
+      videos: [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: true,
+      idleTimeoutSeconds: 60
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/screensaver", adminAuthMiddleware, async (req, res) => {
+  try {
+    const { videos, playSound, idleTimeoutSeconds } = req.body;
+    await db.collection("mimo_settings").doc("screensaver").set({
+      videos: Array.isArray(videos) ? videos : [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: Boolean(playSound),
+      idleTimeoutSeconds: Number(idleTimeoutSeconds || 60)
     }, { merge: true });
     res.json({ success: true });
   } catch (err) {
@@ -2090,8 +2284,8 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
       link_currency: "INR",
       link_purpose: "Mimo Print Order",
       customer_details: {
-        customer_phone: "9999999999",
-        customer_name: session.userId || "WA User"
+        customer_phone: from.toString().replace(/[^\d]/g, "").slice(-10) || "9999999999",
+        customer_name: session.userName || session.userId || "WA User"
       },
       link_meta: {
         return_url: `https://api-upqxuj7evq-uc.a.run.app/wa-pay-success/${orderId}`,
@@ -2187,67 +2381,69 @@ app.get("/kiosk/job-status", async (req, res) => {
     });
 
     // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
-    const kioskId = currentSessionDocs[0].kioskId || "CV-001";
+    // Only perform health checks if printing has not started yet.
+    // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
     const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
-    try {
-      const statusDoc = await db.collection("system_status").doc(kioskId).get();
-      if (statusDoc.exists) {
-        const statusData = statusDoc.data();
-        
-        // A. Kiosk Online Check (lastSeen)
-        const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
-        if (lastSeen) {
-          const now = new Date();
-          const diffMs = now.getTime() - lastSeen.getTime();
-          if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "System error: Kiosk printer listener is offline (not connected)"
-            });
-          }
-        }
+    const hasStarted = currentSessionDocs.some(d => 
+      ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
+    );
 
-        // B. Printer Offline/Disabled Check
-        const printerStatusStr = statusData.printerStatus || "";
-        if (isColorJob) {
-          if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "Printer error: Color printer is offline or disabled"
-            });
+    if (!hasStarted) {
+      const kioskId = currentSessionDocs[0].printOptions?.directKioskId || 
+                      currentSessionDocs[0].settings?.directKioskId || 
+                      currentSessionDocs[0].kioskId || 
+                      "CV-001";
+      try {
+        const statusDoc = await db.collection("system_status").doc(kioskId).get();
+        if (statusDoc.exists) {
+          const statusData = statusDoc.data();
+          
+          // A. Kiosk Online Check (lastSeen)
+          const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
+          if (lastSeen) {
+            const now = new Date();
+            const diffMs = now.getTime() - lastSeen.getTime();
+            if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
+              return res.json({
+                status: "failed",
+                isPrinted: false,
+                printerStatus: "System error: Kiosk printer listener is offline (not connected)"
+              });
+            }
           }
-        } else {
-          if (printerStatusStr.includes("B&W: Paused/Error") || printerStatusStr.includes("B&W: lpstat failed")) {
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "Printer error: B&W printer is offline or disabled"
-            });
-          }
+
+          // B. Printer Offline/Disabled Check
+          // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
+          // should not block active print jobs from being processed.
         }
+      } catch (statusErr) {
+        console.error("⚠️ Error checking system status:", statusErr);
       }
-    } catch (statusErr) {
-      console.error("⚠️ Error checking system status:", statusErr);
     }
 
     // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
     let totalPageCount = 0;
+    let totalFileSizeBytes = 0;
     currentSessionDocs.forEach(d => {
       const pCount = d.pageCount || 1;
       const copies = d.printOptions ? (d.printOptions.copies || 1) : (d.copies || 1);
       totalPageCount += pCount * copies;
+      // fileSize may be stored in bytes; add it up for large-file spooling bonus
+      totalFileSizeBytes += d.fileSize || d.fileSizeBytes || 0;
     });
 
-    const baseWarmupSec = 60; // 60 seconds base warmup/spooling time
-    const secPerPage = isColorJob ? 35 : 8; // Inkjet color prints need longer timeout headroom than B&W laser prints
-    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage) * 1000;
+    // Base warmup: 600s (10 min) — covers Pi receiving snapshot + downloading + compressing + USB spooling
+    const baseWarmupSec = 600;
+    const secPerPage = isColorJob ? 360 : 15; // Epson EcoTank inkjet color needs ~5 min/page; B&W laser ~15s/page
+    // Extra timeout for large files: +1s per 100KB, capped at 600s extra for 100MB files
+    const fileSizeBonusSec = Math.min(Math.floor(totalFileSizeBytes / (100 * 1024)), 600);
+    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage + fileSizeBonusSec) * 1000;
 
     let anyStuck = false;
     for (const d of currentSessionDocs) {
       if (d.status === "printing") {
-        const updatedAt = d.updatedAt ? (d.updatedAt.toDate ? d.updatedAt.toDate() : new Date(d.updatedAt)) : new Date();
+        const startTimestamp = d.printStartedAt || d.updatedAt;
+        const updatedAt = startTimestamp ? (startTimestamp.toDate ? startTimestamp.toDate() : new Date(startTimestamp)) : new Date();
         const elapsedMs = new Date().getTime() - updatedAt.getTime();
         if (elapsedMs > timeoutMs) {
           anyStuck = true;
@@ -2315,59 +2511,186 @@ app.get("/kiosk/job-status", async (req, res) => {
 // ================= KIOSK: TRIGGER PI PRINT =================
 app.post("/kiosk/print", async (req, res) => {
   try {
-    const { printCode, kioskId = "KIOSK_1" } = req.body;
+    const { printCode, kioskId } = req.body;
     if (!printCode) return res.status(400).json({ error: "Print code required" });
-    const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).where("status", "==", "paid").get();
-    if (snapshot.empty) return res.status(400).json({ error: "No paid job found for this code" });
-    
-    // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
-    const sortedDocs = snapshot.docs.sort((a, b) => {
-      const timeA = a.data().createdAt?.toDate().getTime() || 0;
-      const timeB = b.data().createdAt?.toDate().getTime() || 0;
-      return timeB - timeA;
-    });
-    
-    const jobDoc = sortedDocs[0];
-    const jobData = jobDoc.data();
-    
-    let finalKioskId = kioskId;
-    const directKioskId = jobData?.settings?.directKioskId || jobData?.printOptions?.directKioskId || jobData.kioskId;
-    if (directKioskId) {
-      if (directKioskId !== kioskId) {
-        console.warn(`Kiosk mismatch: job assigned to ${directKioskId}, requested from ${kioskId}`);
+    if (!kioskId) return res.status(400).json({ error: "Kiosk ID required" });
+
+    let targetKioskId = kioskId;
+    let transactionFailedError = null;
+    let updatedJobData = null;
+
+    try {
+      const statusDoc = await db.collection("system_status").doc(kioskId).get();
+      if (statusDoc.exists) {
+        const statusData = statusDoc.data();
+        // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
+        // should not block active print jobs from being enqueued.
       }
-      finalKioskId = directKioskId; // Prioritize the user's choice from the front end
-    } else {
-      // Fallback: Route by color mode since there is only one kiosk URL
-      const isColor = jobData?.color === true || jobData?.colorMode === "color" || jobData?.printOptions?.colorMode === "color";
-      finalKioskId = isColor ? "SV-002" : "CV-001";
-      console.log(`No directKioskId found. Routing by color mode (isColor=${isColor}) to ${finalKioskId}`);
+    } catch (statusErr) {
+      console.error("⚠️ Pre-flight health check error:", statusErr);
     }
 
-    // CV-001 only has a monochrome Brother printer — always route color to SV-002 (Epson)
-    const colorMode = jobData?.colorMode || jobData?.printOptions?.colorMode;
-    if (colorMode === "color") {
-      if (finalKioskId === "CV-001") {
-        console.warn(`[ROUTING] Color job requested on CV-001 (monochrome only) — rerouting to SV-002 (Epson color)`);
+    try {
+      await db.runTransaction(async (transaction) => {
+        const querySnap = await transaction.get(
+          db.collection("print_jobs").where("printCode", "==", printCode)
+        );
+        if (querySnap.empty) {
+          transactionFailedError = { status: 404, message: "No paid job found for this code" };
+          throw new Error("TX_ABORT");
+        }
+
+        // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
+        const sortedDocs = querySnap.docs.sort((a, b) => {
+          const timeA = a.data().createdAt?.toDate ? a.data().createdAt.toDate().getTime() : 0;
+          const timeB = b.data().createdAt?.toDate ? b.data().createdAt.toDate().getTime() : 0;
+          return timeB - timeA;
+        });
+        
+        const jobDoc = sortedDocs[0];
+        const jobData = jobDoc.data();
+        targetKioskId = jobData?.kioskId || jobData?.printOptions?.directKioskId || jobData?.settings?.directKioskId || "CV-001";
+
+        if (targetKioskId !== kioskId) {
+          const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
+          transactionFailedError = { status: 400, message: `This code belongs to another printer. Please use ${machineName}.` };
+          throw new Error("TX_ABORT");
+        }
+
+        if (jobData.status !== "paid") {
+          transactionFailedError = { status: 400, message: "Print code already redeemed or job not paid" };
+          throw new Error("TX_ABORT");
+        }
+        
+        // Set status to printing so the Pi's firebase_listener.py picks it up
+        transaction.update(jobDoc.ref, { 
+          status: "printing", 
+          printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(), 
+          kioskId: targetKioskId 
+        });
+        updatedJobData = { ...jobData, status: "printing", kioskId: targetKioskId };
+      });
+    } catch (txErr) {
+      if (txErr.message === "TX_ABORT" && transactionFailedError) {
+        return res.status(transactionFailedError.status).json({ error: transactionFailedError.message });
       }
-      finalKioskId = "SV-002"; // Force ALL color jobs to the SV-002 Epson kiosk
+      throw txErr;
     }
-    
-    // Set status to printing so the Pi's firebase_listener.py picks it up
-    await jobDoc.ref.update({ 
-      status: "printing", 
-      printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
-      kioskId: finalKioskId 
-    });
 
     // PULL ARCHITECTURE: We just return success immediately.
     // The Pi's mimo-listener.service will poll this document, download the PDF, and print it.
     // The Kiosk UI will poll /kiosk/job-status until the Pi updates it to 'completed'.
-    return res.json({ success: true, message: "Print job enqueued successfully", job: jobData });
+    return res.json({ success: true, message: "Print job enqueued successfully", job: updatedJobData });
     
   } catch (err) {
     console.error("❌ KIOSK PRINT ERROR:", err);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ================= AUTO-REFUND KIOSK FAILURE ENDPOINT =================
+app.post("/kiosk/report-failure", async (req, res) => {
+  try {
+    const { jobId, reason, secret } = req.body;
+    if (secret !== process.env.INTERNAL_WEBHOOK_SECRET && secret !== "mimo_secret_123") {
+      console.warn("[AUTO-REFUND] Unauthorized report-failure call");
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+    if (!jobId) return res.status(400).json({ error: "jobId required" });
+
+    const jobRef = db.collection("print_jobs").doc(jobId);
+    const jobSnap = await jobRef.get();
+    if (!jobSnap.exists) return res.status(404).json({ error: "Job not found" });
+
+    const job = jobSnap.data();
+    const orderId = job.orderId;
+    const userId  = job.userId;
+    const failReason = reason || "Print failed at kiosk";
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const paidStatuses = ["paid", "printing"];
+    if (!paidStatuses.includes(job.status)) {
+      return res.json({ skipped: true, reason: `Job status "${job.status}" is not refundable` });
+    }
+    if (job.refundId || job.status === "refunded") {
+      return res.json({ skipped: true, reason: "Already refunded" });
+    }
+
+    let ordSnap = null;
+    let orderAmount = 0;
+    if (orderId) {
+      let snap = await db.collection("orders").where("orderId", "==", orderId).get();
+      if (snap.empty) snap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      if (!snap.empty) {
+        ordSnap = snap;
+        const od = snap.docs[0].data();
+        orderAmount = od.amount || od.totals?.totalAmount || od.totalCost || od.order_amount || od.price || 0;
+      }
+    }
+
+    if (orderAmount <= 0) {
+      await jobRef.update({ status: "failed", printerStatus: failReason, failedAt: now });
+      return res.json({ refunded: false, reason: "Free order — no refund needed" });
+    }
+
+    const refundId = `autorefund_${jobId}_${Date.now()}`;
+    let cashfreeRefundResponse = null;
+    let cashfreeError = null;
+
+    try {
+      const cfRes = await axios.post(
+        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        {
+          refund_amount: orderAmount,
+          refund_id: refundId,
+          refund_note: `Auto-refund: ${failReason}`,
+        },
+        { headers: cashfreeHeaders, timeout: 15000 }
+      );
+      cashfreeRefundResponse = cfRes.data;
+      console.log(`✅ [AUTO-REFUND] Cashfree refund initiated: ${refundId} — ₹${orderAmount}`);
+    } catch (cfErr) {
+      cashfreeError = cfErr.response?.data?.message || cfErr.message;
+      console.error(`❌ [AUTO-REFUND] Cashfree refund API failed: ${cashfreeError}`);
+    }
+
+    const batch = db.batch();
+    batch.update(jobRef, {
+      status: cashfreeRefundResponse ? "refunded" : "failed",
+      printerStatus: failReason,
+      failedAt: now,
+      refundId: cashfreeRefundResponse ? refundId : null,
+      refundedAt: cashfreeRefundResponse ? now : null,
+      autoRefundAttempted: true,
+      autoRefundError: cashfreeError || null,
+    });
+
+    if (ordSnap) {
+      ordSnap.forEach((doc) => {
+        batch.update(doc.ref, {
+          status: cashfreeRefundResponse ? "REFUNDED" : "FAILED",
+          orderStatus: cashfreeRefundResponse ? "refunded" : "failed",
+          refundId: refundId,
+          refundedAt: now,
+          refundAmount: orderAmount,
+        });
+      });
+    }
+
+    const refundDocRef = db.collection("refunds").doc(refundId);
+    batch.set(refundDocRef, {
+      refundId, orderId: orderId || null, jobId, userId, refundAmount: orderAmount,
+      status: cashfreeRefundResponse ? (cashfreeRefundResponse.refund_status || "PENDING") : "CASHFREE_FAILED",
+      cashfreeRefundId: cashfreeRefundResponse?.cf_refund_id || null,
+      cashfreeError: cashfreeError || null, reason: failReason, triggeredBy: "auto", initiatedAt: now,
+    });
+
+    await batch.commit();
+    res.json({ refunded: !!cashfreeRefundResponse, refundId, amount: orderAmount, error: cashfreeError || null });
+  } catch (err) {
+    console.error("[AUTO-REFUND] Unexpected error:", err);
+    res.status(500).json({ error: "Auto-refund processing failed" });
   }
 });
 
@@ -2389,9 +2712,12 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
     }
 
     // 1. Fetch the Order to get the actual amount paid
-    const orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
+    let orderSnapshot = await db.collection("orders").where("orderId", "==", orderId).get();
     if (orderSnapshot.empty) {
-      console.log(`[REFUND] Order ${orderId} not found.`);
+      orderSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+    }
+    if (orderSnapshot.empty) {
+      console.log(`[REFUND] Order ${orderId} not found in orders or payment_transactions.`);
       return;
     }
     const orderDoc = orderSnapshot.docs[0];
@@ -2404,7 +2730,8 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
     }
 
     // Skip refund if the amount is zero (100% discount or free order)
-    if (!orderData.amount || orderData.amount <= 0) {
+    const refundAmount = orderData.amount || orderData.totals?.totalAmount || orderData.totalCost || orderData.order_amount || orderData.price || 0;
+    if (refundAmount <= 0) {
       console.log(`[REFUND] Order ${orderId} has a zero amount. Skipping Cashfree refund API call.`);
       await orderDoc.ref.update({
         refundStatus: "SUCCESS",
@@ -2420,7 +2747,7 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
       const response = await axios.post(
         `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
         {
-          refund_amount: orderData.amount,
+          refund_amount: refundAmount,
           refund_id: refundId,
           refund_note: `Auto-refund for failed print job ${event.params.jobId}`
         },

@@ -17,6 +17,7 @@ import { OnboardingName } from "./app/pages/onboarding-name";
 import { BlankPages } from "./app/pages/blank-pages";
 import { DirectSuccess } from "./app/pages/direct-success";
 import AdminDashboard from "./app/pages/mimo-admin-dashboard";
+import { TextEditor } from "./app/pages/text-editor";
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(false);
@@ -87,6 +88,7 @@ export default function App() {
           <Route path="/blank-pages" element={<BlankPages />} />
           <Route path="/direct-success" element={<DirectSuccess />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/text-editor" element={<TextEditor />} />
         </Routes>
         <Toaster />
       </BrowserRouter>

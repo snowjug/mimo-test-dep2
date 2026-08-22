@@ -8,6 +8,13 @@ from datetime import datetime, timedelta
 import threading
 import requests
 
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    print("✅ Registered pillow_heif opener")
+except ImportError:
+    print("⚠️ pillow_heif not installed. HEIC image support will be disabled.")
+
 active_jobs = set()
 
 # ================= CONFIGURATION =================
@@ -220,7 +227,7 @@ def convert_image_to_pdf_fit(input_path, is_color=False):
         print(f"❌ Image fit conversion failed: {e}")
         return None
 
-def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False):
+def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, photo_layout=None, double_sided="single", is_blank_sheet=False, color_mode="monochrome"):
     try:
         total_size = sum(os.path.getsize(p) for p in file_paths)
         if total_size < 100:
@@ -259,6 +266,11 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         
         if is_blank_sheet:
             cmd.extend(["-o", "print-scaling=none"])
+            
+        if color_mode.lower() in ["color", "colour"]:
+            cmd.extend(["-o", "ColorModel=Color", "-o", "print-color-mode=color", "-o", "Color=True"])
+        else:
+            cmd.extend(["-o", "ColorModel=Gray", "-o", "print-color-mode=monochrome", "-o", "Color=False"])
         
         cmd.extend(file_paths)
         
@@ -320,7 +332,7 @@ def process_job(doc_snapshot):
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
     color_mode = doc.get("colorMode", "monochrome")
-    is_color = color_mode.lower() == "color"
+    is_color = color_mode.lower() in ["color", "colour"]
     
     print_options = doc.get("printOptions", {})
     copies = int(print_options.get("copies", doc.get("copies", 1)))
@@ -342,7 +354,7 @@ def process_job(doc_snapshot):
     final_paths = []
 
     # Dynamic Printer Selection
-    target_printer = COLOR_PRINTER_NAME if color_mode.lower() == "color" else BW_PRINTER_NAME
+    target_printer = COLOR_PRINTER_NAME if is_color else BW_PRINTER_NAME
 
     try:
         for f in files:
@@ -357,7 +369,7 @@ def process_job(doc_snapshot):
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             
-            if ext in [".jpg", ".jpeg", ".png"]:
+            if ext in [".jpg", ".jpeg", ".png", ".heic"]:
                 if image_scaling == "fill":
                     pdf_path = process_image_fill(l_path, photo_layout, is_color)
                     if pdf_path: f_final = pdf_path
@@ -380,7 +392,7 @@ def process_job(doc_snapshot):
         # Ensure all files are PDFs before merging
         pdf_paths = []
         for fp in final_paths:
-            if fp.lower().endswith(('.jpg', '.jpeg', '.png')):
+            if fp.lower().endswith(('.jpg', '.jpeg', '.png', '.heic')):
                 pdf_fp = fp + ".pdf"
                 try:
                     from PIL import Image
@@ -436,7 +448,7 @@ def process_job(doc_snapshot):
         if target_printer == "Brother_HL_L5210DN_series":
             target_printer = "Brother_HL_L5210DN_series_USB"
 
-        success = print_file(final_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet)
+        success = print_file(pdf_paths, copies, page_range, target_printer, photo_layout, double_sided, is_blank_sheet, color_mode)
         
         if success:
             doc_ref.update({

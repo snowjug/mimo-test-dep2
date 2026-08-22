@@ -9,6 +9,7 @@ import { UserProfile } from "./pages/user-profile";
 import { Payment } from "./pages/payment";
 import { PrintCode } from "./pages/print-code";
 import { OnboardingName } from "./pages/onboarding-name";
+import { TextEditor } from "./pages/text-editor";
 
 export const router = createBrowserRouter([
   {
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
       { path: "profile", Component: UserProfile },
       { path: "payment", Component: Payment },
       { path: "print-code", Component: PrintCode },
+      { path: "text-editor", Component: TextEditor },
     ],
   },
 ]);

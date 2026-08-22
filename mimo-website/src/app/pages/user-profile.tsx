@@ -58,13 +58,17 @@ export function UserProfile() {
         setPhone(profileRes.data.mobileNumber || "");
         setPhotoUrl(profileRes.data.photoUrl || null);
 
+        const settingsRes = await api.get("/api/settings").catch(() => ({ data: { pricePerPageBW: 2.3, pricePerPageColor: 10.0 } }));
+        const priceBW = settingsRes.data.pricePerPageBW || 2.3;
+        const priceColor = settingsRes.data.pricePerPageColor || 10.0;
+
         const historyRes = await api.get("/print-history");
         const validHistory = historyRes.data.filter((job: any) => job.printCode && job.printCode !== "-");
         const mappedHistory = validHistory.map((job: any) => {
            if (job.details && job.details.startsWith("0 pages")) {
              const costNum = parseFloat(job.cost.replace('₹', ''));
              const isColor = job.details.includes("Color");
-             const pricePerPage = isColor ? 9.2 : 2.3;
+             const pricePerPage = isColor ? priceColor : priceBW;
              const copies = job.copies || 1;
              if (costNum > 0) {
                const calculatedPages = Math.round(costNum / (copies * pricePerPage));
@@ -327,6 +331,12 @@ export function UserProfile() {
             {/* ─ Mimo Coins ─ */}
             {activeTab === "mimo-coins" && (
               <div className="space-y-4">
+                <div className="flex items-center gap-3 px-1 mb-1">
+                  <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center">
+                    <Gift className="w-5 h-5 text-violet-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-900">MIMO Coins</h2>
+                </div>
                 {/* Balance Hero */}
                 <div className="coin-card rounded-2xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl shadow-violet-900/20">
                   <div className="absolute -top-10 -right-10 w-44 h-44 bg-white/5 rounded-full pointer-events-none" />
@@ -476,6 +486,12 @@ export function UserProfile() {
                           <span>{job.colorMode === "color" ? "Color" : "B&W"}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
                           <span>{job.copies || 1} {job.copies === 1 ? 'copy' : 'copies'}</span>
+                          {job.kioskId && (
+                            <>
+                              <span className="w-1 h-1 rounded-full bg-slate-300" />
+                              <span>{job.kioskId === 'CV-001' ? 'MIMO 1.0' : job.kioskId === 'SV-002' ? 'MIMO 2.0' : job.kioskId}</span>
+                            </>
+                          )}
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
                           <span>{new Date(job.date).toLocaleDateString(undefined, {
                             day: 'numeric', month: 'short', year: 'numeric'

@@ -10,9 +10,12 @@ interface SummaryScreenProps {
         copies: number;
         mode: string;
     } | null;
+    kioskId?: string | null;
 }
 
-export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData }) => {
+export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId }) => {
+    const isCV001 = kioskId === 'CV-001';
+    const isSV002 = kioskId === 'SV-002';
     const timeoutRef = useRef<number | null>(null);
     const [renderKey, setRenderKey] = useState(0);
 
@@ -57,24 +60,25 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 padding: '0 80px 100px 80px' // Added bottom padding for the button
             }}
         >
+            {/* Botanical background */}
+            <div className="kiosk-bg" />
+            <div className="ambient-glow glow-1" />
+            <div className="ambient-glow glow-2" />
+
             {/* NEW Global Top Header: Conversational Success */}
             <div style={{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                marginBottom: '20px',
+                marginTop: '35px',
+                marginBottom: '10px',
                 animation: isActive ? 'fadeInUp 0.8s ease-out forwards' : 'none',
                 opacity: 0,
                 transform: 'translateY(-40px)'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                    <span className="material-symbols-outlined" style={{ color: '#34d399', fontSize: '28px' }}>check_circle</span>
-                    <span style={{ fontSize: '18px', color: '#34d399', fontWeight: 800, letterSpacing: '4px', textTransform: 'uppercase' }}>
-                        Success!
-                    </span>
-                </div>
-                <div style={{ fontSize: '48px', fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', textShadow: '0 10px 30px rgba(0,0,0,0.5)', textAlign: 'center' }}>
-                    <span style={{ color: '#34d399', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
+
+                <div style={{ fontSize: '48px', fontWeight: 900, color: isSV002 ? 'var(--text-primary)' : '#ffffff', letterSpacing: '-1px', textShadow: isSV002 ? 'none' : '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <span style={{ color: isSV002 ? 'var(--gold-accent)' : '#ffffff', textDecoration: isSV002 ? 'none' : 'underline', textDecorationColor: isCV001 ? '#00e5ff' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
                 </div>
             </div>
 
@@ -153,7 +157,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                                 animation: isActive ? 'paperDispenseHand 6s ease-in-out infinite' : 'none',
                                 transformOrigin: 'top center'
                             }}>
-                                 <div style={{ width: '55px', height: '55px', borderRadius: '50%', background: 'rgba(52,211,153,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', border: '2px solid rgba(52,211,153,0.4)', color: '#10b981' }}>
+                                 <div style={{ width: '55px', height: '55px', borderRadius: '50%', background: isCV001 ? 'rgba(0,180,216,0.15)' : 'rgba(232,184,109,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', border: isCV001 ? '2px solid rgba(0,229,255,0.45)' : '2px solid rgba(232,184,109,0.45)', color: isCV001 ? '#00b4d8' : '#C8860A' }}>
                                       <span className="material-symbols-outlined" style={{ fontSize: '36px', fontWeight: 800 }}>check</span>
                                  </div>
                                  <div style={{ width: '90%', height: '10px', background: '#cbd5e1', borderRadius: '5px', marginBottom: '18px' }}></div>
@@ -194,7 +198,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
             {/* Bottom-Centered Done Button & Message Area */}
             <div style={{
                 position: 'absolute',
-                bottom: '40px',
+                bottom: '85px',
                 left: '0',
                 right: '0',
                 display: 'flex',
@@ -204,9 +208,9 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 zIndex: 100
             }}>
                 <div style={{
-                    fontSize: '22px', // Slightly smaller text
+                    fontSize: '22px',
                     fontWeight: 900,
-                    color: '#34d399',
+                    color: isSV002 ? 'var(--text-primary)' : 'rgba(255,255,255,0.90)',
                     letterSpacing: '2px',
                     textTransform: 'uppercase',
                     animation: isActive ? 'fadeInUp 1s ease-out 0.3s forwards' : 'none',
@@ -214,29 +218,29 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '16px',
-                    textShadow: '0 0 20px rgba(52,211,153,0.4)' // Added glow for extra visibility
+                    textShadow: isSV002 ? 'none' : '0 2px 12px rgba(0,0,0,0.25)'
                 }}>
-                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite' }}>south</span>
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
                     Please collect your documents from below
-                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite' }}>south</span>
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
                 </div>
 
                 <button
                     className="done-button-dynamic"
                     style={{
                         padding: '0 50px', height: '64px', borderRadius: '32px',
-                        background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', border: 'none',
+                        background: isCV001 ? 'linear-gradient(135deg, #00e5ff, #0077b6)' : isSV002 ? 'var(--gold-accent)' : 'linear-gradient(135deg, #E8B86D, #C8860A)', color: isCV001 ? '#000a17' : '#fff', border: 'none',
                         fontSize: '20px', fontWeight: 900, letterSpacing: '4px',
                         textTransform: 'uppercase', cursor: 'pointer',
-                        boxShadow: '0 20px 50px rgba(16,185,129,0.4), inset 0 1px 2px rgba(255,255,255,0.4)',
+                        boxShadow: isCV001 ? '0 20px 50px rgba(0,229,255,0.45), inset 0 1px 2px rgba(255,255,255,0.3)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45), inset 0 1px 2px rgba(255,255,255,0.3)',
                         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)', 
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
                         animation: isActive ? 'fadeInUp 1s ease-out 0.5s forwards' : 'none',
                         opacity: 0
                     }}
                     onClick={onReset}
-                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = '0 10px 25px rgba(16,185,129,0.2)'; }}
-                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 20px 50px rgba(16,185,129,0.4)'; }}
+                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = isCV001 ? '0 10px 25px rgba(0,229,255,0.25)' : isSV002 ? '0 5px 15px rgba(183,140,67,0.3)' : '0 10px 25px rgba(200,134,10,0.25)'; }}
+                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = isCV001 ? '0 20px 50px rgba(0,229,255,0.45)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45)'; }}
                 >
                     Done
                     <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>check_circle</span>
@@ -255,8 +259,12 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 }
 
                 .done-button-dynamic:hover {
-                    box-shadow: 0 0 30px rgba(16,185,129,0.5);
+                    box-shadow: 0 0 40px rgba(200,134,10,0.5), 0 20px 50px rgba(200,134,10,0.35);
                     transform: translateY(-2px);
+                }
+                
+                .theme-sv002 .done-button-dynamic:hover {
+                    box-shadow: 0 0 40px rgba(183,140,67,0.4), 0 20px 50px rgba(183,140,67,0.3);
                 }
 
                 @keyframes paperDispenseHand {

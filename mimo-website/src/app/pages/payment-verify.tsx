@@ -28,9 +28,16 @@ export function PaymentVerify() {
           setStatus("success");
 
           if (printCode) {
+            // Store in BOTH sessionStorage and localStorage.
+            // On mobile, Cashfree UPI redirect causes a full page reload which
+            // wipes sessionStorage. localStorage survives the reload so the
+            // print-code page can always find the code.
             sessionStorage.setItem("printCode", printCode);
+            localStorage.setItem("mimo_printCode", printCode);
+            localStorage.setItem("mimo_printCode_ts", Date.now().toString());
             if (directKioskId) {
               sessionStorage.setItem("directKioskId", directKioskId);
+              localStorage.setItem("mimo_directKioskId", directKioskId);
             }
             toast.success("Payment confirmed!");
             setTimeout(() => {

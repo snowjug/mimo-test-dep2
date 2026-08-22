@@ -242,6 +242,42 @@ export function UploadFile() {
     const storedName = localStorage.getItem("mimo_user_name");
     if (storedName) setUserName(storedName);
 
+    // If a print code is present, it means the user just finished a print job.
+    // Clear the print session to start fresh.
+    const storedPrintCode = sessionStorage.getItem("printCode");
+    if (storedPrintCode) {
+      sessionStorage.removeItem("printCode");
+      sessionStorage.removeItem("printFiles");
+      sessionStorage.removeItem("printOptions");
+      sessionStorage.removeItem("uploadedImages");
+      sessionStorage.removeItem("uploadAmount");
+      sessionStorage.removeItem("uploadTotalPages");
+      sessionStorage.removeItem("totalPages");
+      sessionStorage.removeItem("printStatus");
+    } else {
+      // Initialize from sessionStorage if exists
+      const storedPrintFiles = sessionStorage.getItem("printFiles");
+      if (storedPrintFiles) {
+        try {
+          const parsed = JSON.parse(storedPrintFiles);
+          setUploadedFilesData(parsed);
+          setFiles(parsed.map((f: any) => ({
+            name: f.name,
+            size: f.size,
+            type: f.type,
+            status: "completed",
+            progress: 100,
+            pageCount: f.pageCount || 1
+          })));
+          // Re-calculate total pages
+          const totalPages = parsed.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
+          setBackendTotalPages(totalPages);
+        } catch (err) {
+          console.error("Failed to restore files from session:", err);
+        }
+      }
+    }
+
     const fetchData = async () => {
       try {
         const userResponse = await api.get("/mimo/user");
@@ -368,7 +404,7 @@ export function UploadFile() {
 
       // 3. Tell backend to finalize and create database records
       // In Serverless architecture, this doesn't trigger conversion anymore. It just creates the job.
-      const response = await api.post("/finalize-upload", { files: uploadedFiles });
+      const response = await api.post("/finalize-upload", { files: [...uploadedFilesData, ...uploadedFiles] });
       
       // Update UI
       setFiles((prev) =>
@@ -424,10 +460,13 @@ export function UploadFile() {
       }
     }
 
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-    setUploadedFilesData((prev) => prev.filter((f) => f.name !== fileToRemove.name));
+    const updatedFiles = files.filter((_, i) => i !== index);
+    const updatedData = uploadedFilesData.filter((f) => f.name !== fileToRemove.name);
 
-    // Remove from sessionStorage
+    setFiles(updatedFiles);
+    setUploadedFilesData(updatedData);
+
+    // Remove from sessionStorage image list
     const existingRaw = sessionStorage.getItem("uploadedImages");
     if (existingRaw) {
       const existingImages = JSON.parse(existingRaw);
@@ -437,6 +476,28 @@ export function UploadFile() {
       } else {
         sessionStorage.removeItem("uploadedImages");
       }
+    }
+
+    // Sync Firestore with the remaining files list!
+    try {
+      await api.post("/finalize-upload", { files: updatedData });
+    } catch (err) {
+      console.error("Failed to sync remaining files with backend:", err);
+    }
+
+    // Update printFiles in sessionStorage
+    if (updatedData.length > 0) {
+      sessionStorage.setItem("printFiles", JSON.stringify(updatedData));
+      const totalPages = updatedData.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
+      setBackendTotalPages(totalPages);
+      sessionStorage.setItem("uploadTotalPages", totalPages.toString());
+      sessionStorage.setItem("uploadAmount", (totalPages * 2).toString());
+    } else {
+      sessionStorage.removeItem("printFiles");
+      sessionStorage.removeItem("printOptions");
+      sessionStorage.removeItem("uploadAmount");
+      sessionStorage.removeItem("uploadTotalPages");
+      setBackendTotalPages(0);
     }
   };
 
@@ -662,9 +723,9 @@ export function UploadFile() {
           </div>
         </Card>
 
-        {/* Quick Print - A4 Sheet & Mimo Graph */}
+        {/* Quick Print - A4 Sheet, Mimo Graph & Custom Document */}
         {files.length === 0 && (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <button
               onClick={() => navigate("/blank-pages?type=a4")}
               className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
@@ -701,6 +762,22 @@ export function UploadFile() {
                 </div>
               </div>
               <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-emerald-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
+            </button>
+
+            <button
+              onClick={() => navigate("/text-editor")}
+              className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-indigo-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative z-10 flex flex-col items-center sm:items-start gap-3">
+                <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-purple-300 bg-white flex items-center justify-center shadow-sm group-hover:border-purple-500 group-hover:shadow-md transition-all duration-300">
+                  <FileText className="w-6 h-6 sm:w-7 sm:h-7 text-purple-400 group-hover:text-purple-600 transition-colors duration-300" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-purple-700 transition-colors">Custom Document</h3>
+                </div>
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-purple-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
             </button>
           </div>
         )}

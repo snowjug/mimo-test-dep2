@@ -758,7 +758,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const now = new Date();
-    const { printOptions: bodyPrintOptions, isFreeBypass, internalSecret } = req.body || {};
+    const { printOptions: bodyPrintOptions, isFreeBypass, internalSecret, orderId } = req.body || {};
 
     // ─── SECURITY MEASURE ──────────────────────────────────────────
     // The frontend should ONLY call this endpoint directly if amount <= 0.
@@ -770,11 +770,15 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
     }
     // ───────────────────────────────────────────────────────────────
 
-    const snapshot = await db
-      .collection("print_jobs")
+    let queryRef = db.collection("print_jobs")
       .where("userId", "==", userId)
-      .where("status", "in", ["pending", "paid", "pending_conversion", "processing"])
-      .get();
+      .where("status", "in", ["pending", "paid", "pending_conversion", "processing"]);
+
+    if (orderId) {
+      queryRef = queryRef.where("orderId", "==", orderId);
+    }
+
+    const snapshot = await queryRef.get();
 
     // Filter jobs that don't have a printCode yet
     let jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
@@ -794,7 +798,9 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       const recentJob = sortedDocs.find(doc => doc.data().printCode);
       if (recentJob) {
         console.log(`[PAYMENT-SUCCESS] Returning existing code for user ${userId}`);
-        return res.json({ printCode: recentJob.data().printCode });
+        const jobData = recentJob.data();
+        const directKioskId = jobData.printOptions?.directKioskId || jobData.settings?.directKioskId || jobData.kioskId || null;
+        return res.json({ printCode: recentJob.data().printCode, directKioskId });
       }
     }
 
@@ -866,7 +872,8 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
 
     jobsToUpdate.forEach((doc) => {
       const data = doc.data();
-      const directKioskId = data.printOptions?.directKioskId;
+      const directKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
+      const targetKiosk = directKioskId || "CV-001";
       totalAmountForCoins += (data.pageCount || 0) * 2.3; // Defaulting to BW price for coins
       
       if (directKioskId) {
@@ -876,6 +883,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
       
       batch.update(doc.ref, {
         status: "paid",
+        kioskId: targetKiosk,
         "paymentStatus.status": "completed",
         "paymentStatus.paidAt": admin.firestore.FieldValue.serverTimestamp(),
         paymentTime: admin.firestore.FieldValue.serverTimestamp(),
@@ -1116,6 +1124,81 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
   }
 });
 
+// ================= GENERATE TEXT PDF =================
+app.post("/generate-text-pdf", authenticateToken, async (req, res, next) => {
+  try {
+    const { textContent, fontFamily, fontSize, lineSpacing, alignment, pageSize, margins } = req.body;
+    if (!textContent) {
+      return res.status(400).send("Text content is required");
+    }
+
+    // Map margin options
+    let marginValue = 54; // default medium (0.75 inch)
+    if (margins === "small") marginValue = 36; // 0.5 inch
+    else if (margins === "large") marginValue = 72; // 1.0 inch
+
+    // Map font family
+    let mappedFont = "Helvetica";
+    const fontLower = (fontFamily || "").toLowerCase();
+    if (fontLower.includes("times") || fontLower.includes("georgia") || fontLower.includes("serif")) {
+      mappedFont = "Times-Roman";
+    } else if (fontLower.includes("courier") || fontLower.includes("mono")) {
+      mappedFont = "Courier";
+    }
+
+    // Map line gap (PDFKit lineGap is extra space between lines in points)
+    const size = Number(fontSize || 12);
+    const lineGapValue = (parseFloat(lineSpacing || 1.15) - 1.0) * size;
+
+    const PDFDocumentKit = require("pdfkit");
+
+    // Generate PDF via PDFKit
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const doc = new PDFDocumentKit({
+        size: pageSize === "Letter" ? "LETTER" : "A4",
+        margin: marginValue,
+        autoFirstPage: true
+      });
+      const chunks = [];
+      doc.on("data", chunk => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", err => reject(err));
+
+      doc.font(mappedFont)
+         .fontSize(size)
+         .lineGap(lineGapValue)
+         .text(textContent, {
+           align: alignment === "justify" ? "justify" : alignment === "center" ? "center" : alignment === "right" ? "right" : "left"
+         });
+
+      doc.end();
+    });
+
+    // Get page count using pdf-lib (which is required at L12)
+    const pdfLibDoc = await PDFDocument.load(pdfBuffer);
+    const pageCount = pdfLibDoc.getPageCount();
+
+    // Upload to Firebase Storage
+    const mockFile = {
+      originalname: "custom_document.pdf",
+      buffer: pdfBuffer,
+      mimetype: "application/pdf"
+    };
+    const fileUrl = await uploadToStorage(mockFile);
+
+    res.json({
+      name: mockFile.originalname,
+      url: fileUrl,
+      type: mockFile.mimetype,
+      size: pdfBuffer.length,
+      pageCount: pageCount
+    });
+
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ================= CREATE BLANK JOB =================
 app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
   try {
@@ -1241,8 +1324,26 @@ app.get("/api/settings", async (req, res) => {
     if (doc.exists) {
       res.json(doc.data());
     } else {
-      res.json({ pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+      res.json({ pricePerPageBW: 2.30, pricePerPageColor: 10.00, pricePerPageA4: 2.30, pricePerPageGraph: 2.00 });
     }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/screensaver", async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("screensaver").get();
+    res.json(doc.exists ? doc.data() : {
+      videos: [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: true,
+      idleTimeoutSeconds: 60
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1498,7 +1599,7 @@ app.get("/verify-payment/:orderId", async (req, res) => {
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         const internalRes = await axios.post(
           `http://127.0.0.1:${process.env.PORT || 3000}/payment-success`,
-          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
         printCode = internalRes.data.printCode;
@@ -1590,7 +1691,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         await axios.post(
           `http://localhost:${process.env.PORT || 3000}/payment-success`,
-          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET },
+          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
       } catch (internalErr) {
@@ -1632,10 +1733,186 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       }, { merge: true });
 
       res.status(200).send("Webhook received");
+
+    // ── PAYMENT FAILED ──────────────────────────────────────────────────────────
+    } else if (event.type === "PAYMENT_FAILED_WEBHOOK") {
+      const orderId   = event.data?.order?.order_id;
+      const userId    = event.data?.customer_details?.customer_id;
+      const failedAt  = admin.firestore.FieldValue.serverTimestamp();
+      const failReason = event.data?.error_details?.error_description || "Payment failed";
+
+      console.log(`[WEBHOOK] PAYMENT_FAILED for orderId=${orderId} userId=${userId} reason=${failReason}`);
+
+      // 1. Mark the order FAILED in both orders + payment_transactions
+      try {
+        let ordSnap = await db.collection("orders").where("orderId", "==", orderId).get();
+        if (ordSnap.empty) ordSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+        const failBatch = db.batch();
+        ordSnap.forEach((doc) => {
+          failBatch.update(doc.ref, {
+            status: "FAILED",
+            orderStatus: "failed",
+            failedAt,
+            failReason,
+            "paymentDetails.paymentStatus": "failed",
+          });
+        });
+        await failBatch.commit();
+      } catch (e) {
+        console.error("[WEBHOOK FAILED] Error marking order failed:", e.message);
+      }
+
+      // 2. Reset print_jobs back to 'pending' so the user can retry
+      try {
+        const jobsSnap = await db.collection("print_jobs")
+          .where("userId", "==", userId)
+          .where("orderId", "==", orderId)
+          .get();
+        // Fallback: if orderId not on jobs yet, grab all pending jobs for user
+        let docsToReset = jobsSnap.docs;
+        if (docsToReset.length === 0 && userId) {
+          const fallbackSnap = await db.collection("print_jobs")
+            .where("userId", "==", userId)
+            .where("status", "==", "pending")
+            .get();
+          docsToReset = fallbackSnap.docs;
+        }
+        const resetBatch = db.batch();
+        docsToReset.forEach((doc) => {
+          const data = doc.data();
+          // Only reset if not already printing or completed
+          if (!["printing", "completed"].includes(data.status)) {
+            resetBatch.update(doc.ref, {
+              status: "pending",
+              "paymentStatus.status": "failed",
+              "paymentStatus.failedAt": failedAt,
+              "paymentStatus.failReason": failReason,
+              printCode: admin.firestore.FieldValue.delete(),
+              tokenId: admin.firestore.FieldValue.delete(),
+            });
+          }
+        });
+        await resetBatch.commit();
+        console.log(`[WEBHOOK FAILED] Reset ${docsToReset.length} jobs to pending for userId=${userId}`);
+      } catch (e) {
+        console.error("[WEBHOOK FAILED] Error resetting jobs:", e.message);
+      }
+
+      // 3. Restore Mimo Coins if any were deducted for this order
+      try {
+        const coinTxSnap = await db.collection("mimo_coin_transactions")
+          .where("userId", "==", userId)
+          .where("orderId", "==", orderId)
+          .where("type", "==", "deducted")
+          .get();
+        if (!coinTxSnap.empty) {
+          const coinsBatch = db.batch();
+          let totalRestored = 0;
+          coinTxSnap.forEach((doc) => {
+            totalRestored += doc.data().amount || 0;
+            coinsBatch.update(doc.ref, { refunded: true, refundedAt: failedAt });
+          });
+          if (totalRestored > 0) {
+            const restoreTxRef = db.collection("mimo_coin_transactions").doc();
+            coinsBatch.set(restoreTxRef, {
+              userId, orderId, type: "restored",
+              amount: totalRestored,
+              description: `Coins restored — payment failed for order ${orderId}`,
+              createdAt: failedAt,
+            });
+            const userRef = db.collection("users").doc(userId);
+            coinsBatch.update(userRef, {
+              "mimo_coins.balance": admin.firestore.FieldValue.increment(totalRestored),
+            });
+            await coinsBatch.commit();
+            console.log(`[WEBHOOK FAILED] Restored ${totalRestored} Mimo Coins for userId=${userId}`);
+          }
+        }
+      } catch (e) {
+        console.error("[WEBHOOK FAILED] Error restoring coins:", e.message);
+      }
+
+      // 4. Update payment_transactions audit record
+      try {
+        const txnSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+        if (!txnSnap.empty) {
+          const paymentData = event.data?.payment || {};
+          await txnSnap.docs[0].ref.update({
+            "transactionStatus.status": "failed",
+            "transactionStatus.gatewayStatus": paymentData.payment_status || "FAILED",
+            "transactionStatus.failedAt": failedAt,
+            failReason,
+          });
+        }
+      } catch (e) {
+        console.error("[WEBHOOK FAILED] Error updating txn record:", e.message);
+      }
+
+      res.status(200).send("Webhook received");
+
+    } else {
+      // Unknown event type — acknowledge so Cashfree doesn't retry
+      console.log(`[WEBHOOK] Unhandled event type: ${event.type}`);
+      res.status(200).send("Unhandled event acknowledged");
     }
+
   } catch (err) {
     console.error(err);
     res.sendStatus(500);
+  }
+});
+
+// ================= USER REFUND REQUEST =================
+// Lets an authenticated user flag a failed/unprinted paid order for admin review.
+app.post("/request-refund", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { orderId, reason } = req.body;
+    if (!orderId) return res.status(400).json({ error: "orderId is required" });
+
+    // Verify the order belongs to this user
+    let ordSnap = await db.collection("orders").where("orderId", "==", orderId).where("userId", "==", userId).get();
+    if (ordSnap.empty) {
+      ordSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).where("userId", "==", userId).get();
+    }
+    if (ordSnap.empty) return res.status(404).json({ error: "Order not found or does not belong to you" });
+
+    const orderData = ordSnap.docs[0].data();
+    const orderStatus = orderData.status || orderData.orderStatus || "";
+
+    // Only allow refund requests for FAILED or PAID-but-unprinted orders
+    const isPrintedOrPrinting = orderStatus === "printing" || orderStatus === "completed" || orderStatus === "PRINTED";
+    if (isPrintedOrPrinting) {
+      return res.status(400).json({ error: "Cannot request refund for an order that has been printed." });
+    }
+
+    // Check for duplicate request
+    const existingReq = await db.collection("refund_requests")
+      .where("orderId", "==", orderId)
+      .where("userId", "==", userId)
+      .get();
+    if (!existingReq.empty) {
+      return res.status(409).json({ error: "A refund request already exists for this order.", status: existingReq.docs[0].data().status });
+    }
+
+    const refundReqRef = await db.collection("refund_requests").add({
+      userId,
+      orderId,
+      orderStatus,
+      amount: orderData.amount || orderData.totals?.totalAmount || 0,
+      reason: reason || "User requested refund",
+      status: "pending",        // pending → approved → processed | rejected
+      requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+      resolvedAt: null,
+      resolvedBy: null,
+      adminNote: null,
+    });
+
+    console.log(`[REQUEST-REFUND] Created refund_request ${refundReqRef.id} for orderId=${orderId} userId=${userId}`);
+    res.json({ message: "Refund request submitted. Our team will review it within 24–48 hours.", requestId: refundReqRef.id });
+  } catch (err) {
+    console.error("[REQUEST-REFUND] Error:", err);
+    res.status(500).json({ error: "Failed to submit refund request" });
   }
 });
 
@@ -1707,78 +1984,90 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     });
 
     // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
-    const kioskId = currentSessionDocs[0].kioskId || "CV-001";
+    // Only perform health checks if printing has not started yet.
+    // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
     const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
-    try {
-      const statusDoc = await db.collection("system_status").doc(kioskId).get();
-      if (statusDoc.exists) {
-        const statusData = statusDoc.data();
-        
-        // A. Kiosk Online Check (lastSeen)
-        const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
-        if (lastSeen) {
-          const now = new Date();
-          const diffMs = now.getTime() - lastSeen.getTime();
-          if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "System error: Kiosk printer listener is offline (not connected)"
-            });
-          }
-        }
+    const hasStarted = currentSessionDocs.some(d => 
+      ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
+    );
 
-        // B. Printer Offline/Disabled Check
-        const printerStatusStr = statusData.printerStatus || "";
-        if (isColorJob) {
-          if (printerStatusStr.includes("Color: Paused/Error") || printerStatusStr.includes("Color: lpstat failed")) {
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "Printer error: Color printer is offline or disabled"
-            });
+    if (!hasStarted) {
+      const kioskId = currentSessionDocs[0].printOptions?.directKioskId || 
+                      currentSessionDocs[0].settings?.directKioskId || 
+                      currentSessionDocs[0].kioskId || 
+                      "CV-001";
+      try {
+        const statusDoc = await db.collection("system_status").doc(kioskId).get();
+        if (statusDoc.exists) {
+          const statusData = statusDoc.data();
+          
+          // A. Kiosk Online Check (lastSeen)
+          const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
+          if (lastSeen) {
+            const now = new Date();
+            const diffMs = now.getTime() - lastSeen.getTime();
+            if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
+              return res.json({
+                status: "failed",
+                isPrinted: false,
+                printerStatus: "System error: Kiosk printer listener is offline (not connected)"
+              });
+            }
           }
-        } else {
-          if (printerStatusStr.includes("B&W: Paused/Error") || printerStatusStr.includes("B&W: lpstat failed")) {
-            return res.json({
-              status: "failed",
-              isPrinted: false,
-              printerStatus: "Printer error: B&W printer is offline or disabled"
-            });
-          }
+
+          // B. Printer Offline/Disabled Check
+          // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
+          // should not block active print jobs from being processed.
         }
+      } catch (statusErr) {
+        console.error("⚠️ Error checking system status:", statusErr);
       }
-    } catch (statusErr) {
-      console.error("⚠️ Error checking system status:", statusErr);
     }
 
     // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
     let totalPageCount = 0;
+    let totalFileSizeBytes = 0;
     currentSessionDocs.forEach(d => {
       const pCount = d.pageCount || 1;
       const copies = d.printOptions ? (d.printOptions.copies || 1) : (d.copies || 1);
       totalPageCount += pCount * copies;
+      totalFileSizeBytes += d.fileSize || d.fileSizeBytes || 0;
     });
 
-    const baseWarmupSec = 60; // 60 seconds base warmup/spooling time
-    const secPerPage = isColorJob ? 35 : 8; // Inkjet color prints need longer timeout headroom than B&W laser prints
-    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage) * 1000;
+    // Base warmup: 600s (10 min) — covers download + rendering + Ghostscript + CUPS spooling for large files/color
+    const baseWarmupSec = 600;
+    const secPerPage = isColorJob ? 360 : 15; // Epson EcoTank inkjet color needs ~5 min/page; B&W laser ~15s/page
+    const fileSizeBonusSec = Math.min(Math.floor(totalFileSizeBytes / (100 * 1024)), 600); // Up to 10 min bonus for 100MB files
+    const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage + fileSizeBonusSec) * 1000;
 
     let anyStuck = false;
     for (const d of currentSessionDocs) {
       if (d.status === "printing") {
-        const updatedAt = d.updatedAt ? (d.updatedAt.toDate ? d.updatedAt.toDate() : new Date(d.updatedAt)) : new Date();
+        const startTimestamp = d.printStartedAt || d.updatedAt;
+        const updatedAt = startTimestamp ? (startTimestamp.toDate ? startTimestamp.toDate() : new Date(startTimestamp)) : new Date();
         const elapsedMs = new Date().getTime() - updatedAt.getTime();
         if (elapsedMs > timeoutMs) {
           anyStuck = true;
+          const userFriendlyMsg = "Print timed out. If you were charged, your refund will be processed automatically.";
           // Proactively update Firestore so it doesn't stay stuck
           try {
             await db.collection("print_jobs").doc(d.id).update({
               status: "failed",
-              printerStatus: "Print timeout: Printer not responding (check power/cable)"
+              printerStatus: userFriendlyMsg
             });
           } catch (err) {
             console.error(`Failed to update stuck job ${d.id}:`, err);
+          }
+          // Trigger auto-refund asynchronously — fire-and-forget
+          const secret = process.env.INTERNAL_WEBHOOK_SECRET;
+          if (secret) {
+            const apiBase = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+            const selfUrl = `${apiBase}/kiosk/report-failure`;
+            fetch(selfUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jobId: d.id, reason: userFriendlyMsg, secret }),
+            }).catch(e => console.error('[AUTO-REFUND] Self-call failed:', e.message));
           }
         }
       }
@@ -1788,7 +2077,7 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
       return res.json({
         status: "failed",
         isPrinted: false,
-        printerStatus: "Print timeout: Printer not responding (check power/cable)"
+        printerStatus: "Print timed out. If you were charged, your refund will be processed automatically."
       });
     }
 
@@ -1833,14 +2122,178 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
   }
 });
 
+// ================= KIOSK: AUTO-REFUND ON PRINT FAILURE =================
+// Called by the Pi listener whenever a paid print job physically fails.
+// Automatically triggers a full Cashfree refund — no admin action required.
+app.post("/kiosk/report-failure", async (req, res) => {
+  try {
+    const { jobId, reason, secret } = req.body;
+
+    // Authenticate with the shared internal secret
+    if (secret !== process.env.INTERNAL_WEBHOOK_SECRET) {
+      console.warn("[AUTO-REFUND] Unauthorized report-failure call");
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+    if (!jobId) return res.status(400).json({ error: "jobId required" });
+
+    // 1. Fetch the failed job from Firestore
+    const jobRef = db.collection("print_jobs").doc(jobId);
+    const jobSnap = await jobRef.get();
+    if (!jobSnap.exists) {
+      console.warn(`[AUTO-REFUND] Job ${jobId} not found`);
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const job = jobSnap.data();
+    const orderId = job.orderId;
+    const userId  = job.userId;
+    const failReason = reason || "Print failed at kiosk";
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    console.log(`[AUTO-REFUND] Print failure reported — jobId=${jobId} orderId=${orderId} userId=${userId} reason=${failReason}`);
+
+    // 2. Only refund if the job was actually PAID (don't double-refund)
+    const paidStatuses = ["paid", "printing"];
+    if (!paidStatuses.includes(job.status)) {
+      console.log(`[AUTO-REFUND] Job ${jobId} status="${job.status}" — not eligible for refund`);
+      return res.json({ skipped: true, reason: `Job status "${job.status}" is not refundable` });
+    }
+
+    // Check if already refunded
+    if (job.refundId || job.status === "refunded") {
+      console.log(`[AUTO-REFUND] Job ${jobId} already refunded — skipping`);
+      return res.json({ skipped: true, reason: "Already refunded" });
+    }
+
+    // 3. Look up the order to get the refund amount
+    let ordSnap = null;
+    let orderAmount = 0;
+    if (orderId) {
+      let snap = await db.collection("orders").where("orderId", "==", orderId).get();
+      if (snap.empty) snap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+      if (!snap.empty) {
+        ordSnap = snap;
+        const od = snap.docs[0].data();
+        orderAmount = od.amount || od.totals?.totalAmount || od.totalCost || od.order_amount || od.price || 0;
+      }
+    }
+
+    if (orderAmount <= 0) {
+      // Free order — no money to refund, just mark failed
+      console.log(`[AUTO-REFUND] Order amount is ₹0 for job ${jobId} — marking failed, no refund needed`);
+      await jobRef.update({ status: "failed", printerStatus: failReason, failedAt: now });
+      return res.json({ refunded: false, reason: "Free order — no refund needed" });
+    }
+
+    // 4. Call Cashfree Refund API
+    const refundId = `autorefund_${jobId}_${Date.now()}`;
+    let cashfreeRefundResponse = null;
+    let cashfreeError = null;
+
+    try {
+      const cfRes = await axios.post(
+        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        {
+          refund_amount: orderAmount,
+          refund_id: refundId,
+          refund_note: `Auto-refund: ${failReason}`,
+        },
+        { headers: cashfreeHeaders, timeout: 15000 }
+      );
+      cashfreeRefundResponse = cfRes.data;
+      console.log(`✅ [AUTO-REFUND] Cashfree refund initiated: ${refundId} — ₹${orderAmount} for orderId=${orderId}`);
+    } catch (cfErr) {
+      cashfreeError = cfErr.response?.data?.message || cfErr.message;
+      console.error(`❌ [AUTO-REFUND] Cashfree refund API failed: ${cashfreeError}`);
+      // Still mark the job failed in Firestore even if Cashfree API fails
+      // A refund_requests doc is created so admin can retry manually
+    }
+
+    // 5. Batch-write all Firestore updates atomically
+    const batch = db.batch();
+
+    // Mark job as failed (or refunded if Cashfree succeeded)
+    batch.update(jobRef, {
+      status: cashfreeRefundResponse ? "refunded" : "failed",
+      printerStatus: failReason,
+      failedAt: now,
+      refundId: cashfreeRefundResponse ? refundId : null,
+      refundedAt: cashfreeRefundResponse ? now : null,
+      autoRefundAttempted: true,
+      autoRefundError: cashfreeError || null,
+    });
+
+    // Mark order as REFUNDED
+    if (ordSnap) {
+      ordSnap.forEach((doc) => {
+        batch.update(doc.ref, {
+          status: cashfreeRefundResponse ? "REFUNDED" : "FAILED",
+          orderStatus: cashfreeRefundResponse ? "refunded" : "failed",
+          refundId: refundId,
+          refundedAt: now,
+          refundAmount: orderAmount,
+        });
+      });
+    }
+
+    // Record in refunds collection (whether or not Cashfree succeeded)
+    const refundDocRef = db.collection("refunds").doc(refundId);
+    batch.set(refundDocRef, {
+      refundId,
+      orderId: orderId || null,
+      jobId,
+      userId,
+      refundAmount: orderAmount,
+      status: cashfreeRefundResponse ? (cashfreeRefundResponse.refund_status || "PENDING") : "CASHFREE_FAILED",
+      cashfreeRefundId: cashfreeRefundResponse?.cf_refund_id || null,
+      cashfreeError: cashfreeError || null,
+      reason: failReason,
+      triggeredBy: "auto",
+      initiatedAt: now,
+      cashfreeResponse: cashfreeRefundResponse || null,
+    });
+
+    // If Cashfree failed, create a refund_requests doc so admin is alerted
+    if (!cashfreeRefundResponse) {
+      const reqRef = db.collection("refund_requests").doc();
+      batch.set(reqRef, {
+        userId, orderId, jobId,
+        amount: orderAmount,
+        reason: `AUTO-REFUND FAILED: ${failReason}. Cashfree error: ${cashfreeError}`,
+        status: "pending",
+        autoRefundFailed: true,
+        requestedAt: now,
+        resolvedAt: null, resolvedBy: null, adminNote: null,
+      });
+    }
+
+    await batch.commit();
+
+    res.json({
+      refunded: !!cashfreeRefundResponse,
+      refundId,
+      amount: orderAmount,
+      cashfreeStatus: cashfreeRefundResponse?.refund_status || null,
+      error: cashfreeError || null,
+    });
+
+  } catch (err) {
+    console.error("[AUTO-REFUND] Unexpected error:", err);
+    res.status(500).json({ error: "Auto-refund processing failed" });
+  }
+});
+
 // ================= PRINT BY CODE =================
 app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
   try {
-    const { printCode } = req.body;
+    const { printCode, kioskId } = req.body;
     const now = new Date();
 
     if (!printCode) {
       return res.status(400).json({ error: "Print code required" });
+    }
+    if (!kioskId) {
+      return res.status(400).json({ error: "Kiosk ID required" });
     }
 
     const snapshot = await db
@@ -1850,13 +2303,34 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       .get();
 
     if (snapshot.empty) {
+      // Secondary check: was this code already used (completed / refunded / printing)?
+      const usedSnap = await db
+        .collection("print_jobs")
+        .where("printCode", "==", printCode)
+        .where("status", "in", ["completed", "printing", "refunded", "printed", "expired"])
+        .limit(1)
+        .get();
+      if (!usedSnap.empty) {
+        const usedStatus = usedSnap.docs[0].data().status || "used";
+        const msg = usedStatus === "refunded"
+          ? "This print code has been refunded and can no longer be used."
+          : "Print code already used. Your document has already been printed with this code.";
+        return res.status(409).json({ error: msg });
+      }
       return res.status(404).json({ error: "Invalid code" });
+    }
+
+    // ✅ Strict Machine Binding validation
+    const firstDoc = snapshot.docs[0].data();
+    const targetKioskId = firstDoc.kioskId || firstDoc.printOptions?.directKioskId || firstDoc.settings?.directKioskId || "CV-001";
+    if (targetKioskId !== kioskId) {
+      const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
+      return res.status(400).json({ error: `This code belongs to another printer. Please use ${machineName}.` });
     }
 
     const validDocs = [];
 
     // ✅ FIX: define firstDoc FIRST
-    const firstDoc = snapshot.docs[0].data();
     const userId = firstDoc.userId;
 
     // Fetch user name using Firestore doc ID (since auth now resolves to doc ID)
@@ -2005,67 +2479,96 @@ app.post("/mark-printed", authenticateToken, async (req, res) => {
 // Called by kiosk after user confirms. Backend calls Pi, Pi prints via CUPS.
 app.post("/kiosk/print", kioskLimiter, async (req, res) => {
   try {
-    const { printCode, kioskId = "KIOSK_1" } = req.body;
+    const { printCode, kioskId } = req.body;
     if (!printCode) return res.status(400).json({ error: "Print code required" });
+    if (!kioskId) return res.status(400).json({ error: "Kiosk ID required" });
 
     // Dynamic routing configuration based on which kiosk is calling
     const targetPiUrl = process.env[`${kioskId}_PI_URL`] || process.env.PI_BASE_URL;
     const targetPrinterName = process.env[`${kioskId}_PRINTER_NAME`] || process.env.PRINTER_NAME;
 
+    const now = new Date();
+    let transactionFailedError = null;
+    let targetKioskId = kioskId;
+
+    try {
+      const statusDoc = await db.collection("system_status").doc(kioskId).get();
+      if (statusDoc.exists) {
+        const statusData = statusDoc.data();
+        const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
+        if (lastSeen && (Date.now() - lastSeen.getTime() > 75000)) {
+        // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
+        // should not block active print jobs from being enqueued.
+      }
+    } catch (statusErr) {
+      console.error("⚠️ Pre-flight health check error:", statusErr);
+    }
+
+    try {
+      await db.runTransaction(async (transaction) => {
+        const querySnap = await transaction.get(
+          db.collection("print_jobs").where("printCode", "==", printCode)
+        );
+
+        if (querySnap.empty) {
+          transactionFailedError = { status: 404, message: "Invalid or already used print code" };
+          throw new Error("TX_ABORT");
+        }
+
+        const firstData = querySnap.docs[0].data();
+        targetKioskId = firstData.kioskId || firstData.printOptions?.directKioskId || firstData.settings?.directKioskId || "CV-001";
+        
+        // Strict machine binding validation inside transaction
+        if (targetKioskId !== kioskId) {
+          const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
+          transactionFailedError = { status: 400, message: `This code belongs to another printer. Please use ${machineName}.` };
+          throw new Error("TX_ABORT");
+        }
+
+        for (const doc of querySnap.docs) {
+          const data = doc.data();
+          if (data.status !== "paid") {
+            if (data.status === "printing" || data.status === "completed" || data.isPrinted) {
+              transactionFailedError = { status: 409, message: "Print code already used or currently printing." };
+            } else {
+              transactionFailedError = { status: 400, message: `Job not ready for printing (status: ${data.status}).` };
+            }
+            throw new Error("TX_ABORT");
+          }
+
+          if (data.codeExpiresAt && (data.codeExpiresAt.toDate ? data.codeExpiresAt.toDate() : new Date(data.codeExpiresAt)) < now) {
+            transaction.update(doc.ref, { status: "expired", printerStatus: "Expired" });
+            transactionFailedError = { status: 400, message: "Print code has expired." };
+            throw new Error("TX_ABORT");
+          }
+
+          transaction.update(doc.ref, {
+            status: "printing",
+            printerStatus: "Sending to Pi...",
+            kioskId: targetKioskId,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      });
+    } catch (txErr) {
+      if (txErr.message === "TX_ABORT" && transactionFailedError) {
+        return res.status(transactionFailedError.status).json({ error: transactionFailedError.message });
+      }
+      throw txErr;
+    }
+
     const snapshot = await db
       .collection("print_jobs")
       .where("printCode", "==", printCode)
-      .where("status", "in", ["paid", "printing"])
+      .where("status", "==", "printing")
       .get();
 
-    if (snapshot.empty) {
-      return res.status(404).json({ error: "Invalid or already used print code" });
-    }
-
-    const now = new Date();
     const results = [];
 
     for (const doc of snapshot.docs) {
       const data = doc.data();
       const fileName = data.fileName || "file";
-
-      // Skip expired
-      if (data.codeExpiresAt && data.codeExpiresAt.toDate() < now) {
-        await doc.ref.update({ status: "expired", printerStatus: "Expired" });
-        results.push({ file: fileName, status: "expired" });
-        continue;
-      }
-
-      // Skip already printed
-      if (data.isPrinted) {
-        results.push({ file: fileName, status: "already_printed" });
-        continue;
-      }
-
-      const directKioskId = data.printOptions?.directKioskId;
-      const colorMode = data.colorMode || data.printOptions?.colorMode;
-      
-      // Determine the true destination kiosk
-      let finalKioskId = kioskId;
-      if (directKioskId) {
-        finalKioskId = directKioskId;
-      }
-
-      // CV-001 only has a monochrome Brother printer — always route color to SV-002 (Epson)
-      if (colorMode === "color") {
-        if (finalKioskId === "CV-001") {
-          console.warn(`[ROUTING] Color job requested on CV-001 (monochrome only) — rerouting to SV-002 (Epson color)`);
-        }
-        finalKioskId = "SV-002"; // Force ALL color jobs to the SV-002 Epson kiosk
-      }
-
-      // Mark sending to Pi
-      await doc.ref.update({
-        status: "printing",
-        printerStatus: "Sending to Pi...",
-        kioskId: finalKioskId,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      const finalKioskId = targetKioskId;
 
       try {
         const opts = data.printOptions || {};
@@ -2340,6 +2843,140 @@ const authenticateAdmin = (req, res, next) => {
   });
 };
 
+// ================= ADMIN REFUND =================
+// Admin manually triggers a real Cashfree refund for an order.
+app.post("/admin/refund", authenticateAdmin, async (req, res) => {
+  try {
+    const { orderId, refundAmount, note } = req.body;
+    if (!orderId) return res.status(400).json({ error: "orderId is required" });
+
+    // 1. Fetch the order to get the amount and userId
+    let ordSnap = await db.collection("orders").where("orderId", "==", orderId).get();
+    if (ordSnap.empty) {
+      ordSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+    }
+    if (ordSnap.empty) return res.status(404).json({ error: "Order not found" });
+
+    const orderData = ordSnap.docs[0].data();
+    const userId = orderData.userId;
+    const originalAmount = orderData.amount || orderData.totals?.totalAmount || 0;
+    const amountToRefund = refundAmount ? Number(refundAmount) : originalAmount;
+
+    if (amountToRefund <= 0 || amountToRefund > originalAmount) {
+      return res.status(400).json({ error: `Invalid refund amount. Must be between 0.01 and ${originalAmount}` });
+    }
+
+    // 2. Call Cashfree Refund API
+    const refundId = `refund_${Date.now()}`;
+    let cashfreeRefundResponse = null;
+    try {
+      const cfRefundRes = await axios.post(
+        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        {
+          refund_amount: amountToRefund,
+          refund_id: refundId,
+          refund_note: note || "Refund initiated by Mimo admin",
+        },
+        { headers: cashfreeHeaders, timeout: 15000 }
+      );
+      cashfreeRefundResponse = cfRefundRes.data;
+      console.log(`[ADMIN-REFUND] Cashfree refund created: ${refundId} for orderId=${orderId} amount=₹${amountToRefund}`);
+    } catch (cfErr) {
+      const cfError = cfErr.response?.data?.message || cfErr.message;
+      console.error(`[ADMIN-REFUND] Cashfree refund API failed: ${cfError}`);
+      return res.status(502).json({ error: `Cashfree refund failed: ${cfError}` });
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+
+    // 3. Record refund in Firestore `refunds` collection
+    const refundDocRef = db.collection("refunds").doc(refundId);
+    batch.set(refundDocRef, {
+      refundId,
+      orderId,
+      userId,
+      refundAmount: amountToRefund,
+      originalAmount,
+      status: cashfreeRefundResponse?.refund_status || "PENDING",
+      cashfreeRefundId: cashfreeRefundResponse?.cf_refund_id || null,
+      note: note || null,
+      initiatedAt: now,
+      cashfreeResponse: cashfreeRefundResponse,
+    });
+
+    // 4. Mark order as REFUNDED
+    ordSnap.forEach((doc) => {
+      batch.update(doc.ref, {
+        status: "REFUNDED",
+        orderStatus: "refunded",
+        refundId,
+        refundedAt: now,
+        refundAmount: amountToRefund,
+      });
+    });
+
+    // 5. Reset print_jobs to 'pending' if not yet printed (allows admin retry if needed)
+    const jobsSnap = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("orderId", "==", orderId)
+      .get();
+    jobsSnap.forEach((doc) => {
+      const data = doc.data();
+      if (!["printing", "completed"].includes(data.status)) {
+        batch.update(doc.ref, {
+          status: "refunded",
+          "paymentStatus.status": "refunded",
+          refundId,
+          refundedAt: now,
+        });
+      }
+    });
+
+    // 6. Mark pending refund_request as resolved (if one exists)
+    const refReqSnap = await db.collection("refund_requests")
+      .where("orderId", "==", orderId)
+      .where("status", "==", "pending")
+      .get();
+    refReqSnap.forEach((doc) => {
+      batch.update(doc.ref, {
+        status: "processed",
+        resolvedAt: now,
+        resolvedBy: "admin",
+        adminNote: note || "Refund processed",
+        refundId,
+      });
+    });
+
+    await batch.commit();
+
+    res.json({
+      message: `Refund of ₹${amountToRefund} initiated successfully for order ${orderId}`,
+      refundId,
+      cashfreeStatus: cashfreeRefundResponse?.refund_status,
+    });
+  } catch (err) {
+    console.error("[ADMIN-REFUND] Error:", err);
+    res.status(500).json({ error: "Refund processing failed" });
+  }
+});
+
+// ================= ADMIN REFUND REQUESTS LIST =================
+// Admin views all pending user refund requests.
+app.get("/admin/refund-requests", authenticateAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection("refund_requests")
+      .orderBy("requestedAt", "desc")
+      .limit(50)
+      .get();
+    const requests = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json({ requests });
+  } catch (err) {
+    console.error("[ADMIN-REFUND-REQUESTS] Error:", err);
+    res.status(500).json({ error: "Failed to fetch refund requests" });
+  }
+});
+
 app.post("/admin/login", async (req, res) => {
   const { email, password } = req.body;
   const adminEmail = process.env.ADMIN_EMAIL || "admin@printmimo.tech";
@@ -2424,10 +3061,50 @@ app.get("/admin/settings", authenticateAdmin, async (req, res) => {
 
 app.post("/admin/settings", authenticateAdmin, async (req, res) => {
   try {
-    const { pricePerPageBW, pricePerPageColor } = req.body;
-    await db.collection("mimo_settings").doc("pricing").set({
-      pricePerPageBW: Number(pricePerPageBW),
-      pricePerPageColor: Number(pricePerPageColor)
+    const { pricePerPageBW, pricePerPageColor, pricePerPageA4, pricePerPageGraph } = req.body;
+    const updateData = {};
+    if (pricePerPageBW !== undefined) updateData.pricePerPageBW = Number(pricePerPageBW);
+    if (pricePerPageColor !== undefined) updateData.pricePerPageColor = Number(pricePerPageColor);
+    if (pricePerPageA4 !== undefined) updateData.pricePerPageA4 = Number(pricePerPageA4);
+    if (pricePerPageGraph !== undefined) updateData.pricePerPageGraph = Number(pricePerPageGraph);
+
+    await db.collection("mimo_settings").doc("pricing").set(updateData, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/admin/screensaver", authenticateAdmin, async (req, res) => {
+  try {
+    const doc = await db.collection("mimo_settings").doc("screensaver").get();
+    res.json(doc.exists ? doc.data() : {
+      videos: [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: true,
+      idleTimeoutSeconds: 60
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/admin/screensaver", authenticateAdmin, async (req, res) => {
+  try {
+    const { videos, playSound, idleTimeoutSeconds } = req.body;
+    await db.collection("mimo_settings").doc("screensaver").set({
+      videos: Array.isArray(videos) ? videos : [
+        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
+        "/second_video.mp4",
+        "/3_video.mp4",
+        "/4_video.mp4"
+      ],
+      playSound: Boolean(playSound),
+      idleTimeoutSeconds: Number(idleTimeoutSeconds || 60)
     }, { merge: true });
     res.json({ success: true });
   } catch (err) {
