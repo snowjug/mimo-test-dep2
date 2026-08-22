@@ -15,6 +15,7 @@ interface SummaryScreenProps {
 
 export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId }) => {
     const isCV001 = kioskId === 'CV-001';
+    const isSV002 = kioskId === 'SV-002';
     const timeoutRef = useRef<number | null>(null);
     const [renderKey, setRenderKey] = useState(0);
 
@@ -76,8 +77,8 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 transform: 'translateY(-40px)'
             }}>
 
-                <div style={{ fontSize: '48px', fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', textShadow: '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <span style={{ color: '#ffffff', textDecoration: 'underline', textDecorationColor: isCV001 ? '#00e5ff' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
+                <div style={{ fontSize: '48px', fontWeight: 900, color: isSV002 ? 'var(--text-primary)' : '#ffffff', letterSpacing: '-1px', textShadow: isSV002 ? 'none' : '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <span style={{ color: isSV002 ? 'var(--gold-accent)' : '#ffffff', textDecoration: isSV002 ? 'none' : 'underline', textDecorationColor: isCV001 ? '#00e5ff' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
                 </div>
             </div>
 
@@ -209,7 +210,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 <div style={{
                     fontSize: '22px',
                     fontWeight: 900,
-                    color: 'rgba(255,255,255,0.90)',
+                    color: isSV002 ? 'var(--text-primary)' : 'rgba(255,255,255,0.90)',
                     letterSpacing: '2px',
                     textTransform: 'uppercase',
                     animation: isActive ? 'fadeInUp 1s ease-out 0.3s forwards' : 'none',
@@ -217,29 +218,29 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '16px',
-                    textShadow: '0 2px 12px rgba(0,0,0,0.25)'
+                    textShadow: isSV002 ? 'none' : '0 2px 12px rgba(0,0,0,0.25)'
                 }}>
-                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
                     Please collect your documents from below
-                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
                 </div>
 
                 <button
                     className="done-button-dynamic"
                     style={{
                         padding: '0 50px', height: '64px', borderRadius: '32px',
-                        background: isCV001 ? 'linear-gradient(135deg, #00e5ff, #0077b6)' : 'linear-gradient(135deg, #E8B86D, #C8860A)', color: isCV001 ? '#000a17' : '#fff', border: 'none',
+                        background: isCV001 ? 'linear-gradient(135deg, #00e5ff, #0077b6)' : isSV002 ? 'var(--gold-accent)' : 'linear-gradient(135deg, #E8B86D, #C8860A)', color: isCV001 ? '#000a17' : '#fff', border: 'none',
                         fontSize: '20px', fontWeight: 900, letterSpacing: '4px',
                         textTransform: 'uppercase', cursor: 'pointer',
-                        boxShadow: isCV001 ? '0 20px 50px rgba(0,229,255,0.45), inset 0 1px 2px rgba(255,255,255,0.3)' : '0 20px 50px rgba(200,134,10,0.45), inset 0 1px 2px rgba(255,255,255,0.3)',
+                        boxShadow: isCV001 ? '0 20px 50px rgba(0,229,255,0.45), inset 0 1px 2px rgba(255,255,255,0.3)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45), inset 0 1px 2px rgba(255,255,255,0.3)',
                         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)', 
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
                         animation: isActive ? 'fadeInUp 1s ease-out 0.5s forwards' : 'none',
                         opacity: 0
                     }}
                     onClick={onReset}
-                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = isCV001 ? '0 10px 25px rgba(0,229,255,0.25)' : '0 10px 25px rgba(200,134,10,0.25)'; }}
-                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = isCV001 ? '0 20px 50px rgba(0,229,255,0.45)' : '0 20px 50px rgba(200,134,10,0.45)'; }}
+                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = isCV001 ? '0 10px 25px rgba(0,229,255,0.25)' : isSV002 ? '0 5px 15px rgba(183,140,67,0.3)' : '0 10px 25px rgba(200,134,10,0.25)'; }}
+                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = isCV001 ? '0 20px 50px rgba(0,229,255,0.45)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45)'; }}
                 >
                     Done
                     <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>check_circle</span>
@@ -260,6 +261,10 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 .done-button-dynamic:hover {
                     box-shadow: 0 0 40px rgba(200,134,10,0.5), 0 20px 50px rgba(200,134,10,0.35);
                     transform: translateY(-2px);
+                }
+                
+                .theme-sv002 .done-button-dynamic:hover {
+                    box-shadow: 0 0 40px rgba(183,140,67,0.4), 0 20px 50px rgba(183,140,67,0.3);
                 }
 
                 @keyframes paperDispenseHand {
