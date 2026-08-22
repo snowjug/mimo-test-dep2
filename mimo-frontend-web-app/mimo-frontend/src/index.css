@@ -1484,6 +1484,15 @@ body.theme-sv002,
     opacity: 1;
 }
 
+.theme-sv002 .kiosk-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: #fdfbf7;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+}
+
 /* Adjust text shadows and text colours globally for sv002 */
 .theme-sv002 .tag-line,
 .theme-sv002 .sub-heading,
