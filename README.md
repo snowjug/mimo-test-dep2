@@ -102,7 +102,7 @@ mimo-test-dep2/
 | Tool | Why You Need It | Download |
 |---|---|---|
 | **Node.js v18+** | Runs the backend server and all React frontends | [nodejs.org](https://nodejs.org/) |
-| **npm** | Installs JavaScript packages (comes with Node.js) | — |
+| **npm** | Installs JavaScript packages (comes with Node.js) | Package |
 | **Git** | Version control, cloning this repo | [git-scm.com](https://git-scm.com/) |
 | **Python 3.9+** | Run the Raspberry Pi listener scripts locally | [python.org](https://www.python.org/) |
 | **Firebase CLI** | Deploy Firestore rules, Firebase Functions | `npm install -g firebase-tools` |
@@ -183,7 +183,7 @@ npm run dev
 | Admin Dashboard | [https://printmimo.tech/admin](https://printmimo.tech/admin) |
 | Kiosk App | [https://mimo-kiosk-app.vercel.app](https://kisokmechine.vercel.app) |
 | Kiosk SV-002 | [https://kisokmechine.vercel.app/?kioskId=SV-002](https://kisokmechine.vercel.app/?kioskId=SV-002) |
-| Kiosk CV-001 | [https://mimo-kiosk-app.vercel.app/?kioskId=CV-001](https://kisokmechine.vercel.app/?kioskId=CV-001) |
+| Kiosk CV-001 | [https://kisokmechine.vercel.app/?kioskId=CV-001](https://kisokmechine.vercel.app/?kioskId=CV-001) |
 | Backend Cloud API | [https://api-upqxuj7evq-uc.a.run.app](https://api-upqxuj7evq-uc.a.run.app) |
 
 ---
