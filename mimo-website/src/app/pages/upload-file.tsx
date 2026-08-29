@@ -111,6 +111,10 @@ const estimateDocxPages = async (file: File): Promise<number> => {
       cdOffset += 46 + fileNameLen + extraFieldLen + commentLen;
     }
 
+    if (pagesMetadata > 1) {
+      return pagesMetadata;
+    }
+
     const estPagesByWords = Math.ceil(words / 350);
     const estPagesByParagraphs = Math.ceil(paragraphs / 22);
     const estPagesByBreaks = pageBreaks + 1;
@@ -399,19 +403,36 @@ export function UploadFile() {
 
       const uploadedFiles = await Promise.all(uploadPromises) as any[];
 
-      // Store the full file metadata (with URLs) for later use in handlePrint
-      setUploadedFilesData(prev => [...prev, ...uploadedFiles]);
-
-      // 3. Tell backend to finalize and create database records
-      // In Serverless architecture, this doesn't trigger conversion anymore. It just creates the job.
+      // 3. Tell backend to finalize, perform conversion, and create database records
       const response = await api.post("/finalize-upload", { files: [...uploadedFilesData, ...uploadedFiles] });
       
+      // Override local estimations with verified page counts and converted URLs returned by backend
+      let finalUploadedFiles = uploadedFiles;
+      if (response && response.data && Array.isArray(response.data.files)) {
+        const backendFiles = response.data.files;
+        finalUploadedFiles = uploadedFiles.map((uf) => {
+          const bf = backendFiles.find((b: any) => b.name === uf.name);
+          if (bf) {
+            return {
+              ...uf,
+              url: bf.url || uf.url,
+              type: bf.type || uf.type,
+              pageCount: typeof bf.pageCount === "number" ? bf.pageCount : uf.pageCount,
+            };
+          }
+          return uf;
+        });
+      }
+
+      // Store the full verified file metadata (with converted URLs and exact page counts)
+      setUploadedFilesData(prev => [...prev.filter(p => !finalUploadedFiles.some(f => f.name === p.name)), ...finalUploadedFiles]);
+
       // Update UI
       setFiles((prev) =>
         prev.map((f) => {
           const isTarget = newFiles.some((nf) => nf.name === f.name);
           if (isTarget) {
-            const meta = uploadedFiles.find(uf => uf.name === f.name);
+            const meta = finalUploadedFiles.find(uf => uf.name === f.name);
             return { ...f, status: "completed", progress: 100, pageCount: meta?.pageCount || 1 };
           }
           return f;
@@ -419,8 +440,8 @@ export function UploadFile() {
       );
       toast.success("Files ready for printing!");
 
-      // Calculate total pages for pricing
-      const totalPages = uploadedFiles.reduce((acc: number, curr: any) => acc + curr.pageCount, 0);
+      // Calculate total pages for pricing using verified page counts
+      const totalPages = finalUploadedFiles.reduce((acc: number, curr: any) => acc + curr.pageCount, 0);
       setBackendTotalPages(totalPages);
       
       // Assuming a base rate of 2 per page for estimation, backend handles real calculation

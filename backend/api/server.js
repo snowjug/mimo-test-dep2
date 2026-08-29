@@ -1067,31 +1067,89 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
       console.log(`🧹 Cleaned up ${cleanupCount} old jobs for user ${userId}`);
     }
 
+    const processedFiles = [];
+
     for (const file of files) {
       // Use the Firebase download URL the frontend sends (file.url)
       // Fall back to constructing from storagePath only if url is missing
-      const fileUrl = file.url || `https://storage.googleapis.com/${bucket.name}/${file.storagePath}`;
-      
+      let fileUrl = file.url || `https://storage.googleapis.com/${bucket.name}/${file.storagePath}`;
+      let finalPageCount = file.pageCount || 0;
+      let finalMimeType = file.type || "application/octet-stream";
+
+      const extension = path.extname(file.name || "").toLowerCase();
+      const isOfficeDoc = [".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"].includes(extension);
+
+      if (isOfficeDoc) {
+        console.log(`⏳ Converting Office document ${file.name} to PDF before finalizing...`);
+        let buffer;
+        const filePath = extractFilePath(fileUrl, bucket.name);
+        if (filePath) {
+          const bucketFile = bucket.file(filePath);
+          const [dlBuffer] = await bucketFile.download();
+          buffer = dlBuffer;
+        } else {
+          const resp = await axios.get(fileUrl, { responseType: "arraybuffer" });
+          buffer = Buffer.from(resp.data);
+        }
+
+        let pdfBuffer;
+        try {
+          pdfBuffer = await libreConvert(buffer, ".pdf", undefined);
+        } catch (convErr) {
+          console.error(`❌ Conversion failed for ${file.name}:`, convErr);
+          throw new Error(`Failed to convert ${file.name} to PDF: ${convErr.message}`);
+        }
+
+        const pdfDoc = await PDFDocument.load(pdfBuffer);
+        finalPageCount = pdfDoc.getPageCount();
+        if (!finalPageCount || finalPageCount <= 0) {
+          throw new Error(`Invalid page count (${finalPageCount}) determined for ${file.name}`);
+        }
+
+        finalMimeType = "application/pdf";
+
+        const newFileName = `converted/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.pdf`;
+        const newFile = bucket.file(newFileName);
+        await newFile.save(pdfBuffer, { contentType: "application/pdf" });
+        fileUrl = `https://storage.googleapis.com/${bucket.name}/${newFileName}`;
+
+        console.log(`✅ Converted ${file.name} -> PDF (${finalPageCount} pages)`);
+      }
+
+      let resolvedPageCount;
+      if (file.type.startsWith("image/")) {
+        resolvedPageCount = 1;
+      } else if (isOfficeDoc) {
+        resolvedPageCount = finalPageCount;
+      } else {
+        resolvedPageCount = finalPageCount || 1;
+      }
+
       const baseJobData = {
         userId,
         fileName: file.name,
         documentUrl: fileUrl,
         fileUrl,
-        mimetype: file.type,
+        mimetype: finalMimeType,
         fileSize: file.size || 0,
-        fileType: file.type.split("/")[1] || "unknown",
+        fileType: finalMimeType.split("/")[1] || "unknown",
         isImage: file.type.startsWith("image/"),
         createdAt: now,
         updatedAt: now,
-        files: [{ name: file.name, size: file.size || 0, type: file.type, url: fileUrl }],
+        files: [{ name: file.name, size: file.size || 0, type: finalMimeType, url: fileUrl }],
         sourceFile: {
           fileName: file.name,
-          originalExtension: require('path').extname(file.name) || "",
+          originalExtension: extension || "",
           mimeType: file.type,
           fileSizeBytes: file.size || 0,
           uploadedAt: now,
         },
-        conversionDetails: { convertedAt: null, originalPageCount: 0, actualPageCount: 0, isConverting: false },
+        conversionDetails: {
+          convertedAt: isOfficeDoc ? now : null,
+          originalPageCount: file.pageCount || 0,
+          actualPageCount: finalPageCount,
+          isConverting: false
+        },
         printOptions: { copies: 1, colorMode: "bw", layout: "single", duplexMode: "simplex" },
         pricing: { pricePerPage: 0, totalPages: 0, copiesRequested: 1, totalPagesToPrint: 0, estimatedAmount: 0, finalAmount: 0, currency: "INR" },
         paymentStatus: { status: "pending", paymentMethod: "cashfree", transactionId: null, paidAt: null },
@@ -1100,25 +1158,21 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
         metadata: { ipAddress: req.ip || "", userAgent: req.get("user-agent") || "", tags: [] }
       };
 
-      // If the client already computed a valid pageCount (PDF, PPTX, DOCX, XLSX, images),
-      // skip slow server-side LibreOffice conversion and go straight to "pending"
-      const clientPageCount = file.pageCount || 0;
-      if (file.type.startsWith("image/") || clientPageCount > 0) {
-        await db.collection("print_jobs").add({
-          ...baseJobData,
-          status: "pending",
-          pageCount: file.type.startsWith("image/") ? 1 : clientPageCount,
-        });
-      } else {
-        // Only fall back to server-side conversion if client couldn't determine page count
-        await db.collection("print_jobs").add({
-          ...baseJobData,
-          status: "pending_conversion",
-        });
-      }
+      await db.collection("print_jobs").add({
+        ...baseJobData,
+        status: "pending",
+        pageCount: resolvedPageCount,
+      });
+
+      processedFiles.push({
+        name: file.name,
+        url: fileUrl,
+        pageCount: resolvedPageCount,
+        type: finalMimeType
+      });
     }
 
-    res.json({ message: "Files finalized and queued for processing" });
+    res.json({ message: "Files finalized and queued for processing", files: processedFiles });
   } catch (err) {
     next(err);
   }
@@ -2499,6 +2553,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         if (lastSeen && (Date.now() - lastSeen.getTime() > 75000)) {
         // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
         // should not block active print jobs from being enqueued.
+      }
       }
     } catch (statusErr) {
       console.error("⚠️ Pre-flight health check error:", statusErr);
