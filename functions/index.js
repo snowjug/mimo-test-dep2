@@ -24,8 +24,8 @@ function getTransporter() {
 }
 
 // ================= WHATSAPP CONFIG =================
-const WA_PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || "943206795552432";
-const WA_ACCESS_TOKEN = process.env.WA_ACCESS_TOKEN || "EAAkN2tEVOeMBRiZBa3iQBcB241gbQTJ1GXi0ZBufsJTIHA0hkCSZC9fuc4YqAKOcHkUneoPyPRZC3WuUARywUHdAVxXzy7hdN6IeBXyl5lj6xsnr69L5b4aC4F6ZBywQmOMWuZB31FkCmbopBX1ZCo0zhofMjprpsQ5CaHPi86VVq9MSRR4j9yulQzViz7pYaHYZAgZDZD";
+const WA_PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || "1178360992020211";
+const WA_ACCESS_TOKEN = process.env.WA_ACCESS_TOKEN || "EAFx0IQr1tSwBSEgosZCegrEw1X9DCGTmJN9oZAkkDMK6KN2DfAY9ELN0Dxr64zvuliBaOnFfx4ZCl4ibCBTNcbEltbjpdAZA0dZCom8vPh7nmIMtTZAZBA354LYJBgCGqiXGqtz5wLlZCKvrzeGovdurgjMgLlZAckdoeiL6ndUa0A928LODxbMDMUyEaIC3v8wSMCwZDZD";
 const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || "mimo_webhook_verify_2024";
 const { AsyncLocalStorage } = require('async_hooks');
 const waContext = new AsyncLocalStorage();
@@ -1997,10 +1997,13 @@ app.post("/whatsapp-webhook", async (req, res) => {
         userId = guestRef.id;
       }
 
+      const ext = isImage ? (mimeType.includes("png") ? "png" : "jpg") : "pdf";
+      const actualFileName = doc.filename || `whatsapp_${Date.now()}.${ext}`;
+
       // Create a print job in Firestore
       const jobRef = await db.collection("print_jobs").add({
         userId,
-        fileName: doc.filename || `document_${Date.now()}.pdf`,
+        fileName: actualFileName,
         documentUrl: fileUrl,
         fileUrl,
         mimetype: isImage ? mimeType : "application/pdf",
@@ -2033,17 +2036,17 @@ app.post("/whatsapp-webhook", async (req, res) => {
         state: "awaiting_destination",
         jobId: jobRef.id,
         userId,
-        fileName: doc.filename || "document.pdf",
+        fileName: actualFileName,
         colorMode: "bw",
         copies: 1,
         pageCount
       });
 
       await sendWhatsAppButtons(from, 
-        `📄 *${doc.filename || "document.pdf"}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`, 
+        `📄 *${doc.filename || (isImage ? "Image" : "Document")}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`, 
         [
-          { id: "dest_cv", title: "📍 CV B&W" },
-          { id: "dest_sv", title: "📍 SV Color and B&W" }
+          { id: "dest_cv", title: "📍 MIMO 1.0" },
+          { id: "dest_sv", title: "📍 MIMO 2.0" }
         ]
       );
       return res.sendStatus(200);
@@ -2055,16 +2058,16 @@ app.post("/whatsapp-webhook", async (req, res) => {
       
       if (session.state === "awaiting_destination") {
          if (buttonId === "dest_cv") {
-           // CV is B&W only, skip color selection
-           await sessionRef.update({ state: "awaiting_copies", destination: "KIOSK-001-CV", colorMode: "bw" });
+           // MIMO V1 (CV-001) is B&W only, skip color selection
+           await sessionRef.update({ state: "awaiting_copies", destination: "CV-001", kioskId: "CV-001", colorMode: "bw" });
            await sendWhatsAppButtons(from, "How many copies?", [
              { id: "copies_1", title: "1 Copy" },
              { id: "copies_2", title: "2 Copies" },
              { id: "copies_3", title: "3 Copies" }
            ], "Select copies or type a number");
          } else if (buttonId === "dest_sv") {
-           // SV has both options
-           await sessionRef.update({ state: "awaiting_color", destination: "KIOSK-002-SV" });
+           // MIMO V2 (SV-002 / pi@pi) has both options
+           await sessionRef.update({ state: "awaiting_color", destination: "SV-002", kioskId: "SV-002" });
            await sendWhatsAppButtons(from, "Please select Print Type:", [
              { id: "color_bw", title: "⚫ B&W (₹2.30/pg)" },
              { id: "color_color", title: "🎨 Color (₹10.00/pg)" }
@@ -2092,6 +2095,14 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
       if (session.state === "awaiting_coupon" && buttonId === "skip_coupon") {
         await _finalizePayment(from, session, sessionRef, null);
+        return res.sendStatus(200);
+      }
+
+      if (buttonId === "need_more_prints") {
+        await sessionRef.set({ state: "idle" });
+        await sendWhatsAppMessage(from,
+          `📄 *Ready for your next print!*\n\nPlease send me a *PDF file* or *Photo (JPG/PNG)* to print.`
+        );
         return res.sendStatus(200);
       }
       return res.sendStatus(200);
@@ -2209,7 +2220,7 @@ async function _askForCoupon(from, session, sessionRef, copies) {
   // Update session
   await sessionRef.update({ state: "awaiting_coupon", copies, rawTotal: totalAmount });
   
-  const kioskName = session.destination === "KIOSK-001-CV" ? "🖨️ CV B&W" : "🖨️ SV Color and B&W";
+  const kioskName = (session.destination === "CV-001" || session.destination === "KIOSK-001-CV") ? "🖨️ MIMO 1.0" : "🖨️ MIMO 2.0";
   const colorText = session.colorMode === "color" ? "🎨 Color" : "📄 B&W";
   
   const receiptText = `🧾 *MIMO PRINT SUMMARY* 🧾
@@ -2266,8 +2277,9 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
     // FREE ORDER
     const orderId = `WA-FREE-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
     const printCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const targetKioskId = session.kioskId || session.destination || "SV-002";
     await db.collection("print_jobs").doc(session.jobId).update({
-      orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: 0, printDestination: session.destination || "Any", status: "paid", printCode, couponUsed: couponCode || null
+      orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: 0, printDestination: targetKioskId, kioskId: targetKioskId, status: "paid", printCode, couponUsed: couponCode || null
     });
     await sessionRef.update({ state: "idle" });
     await sendWhatsAppMessage(from, `🎉 *100% Free!* Your order is fully covered.\n\nYour Print Code is:\n*${printCode}*\n\nHead to the Mimo kiosk and enter this code! 🖨️`);
@@ -2293,8 +2305,9 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
       }
     }, { headers: cashfreeHeaders });
 
+    const targetKioskId = session.kioskId || session.destination || "SV-002";
     await db.collection("print_jobs").doc(session.jobId).update({
-      orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: totalAmount, printDestination: session.destination || "Any", couponUsed: couponCode || null
+      orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: totalAmount, printDestination: targetKioskId, kioskId: targetKioskId, couponUsed: couponCode || null
     });
     
     await sessionRef.update({ state: "idle" });
@@ -2819,6 +2832,33 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
 
     } catch (err) {
       console.error(`[STORAGE ERROR] Failed to delete file for job ${event.params.jobId}:`, err);
+    }
+
+    // Send WhatsApp Acknowledgement + "Need More Prints" button
+    try {
+      let waPhone = null;
+      if (afterData.source === "whatsapp" && afterData.userId && afterData.userId.startsWith("wa_")) {
+        waPhone = afterData.userId.replace("wa_", "");
+      } else if (afterData.userPhone || afterData.phoneNumber) {
+        waPhone = afterData.userPhone || afterData.phoneNumber;
+      }
+
+      if (waPhone) {
+        let normalized = waPhone.replace(/[^\d]/g, "");
+        if (normalized.length === 10) normalized = "91" + normalized;
+        
+        const machineLabel = (afterData.kioskId === "CV-001" || afterData.printDestination === "CV-001") ? "MIMO 1.0" : "MIMO 2.0";
+        await sendWhatsAppButtons(
+          normalized,
+          `🎉 *PRINT COMPLETE!* 🎉\n\nYour document *${afterData.fileName || "document"}* was successfully printed at *${machineLabel}*! 🖨️✨\n\nNeed to print more files? Click below!`,
+          [
+            { id: "need_more_prints", title: "📄 Need More Prints" }
+          ]
+        );
+        console.log(`[WHATSAPP] Sent completion acknowledgment to ${normalized}`);
+      }
+    } catch (waAckErr) {
+      console.error("[WHATSAPP ACK ERROR]", waAckErr);
     }
   }
 });
