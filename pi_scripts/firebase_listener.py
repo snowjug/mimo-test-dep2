@@ -1393,7 +1393,7 @@ def heartbeat_loop():
             }, merge=True)
         except Exception as e:
             print(f"⚠️ Heartbeat failed: {e}")
-        time.sleep(30)
+        time.sleep(120)
 
 def reset_printer_usb(printer_name):
     usb_id = PRINTER_USB_IDS.get(printer_name)
@@ -1574,7 +1574,7 @@ def watchdog_loop():
             print(f"⚠️ Watchdog failed: {e}")
         
         counter += 1
-        time.sleep(10)
+        time.sleep(60)
 
 
 def ping_printer_raw(printer_name, payload):
