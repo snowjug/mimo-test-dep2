@@ -181,7 +181,7 @@ npm run dev
 | Customer Web App | [https://printmimo.tech](https://printmimo.tech) |
 | Landing Page | [https://printmimo.tech/landing](https://printmimo.tech/landing) |
 | Admin Dashboard | [https://printmimo.tech/admin](https://printmimo.tech/admin) |
-| Kiosk App | [https://mimo-kiosk-app.vercel.app](https://kisokmechine.vercel.app) |
+
 | Kiosk SV-002 | [https://kisokmechine.vercel.app/?kioskId=SV-002](https://kisokmechine.vercel.app/?kioskId=SV-002) |
 | Kiosk CV-001 | [https://kisokmechine.vercel.app/?kioskId=CV-001](https://kisokmechine.vercel.app/?kioskId=CV-001) |
 | Backend Cloud API | [https://api-upqxuj7evq-uc.a.run.app](https://api-upqxuj7evq-uc.a.run.app) |
