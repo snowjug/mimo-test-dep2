@@ -1319,63 +1319,68 @@ body.theme-cv001,
     text-shadow: 0 0 20px rgba(0, 229, 255, 0.6), 0 0 40px rgba(0, 180, 216, 0.35);
 }
 
-/* CV-001 Customized Swipe Track & Solid White Pill Thumb */
-.cv001-track {
-    background: rgba(0, 80, 220, 0.35) !important;
-    border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
-    backdrop-filter: blur(25px) !important;
-    -webkit-backdrop-filter: blur(25px) !important;
-    box-shadow: 
-        0 20px 50px rgba(0, 20, 110, 0.45),
-        0 0 30px rgba(0, 160, 255, 0.25),
-        inset 0 0 30px rgba(255, 255, 255, 0.15) !important;
-}
-
-.cv001-swipe-fill {
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, rgba(0, 229, 255, 0.4) 100%) !important;
-    box-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
-}
-
-.cv001-thumb {
-    background: linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%) !important;
+/* CV-001 MIMO 1.0 Swipe Control */
+.theme-cv001 .cv001-main .cv001-track {
+    width: 100%;
+    max-width: 780px;
+    height: 104px;
+    padding: 7px;
+    background: #fbf8f1 !important;
     border: none !important;
-    box-shadow: 
-        0 12px 32px rgba(0, 35, 140, 0.45),
-        0 2px 6px rgba(0, 0, 0, 0.12) !important;
+    border-radius: 60px;
+    box-shadow:
+        0 8px 22px rgba(89, 52, 23, 0.10),
+        inset 0 1px 2px rgba(255, 255, 255, 0.95) !important;
 }
 
-.cv001-thumb .thumb-text {
-    color: #0056f5 !important;
-    font-weight: 800 !important;
-    letter-spacing: 2px !important;
+/* Draggable left button */
+.theme-cv001 .cv001-main .cv001-thumb {
+    width: 350px;
+    height: 90px;
+    padding: 0 10px 0 28px;
+    gap: 16px;
+    border-radius: 50px;
+    background: #fffdf8 !important;
+    border: none !important;
+    box-shadow:
+        0 5px 14px rgba(89, 52, 23, 0.16),
+        inset 0 1px 2px rgba(255, 255, 255, 1) !important;
+}
+
+/* Swipe text */
+.theme-cv001 .cv001-main .cv001-thumb .thumb-text {
+    color: #a66d2b !important;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: 0.08em !important;
     text-shadow: none !important;
 }
 
-.cv001-thumb .arrow-circle {
-    background: #e6f0ff !important;
-    border: 1px solid rgba(0, 86, 245, 0.2) !important;
-    box-shadow: 0 4px 10px rgba(0, 86, 245, 0.18) !important;
+/* Arrow circle */
+.theme-cv001 .cv001-main .cv001-thumb .arrow-circle {
+    width: 68px;
+    height: 68px;
+    background: #f1eee5 !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
-.cv001-thumb .arrow-circle span {
-    color: #0056f5 !important;
-    font-weight: 800;
+/* Arrow */
+.theme-cv001 .cv001-main .cv001-thumb .arrow-circle span {
+    font-size: 28px;
+    color: #76543a !important;
 }
 
-.cv001-chevrons {
-    background: linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0.15) 0%,
-        #00e5ff 45%,
-        #ffffff 50%,
-        #00e5ff 55%,
-        rgba(255, 255, 255, 0.15) 100%
-    ) !important;
-    background-size: 200% 100% !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
-    filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.5)) !important;
+/* Right-side >>>> */
+.theme-cv001 .cv001-main .cv001-chevrons {
+    background: none !important;
+    filter: none !important;
+}
+
+.theme-cv001 .cv001-main .cv001-chevrons span {
+    font-size: 70px;
+    color: #d6b477 !important;
+    opacity: 0.55;
 }
 
 /* CV-001 Keypad & Code Slot Adjustments */
@@ -1436,6 +1441,339 @@ body.theme-cv001,
 
 .theme-cv001 .kiosk-back-btn:active {
     background: rgba(255, 255, 255, 0.30);
+}
+
+/* ================================================
+   CV-001 MIMO 1.0 WARM KIOSK OVERRIDES
+   ================================================ */
+body.theme-cv001,
+#root.theme-cv001 {
+    background:
+        radial-gradient(circle at 50% 12%, rgba(255, 250, 235, 0.78), transparent 42%),
+        linear-gradient(135deg, #f2e8d7 0%, #e4d0b1 100%) !important;
+    color: #3d281b;
+    --amber-deep: #4b2d1d;
+    --amber-mid: #9b672f;
+    --amber-warm: #b47b37;
+    --amber-light: #d9ad63;
+    --amber-pale: #f7e7bf;
+    --gold-accent: #b47b37;
+    --keypad-bg: rgba(83, 49, 27, 0.92);
+    --keypad-border: rgba(255, 244, 218, 0.62);
+    --keypad-hover: rgba(217, 173, 99, 0.55);
+    --text-primary: #3d281b;
+    --text-muted: rgba(61, 40, 27, 0.7);
+}
+
+.theme-cv001 .main-interface-wrap,
+.theme-cv001 .code-entry-wrap,
+.theme-cv001 .printing-wrap,
+.theme-cv001 .summary-wrapper {
+    background:
+        radial-gradient(circle at 50% 8%, rgba(255, 252, 242, 0.72), transparent 42%),
+        linear-gradient(145deg, #f3eadb 0%, #e4d0b1 100%);
+    color: #3d281b;
+}
+
+.theme-cv001 .kiosk-bg,
+.theme-cv001 .ambient-glow,
+.theme-cv001 .watermark-mimo,
+.theme-cv001 .kiosk-footer {
+    display: none !important;
+}
+
+.theme-cv001 .immersive-container {
+    padding-bottom: 174px;
+    top: 0;
+}
+
+.theme-cv001 .brand-panel {
+    gap: 8px;
+    margin-bottom: 30px;
+    transform: translateY(-18px);
+}
+
+.theme-cv001 .main-heading svg {
+    width: 650px;
+    height: 143px;
+}
+
+.theme-cv001 .tag-line {
+    color: #76543a;
+    text-shadow: none;
+    letter-spacing: 0.42em;
+}
+
+.theme-cv001 .main-heading svg {
+    filter: drop-shadow(0 16px 24px rgba(74, 45, 20, 0.25)) !important;
+}
+
+.theme-cv001 .sub-heading {
+    color: #4b2d1d;
+    text-shadow: none;
+}
+
+.theme-cv001 .cv001-gold-text {
+    color: #a66d2b !important;
+    text-shadow: none;
+}
+
+.theme-cv001 .brand-desc {
+    color: rgba(75, 45, 29, 0.68);
+    text-shadow: none;
+}
+
+.theme-cv001 .action-panel {
+    bottom: 96px;
+}
+
+.theme-cv001 .cv001-track {
+    height: 96px;
+    max-width: 900px;
+    padding: 8px;
+    background: rgba(255, 252, 244, 0.92) !important;
+    border: 1px solid rgba(139, 93, 42, 0.24) !important;
+    box-shadow: 0 14px 30px rgba(89, 52, 23, 0.12), inset 0 1px 0 rgba(255,255,255,0.94) !important;
+}
+
+.theme-cv001 .cv001-swipe-fill {
+    background: linear-gradient(90deg, rgba(180, 123, 55, 0.16), rgba(180, 123, 55, 0.5)) !important;
+    box-shadow: 0 0 22px rgba(180, 123, 55, 0.28);
+}
+
+.theme-cv001 .cv001-thumb {
+    width: 270px;
+    height: 80px;
+    padding: 0 8px 0 24px;
+    gap: 12px;
+    background: linear-gradient(145deg, #4b2d1d 0%, #815225 58%, #ae7837 100%) !important;
+    box-shadow: 0 9px 20px rgba(79, 44, 20, 0.2), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+
+.theme-cv001 .cv001-thumb .thumb-text {
+    color: #fff8e9 !important;
+    font-size: 18px;
+    letter-spacing: 0.12em !important;
+    text-shadow: 0 2px 8px rgba(45, 24, 11, 0.32) !important;
+}
+
+.theme-cv001 .cv001-thumb .arrow-circle {
+    width: 62px;
+    height: 62px;
+    background: #f3dfb6 !important;
+    border-color: rgba(93, 56, 25, 0.2) !important;
+    box-shadow: 0 4px 12px rgba(55, 30, 13, 0.22) !important;
+}
+
+.theme-cv001 .cv001-thumb .arrow-circle span {
+    font-size: 28px;
+    color: #68401f !important;
+}
+
+.theme-cv001 .cv001-chevrons {
+    background: linear-gradient(90deg, rgba(141, 91, 40, 0.12), #c28b42 45%, #f2d79e 50%, #c28b42 55%, rgba(141, 91, 40, 0.12)) !important;
+    filter: none !important;
+}
+
+.theme-cv001 .cv001-chevrons span {
+    font-size: 56px;
+}
+
+.theme-cv001 .entry-instruction h2,
+.theme-cv001 .percentage-text,
+.theme-cv001 .summary-title,
+.theme-cv001 .summary-value,
+.theme-cv001 .summary-label,
+.theme-cv001 .printing-wrap p {
+    color: #4b2d1d !important;
+    text-shadow: none !important;
+}
+
+.theme-cv001 .code-slot {
+    background: rgba(255, 249, 235, 0.72) !important;
+    border-color: rgba(139, 93, 42, 0.42) !important;
+    color: #6d431f !important;
+    box-shadow: 0 12px 26px rgba(89, 52, 23, 0.14), inset 0 1px 8px rgba(255,255,255,0.7) !important;
+}
+
+.theme-cv001 .code-slot.active {
+    border-color: #b47b37 !important;
+    background: rgba(255, 246, 222, 0.94) !important;
+    box-shadow: 0 0 0 3px rgba(180,123,55,0.24), 0 0 24px rgba(180,123,55,0.28) !important;
+    animation: none;
+}
+
+.theme-cv001 .num-btn {
+    background: linear-gradient(145deg, #56351f, #8c5b2a) !important;
+    border-color: rgba(255, 239, 204, 0.38) !important;
+    color: #fff7e6 !important;
+    box-shadow: 0 10px 22px rgba(69, 38, 17, 0.2), inset 0 1px 2px rgba(255,255,255,0.18) !important;
+}
+
+.theme-cv001 .num-btn:active,
+.theme-cv001 .num-btn.submit-btn.ready {
+    background: linear-gradient(135deg, #d5a45a, #8b5928) !important;
+    color: #fffaf0 !important;
+    border-color: #f2d79e !important;
+    box-shadow: 0 0 28px rgba(180,123,55,0.42) !important;
+}
+
+.theme-cv001 .kiosk-back-btn {
+    background: rgba(255, 249, 235, 0.76) !important;
+    border-color: rgba(139, 93, 42, 0.3) !important;
+    color: #68401f !important;
+    box-shadow: 0 8px 20px rgba(89, 52, 23, 0.14) !important;
+}
+
+.theme-cv001 .printing-wrap svg circle {
+    stroke: #b47b37 !important;
+}
+
+.theme-cv001 .printing-wrap svg text,
+.theme-cv001 .printing-wrap svg tspan {
+    fill: #4b2d1d !important;
+}
+
+.theme-cv001 .printing-wrap svg circle[filter] {
+    filter: none !important;
+}
+
+.theme-cv001 .summary-wrapper span {
+    color: #a66d2b !important;
+}
+
+.theme-cv001 .summary-wrapper > div:last-of-type > div:first-child {
+    color: #6d431f !important;
+    text-shadow: none !important;
+}
+
+.theme-cv001 .summary-wrapper .done-button-dynamic {
+    background: linear-gradient(135deg, #4b2d1d, #b47b37) !important;
+    color: #fff8e9 !important;
+    box-shadow: 0 18px 42px rgba(107, 66, 27, 0.3) !important;
+}
+
+.theme-cv001 .summary-wrapper .done-button-dynamic:hover {
+    box-shadow: 0 0 30px rgba(180,123,55,0.34), 0 18px 42px rgba(107,66,27,0.24) !important;
+}
+
+/* CV-001 welcome: large centered brand block with the control directly below */
+.theme-cv001 .cv001-main .immersive-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    height: 100%;
+    padding: 148px 40px 0;
+    top: 0;
+    gap: 18px;
+}
+
+.theme-cv001 .cv001-main .brand-panel {
+    width: 100%;
+    max-width: 940px;
+    gap: 8px;
+    margin: 0;
+    transform: none;
+}
+
+.theme-cv001 .cv001-main .main-heading {
+    width: 100%;
+    height: 176px;
+    margin: 0;
+}
+
+.theme-cv001 .cv001-main .main-heading svg {
+    width: 780px;
+    height: 172px;
+}
+
+.theme-cv001 .cv001-main .tag-line {
+    font-size: 17px;
+    letter-spacing: 0.42em;
+    margin-bottom: 0;
+}
+
+.theme-cv001 .cv001-main .sub-heading {
+    margin: 0;
+    font-size: 40px;
+    line-height: 1.1;
+    letter-spacing: 0;
+}
+
+.theme-cv001 .cv001-main .brand-desc {
+    margin-top: 8px;
+    font-size: 18px;
+    line-height: 1.35;
+}
+
+.theme-cv001 .cv001-main .action-panel {
+    position: relative;
+    inset: auto;
+    width: min(100%, 780px);
+    padding: 0;
+    margin: 52px 0 0;
+}
+
+/* CV-001 SWIPE - reference style */
+
+.theme-cv001 .cv001-main .cv001-track {
+    width: 100%;
+    max-width: 780px;
+    height: 104px;
+    padding: 7px;
+    background: #fbf8f1 !important;
+    border: none !important;
+    border-radius: 60px;
+    box-shadow: 0 8px 22px rgba(89,52,23,0.12) !important;
+}
+
+.theme-cv001 .cv001-main .cv001-thumb {
+    width: 350px;
+    height: 90px;
+    padding: 0 10px 0 28px;
+    gap: 16px;
+    border-radius: 50px;
+    background: #fffdf8 !important;
+    border: none !important;
+    box-shadow: 0 5px 14px rgba(89,52,23,0.16) !important;
+}
+
+.theme-cv001 .cv001-main .cv001-thumb .thumb-text {
+    color: #a66d2b !important;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: 0.08em !important;
+    text-shadow: none !important;
+}
+
+.theme-cv001 .cv001-main .cv001-thumb .arrow-circle {
+    width: 68px;
+    height: 68px;
+    background: #f1eee5 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.theme-cv001 .cv001-main .cv001-thumb .arrow-circle span {
+    color: #76543a !important;
+    font-size: 28px;
+}
+
+/* Clean >>>> - NO rectangle/background */
+.theme-cv001 .cv001-main .cv001-chevrons {
+    background: none !important;
+    background-image: none !important;
+    -webkit-background-clip: initial !important;
+    background-clip: initial !important;
+    -webkit-text-fill-color: initial !important;
+    filter: none !important;
+}
+
+.theme-cv001 .cv001-main .cv001-chevrons span {
+    font-size: 70px;
+    color: #c9a15d !important;
+    opacity: 0.55;
 }
 
 /* ================================================
