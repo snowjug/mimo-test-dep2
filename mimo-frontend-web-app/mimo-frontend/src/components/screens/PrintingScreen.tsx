@@ -534,7 +534,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       {collectingPages && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 200,
-          background: 'linear-gradient(135deg, #001a28 0%, #00101c 100%)',
+          background: isCV001 ? 'linear-gradient(135deg, #f5ecdc 0%, #e6cfad 100%)' : 'linear-gradient(135deg, #001a28 0%, #00101c 100%)',
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: '36px',
           animation: 'collect-fade-in 0.5s ease',
@@ -543,14 +543,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{
               width: '140px', height: '140px', borderRadius: '50%',
-              background: 'rgba(0,242,254,0.08)',
-              border: '3px solid rgba(0,242,254,0.4)',
+              background: isCV001 ? 'rgba(180,123,55,0.10)' : 'rgba(0,242,254,0.08)',
+              border: isCV001 ? '3px solid rgba(180,123,55,0.5)' : '3px solid rgba(0,242,254,0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               animation: 'collect-pulse 2s ease-in-out infinite',
             }}>
               <span className="material-symbols-outlined" style={{
-                fontSize: '72px', color: '#00f2fe',
-                filter: 'drop-shadow(0 0 16px rgba(0,242,254,0.7))',
+                fontSize: '72px', color: isCV001 ? '#a66d2b' : '#00f2fe',
+                filter: isCV001 ? 'drop-shadow(0 0 16px rgba(180,123,55,0.45))' : 'drop-shadow(0 0 16px rgba(0,242,254,0.7))',
               }}>print</span>
             </div>
           </div>
@@ -560,7 +560,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             <h2 style={{
               fontSize: '62px', fontWeight: 800, letterSpacing: '-2px',
               lineHeight: 1.1, marginBottom: '20px',
-              background: 'linear-gradient(135deg, #00f2fe, #4facfe)',
+              background: isCV001 ? 'linear-gradient(135deg, #4b2d1d, #d5a45a)' : 'linear-gradient(135deg, #00f2fe, #4facfe)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             }}>
               🖨️ Collecting your pages…
@@ -580,18 +580,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           }}>
             <div style={{
               width: '90px', height: '90px', borderRadius: '50%',
-              border: '4px solid rgba(0,242,254,0.25)',
+              border: isCV001 ? '4px solid rgba(180,123,55,0.3)' : '4px solid rgba(0,242,254,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(0,242,254,0.06)',
-              boxShadow: 'inset 0 0 20px rgba(0,242,254,0.1)',
+              background: isCV001 ? 'rgba(180,123,55,0.08)' : 'rgba(0,242,254,0.06)',
+              boxShadow: isCV001 ? 'inset 0 0 20px rgba(180,123,55,0.12)' : 'inset 0 0 20px rgba(0,242,254,0.1)',
             }}>
               <span style={{
-                fontSize: '38px', fontWeight: 800, color: '#00f2fe',
+                fontSize: '38px', fontWeight: 800, color: isCV001 ? '#8b5928' : '#00f2fe',
                 fontVariantNumeric: 'tabular-nums',
-                filter: 'drop-shadow(0 0 8px rgba(0,242,254,0.6))',
+                filter: isCV001 ? 'drop-shadow(0 0 8px rgba(180,123,55,0.45))' : 'drop-shadow(0 0 8px rgba(0,242,254,0.6))',
               }}>{collectCountdown}</span>
             </div>
-            <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            <p style={{ fontSize: '16px', color: isCV001 ? 'rgba(75,45,29,0.6)' : 'rgba(255,255,255,0.4)', letterSpacing: '1px', textTransform: 'uppercase' }}>
               seconds
             </p>
           </div>
@@ -602,13 +602,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '30px',
         flex: 1, textAlign: 'left', maxWidth: '750px', zIndex: 10,
-        background: isSV002 ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0,0,0,0.22)',
+          background: isSV002 ? 'rgba(255, 255, 255, 0.3)' : (isCV001 ? 'rgba(255,249,235,0.66)' : 'rgba(0,0,0,0.22)'),
         backdropFilter: 'blur(18px)',
         WebkitBackdropFilter: 'blur(18px)',
-        border: isSV002 ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.14)',
+          border: isSV002 ? '1px solid rgba(0,0,0,0.05)' : (isCV001 ? '1px solid rgba(139,93,42,0.22)' : '1px solid rgba(255,255,255,0.14)'),
         borderRadius: '28px',
         padding: '40px 48px',
-        boxShadow: isSV002 ? '0 10px 40px rgba(0,0,0,0.06)' : '0 8px 40px rgba(0,0,0,0.18)',
+          boxShadow: isSV002 ? '0 10px 40px rgba(0,0,0,0.06)' : (isCV001 ? '0 12px 38px rgba(89,52,23,0.16)' : '0 8px 40px rgba(0,0,0,0.18)'),
       }}>
         <div style={{ minHeight: '180px' }}>
           <h2 style={{ fontSize: isSV002 ? '80px' : '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-2px', lineHeight: '1.05', display: 'flex', flexDirection: 'column', textShadow: isSV002 ? 'none' : '0 4px 24px rgba(0,0,0,0.4)' }}>
@@ -620,7 +620,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             {typedSub}
           </p>
           {!isCompleted && (
-            <p style={{ color: isSV002 ? 'var(--amber-warm)' : (isCV001 ? '#80efff' : '#FFD97D'), fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: isSV002 ? 'none' : (isCV001 ? '0 0 16px rgba(0,229,255,0.6)' : '0 0 16px rgba(200,134,10,0.5)'), minHeight: '36px' }}>
+            <p style={{ color: isSV002 ? 'var(--amber-warm)' : (isCV001 ? '#a66d2b' : '#FFD97D'), fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: isSV002 ? 'none' : (isCV001 ? '0 0 16px rgba(180,123,55,0.35)' : '0 0 16px rgba(200,134,10,0.5)'), minHeight: '36px' }}>
               {statusMsg}
             </p>
           )}
@@ -640,7 +640,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               width: '300px',
               height: '300px',
               borderRadius: '50%',
-              background: isCV001 ? '#0077b6' : '#C8860A',
+              background: isCV001 ? '#b47b37' : '#C8860A',
               filter: 'blur(70px)',
               opacity: 0.10 + (progress / 100) * 0.22,
               transition: 'opacity 0.3s',
@@ -653,20 +653,20 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             <>
               <div style={{
                 position: 'absolute', inset: '45px', borderRadius: '50%',
-                border: isCV001 ? '2px solid rgba(0,229,255,0.6)' : '2px solid rgba(232,184,109,0.6)',
+                border: isCV001 ? '2px solid rgba(180,123,55,0.55)' : '2px solid rgba(232,184,109,0.6)',
                 animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite',
                 pointerEvents: 'none',
               }} />
               <div style={{
                 position: 'absolute', inset: '45px', borderRadius: '50%',
-                border: isCV001 ? '2px solid rgba(0,180,216,0.35)' : '2px solid rgba(200,134,10,0.28)',
+                border: isCV001 ? '2px solid rgba(180,123,55,0.3)' : '2px solid rgba(200,134,10,0.28)',
                 animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite 1.5s',
                 pointerEvents: 'none',
               }} />
             </>
           )}
           {/* ── Floating particles (Music notes for CV-001, Petals for standard) ── */}
-          {isActive && !isSV002 && noteParticles.map(note => (
+          {isActive && !isSV002 && !isCV001 && noteParticles.map(note => (
             <div
               key={note.id}
               className="music-note-particle"
@@ -715,7 +715,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                   strokeDasharray={progress === 100 ? 'none' : circumference}
                   strokeDashoffset={progress === 100 ? 0 : strokeDashoffset}
                   strokeLinecap="round"
-                  style={{ transition: 'stroke-dashoffset 0.18s linear' }}
+                  style={{ transition: 'stroke-dashoffset 0.14s linear' }}
                 />
               </g>
 
@@ -762,19 +762,19 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
             {/* Outer dashed ring — slow clockwise spin */}
             <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow 24s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="176" fill="transparent" stroke={isCV001 ? "rgba(0,229,255,0.15)" : "rgba(255,255,255,0.08)"} strokeWidth="3" strokeDasharray="12 18" />
+              <circle cx="190" cy="190" r="176" fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.18)" : "rgba(255,255,255,0.08)"} strokeWidth="3" strokeDasharray="12 18" />
             </g>
 
             {/* Inner dotted ring — slow counter-clockwise spin */}
             <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow-reverse 18s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="105" fill="transparent" stroke={isCV001 ? "rgba(0,229,255,0.35)" : "rgba(232,184,109,0.22)"} strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
+              <circle cx="190" cy="190" r="105" fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.28)" : "rgba(232,184,109,0.22)"} strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
             </g>
 
             {/* Glassmorphic center circle background */}
-            <circle cx="190" cy="190" r="130" fill={isCV001 ? "rgba(0, 20, 45, 0.65)" : "rgba(30, 18, 0, 0.62)"} stroke={isCV001 ? "rgba(0,229,255,0.35)" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
+            <circle cx="190" cy="190" r="130" fill={isCV001 ? "rgba(255,249,235,0.9)" : "rgba(30, 18, 0, 0.62)"} stroke={isCV001 ? "rgba(180,123,55,0.3)" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
 
             {/* Static background track */}
-            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isCV001 ? "rgba(0,229,255,0.10)" : "rgba(255,255,255,0.05)"} strokeWidth="10" />
+            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.12)" : "rgba(255,255,255,0.05)"} strokeWidth="10" />
 
             {/* Center Percentage Display */}
             <text
@@ -783,11 +783,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               dominantBaseline="middle"
               style={{
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
-                animation: isActive && progress < 100 ? (isCV001 ? 'text-glow-pulse-cyan 2s infinite alternate' : 'text-glow-pulse 2s infinite alternate') : 'none',
+                animation: isActive && progress < 100 ? 'text-glow-pulse 2s infinite alternate' : 'none',
               }}
             >
               <tspan fontSize="92px" fontWeight="800" fill="#ffffff" letterSpacing="-2px" style={{ fontFeatureSettings: '"tnum"', fontVariantNumeric: 'tabular-nums' }}>{progress}</tspan>
-              <tspan fontSize="32px" fontWeight="700" fill={isCV001 ? "#00e5ff" : "#FFD97D"} dx="4">%</tspan>
+              <tspan fontSize="32px" fontWeight="700" fill={isCV001 ? "#b47b37" : "#FFD97D"} dx="4">%</tspan>
             </text>
 
             {/* Rotated group for progress arc and comet tail */}
@@ -796,13 +796,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               <circle
                 cx="190" cy="190" r={radius}
                 fill="transparent"
-                stroke={isCV001 ? "url(#progressGradientCyber)" : "url(#progressGradient)"}
+                stroke="url(#progressGradient)"
                 strokeWidth="10"
                 strokeDasharray={progress === 100 ? 'none' : circumference}
                 strokeDashoffset={progress === 100 ? 0 : strokeDashoffset}
                 strokeLinecap="round"
                 filter="url(#neonGlow)"
-                style={{ transition: 'stroke-dashoffset 0.18s linear' }}
+                style={{ transition: 'stroke-dashoffset 0.14s linear' }}
               />
 
               {/* Progress arc — bright white core */}
@@ -826,10 +826,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 cx={pt.x}
                 cy={pt.y}
                 r={Math.max(0.5, pt.r)}
-                fill={pt.key === 0 ? '#ffffff' : (isCV001 ? '#00e5ff' : '#E8B86D')}
+                fill={pt.key === 0 ? '#ffffff' : (isCV001 ? '#b47b37' : '#E8B86D')}
                 opacity={pt.opacity * (pt.key === 0 ? 1 : 0.65)}
                 filter={pt.key <= 2 ? 'url(#cometGlow)' : undefined}
-                style={{ transition: 'cx 0.18s linear, cy 0.18s linear' }}
+                style={{ transition: 'cx 0.14s linear, cy 0.14s linear' }}
               />
             ))}
           </svg>

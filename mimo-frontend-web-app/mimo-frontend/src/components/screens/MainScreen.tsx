@@ -126,7 +126,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                     </div>
 
                     <div className="main-heading">
-                        <svg width="820" height="180" viewBox="0 0 820 180" style={{ overflow: 'visible', filter: isCV001 ? 'drop-shadow(0 16px 36px rgba(0, 20, 110, 0.55))' : 'drop-shadow(0 10px 22px rgba(80,40,0,0.38))' }}>
+                        <svg width="820" height="180" viewBox="0 0 820 180" style={{ overflow: 'visible', filter: isCV001 ? 'drop-shadow(0 16px 28px rgba(74, 45, 20, 0.35))' : 'drop-shadow(0 10px 22px rgba(80,40,0,0.38))' }}>
                             <defs>
                                 <linearGradient id="mimoBotanicalGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%"   stopColor="#ffd97d" />
@@ -136,6 +136,11 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                     <stop offset="0%"   stopColor="#ffffff" />
                                     <stop offset="100%" stopColor="#e3f2ff" />
                                 </linearGradient>
+                                <linearGradient id="mimoCv001Grad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop offset="0%" stopColor="#3c2113" />
+                                    <stop offset="48%" stopColor="#a86f2b" />
+                                    <stop offset="100%" stopColor="#e7bd68" />
+                                </linearGradient>
                             </defs>
 
                             {/* 3D shadow layer */}
@@ -143,7 +148,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                 x="50%" y="52%"
                                 dominantBaseline="middle"
                                 textAnchor="middle"
-                                fill={isCV001 ? 'rgba(0, 30, 140, 0.5)' : 'rgba(80,40,0,0.45)'}
+                                fill={isCV001 ? 'rgba(67, 38, 18, 0.28)' : 'rgba(80,40,0,0.45)'}
                                 transform="translate(5, 18)"
                                 style={{
                                     fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -152,7 +157,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                     letterSpacing: '4px'
                                 }}
                             >
-                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">2.0</tspan>
+                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">{isCV001 ? '1.0' : '2.0'}</tspan>
                             </text>
 
                             {/* Main text */}
@@ -160,7 +165,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                 x="50%" y="52%"
                                 dominantBaseline="middle"
                                 textAnchor="middle"
-                                fill={isCV001 ? 'url(#mimoCyberGrad)' : 'url(#mimoBotanicalGrad)'}
+                                fill={isCV001 ? 'url(#mimoCv001Grad)' : 'url(#mimoBotanicalGrad)'}
                                 stroke={isCV001 ? 'none' : 'rgba(255,255,255,0.35)'}
                                 strokeWidth={isCV001 ? '0' : '1.5'}
                                 paintOrder="stroke fill"
@@ -172,14 +177,14 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                     letterSpacing: '4px'
                                 }}
                             >
-                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">2.0</tspan>
+                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">{isCV001 ? '1.0' : '2.0'}</tspan>
                             </text>
                         </svg>
                     </div>
 
                     <div className="sub-heading-wrap">
                         <h2 className="sub-heading">
-                            Self-Service <span className={isCV001 ? "neon-cyan-text" : "cyan-text"}>Printing Kiosk</span>
+                            Self-Service <span className={isCV001 ? "cv001-gold-text" : "cyan-text"}>Printing Kiosk</span>
                         </h2>
                     </div>
                     <p className="brand-desc">Fast, secure document printing via Mimo code.</p>
@@ -242,7 +247,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                             <div className="arrow-circle">
                                 <span
                                     className="material-symbols-outlined"
-                                    style={{ color: isUnlocked ? '#4CAF50' : (isCV001 ? '#0056f5' : '') }}
+                                    style={{ color: isUnlocked ? '#4CAF50' : (isCV001 ? '#a66d2b' : '') }}
                                 >
                                     {isUnlocked ? 'check' : 'arrow_forward'}
                                 </span>
