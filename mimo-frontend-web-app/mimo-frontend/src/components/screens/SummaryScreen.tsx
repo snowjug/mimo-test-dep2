@@ -78,7 +78,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
             }}>
 
                 <div style={{ fontSize: '48px', fontWeight: 900, color: isSV002 ? 'var(--text-primary)' : '#ffffff', letterSpacing: '-1px', textShadow: isSV002 ? 'none' : '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <span style={{ color: isSV002 ? 'var(--gold-accent)' : '#ffffff', textDecoration: isSV002 ? 'none' : 'underline', textDecorationColor: isCV001 ? '#00e5ff' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
+                    <span style={{ color: isSV002 ? 'var(--gold-accent)' : '#ffffff', textDecoration: isSV002 ? 'none' : 'underline', textDecorationColor: isCV001 ? '#b47b37' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
                 </div>
             </div>
 
@@ -157,7 +157,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                                 animation: isActive ? 'paperDispenseHand 6s ease-in-out infinite' : 'none',
                                 transformOrigin: 'top center'
                             }}>
-                                 <div style={{ width: '55px', height: '55px', borderRadius: '50%', background: isCV001 ? 'rgba(0,180,216,0.15)' : 'rgba(232,184,109,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', border: isCV001 ? '2px solid rgba(0,229,255,0.45)' : '2px solid rgba(232,184,109,0.45)', color: isCV001 ? '#00b4d8' : '#C8860A' }}>
+                                 <div style={{ width: '55px', height: '55px', borderRadius: '50%', background: isCV001 ? 'rgba(180,123,55,0.15)' : 'rgba(232,184,109,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', border: isCV001 ? '2px solid rgba(180,123,55,0.45)' : '2px solid rgba(232,184,109,0.45)', color: isCV001 ? '#a66d2b' : '#C8860A' }}>
                                       <span className="material-symbols-outlined" style={{ fontSize: '36px', fontWeight: 800 }}>check</span>
                                  </div>
                                  <div style={{ width: '90%', height: '10px', background: '#cbd5e1', borderRadius: '5px', marginBottom: '18px' }}></div>
@@ -220,27 +220,27 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                     gap: '16px',
                     textShadow: isSV002 ? 'none' : '0 2px 12px rgba(0,0,0,0.25)'
                 }}>
-                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
-                    Please collect your documents from below
-                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#a66d2b' : '#E8B86D' }}>south</span>
+                    {isCV001 ? 'Please collect your document from below' : 'Please collect your documents from below'}
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#a66d2b' : '#E8B86D' }}>south</span>
                 </div>
 
                 <button
                     className="done-button-dynamic"
                     style={{
                         padding: '0 50px', height: '64px', borderRadius: '32px',
-                        background: isCV001 ? 'linear-gradient(135deg, #00e5ff, #0077b6)' : isSV002 ? 'var(--gold-accent)' : 'linear-gradient(135deg, #E8B86D, #C8860A)', color: isCV001 ? '#000a17' : '#fff', border: 'none',
+                        background: isCV001 ? 'linear-gradient(135deg, #4b2d1d, #b47b37)' : isSV002 ? 'var(--gold-accent)' : 'linear-gradient(135deg, #E8B86D, #C8860A)', color: isCV001 ? '#fff8e9' : '#fff', border: 'none',
                         fontSize: '20px', fontWeight: 900, letterSpacing: '4px',
                         textTransform: 'uppercase', cursor: 'pointer',
-                        boxShadow: isCV001 ? '0 20px 50px rgba(0,229,255,0.45), inset 0 1px 2px rgba(255,255,255,0.3)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45), inset 0 1px 2px rgba(255,255,255,0.3)',
+                        boxShadow: isCV001 ? '0 20px 50px rgba(180,123,55,0.35), inset 0 1px 2px rgba(255,255,255,0.3)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45), inset 0 1px 2px rgba(255,255,255,0.3)',
                         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)', 
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
                         animation: isActive ? 'fadeInUp 1s ease-out 0.5s forwards' : 'none',
                         opacity: 0
                     }}
                     onClick={onReset}
-                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = isCV001 ? '0 10px 25px rgba(0,229,255,0.25)' : isSV002 ? '0 5px 15px rgba(183,140,67,0.3)' : '0 10px 25px rgba(200,134,10,0.25)'; }}
-                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = isCV001 ? '0 20px 50px rgba(0,229,255,0.45)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45)'; }}
+                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = isCV001 ? '0 10px 25px rgba(180,123,55,0.22)' : isSV002 ? '0 5px 15px rgba(183,140,67,0.3)' : '0 10px 25px rgba(200,134,10,0.25)'; }}
+                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = isCV001 ? '0 20px 50px rgba(180,123,55,0.35)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45)'; }}
                 >
                     Done
                     <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>check_circle</span>
