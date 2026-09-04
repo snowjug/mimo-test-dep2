@@ -2497,8 +2497,9 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         const statusData = statusDoc.data();
         const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
         if (lastSeen && (Date.now() - lastSeen.getTime() > 75000)) {
-        // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
-        // should not block active print jobs from being enqueued.
+          // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
+          // should not block active print jobs from being enqueued.
+        }
       }
     } catch (statusErr) {
       console.error("⚠️ Pre-flight health check error:", statusErr);
