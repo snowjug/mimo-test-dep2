@@ -113,10 +113,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   const finalTitle = isCompleted
     ? "Print Completed ✅"
+    : (isCV001 && statusTitle === "Print Completed ✅")
+    ? "Printing in Progress"
     : (statusTitle || "Printing in Progress");
 
   const finalSub = isCompleted
     ? "Your document has been printed successfully."
+    : (isCV001 && statusTitle === "Print Completed ✅")
+    ? "Printing in progress…\nPlease wait."
     : (statusSub || "Printing in progress…\nPlease wait.");
 
   // ─── helpers ───────────────────────────────────────────────────────────────
@@ -213,10 +217,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (isCompletingRef.current) return;
 
       const currentProgress = progressRef.current;
-      const cap = (printCode && printCode !== '0000') ? 85 : 100;
+      const cap = isCV001 ? 85 : ((printCode && printCode !== '0000') ? 85 : 100);
 
       if (currentProgress >= cap) {
-        if (!printCode || printCode === '0000') {
+        if (!isCV001 && (!printCode || printCode === '0000')) {
           animateTo100AndComplete();
         } else {
           // Creep very slowly above 85% so it never looks frozen
@@ -280,7 +284,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     };
 
     tickTimerRef.current = window.setTimeout(tick, 600);
-  }, [pages, copies, printCode, manualProgress, colorMode, animateTo100AndComplete]);
+  }, [pages, copies, printCode, manualProgress, colorMode, animateTo100AndComplete, isCV001]);
 
   // ─── main effect ──────────────────────────────────────────────────────────
 
