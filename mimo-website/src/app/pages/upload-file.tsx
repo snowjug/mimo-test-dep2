@@ -27,7 +27,7 @@ const estimateDocxPages = async (file: File): Promise<number> => {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
     const view = new DataView(arrayBuffer);
-    
+
     // Find End of Central Directory (EOCD) signature: 0x06054b50
     let eocdOffset = -1;
     for (let i = buffer.length - 22; i >= 0; i--) {
@@ -36,96 +36,157 @@ const estimateDocxPages = async (file: File): Promise<number> => {
         break;
       }
     }
+
     if (eocdOffset === -1) {
       return 1;
     }
-    
+
     const cdCount = view.getUint16(eocdOffset + 10, true);
     const cdStartOffset = view.getUint32(eocdOffset + 16, true);
-    
+
     let words = 0;
-    let pagesMetadata = 1;
+    let pagesMetadata = 0;
     let paragraphs = 0;
     let pageBreaks = 0;
 
-    const decompressEntry = async (dataOffset: number, compSize: number): Promise<string> => {
+    const decompressEntry = async (
+      dataOffset: number,
+      compSize: number
+    ): Promise<string> => {
       if (compSize === 0) return "";
-      const compressedData = buffer.slice(dataOffset, dataOffset + compSize);
-      const ds = new DecompressionStream('deflate-raw');
+
+      const compressedData = buffer.slice(
+        dataOffset,
+        dataOffset + compSize
+      );
+
+      const ds = new DecompressionStream("deflate-raw");
       const writer = ds.writable.getWriter();
-      
-      // Start writing and close concurrently to prevent backpressure deadlock
+
       const writePromise = writer.write(compressedData).then(() => writer.close());
       const response = new Response(ds.readable);
       const text = await response.text();
+
       await writePromise;
       return text;
     };
-    
+
     let cdOffset = cdStartOffset;
+
     for (let i = 0; i < cdCount; i++) {
       if (cdOffset + 46 > buffer.length) break;
+
       const sig = view.getUint32(cdOffset, true);
       if (sig !== 0x02014b50) break;
-      
+
       const compSize = view.getUint32(cdOffset + 20, true);
       const fileNameLen = view.getUint16(cdOffset + 28, true);
       const extraFieldLen = view.getUint16(cdOffset + 30, true);
       const commentLen = view.getUint16(cdOffset + 32, true);
       const localHeaderOffset = view.getUint32(cdOffset + 42, true);
-      
-      const fileNameBytes = buffer.slice(cdOffset + 46, cdOffset + 46 + fileNameLen);
+
+      const fileNameBytes = buffer.slice(
+        cdOffset + 46,
+        cdOffset + 46 + fileNameLen
+      );
+
       const fileName = new TextDecoder("utf-8").decode(fileNameBytes);
-      
+
       if (localHeaderOffset + 30 <= buffer.length) {
         const lfSig = view.getUint32(localHeaderOffset, true);
+
         if (lfSig === 0x04034b50) {
-          const lfFileNameLen = view.getUint16(localHeaderOffset + 26, true);
-          const lfExtraFieldLen = view.getUint16(localHeaderOffset + 28, true);
-          const dataOffset = localHeaderOffset + 30 + lfFileNameLen + lfExtraFieldLen;
-          
-          if (fileName === 'docProps/app.xml') {
+          const lfFileNameLen = view.getUint16(
+            localHeaderOffset + 26,
+            true
+          );
+
+          const lfExtraFieldLen = view.getUint16(
+            localHeaderOffset + 28,
+            true
+          );
+
+          const dataOffset =
+            localHeaderOffset +
+            30 +
+            lfFileNameLen +
+            lfExtraFieldLen;
+
+          if (fileName === "docProps/app.xml") {
             const text = await decompressEntry(dataOffset, compSize);
+
             const pagesMatch = text.match(/<Pages>(\d+)<\/Pages>/);
             const wordsMatch = text.match(/<Words>(\d+)<\/Words>/);
-            pagesMetadata = pagesMatch ? parseInt(pagesMatch[1], 10) : 1;
-            words = wordsMatch ? parseInt(wordsMatch[1], 10) : 0;
+
+            if (pagesMatch) {
+              pagesMetadata = parseInt(pagesMatch[1], 10);
+            }
+
+            if (wordsMatch) {
+              words = parseInt(wordsMatch[1], 10);
+            }
           }
-          
-          if (fileName === 'word/document.xml') {
+
+          if (fileName === "word/document.xml") {
             const text = await decompressEntry(dataOffset, compSize);
+
             const pMatches = text.match(/<w:p\b/g);
             paragraphs = pMatches ? pMatches.length : 0;
-            
-            const lrbMatches = text.match(/<w:lastRenderedPageBreak\b/g);
+
+            const lrbMatches = text.match(
+              /<w:lastRenderedPageBreak\b/g
+            );
+
+            const brMatches = text.match(
+              /<w:br\b[^>]*?w:type="page"/g
+            );
+
             const lrbCount = lrbMatches ? lrbMatches.length : 0;
-            
-            const brMatches = text.match(/<w:br\b[^>]*?w:type="page"/g);
             const brCount = brMatches ? brMatches.length : 0;
-            
+
             pageBreaks = lrbCount + brCount;
           }
         }
       }
-      
-      cdOffset += 46 + fileNameLen + extraFieldLen + commentLen;
+
+      cdOffset +=
+        46 +
+        fileNameLen +
+        extraFieldLen +
+        commentLen;
     }
 
-    if (pagesMetadata > 1) {
+    // Word's stored page count is the best available client-side
+    // estimate because it comes from the document's saved layout data.
+    if (pagesMetadata > 0) {
       return pagesMetadata;
     }
 
-    const estPagesByWords = Math.ceil(words / 350);
-    const estPagesByParagraphs = Math.ceil(paragraphs / 22);
-    const estPagesByBreaks = pageBreaks + 1;
-    return Math.max(pagesMetadata, estPagesByWords, estPagesByParagraphs, estPagesByBreaks);
+    // Explicit page breaks provide a reliable lower-bound estimate.
+    if (pageBreaks > 0) {
+      return pageBreaks + 1;
+    }
+
+    // Fallback estimates when Word page metadata is unavailable.
+    const estPagesByWords = words > 0 ? Math.ceil(words / 350) : 0;
+    const estPagesByParagraphs =
+      paragraphs > 0 ? Math.ceil(paragraphs / 22) : 0;
+
+    const estimates = [
+      estPagesByWords,
+      estPagesByParagraphs,
+    ].filter((value) => value > 0);
+
+    return estimates.length > 0 ? Math.max(...estimates) : 1;
 
   } catch (err) {
     console.error("Error reading DOCX pages:", err);
   }
-  
-  // Fallback: rough estimation based on size
-  return file.size > 2000000 ? Math.max(1, Math.floor(file.size / 500000)) : 1;
+
+  // Fallback: rough estimation based on file size.
+  return file.size > 2000000
+    ? Math.max(1, Math.floor(file.size / 500000))
+    : 1;
 };
 
 /**
