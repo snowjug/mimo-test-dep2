@@ -154,8 +154,8 @@ app.get("/", (req, res) => res.send("Mimo Firebase Serverless is LIVE 🚀"));
 const SECRET_KEY = process.env.JWT_SECRET || "fallback_secret_key_change_me_in_prod";
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com");
 
-const CASHFREE_BASE_URL = process.env.CASHFREE_ENV === "production" 
-  ? "https://api.cashfree.com/pg" 
+const CASHFREE_BASE_URL = process.env.CASHFREE_ENV === "production"
+  ? "https://api.cashfree.com/pg"
   : "https://sandbox.cashfree.com/pg";
 
 const cashfreeHeaders = {
@@ -291,9 +291,11 @@ app.get("/profile", authMiddleware, async (req, res) => {
     const doc = await db.collection("users").doc(userId).get();
     if (!doc.exists) return res.status(404).json({ error: "User not found" });
     const user = doc.data();
-    res.json({ id: userId, username: user.username, email: user.email, photoUrl: user.photoUrl,
+    res.json({
+      id: userId, username: user.username, email: user.email, photoUrl: user.photoUrl,
       mobileNumber: user.mobileNumber || "", googleUser: user.googleUser || false,
-      mimo_coins: user.mimo_coins || { balance: 0, total_earned: 0, total_used: 0 } });
+      mimo_coins: user.mimo_coins || { balance: 0, total_earned: 0, total_used: 0 }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch profile" });
@@ -304,11 +306,11 @@ app.put("/profile", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { username, mobileNumber, photoUrl } = req.body;
-    
+
     const updateData = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    
+
     if (username !== undefined) updateData.username = username;
     if (mobileNumber !== undefined) updateData.mobileNumber = mobileNumber || "";
     if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
@@ -399,7 +401,7 @@ app.get("/print-history", authMiddleware, async (req, res) => {
         date: data.createdAt?.toDate ? new Date(data.createdAt.toDate()).toLocaleString() : "N/A",
         createdAtTime,
       };
-    }).filter(j => ["paid","printing","completed","printed","failed"].includes(j.status))
+    }).filter(j => ["paid", "printing", "completed", "printed", "failed"].includes(j.status))
       .sort((a, b) => b.createdAtTime - a.createdAtTime);
     res.json(history);
   } catch (err) {
@@ -455,7 +457,7 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
 
     const batch = db.batch();
     const processedFiles = [];
-    
+
     // Process files directly - no conversion loop, Pi handles it!
     for (const f of files) {
       const rawCount = Number(f.pageCount);
@@ -483,7 +485,7 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
         pageCount: validPageCount
       });
     }
-    
+
     await batch.commit();
 
     res.json({
@@ -539,11 +541,11 @@ app.post("/generate-text-pdf", authMiddleware, async (req, res, next) => {
       doc.on("error", err => reject(err));
 
       doc.font(mappedFont)
-         .fontSize(size)
-         .lineGap(lineGapValue)
-         .text(textContent, {
-           align: alignment === "justify" ? "justify" : alignment === "center" ? "center" : alignment === "right" ? "right" : "left"
-         });
+        .fontSize(size)
+        .lineGap(lineGapValue)
+        .text(textContent, {
+          align: alignment === "justify" ? "justify" : alignment === "center" ? "center" : alignment === "right" ? "right" : "left"
+        });
 
       doc.end();
     });
@@ -581,13 +583,13 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { type, pageCount } = req.body; // "a4" or "graph"
-    
+
     // 1. Clear abandoned jobs to prevent overcharging
     const existingJobs = await db.collection("print_jobs")
       .where("userId", "==", userId)
       .where("status", "==", "pending")
       .get();
-      
+
     if (!existingJobs.empty) {
       const deleteBatch = db.batch();
       existingJobs.forEach(doc => deleteBatch.delete(doc.ref));
@@ -597,10 +599,10 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
     // 2. Create the blank job
     const isGraph = type === "graph";
     const fileName = isGraph ? "mimo_graph.pdf" : "blank_a4.pdf";
-    const actualUrl = isGraph 
-      ? "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fmimo_graph.pdf" 
+    const actualUrl = isGraph
+      ? "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fmimo_graph.pdf"
       : "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fblank_a4.pdf";
-    
+
     // Determine exact size based on uploaded files
     const fileSize = isGraph ? 1806 : 583;
     const now = admin.firestore.FieldValue.serverTimestamp();
@@ -718,7 +720,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     const isBlankSheet = printOptions?.isBlankSheet === true || printOptions?.blankSheet === true;
     const sheetType = printOptions?.sheetType || "a4";
     const colorMode = printOptions?.colorMode || "bw";
-    
+
     let pricePerPage = 2.30;
     if (colorMode === "color") {
       pricePerPage = 10.00;
@@ -728,7 +730,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     const copies = Number(printOptions?.copies || 1);
 
     const batchUpdate = db.batch();
-    
+
     // Group all pending jobs into a single unified job for the printer
     const mergedFiles = [];
     let totalRawPages = 0;
@@ -765,7 +767,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
         size: data.size || data.fileSize || 0,
         pageCount: numPages
       });
-      
+
       // Delete the individual pending jobs so we can replace them with the merged group
       batchUpdate.delete(doc.ref);
     });
@@ -776,7 +778,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     if (printOptions?.photoLayout === "4") divisor = 4;
     if (printOptions?.photoLayout === "6") divisor = 6;
     if (printOptions?.photoLayout === "9") divisor = 9;
-    
+
     let actualPages = Math.ceil(totalRawPages / divisor);
 
     // Handle double-sided
@@ -792,7 +794,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
 
     // Create the unified merged job
     const newJobRef = db.collection("print_jobs").doc();
-    batchUpdate.set(newJobRef, { 
+    batchUpdate.set(newJobRef, {
       userId,
       fileName: mergedFiles.length > 1 ? `Multiple Files (${mergedFiles.length})` : mergedFiles[0].name,
       fileUrl: mergedFiles[0].url, // legacy support for older apps
@@ -824,19 +826,19 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     if (discountPercentage > 0) {
       amount = Number((amount - (amount * (discountPercentage / 100))).toFixed(2));
     }
-    
+
     // ─── FREE ORDER BYPASS ──────────────────────────────────────────────────────
     if (amount <= 0 || amount < 1.00) {
       const printCode = Math.floor(1000 + Math.random() * 9000).toString();
       const now = admin.firestore.FieldValue.serverTimestamp();
-      
+
       await newJobRef.update({
         status: "paid",
         printCode,
         paymentTime: now,
         isPrinted: false
       });
-      
+
       // Deduct coins from user balance if coins were used
       if (coinsToUse && coinsToUse > 0) {
         await db.collection("users").doc(userId).update({
@@ -864,9 +866,9 @@ app.post("/create-order", authMiddleware, async (req, res) => {
             console.log("Could not fetch user email from admin auth:", e.message);
           }
         }
-        
+
         console.log(`[EMAIL-DEBUG] Preparing to send FREE OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
-        
+
         if (userEmail && process.env.GMAIL_APP_PASSWORD) {
           const mailOptions = {
             from: '"Mimo Printing" <visionprintt@gmail.com>',
@@ -1064,7 +1066,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       }
       const orderBatch = db.batch();
       orders.forEach((doc) => {
-        orderBatch.update(doc.ref, { 
+        orderBatch.update(doc.ref, {
           status: "PAID",
           orderStatus: "completed",
           "paymentDetails.paymentStatus": "completed",
@@ -1078,14 +1080,14 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         .collection("print_jobs")
         .where("orderId", "==", orderId)
         .get();
-        
+
       const jobsBatch = db.batch();
       let newTotalPages = 0;
-      
+
       jobs.forEach((doc) => {
         const pages = doc.data().pageCount || 0;
         newTotalPages += pages;
-        jobsBatch.update(doc.ref, { 
+        jobsBatch.update(doc.ref, {
           status: "paid",
           "paymentStatus.status": "completed",
           "paymentStatus.paidAt": now,
@@ -1093,7 +1095,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         });
       });
       await jobsBatch.commit();
-      
+
       // ✅ Call /payment-success internally to generate the print code
       // Guard: only call if no print code exists yet on these jobs
       const existingCodeCheck = await db.collection("print_jobs")
@@ -1102,7 +1104,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         .where("printCode", "!=", null)
         .limit(1)
         .get();
-      
+
       if (existingCodeCheck.empty) {
         try {
           const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
@@ -1117,14 +1119,14 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       } else {
         console.log(`[WEBHOOK] Print code already exists for user ${userId}, skipping duplicate generation.`);
       }
-      
+
       // Update User Statistics (V2 Schema)
       const userRef = db.collection("users").doc(userId);
       await userRef.update({
         totalSpent: admin.firestore.FieldValue.increment(paidAmount),
         totalPagesPrinted: admin.firestore.FieldValue.increment(newTotalPages)
       });
-      
+
       // Update Payment Transactions Audit (V2 Schema)
       const txnSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
       if (!txnSnapshot.empty) {
@@ -1181,16 +1183,16 @@ app.post("/check-status", async (req, res) => {
     snapshot.forEach((doc) => {
       const data = doc.data();
       const printerStatus = data.printerStatus || "";
-      
+
       // Auto-cancelled jobs (bad URL) are NOT real failures - ignore them for status
       const isAutoCancelled = data.status === "failed" && (
         printerStatus.includes("Invalid file URL") ||
         printerStatus.includes("invalid file path") ||
         printerStatus.includes("Cancelled")
       );
-      
+
       if (isAutoCancelled) return; // skip — these are not real jobs
-      
+
       hasValidJob = true;
       if (data.status === "failed") anyRealFailed = true;
       if (data.status === "printing") anyPrinting = true;
@@ -1288,7 +1290,7 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
     let queryRef = db.collection("print_jobs")
       .where("userId", "==", userId)
       .where("status", "in", ["pending", "paid"]);
-    
+
     // If orderId provided, narrow query to only jobs from this order
     if (orderId) {
       queryRef = queryRef.where("orderId", "==", orderId);
@@ -1347,9 +1349,9 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
           console.log("Could not fetch user email from admin auth:", e.message);
         }
       }
-      
+
       console.log(`[EMAIL-DEBUG] Preparing to send OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
-      
+
       if (userEmail && process.env.GMAIL_APP_PASSWORD) {
         const mailOptions = {
           from: '"Mimo Printing" <visionprintt@gmail.com>',
@@ -1440,11 +1442,11 @@ const adminAuthMiddleware = (req, res, next) => {
 // ================= ADMIN AUTH =================
 app.post("/admin/login", (req, res) => {
   const { email, password } = req.body;
-  
+
   // Defensively strip quotes and whitespace from both env vars and user input
   const envEmail = (process.env.ADMIN_EMAIL || "").replace(/^"|"$/g, '').trim();
   const envPassword = (process.env.ADMIN_PASSWORD || "").replace(/^"|"$/g, '').trim();
-  
+
   const reqEmail = (email || "").trim();
   const reqPassword = (password || "").trim();
 
@@ -1452,7 +1454,7 @@ app.post("/admin/login", (req, res) => {
     const token = jwt.sign({ isAdmin: true, email: reqEmail }, SECRET_KEY, { expiresIn: "24h" });
     return res.json({ token, message: "Admin Login Successful" });
   }
-  
+
   console.log(`[AUTH FAILED] Attempted: '${reqEmail}' / '${reqPassword}' against Env: '${envEmail}' / '${envPassword}'`);
   return res.status(401).json({ error: "Invalid admin credentials" });
 });
@@ -1472,7 +1474,7 @@ app.post("/admin/coupons", adminAuthMiddleware, async (req, res) => {
   try {
     const { code, discountPercentage, expiryDate } = req.body;
     if (!code || !discountPercentage) return res.status(400).json({ error: "Missing required fields" });
-    
+
     const couponRef = db.collection("coupons").doc(code.toUpperCase());
     await couponRef.set({
       code: code.toUpperCase(),
@@ -1481,7 +1483,7 @@ app.post("/admin/coupons", adminAuthMiddleware, async (req, res) => {
       expiryDate: expiryDate ? new Date(expiryDate) : null,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     res.json({ message: "Coupon created successfully" });
   } catch (err) {
     res.status(500).json({ error: "Failed to create coupon" });
@@ -1502,18 +1504,18 @@ app.get("/validate-coupon/:code", async (req, res) => {
   try {
     const code = req.params.code.toUpperCase();
     const couponDoc = await db.collection("coupons").doc(code).get();
-    
+
     if (!couponDoc.exists) {
       return res.status(404).json({ error: "Invalid promo code" });
     }
 
     const couponData = couponDoc.data();
     const now = new Date();
-    
+
     if (!couponData.isActive) {
       return res.status(400).json({ error: "Promo code is disabled" });
     }
-    
+
     if (couponData.expiryDate && couponData.expiryDate.toDate() < now) {
       return res.status(400).json({ error: "Promo code has expired" });
     }
@@ -1618,12 +1620,12 @@ app.get("/admin/hardware", adminAuthMiddleware, async (req, res) => {
   try {
     const doc = await db.collection("hardware").doc("printers").get();
     if (!doc.exists) {
-        const defaultData = {
-          "CV-001": { type: "bw", tonerLevel: 100, paperLevel: 500, status: "Online" },
-          "SV-002-COLOR": { type: "color", inkLevel: 100, paperLevel: 500, status: "Online" }
-        };
-        await db.collection("hardware").doc("printers").set(defaultData);
-        return res.json(defaultData);
+      const defaultData = {
+        "CV-001": { type: "bw", tonerLevel: 100, paperLevel: 500, status: "Online" },
+        "SV-002-COLOR": { type: "color", inkLevel: 100, paperLevel: 500, status: "Online" }
+      };
+      await db.collection("hardware").doc("printers").set(defaultData);
+      return res.json(defaultData);
     }
     res.json(doc.data());
   } catch (err) {
@@ -1652,7 +1654,7 @@ app.get("/admin/metrics", adminAuthMiddleware, async (req, res) => {
 
     let totalRevenue = 0;
     let totalPages = 0;
-    
+
     ordersSnap.forEach((doc) => {
       const data = doc.data();
       if (data.status === "PAID" || data.status === "SUCCESS") {
@@ -1713,18 +1715,18 @@ app.get("/admin/recent-prints", adminAuthMiddleware, async (req, res) => {
       .orderBy("createdAt", "desc")
       .limit(30)
       .get();
-      
+
     const recentPrints = [];
     for (const doc of jobsSnapshot.docs) {
       const data = doc.data();
       let userEmail = data.userEmail || "Guest User";
-      
+
       try {
         if (!data.userEmail && data.userId && data.source !== "whatsapp") {
           const userDoc = await db.collection("users").doc(data.userId).get();
           if (userDoc.exists) userEmail = userDoc.data().email || "Guest User";
         }
-      } catch (e) {}
+      } catch (e) { }
 
       let dateStr = "";
       if (data.createdAt) {
@@ -1748,7 +1750,7 @@ app.get("/admin/recent-prints", adminAuthMiddleware, async (req, res) => {
         refundAmount: data.refundAmount || null
       });
     }
-    
+
     res.json(recentPrints);
   } catch (err) {
     console.error("Recent prints error:", err);
@@ -1855,7 +1857,7 @@ app.get("/wa-pay-success/:orderId", async (req, res) => {
     const waJobs = await db.collection("print_jobs").where("orderId", "==", orderId).get();
     let printCode = null;
     waJobs.forEach(d => { if (d.data().printCode) printCode = d.data().printCode; });
-    
+
     if (!printCode) {
       // Payment just completed, trigger fulfillment
       const cfStatus = await axios.get(`${CASHFREE_BASE_URL}/links/${orderId}`, { headers: cashfreeHeaders });
@@ -1885,7 +1887,7 @@ app.get("/wa-pay-success/:orderId", async (req, res) => {
         }
       }
     }
-    
+
     res.send(`
       <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
       <title>Mimo - Payment Success!</title>
@@ -1897,7 +1899,7 @@ app.get("/wa-pay-success/:orderId", async (req, res) => {
       ${printCode ? `<p>Your Print Code is</p><div class="code">${printCode}</div><p>Head to any Mimo kiosk and enter this code to collect your prints!</p>` : `<p>Your print code has been sent to you on WhatsApp!</p>`}
       </div></body></html>
     `);
-  } catch(err) {
+  } catch (err) {
     console.error("[WA-PAY-SUCCESS ERROR]", err.message);
     res.send("Payment received! Your print code has been sent via WhatsApp.");
   }
@@ -1924,233 +1926,233 @@ app.post("/whatsapp-webhook", async (req, res) => {
     const entry = body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
-    
+
     const phoneNumberId = value?.metadata?.phone_number_id;
     return waContext.run({ phoneNumberId }, async () => {
 
-    const messages = value?.messages;
-    if (!messages || messages.length === 0) return res.sendStatus(200);
+      const messages = value?.messages;
+      if (!messages || messages.length === 0) return res.sendStatus(200);
 
-    const msg = messages[0];
-    const from = msg.from; // e.g. "919876543210"
-    const msgType = msg.type;
+      const msg = messages[0];
+      const from = msg.from; // e.g. "919876543210"
+      const msgType = msg.type;
 
-    const msgId = msg.id;
+      const msgId = msg.id;
 
-    // Strict Idempotency Check: Prevent race conditions by forcing an atomic write
-    try {
-      await db.collection("whatsapp_msg_ids").doc(msgId).create({ 
-        processedAt: admin.firestore.FieldValue.serverTimestamp() 
-      });
-    } catch (e) {
-      if (e.code === 6 || e.message.includes("ALREADY_EXISTS")) {
-        console.log(`[WHATSAPP] Race condition prevented! Duplicate message ${msgId} ignored.`);
-        return res.sendStatus(200);
-      }
-    }
-
-    // Load or create bot session from Firestore
-    const sessionRef = db.collection("whatsapp_sessions").doc(from);
-    const sessionDoc = await sessionRef.get();
-    const session = sessionDoc.exists ? sessionDoc.data() : { state: "idle" };
-
-    // ── Handle PDF/document upload ──────────────────────────────────────────
-    if (msgType === "document" || msgType === "image") {
-      const doc = msg.document || msg.image;
-      const mimeType = doc.mime_type || "";
-      
-      const isPdf = mimeType.includes("pdf");
-      const isImage = mimeType.includes("image/jpeg") || mimeType.includes("image/png") || mimeType.includes("image/jpg");
-
-      if (!isPdf && !isImage) {
-        await sendWhatsAppMessage(from, "❌ Sorry, we only support standard PDF, JPG, and PNG files. Word documents (.doc/.docx) are NOT supported. Please convert your file to a PDF and upload again.");
-        return res.sendStatus(200);
-      }
-
-      // Download file from Meta servers and upload to Firebase Storage
-      let fileUrl = "";
-      let buffer = null;
+      // Strict Idempotency Check: Prevent race conditions by forcing an atomic write
       try {
-        const mediaRes = await axios.get(`https://graph.facebook.com/v19.0/${doc.id}`, {
-          headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` }
+        await db.collection("whatsapp_msg_ids").doc(msgId).create({
+          processedAt: admin.firestore.FieldValue.serverTimestamp()
         });
-        const downloadUrl = mediaRes.data.url;
-        const fileRes = await axios.get(downloadUrl, {
-          headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` },
-          responseType: "arraybuffer"
-        });
-        buffer = Buffer.from(fileRes.data);
-        const fileName = doc.filename || (isImage ? `whatsapp_${Date.now()}.jpg` : `whatsapp_${Date.now()}.pdf`);
-        const bucket = admin.storage().bucket();
-        const fileRef = bucket.file(`uploads/wa_${from}/${fileName}`);
-        const cType = isImage ? mimeType : "application/pdf";
-        await fileRef.save(buffer, { contentType: cType, metadata: { contentType: cType } });
-        const { getDownloadURL } = require("firebase-admin/storage");
-        fileUrl = await getDownloadURL(fileRef);
-        console.log(`[WHATSAPP BOT] File uploaded for ${from}: ${fileName}`);
-      } catch (uploadErr) {
-        console.error("[WHATSAPP BOT] File upload failed:", uploadErr);
-        await sendWhatsAppMessage(from, "❌ Sorry, we couldn't process your file. Please try again.");
-        return res.sendStatus(200);
-      }
-
-      // Find or create a user account for this WhatsApp number
-      let userId;
-      const usersSnap = await db.collection("users").where("mobileNumber", "==", from).get();
-      if (!usersSnap.empty) {
-        userId = usersSnap.docs[0].id;
-      } else {
-        // Create a lightweight guest account linked to this WhatsApp number
-        const guestRef = await db.collection("users").add({
-          email: `wa_${from}@mimo.guest`,
-          username: `WA User ${from.slice(-4)}`,
-          mobileNumber: from,
-          isWhatsAppUser: true,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        userId = guestRef.id;
-      }
-
-      const ext = isImage ? (mimeType.includes("png") ? "png" : "jpg") : "pdf";
-      const actualFileName = doc.filename || `whatsapp_${Date.now()}.${ext}`;
-
-      // Create a print job in Firestore
-      const jobRef = await db.collection("print_jobs").add({
-        userId,
-        fileName: actualFileName,
-        documentUrl: fileUrl,
-        fileUrl,
-        mimetype: isImage ? mimeType : "application/pdf",
-        fileSize: doc.file_size || 0,
-        fileType: isImage ? "image" : "pdf",
-        isImage: isImage,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: "pending",
-        source: "whatsapp"
-      });
-
-      // Count PDF Pages
-      let pageCount = 1;
-      if (isPdf) {
-        try {
-          const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
-          pageCount = pdfDoc.getPageCount();
-        } catch (err) {
-          console.error("Failed to parse PDF pages with pdf-lib:", err);
-          await sendWhatsAppMessage(from, "❌ Sorry, I couldn't read the pages in this PDF. It might be corrupted, password-protected, or in an unsupported format. Please save it as a standard PDF and try again.");
+      } catch (e) {
+        if (e.code === 6 || e.message.includes("ALREADY_EXISTS")) {
+          console.log(`[WHATSAPP] Race condition prevented! Duplicate message ${msgId} ignored.`);
           return res.sendStatus(200);
         }
-      } else if (isImage) {
-        pageCount = 1;
       }
 
-      // Save session state
-      await sessionRef.set({
-        state: "awaiting_destination",
-        jobId: jobRef.id,
-        userId,
-        fileName: actualFileName,
-        colorMode: "bw",
-        copies: 1,
-        pageCount
-      });
+      // Load or create bot session from Firestore
+      const sessionRef = db.collection("whatsapp_sessions").doc(from);
+      const sessionDoc = await sessionRef.get();
+      const session = sessionDoc.exists ? sessionDoc.data() : { state: "idle" };
 
-      await sendWhatsAppButtons(from, 
-        `📄 *${doc.filename || (isImage ? "Image" : "Document")}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`, 
-        [
-          { id: "dest_cv", title: "📍 MIMO 1.0" },
-          { id: "dest_sv", title: "📍 MIMO 2.0" }
-        ]
-      );
-      return res.sendStatus(200);
-    }
+      // ── Handle PDF/document upload ──────────────────────────────────────────
+      if (msgType === "document" || msgType === "image") {
+        const doc = msg.document || msg.image;
+        const mimeType = doc.mime_type || "";
 
-    // ── Handle interactive button replies ───────────────────────────────────────
-    if (msgType === "interactive" && msg.interactive.type === "button_reply") {
-      const buttonId = msg.interactive.button_reply.id;
-      
-      if (session.state === "awaiting_destination") {
-         if (buttonId === "dest_cv") {
-           // MIMO V1 (CV-001) is B&W only, skip color selection
-           await sessionRef.update({ state: "awaiting_copies", destination: "CV-001", kioskId: "CV-001", colorMode: "bw" });
-           await sendWhatsAppButtons(from, "How many copies?", [
-             { id: "copies_1", title: "1 Copy" },
-             { id: "copies_2", title: "2 Copies" },
-             { id: "copies_3", title: "3 Copies" }
-           ], "Select copies or type a number");
-         } else if (buttonId === "dest_sv") {
-           // MIMO V2 (SV-002 / pi@pi) has both options
-           await sessionRef.update({ state: "awaiting_color", destination: "SV-002", kioskId: "SV-002" });
-           await sendWhatsAppButtons(from, "Please select Print Type:", [
-             { id: "color_bw", title: "⚫ B&W (₹2.30/pg)" },
-             { id: "color_color", title: "🎨 Color (₹10.00/pg)" }
-           ]);
-         }
-         return res.sendStatus(200);
-      }
+        const isPdf = mimeType.includes("pdf");
+        const isImage = mimeType.includes("image/jpeg") || mimeType.includes("image/png") || mimeType.includes("image/jpg");
 
-      if (session.state === "awaiting_color") {
-        const colorMode = buttonId === "color_color" ? "color" : "bw";
-        await sessionRef.update({ state: "awaiting_copies", colorMode });
-        await sendWhatsAppButtons(from, "How many copies?", [
-          { id: "copies_1", title: "1 Copy" },
-          { id: "copies_2", title: "2 Copies" },
-          { id: "copies_3", title: "3 Copies" }
-        ], "Select copies or type a number");
-        return res.sendStatus(200);
-      }
+        if (!isPdf && !isImage) {
+          await sendWhatsAppMessage(from, "❌ Sorry, we only support standard PDF, JPG, and PNG files. Word documents (.doc/.docx) are NOT supported. Please convert your file to a PDF and upload again.");
+          return res.sendStatus(200);
+        }
 
-      if (session.state === "awaiting_copies" && buttonId.startsWith("copies_")) {
-        const copies = parseInt(buttonId.replace("copies_", ""));
-        await _askForCoupon(from, session, sessionRef, copies);
-        return res.sendStatus(200);
-      }
+        // Download file from Meta servers and upload to Firebase Storage
+        let fileUrl = "";
+        let buffer = null;
+        try {
+          const mediaRes = await axios.get(`https://graph.facebook.com/v19.0/${doc.id}`, {
+            headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` }
+          });
+          const downloadUrl = mediaRes.data.url;
+          const fileRes = await axios.get(downloadUrl, {
+            headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` },
+            responseType: "arraybuffer"
+          });
+          buffer = Buffer.from(fileRes.data);
+          const fileName = doc.filename || (isImage ? `whatsapp_${Date.now()}.jpg` : `whatsapp_${Date.now()}.pdf`);
+          const bucket = admin.storage().bucket();
+          const fileRef = bucket.file(`uploads/wa_${from}/${fileName}`);
+          const cType = isImage ? mimeType : "application/pdf";
+          await fileRef.save(buffer, { contentType: cType, metadata: { contentType: cType } });
+          const { getDownloadURL } = require("firebase-admin/storage");
+          fileUrl = await getDownloadURL(fileRef);
+          console.log(`[WHATSAPP BOT] File uploaded for ${from}: ${fileName}`);
+        } catch (uploadErr) {
+          console.error("[WHATSAPP BOT] File upload failed:", uploadErr);
+          await sendWhatsAppMessage(from, "❌ Sorry, we couldn't process your file. Please try again.");
+          return res.sendStatus(200);
+        }
 
-      if (session.state === "awaiting_coupon" && buttonId === "skip_coupon") {
-        await _finalizePayment(from, session, sessionRef, null);
-        return res.sendStatus(200);
-      }
+        // Find or create a user account for this WhatsApp number
+        let userId;
+        const usersSnap = await db.collection("users").where("mobileNumber", "==", from).get();
+        if (!usersSnap.empty) {
+          userId = usersSnap.docs[0].id;
+        } else {
+          // Create a lightweight guest account linked to this WhatsApp number
+          const guestRef = await db.collection("users").add({
+            email: `wa_${from}@mimo.guest`,
+            username: `WA User ${from.slice(-4)}`,
+            mobileNumber: from,
+            isWhatsAppUser: true,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          userId = guestRef.id;
+        }
 
-      if (buttonId === "need_more_prints") {
-        await sessionRef.set({ state: "idle" });
-        await sendWhatsAppMessage(from,
-          `📄 *Ready for your next print!*\n\nPlease send me a *PDF file* or *Photo (JPG/PNG)* to print.`
+        const ext = isImage ? (mimeType.includes("png") ? "png" : "jpg") : "pdf";
+        const actualFileName = doc.filename || `whatsapp_${Date.now()}.${ext}`;
+
+        // Create a print job in Firestore
+        const jobRef = await db.collection("print_jobs").add({
+          userId,
+          fileName: actualFileName,
+          documentUrl: fileUrl,
+          fileUrl,
+          mimetype: isImage ? mimeType : "application/pdf",
+          fileSize: doc.file_size || 0,
+          fileType: isImage ? "image" : "pdf",
+          isImage: isImage,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          status: "pending",
+          source: "whatsapp"
+        });
+
+        // Count PDF Pages
+        let pageCount = 1;
+        if (isPdf) {
+          try {
+            const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+            pageCount = pdfDoc.getPageCount();
+          } catch (err) {
+            console.error("Failed to parse PDF pages with pdf-lib:", err);
+            await sendWhatsAppMessage(from, "❌ Sorry, I couldn't read the pages in this PDF. It might be corrupted, password-protected, or in an unsupported format. Please save it as a standard PDF and try again.");
+            return res.sendStatus(200);
+          }
+        } else if (isImage) {
+          pageCount = 1;
+        }
+
+        // Save session state
+        await sessionRef.set({
+          state: "awaiting_destination",
+          jobId: jobRef.id,
+          userId,
+          fileName: actualFileName,
+          colorMode: "bw",
+          copies: 1,
+          pageCount
+        });
+
+        await sendWhatsAppButtons(from,
+          `📄 *${doc.filename || (isImage ? "Image" : "Document")}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`,
+          [
+            { id: "dest_cv", title: "📍 MIMO 1.0" },
+            { id: "dest_sv", title: "📍 MIMO 2.0" }
+          ]
         );
         return res.sendStatus(200);
       }
-      return res.sendStatus(200);
-    }
 
-    // ── Handle text replies ───────────────────────────────────────────────────
-    if (msgType === "text") {
-      const textBody = msg.text.body.trim();
-      
-      if (session.state === "awaiting_copies") {
-        const copies = parseInt(textBody);
-        if (!isNaN(copies) && copies > 0 && copies <= 100) {
+      // ── Handle interactive button replies ───────────────────────────────────────
+      if (msgType === "interactive" && msg.interactive.type === "button_reply") {
+        const buttonId = msg.interactive.button_reply.id;
+
+        if (session.state === "awaiting_destination") {
+          if (buttonId === "dest_cv") {
+            // MIMO V1 (CV-001) is B&W only, skip color selection
+            await sessionRef.update({ state: "awaiting_copies", destination: "CV-001", kioskId: "CV-001", colorMode: "bw" });
+            await sendWhatsAppButtons(from, "How many copies?", [
+              { id: "copies_1", title: "1 Copy" },
+              { id: "copies_2", title: "2 Copies" },
+              { id: "copies_3", title: "3 Copies" }
+            ], "Select copies or type a number");
+          } else if (buttonId === "dest_sv") {
+            // MIMO V2 (SV-002 / pi@pi) has both options
+            await sessionRef.update({ state: "awaiting_color", destination: "SV-002", kioskId: "SV-002" });
+            await sendWhatsAppButtons(from, "Please select Print Type:", [
+              { id: "color_bw", title: "⚫ B&W (₹2.30/pg)" },
+              { id: "color_color", title: "🎨 Color (₹10.00/pg)" }
+            ]);
+          }
+          return res.sendStatus(200);
+        }
+
+        if (session.state === "awaiting_color") {
+          const colorMode = buttonId === "color_color" ? "color" : "bw";
+          await sessionRef.update({ state: "awaiting_copies", colorMode });
+          await sendWhatsAppButtons(from, "How many copies?", [
+            { id: "copies_1", title: "1 Copy" },
+            { id: "copies_2", title: "2 Copies" },
+            { id: "copies_3", title: "3 Copies" }
+          ], "Select copies or type a number");
+          return res.sendStatus(200);
+        }
+
+        if (session.state === "awaiting_copies" && buttonId.startsWith("copies_")) {
+          const copies = parseInt(buttonId.replace("copies_", ""));
           await _askForCoupon(from, session, sessionRef, copies);
-        } else {
-          await sendWhatsAppMessage(from, "Please enter a valid number of copies (1-100).");
+          return res.sendStatus(200);
+        }
+
+        if (session.state === "awaiting_coupon" && buttonId === "skip_coupon") {
+          await _finalizePayment(from, session, sessionRef, null);
+          return res.sendStatus(200);
+        }
+
+        if (buttonId === "need_more_prints") {
+          await sessionRef.set({ state: "idle" });
+          await sendWhatsAppMessage(from,
+            `📄 *Ready for your next print!*\n\nPlease send me a *PDF file* or *Photo (JPG/PNG)* to print.`
+          );
+          return res.sendStatus(200);
         }
         return res.sendStatus(200);
       }
 
-      if (session.state === "awaiting_coupon") {
-        await _finalizePayment(from, session, sessionRef, textBody.trim().toUpperCase());
+      // ── Handle text replies ───────────────────────────────────────────────────
+      if (msgType === "text") {
+        const textBody = msg.text.body.trim();
+
+        if (session.state === "awaiting_copies") {
+          const copies = parseInt(textBody);
+          if (!isNaN(copies) && copies > 0 && copies <= 100) {
+            await _askForCoupon(from, session, sessionRef, copies);
+          } else {
+            await sendWhatsAppMessage(from, "Please enter a valid number of copies (1-100).");
+          }
+          return res.sendStatus(200);
+        }
+
+        if (session.state === "awaiting_coupon") {
+          await _finalizePayment(from, session, sessionRef, textBody.trim().toUpperCase());
+          return res.sendStatus(200);
+        }
+
+        // Default: Welcome message
+        await sendWhatsAppMessage(from,
+          `👋 *Welcome to Mimo Printing!*\n\nSend me a *PDF file* and I'll guide you through printing it at any Mimo kiosk.\n\n📄 Upload PDF → ⚙️ Select Settings → 💳 Pay → 🖨️ Collect!`
+        );
         return res.sendStatus(200);
       }
-      
-      // Default: Welcome message
-      await sendWhatsAppMessage(from,
-        `👋 *Welcome to Mimo Printing!*\n\nSend me a *PDF file* and I'll guide you through printing it at any Mimo kiosk.\n\n📄 Upload PDF → ⚙️ Select Settings → 💳 Pay → 🖨️ Collect!`
-      );
-      return res.sendStatus(200);
-    }
 
-    // Unsupported message type
-    await sendWhatsAppMessage(from, "Please send a *PDF, JPG, or PNG document* to get started! 📄");
-    return res.sendStatus(200);
+      // Unsupported message type
+      await sendWhatsAppMessage(from, "Please send a *PDF, JPG, or PNG document* to get started! 📄");
+      return res.sendStatus(200);
 
     }); // END waContext.run
   } catch (err) {
@@ -2225,18 +2227,18 @@ async function sendWhatsAppOrderCard(to, { orderId, fileName, colorMode, copies,
 async function _askForCoupon(from, session, sessionRef, copies) {
   const pricingDoc = await db.collection("settings").doc("pricing").get();
   const pricing = pricingDoc.exists ? pricingDoc.data() : {};
-  
+
   const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageWAColor || pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageWABW || pricing.pricePerPageBW || 2.30);
-  
+
   const pageCount = session.pageCount || 1;
   let totalAmount = Number((copies * pageCount * pricePerPage).toFixed(2));
 
   // Update session
   await sessionRef.update({ state: "awaiting_coupon", copies, rawTotal: totalAmount });
-  
+
   const kioskName = (session.destination === "CV-001" || session.destination === "KIOSK-001-CV") ? "🖨️ MIMO 1.0" : "🖨️ MIMO 2.0";
   const colorText = session.colorMode === "color" ? "🎨 Color" : "📄 B&W";
-  
+
   const receiptText = `🧾 *MIMO PRINT SUMMARY* 🧾
 ➖➖➖➖➖➖➖➖➖➖➖➖➖➖
 📄 *Document:* ${session.fileName}
@@ -2258,14 +2260,14 @@ Type the code below, or click *Skip & Pay* to proceed.`;
 async function _finalizePayment(from, session, sessionRef, couponCode) {
   let totalAmount = session.rawTotal || 1.00;
   let discountAmount = 0;
-  
+
   if (couponCode) {
     try {
       const couponDoc = await db.collection("coupons").doc(couponCode).get();
       if (couponDoc.exists) {
         const data = couponDoc.data();
         let isExpired = false;
-        
+
         if (data.expiryDate) {
           const expiryDate = data.expiryDate.toDate ? data.expiryDate.toDate() : new Date(data.expiryDate);
           if (expiryDate < new Date()) isExpired = true;
@@ -2282,7 +2284,7 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
       } else {
         await sendWhatsAppMessage(from, `❌ Invalid coupon code. Proceeding with original amount.`);
       }
-    } catch(e) {
+    } catch (e) {
       console.error("[WHATSAPP] Coupon check error:", e);
     }
   }
@@ -2323,7 +2325,7 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
     await db.collection("print_jobs").doc(session.jobId).update({
       orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: totalAmount, printDestination: targetKioskId, kioskId: targetKioskId, couponUsed: couponCode || null
     });
-    
+
     await sessionRef.update({ state: "idle" });
 
     const paymentLink = cfRes.data.link_url;
@@ -2390,7 +2392,7 @@ app.get("/kiosk/job-status", async (req, res) => {
     if (!printCode) return res.status(400).json({ error: "Print code required" });
     const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).get();
     if (snapshot.empty) return res.status(404).json({ error: "Job not found" });
-    
+
     // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
     const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     docs.sort((a, b) => {
@@ -2411,20 +2413,20 @@ app.get("/kiosk/job-status", async (req, res) => {
     // Only perform health checks if printing has not started yet.
     // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
     const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
-    const hasStarted = currentSessionDocs.some(d => 
+    const hasStarted = currentSessionDocs.some(d =>
       ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
     );
 
     if (!hasStarted) {
-      const kioskId = currentSessionDocs[0].printOptions?.directKioskId || 
-                      currentSessionDocs[0].settings?.directKioskId || 
-                      currentSessionDocs[0].kioskId || 
-                      "CV-001";
+      const kioskId = currentSessionDocs[0].printOptions?.directKioskId ||
+        currentSessionDocs[0].settings?.directKioskId ||
+        currentSessionDocs[0].kioskId ||
+        "CV-001";
       try {
         const statusDoc = await db.collection("system_status").doc(kioskId).get();
         if (statusDoc.exists) {
           const statusData = statusDoc.data();
-          
+
           // A. Kiosk Online Check (lastSeen)
           const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
           if (lastSeen) {
@@ -2522,7 +2524,7 @@ app.get("/kiosk/job-status", async (req, res) => {
     if (allCompleted) {
       return res.json({ status: "completed", isPrinted: true });
     }
-    
+
     if (anyPrinting) {
       return res.json({ status: "printing", isPrinted: false });
     }
@@ -2573,7 +2575,7 @@ app.post("/kiosk/print", async (req, res) => {
           const timeB = b.data().createdAt?.toDate ? b.data().createdAt.toDate().getTime() : 0;
           return timeB - timeA;
         });
-        
+
         const jobDoc = sortedDocs[0];
         const jobData = jobDoc.data();
         targetKioskId = jobData?.kioskId || jobData?.printOptions?.directKioskId || jobData?.settings?.directKioskId || "CV-001";
@@ -2588,13 +2590,13 @@ app.post("/kiosk/print", async (req, res) => {
           transactionFailedError = { status: 400, message: "Print code already redeemed or job not paid" };
           throw new Error("TX_ABORT");
         }
-        
+
         // Set status to printing so the Pi's firebase_listener.py picks it up
-        transaction.update(jobDoc.ref, { 
-          status: "printing", 
-          printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(), 
-          kioskId: targetKioskId 
+        transaction.update(jobDoc.ref, {
+          status: "printing",
+          printStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          kioskId: targetKioskId
         });
         updatedJobData = { ...jobData, status: "printing", kioskId: targetKioskId };
       });
@@ -2609,7 +2611,7 @@ app.post("/kiosk/print", async (req, res) => {
     // The Pi's mimo-listener.service will poll this document, download the PDF, and print it.
     // The Kiosk UI will poll /kiosk/job-status until the Pi updates it to 'completed'.
     return res.json({ success: true, message: "Print job enqueued successfully", job: updatedJobData });
-    
+
   } catch (err) {
     console.error("❌ KIOSK PRINT ERROR:", err);
     res.status(500).json({ error: "Server error" });
@@ -2632,7 +2634,7 @@ app.post("/kiosk/report-failure", async (req, res) => {
 
     const job = jobSnap.data();
     const orderId = job.orderId;
-    const userId  = job.userId;
+    const userId = job.userId;
     const failReason = reason || "Print failed at kiosk";
     const now = admin.firestore.FieldValue.serverTimestamp();
 
@@ -2809,7 +2811,7 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
   // Trigger ONLY if status changes to "completed"
   if (beforeData.status !== "completed" && afterData.status === "completed") {
     console.log(`[STORAGE] Print job ${event.params.jobId} completed. Cleaning up file...`);
-    
+
     if (!afterData.fileUrl) {
       console.log(`[STORAGE] No fileUrl found for job ${event.params.jobId}.`);
       return;
@@ -2818,10 +2820,10 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
     try {
       // fileUrl format: "gs://mimo-v2-11868.firebasestorage.app/uploads/username/filename.pdf"
       // Or: "https://firebasestorage.googleapis.com/v0/b/..."
-      
+
       const fileUrl = afterData.fileUrl;
       const bucket = admin.storage().bucket();
-      
+
       let filePath = "";
       if (fileUrl.startsWith("gs://")) {
         const bucketName = bucket.name;
@@ -2860,7 +2862,7 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
       if (waPhone) {
         let normalized = waPhone.replace(/[^\d]/g, "");
         if (normalized.length === 10) normalized = "91" + normalized;
-        
+
         const machineLabel = (afterData.kioskId === "CV-001" || afterData.printDestination === "CV-001") ? "MIMO 1.0" : "MIMO 2.0";
         await sendWhatsAppButtons(
           normalized,
@@ -2876,3 +2878,268 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
     }
   }
 });
+exports.sendFailureNotification = onDocumentUpdated(
+  {
+    document: "print_jobs/{jobId}",
+    secrets: ["GMAIL_APP_PASSWORD"],
+  },
+  async (event) => {
+    try {
+      const beforeData = event.data.before.data();
+      const afterData = event.data.after.data();
+
+      // Trigger only when the print job changes to "failed"
+      if (
+        beforeData.status === "failed" ||
+        afterData.status !== "failed"
+      ) {
+        return;
+      }
+
+      const reason =
+        afterData.printerStatus ||
+        afterData.error ||
+        "Print job failed";
+
+      // Only send alerts for important kiosk hardware/system problems
+      const reasonLower = String(reason).toLowerCase();
+
+      const shouldAlert =
+        reasonLower.includes("network") ||
+        reasonLower.includes("power") ||
+        reasonLower.includes("paper jam") ||
+        reasonLower.includes("toner");
+
+      if (!shouldAlert) {
+        console.log(
+          `[EMAIL] No Gmail alert needed for job ${event.params.jobId}. Reason: ${reason}`
+        );
+        return;
+      }
+
+      const kioskId = afterData.kioskId || "Unknown Kiosk";
+      const jobId = event.params.jobId;
+
+      const transporter = getTransporter();
+
+      await transporter.sendMail({
+        from: "visionprintt@gmail.com",
+        to: "visionprintt@gmail.com",
+        subject: `MIMO Print Job Failed - ${kioskId}`,
+        text:
+          `MIMO Kiosk Failure Alert\n\n` +
+          `Kiosk: ${kioskId}\n` +
+          `Job ID: ${jobId}\n` +
+          `Problem: ${reason}\n\n` +
+          `Please check the kiosk immediately.`,
+      });
+
+      console.log(
+        `[EMAIL] Failure notification sent for kiosk ${kioskId}, job ${jobId}`
+      );
+    } catch (err) {
+      console.error(
+        "[EMAIL] Failed to send failure notification:",
+        err
+      );
+    }
+  }
+);
+// ================= GMAIL: LOW PAPER NOTIFICATION =================
+exports.lowPaperNotification = onDocumentUpdated(
+  {
+    document: "hardware/printers",
+    secrets: ["GMAIL_APP_PASSWORD"],
+  },
+  async (event) => {
+    try {
+      const beforeData = event.data.before.data() || {};
+      const afterData = event.data.after.data() || {};
+
+      for (const [printerId, printer] of Object.entries(afterData)) {
+        if (!printer || typeof printer !== "object") {
+          continue;
+        }
+
+        const beforePrinter = beforeData[printerId] || {};
+
+        const paperLevel = Number(printer.paperLevel);
+        const previousPaperLevel = Number(beforePrinter.paperLevel);
+
+        if (!Number.isFinite(paperLevel)) {
+          console.log(
+            `[EMAIL] Invalid paper level for ${printerId}. Skipping alert.`
+          );
+          continue;
+        }
+
+        const isColor = printer.type === "color";
+
+        if (isColor) {
+          continue;
+        }
+
+        const printerCapacity = isColor ? 100 : 250;
+        const alertLevel = isColor ? 70 : 50;
+
+        const crossedThreshold =
+          paperLevel <= alertLevel &&
+          (
+            previousPaperLevel > alertLevel ||
+            !Number.isFinite(previousPaperLevel)
+          );
+
+        if (!crossedThreshold) {
+          continue;
+        }
+
+        if (!process.env.GMAIL_APP_PASSWORD) {
+          console.error(
+            "[EMAIL] GMAIL_APP_PASSWORD is not configured."
+          );
+          continue;
+        }
+
+        const transporter = getTransporter();
+
+        const printerName =
+          printer.name ||
+          printer.printerName ||
+          printerId ||
+          "Unknown Printer";
+
+        const kioskId =
+          printer.kioskId ||
+          printer.kiosk ||
+          "Unknown Kiosk";
+
+        await transporter.sendMail({
+          from: '"Mimo Printing" <visionprintt@gmail.com>',
+          to: "visionprintt@gmail.com",
+          subject: `MIMO Low Paper Alert - ${printerName}`,
+          text:
+            `MIMO Kiosk Low Paper Alert\n\n` +
+            `Printer ID: ${printerId}\n` +
+            `Printer: ${printerName}\n` +
+            `Kiosk: ${kioskId}\n` +
+            `Printer Type: ${isColor ? "Colour" : "B&W"}\n` +
+            `Printer Capacity: ${printerCapacity} sheets\n` +
+            `Alert Level: ${alertLevel} sheets\n` +
+            `Current Paper Level: ${paperLevel} sheets\n\n` +
+            `Please refill the printer.`,
+        });
+
+        console.log(
+          `[EMAIL] Low paper notification sent for ${printerId}. ` +
+          `Current level: ${paperLevel}`
+        );
+      }
+    } catch (err) {
+      console.error(
+        "[EMAIL] Failed to send low paper notification:",
+        err.message
+      );
+    }
+  }
+);
+// ================= GMAIL: COLOUR PAPER USAGE NOTIFICATION =================
+exports.colourPaperUsageNotification = onDocumentUpdated(
+  {
+    document: "hardware/printers",
+    secrets: ["GMAIL_APP_PASSWORD"],
+  },
+  async (event) => {
+    try {
+      const beforeData = event.data.before.data() || {};
+      const afterData = event.data.after.data() || {};
+
+      // Only check the colour printer
+      const printerId = "SV-002-COLOR";
+      const printer = afterData[printerId];
+
+      if (!printer || typeof printer !== "object") {
+        console.log(
+          "[EMAIL] SV-002-COLOR printer data not found."
+        );
+        return;
+      }
+
+      const beforePrinter = beforeData[printerId] || {};
+
+      const paperLevel = Number(printer.paperLevel);
+      const previousPaperLevel = Number(beforePrinter.paperLevel);
+
+      if (!Number.isFinite(paperLevel)) {
+        console.log(
+          "[EMAIL] Invalid colour printer paper level. Skipping alert."
+        );
+        return;
+      }
+
+      // Epson L3250 actual paper capacity
+      const printerCapacity = 100;
+
+      // Send alert when remaining paper reaches 70 or below
+      const alertLevel = 70;
+
+      const crossedThreshold =
+        paperLevel <= alertLevel &&
+        (
+          previousPaperLevel > alertLevel ||
+          !Number.isFinite(previousPaperLevel)
+        );
+
+      if (!crossedThreshold) {
+        return;
+      }
+
+      // Calculate how many papers have been printed
+      const papersPrinted = printerCapacity - paperLevel;
+
+      if (papersPrinted <= 0) {
+        return;
+      }
+
+      if (!process.env.GMAIL_APP_PASSWORD) {
+        console.error(
+          "[EMAIL] GMAIL_APP_PASSWORD is not configured."
+        );
+        return;
+      }
+
+      const transporter = getTransporter();
+
+      const printerName =
+        printer.name ||
+        "Epson L3250";
+
+      const kioskId = "SV-002";
+
+      await transporter.sendMail({
+        from: '"Mimo Printing" <visionprintt@gmail.com>',
+        to: "visionprintt@gmail.com",
+        subject: `MIMO Paper Usage Alert - ${printerName}`,
+        text:
+          `MIMO Paper Usage Alert\n\n` +
+          `Printer: ${printerName}\n` +
+          `Kiosk: ${kioskId}\n\n` +
+          `${papersPrinted} papers have been printed.\n\n` +
+          `Please check/refill the paper if required.`,
+      });
+
+      console.log(
+        `[EMAIL] Colour paper usage alert sent. ` +
+        `Printer: ${printerName}, ` +
+        `Kiosk: ${kioskId}, ` +
+        `Paper remaining: ${paperLevel}, ` +
+        `Papers printed: ${papersPrinted}`
+      );
+
+    } catch (err) {
+      console.error(
+        "[EMAIL] Failed to send colour paper usage notification:",
+        err.message
+      );
+    }
+  }
+);
