@@ -454,9 +454,15 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
     await deleteBatch.commit();
 
     const batch = db.batch();
+    const processedFiles = [];
     
     // Process files directly - no conversion loop, Pi handles it!
     for (const f of files) {
+      const rawCount = Number(f.pageCount);
+      const isValidCount = Number.isInteger(rawCount) && rawCount > 0 && Number.isFinite(rawCount);
+      const isImage = typeof f.type === "string" && f.type.startsWith("image/");
+      const validPageCount = isImage ? 1 : (isValidCount ? rawCount : 1);
+
       const docRef = db.collection("print_jobs").doc();
       batch.set(docRef, {
         userId: req.user.id || req.user.userId,
@@ -465,10 +471,17 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
         mimetype: f.type,
         size: f.size,
         status: "pending", // Direct to pending, bypassing 'pending_conversion'
-        pageCount: f.pageCount || 1, // Handled on frontend
+        pageCount: validPageCount,
         uploadedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      totalPages += (f.pageCount || 1);
+      totalPages += validPageCount;
+
+      processedFiles.push({
+        name: f.name,
+        url: f.url,
+        type: f.type,
+        pageCount: validPageCount
+      });
     }
     
     await batch.commit();
@@ -476,7 +489,8 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
     res.json({
       message: "Jobs created successfully.",
       amount: totalPages * 2,
-      totalPages: totalPages
+      totalPages: totalPages,
+      files: processedFiles
     });
   } catch (err) {
     console.error("Error finalizing upload:", err);
