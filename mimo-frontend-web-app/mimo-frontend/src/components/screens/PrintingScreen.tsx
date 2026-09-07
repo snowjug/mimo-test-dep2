@@ -222,9 +222,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (currentProgress >= cap) {
         if (!isCV001 && (!printCode || printCode === '0000')) {
           animateTo100AndComplete();
-        } else {
-          // Creep very slowly above 85% so it never looks frozen
-          const nextCreep = Math.min(94, currentProgress + 1);
+        } else if (currentProgress < 95) {
+          // Fast, smooth progression toward 95% in +3% steps (85% → 88% → 91% → 94% → 95%)
+          const nextCreep = Math.min(95, currentProgress + 3);
           progressRef.current = nextCreep;
           setProgress(nextCreep);
           setStatusMsg(
@@ -232,7 +232,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               ? `Ejecting paper (${totalSheets} of ${totalSheets})…`
               : `Ejecting paper into tray…`
           );
-          tickTimerRef.current = window.setTimeout(tick, 8000); // 8 seconds per 1% creep
+          tickTimerRef.current = window.setTimeout(tick, 250);
+        } else {
+          // Reached 95% cap — hold here until real backend completion signal arrives
+          setStatusMsg(
+            totalSheets > 1
+              ? `Ejecting paper (${totalSheets} of ${totalSheets})…`
+              : `Ejecting paper into tray…`
+          );
         }
         return;
       }
