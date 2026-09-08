@@ -2418,36 +2418,9 @@ app.get("/kiosk/job-status", async (req, res) => {
     );
 
     if (!hasStarted) {
-      const kioskId = currentSessionDocs[0].printOptions?.directKioskId ||
-        currentSessionDocs[0].settings?.directKioskId ||
-        currentSessionDocs[0].kioskId ||
-        "CV-001";
-      try {
-        const statusDoc = await db.collection("system_status").doc(kioskId).get();
-        if (statusDoc.exists) {
-          const statusData = statusDoc.data();
-
-          // A. Kiosk Online Check (lastSeen)
-          const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
-          if (lastSeen) {
-            const now = new Date();
-            const diffMs = now.getTime() - lastSeen.getTime();
-            if (diffMs > 75000) { // 75 seconds threshold (heartbeat is every 30s)
-              return res.json({
-                status: "failed",
-                isPrinted: false,
-                printerStatus: "System error: Kiosk printer listener is offline (not connected)"
-              });
-            }
-          }
-
-          // B. Printer Offline/Disabled Check
-          // We rely on lastSeen heartbeat above. Once listener is online, temporary PPD alert strings in printerStatus
-          // should not block active print jobs from being processed.
-        }
-      } catch (statusErr) {
-        console.error("⚠️ Error checking system status:", statusErr);
-      }
+      // Job is paid and waiting for user to enter 4-digit code at the kiosk.
+      // Do not prematurely fail the job due to Pi heartbeat intervals or transient network dips.
+      return res.json({ status: "paid", isPrinted: false });
     }
 
     // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
