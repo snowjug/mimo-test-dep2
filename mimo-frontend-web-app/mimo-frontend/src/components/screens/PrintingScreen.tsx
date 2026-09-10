@@ -528,6 +528,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           50%  { opacity: 0.6; transform: translateY(-20px) scale(1.1) rotate(180deg); }
           100% { opacity: 0;   transform: translateY(-40px) scale(0.6) rotate(360deg); }
         }
+        @keyframes ladoo-group-spin {
+          0%   { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes ladoo-counter-spin {
+          0%   { transform: rotate(0deg); }
+          100% { transform: rotate(-360deg); }
+        }
       `}</style>
 
       {/* ── Color print: "Collecting your pages" overlay ── */}
@@ -611,12 +619,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           boxShadow: isSV002 ? '0 10px 40px rgba(0,0,0,0.06)' : (isCV001 ? '0 12px 38px rgba(89,52,23,0.16)' : '0 8px 40px rgba(0,0,0,0.18)'),
       }}>
         <div style={{ minHeight: '180px' }}>
-          <h2 style={{ fontSize: isSV002 ? '80px' : '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-2px', lineHeight: '1.05', display: 'flex', flexDirection: 'column', textShadow: isSV002 ? 'none' : '0 4px 24px rgba(0,0,0,0.4)' }}>
-            <span style={{ color: isSV002 ? 'var(--text-primary)' : 'inherit' }}>
+          <h2 style={{ fontSize: isSV002 ? '80px' : '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-2px', lineHeight: '1.05', display: 'flex', flexDirection: 'column', textShadow: isSV002 || isCV001 ? 'none' : '0 4px 24px rgba(0,0,0,0.4)' }}>
+            <span style={{ color: isSV002 ? 'var(--text-primary)' : (isCV001 ? '#3C2113' : 'inherit') }}>
               {typedTitle}
             </span>
           </h2>
-          <p style={{ color: isSV002 ? '#777777' : 'rgba(255,255,255,0.95)', fontSize: isSV002 ? '28px' : '36px', fontWeight: isSV002 ? 500 : 600, lineHeight: '1.5', whiteSpace: 'pre-line', marginBottom: '15px', textShadow: isSV002 ? 'none' : '0 2px 12px rgba(0,0,0,0.3)' }}>
+          <p style={{ color: isSV002 ? '#777777' : (isCV001 ? '#5A3D28' : 'rgba(255,255,255,0.95)'), fontSize: isSV002 ? '28px' : '36px', fontWeight: isSV002 || isCV001 ? 500 : 600, lineHeight: '1.5', whiteSpace: 'pre-line', marginBottom: '15px', textShadow: isSV002 || isCV001 ? 'none' : '0 2px 12px rgba(0,0,0,0.3)' }}>
             {typedSub}
           </p>
           {!isCompleted && (
@@ -744,6 +752,25 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 <stop offset="50%"  stopColor="#80efff" />
                 <stop offset="100%" stopColor="#00b4d8" />
               </linearGradient>
+              {/* 3D Spherical Gold-Orange Ladoo Radial Gradient */}
+              <radialGradient id="ladoo3DGrad" cx="35%" cy="35%" r="65%">
+                <stop offset="0%" stopColor="#FFF176" />
+                <stop offset="25%" stopColor="#F5A623" />
+                <stop offset="65%" stopColor="#E67E22" />
+                <stop offset="90%" stopColor="#D35400" />
+                <stop offset="100%" stopColor="#6E3D11" />
+              </radialGradient>
+              {/* Boondi Texture Highlight Gradient */}
+              <radialGradient id="boondiGlow" cx="40%" cy="40%" r="50%">
+                <stop offset="0%" stopColor="#FFF7C2" />
+                <stop offset="100%" stopColor="#F5A623" />
+              </radialGradient>
+              {/* Ganesha Center Aura Gradient */}
+              <radialGradient id="ganeshaAuraGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#FDE699" stopOpacity="0.6" />
+                <stop offset="70%" stopColor="#E59866" stopOpacity="0.2" />
+                <stop offset="100%" stopColor="#FAF4E8" stopOpacity="0" />
+              </radialGradient>
               <filter id="neonGlow" x="-30%" y="-30%" width="160%" height="160%">
                 <feGaussianBlur stdDeviation="6" result="blur" />
                 <feMerge>
@@ -762,7 +789,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
             {/* Outer dashed ring — slow clockwise spin */}
             <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow 24s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="176" fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.18)" : "rgba(255,255,255,0.08)"} strokeWidth="3" strokeDasharray="12 18" />
+              <circle cx="190" cy="190" r="176" fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.22)" : "rgba(255,255,255,0.08)"} strokeWidth="3" strokeDasharray="12 18" />
             </g>
 
             {/* Inner dotted ring — slow counter-clockwise spin */}
@@ -771,10 +798,47 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             </g>
 
             {/* Glassmorphic center circle background */}
-            <circle cx="190" cy="190" r="130" fill={isCV001 ? "rgba(255,249,235,0.9)" : "rgba(30, 18, 0, 0.62)"} stroke={isCV001 ? "rgba(180,123,55,0.3)" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
+            <circle cx="190" cy="190" r="130" fill={isCV001 ? "rgba(255,249,235,0.92)" : "rgba(30, 18, 0, 0.62)"} stroke={isCV001 ? "rgba(180,123,55,0.3)" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
+
+            {/* Ganesha center artwork for CV-001 — Clean, Elegant & Contained Inside Center Circle */}
+            {isCV001 && (
+              <g id="cv001-ganesha-center" pointerEvents="none" style={{ filter: 'drop-shadow(0 2px 4px rgba(120, 70, 20, 0.10))' }}>
+                {/* Subtle warm golden background aura inside center circle */}
+                <circle cx="190" cy="190" r="118" fill="url(#ganeshaAuraGrad)" opacity="0.32" />
+
+                {/* Refined Warm Gold Line Art Watermark */}
+                <g opacity="0.28" stroke="#A86F2B" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  {/* Mukut / Crown Apex */}
+                  <path d="M 190 84 L 184 102 Q 190 98 196 102 Z" fill="#D49B3F" opacity="0.4" strokeWidth="1" />
+                  <path d="M 176 104 Q 190 94 204 104 Q 190 110 176 104 Z" strokeWidth="1.6" />
+                  <path d="M 170 114 Q 190 122 210 114" strokeWidth="1.6" />
+
+                  {/* Sacred Bindi Mark */}
+                  <circle cx="190" cy="126" r="2.2" fill="#B71C1C" stroke="none" opacity="0.75" />
+
+                  {/* Left & Right Ears */}
+                  <path d="M 170 114 C 142 120 128 154 154 174 C 162 178 165 168 167 158 Z" strokeWidth="1.6" />
+                  <path d="M 210 114 C 238 120 252 154 226 174 C 218 178 215 168 213 158 Z" strokeWidth="1.6" />
+
+                  {/* Eyes */}
+                  <path d="M 174 144 Q 180 138 186 144" strokeWidth="1.6" />
+                  <path d="M 194 144 Q 200 138 206 144" strokeWidth="1.6" />
+
+                  {/* Sweeping Ganesha Trunk */}
+                  <path
+                    d="M 183 150 
+                       C 181 172 177 198 190 222 
+                       C 198 236 220 246 230 234 
+                       C 236 226 228 214 218 218 
+                       C 210 222 210 232 218 234 Z"
+                    strokeWidth="2.0"
+                  />
+                </g>
+              </g>
+            )}
 
             {/* Static background track */}
-            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.12)" : "rgba(255,255,255,0.05)"} strokeWidth="10" />
+            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.15)" : "rgba(255,255,255,0.05)"} strokeWidth="10" />
 
             {/* Center Percentage Display */}
             <text
@@ -783,10 +847,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               dominantBaseline="middle"
               style={{
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
-                animation: isActive && progress < 100 ? 'text-glow-pulse 2s infinite alternate' : 'none',
+                animation: isActive && progress < 100 && !isCV001 ? 'text-glow-pulse 2s infinite alternate' : 'none',
               }}
             >
-              <tspan fontSize="92px" fontWeight="800" fill="#ffffff" letterSpacing="-2px" style={{ fontFeatureSettings: '"tnum"', fontVariantNumeric: 'tabular-nums' }}>{progress}</tspan>
+              <tspan fontSize="92px" fontWeight="800" fill={isCV001 ? "#3C2113" : "#ffffff"} letterSpacing="-2px" style={{ fontFeatureSettings: '"tnum"', fontVariantNumeric: 'tabular-nums' }}>{progress}</tspan>
               <tspan fontSize="32px" fontWeight="700" fill={isCV001 ? "#b47b37" : "#FFD97D"} dx="4">%</tspan>
             </text>
 
@@ -832,6 +896,148 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 style={{ transition: 'cx 0.14s linear, cy 0.14s linear' }}
               />
             ))}
+
+            {/* Decorative Festive Ladoos for CV-001 ONLY — Perfect Circular Orbit centered at (190, 190), R = 172px */}
+            {isCV001 && (
+              <g
+                className="cv001-ladoo-decor-orbit"
+                style={{
+                  transformOrigin: '190px 190px',
+                  animation: isActive ? 'ladoo-group-spin 48s linear infinite' : 'none',
+                }}
+              >
+                {/* Orbital Dashed Guideline Ring */}
+                <circle cx="190" cy="190" r="172" fill="none" stroke="rgba(180,123,55,0.22)" strokeWidth="1.5" strokeDasharray="6 14" />
+                <circle cx="190" cy="190" r="182" fill="none" stroke="rgba(212,151,62,0.12)" strokeWidth="1" strokeDasharray="3 18" />
+
+                {/* Ladoo 1: Top (~11:30 position, Angle -75deg: x=234.5, y=23.8) */}
+                <g transform="translate(234.5, 23.8)">
+                  <g style={{ transformOrigin: '0px 0px', animation: isActive ? 'ladoo-counter-spin 48s linear infinite' : 'none' }}>
+                    <ellipse cx="0" cy="16" rx="13" ry="4" fill="rgba(74,45,20,0.28)" filter="blur(2px)" />
+                    {/* Organic Ladoo 1 Shape */}
+                    <path
+                      d="M -15 0 C -16 -10 -8 -16 0 -16 C 9 -16 16 -8 16 0 C 16 9 8 16 0 15 C -9 15 -15 9 -15 0 Z"
+                      fill="url(#ladoo3DGrad)"
+                      stroke="#B77B1A"
+                      strokeWidth="0.8"
+                    />
+                    <circle cx="-6" cy="-4" r="3.2" fill="url(#boondiGlow)" opacity="0.85" />
+                    <circle cx="5" cy="-6" r="3" fill="#F5A623" opacity="0.9" />
+                    <circle cx="-7" cy="4" r="2.8" fill="#D35400" opacity="0.75" />
+                    <circle cx="2" cy="6" r="3.2" fill="#F39C12" opacity="0.9" />
+                    <circle cx="7" cy="2" r="2.5" fill="#FDE699" opacity="0.85" />
+                    <circle cx="-1" cy="-8" r="2.6" fill="#FFF7C2" opacity="0.9" />
+                    <circle cx="0" cy="1" r="3" fill="#E67E22" />
+                    {/* Garnishes */}
+                    <ellipse cx="-2" cy="-5" rx="3.5" ry="1.6" fill="#FFFDE7" transform="rotate(-20, -2, -5)" />
+                    <ellipse cx="3" cy="-4" rx="2.6" ry="1.3" fill="#27AE60" transform="rotate(35, 3, -4)" />
+                    <circle cx="3" cy="-4" r="0.8" fill="#A9DFBF" />
+                    <circle cx="19" cy="-8" r="2.2" fill="#F5A623" />
+                    <circle cx="24" cy="-14" r="1.5" fill="#FDE699" />
+                    <circle cx="-16" cy="12" r="1.8" fill="#D35400" />
+                  </g>
+                </g>
+
+                {/* Ladoo 2: Top-Right (~2:15 position, Angle -25deg: x=345.9, y=117.3) */}
+                <g transform="translate(345.9, 117.3)">
+                  <g style={{ transformOrigin: '0px 0px', animation: isActive ? 'ladoo-counter-spin 48s linear infinite' : 'none' }}>
+                    <ellipse cx="0" cy="17" rx="14" ry="4.5" fill="rgba(74,45,20,0.28)" filter="blur(2px)" />
+                    {/* Organic Ladoo 2 Shape */}
+                    <path
+                      d="M -16 0 C -15 -9 -7 -15 1 -15 C 10 -15 17 -7 17 1 C 17 10 7 16 -1 16 C -10 16 -16 8 -16 0 Z"
+                      fill="url(#ladoo3DGrad)"
+                      stroke="#B77B1A"
+                      strokeWidth="0.8"
+                    />
+                    <circle cx="-6" cy="-5" r="3.4" fill="url(#boondiGlow)" opacity="0.9" />
+                    <circle cx="6" cy="-6" r="3.2" fill="#F5A623" opacity="0.9" />
+                    <circle cx="-8" cy="4" r="3" fill="#D35400" opacity="0.75" />
+                    <circle cx="2" cy="7" r="3.5" fill="#F39C12" opacity="0.95" />
+                    <circle cx="8" cy="2" r="2.6" fill="#FDE699" opacity="0.85" />
+                    <circle cx="-1" cy="-9" r="2.8" fill="#FFF7C2" opacity="0.9" />
+                    <circle cx="0" cy="1" r="3.2" fill="#E67E22" />
+                    <ellipse cx="-2" cy="-6" rx="3.8" ry="1.8" fill="#FFFDE7" transform="rotate(-15, -2, -6)" />
+                    <ellipse cx="4" cy="-5" rx="2.8" ry="1.4" fill="#27AE60" transform="rotate(40, 4, -5)" />
+                    <circle cx="4" cy="-5" r="0.8" fill="#A9DFBF" />
+                    <circle cx="15" cy="16" r="2" fill="#FDE699" />
+                    <circle cx="-18" cy="-14" r="1.6" fill="#F5A623" />
+                  </g>
+                </g>
+
+                {/* Ladoo 3: Bottom-Right (~4:15 position, Angle 45deg: x=311.6, y=311.6) */}
+                <g transform="translate(311.6, 311.6)">
+                  <g style={{ transformOrigin: '0px 0px', animation: isActive ? 'ladoo-counter-spin 48s linear infinite' : 'none' }}>
+                    <ellipse cx="0" cy="16" rx="13" ry="4" fill="rgba(74,45,20,0.28)" filter="blur(2px)" />
+                    {/* Organic Ladoo 3 Shape */}
+                    <path
+                      d="M -15 -1 C -16 -9 -6 -16 1 -16 C 9 -16 16 -7 15 1 C 15 9 6 15 -2 15 C -10 15 -15 7 -15 -1 Z"
+                      fill="url(#ladoo3DGrad)"
+                      stroke="#B77B1A"
+                      strokeWidth="0.8"
+                    />
+                    <circle cx="-5" cy="-4" r="3.2" fill="url(#boondiGlow)" opacity="0.85" />
+                    <circle cx="5" cy="-5" r="3" fill="#F5A623" opacity="0.9" />
+                    <circle cx="-7" cy="4" r="2.8" fill="#D35400" opacity="0.75" />
+                    <circle cx="2" cy="6" r="3.2" fill="#F39C12" opacity="0.9" />
+                    <circle cx="7" cy="2" r="2.5" fill="#FDE699" opacity="0.85" />
+                    <circle cx="0" cy="1" r="3" fill="#E67E22" />
+                    <ellipse cx="-2" cy="-5" rx="3.5" ry="1.6" fill="#FFFDE7" transform="rotate(-25, -2, -5)" />
+                    <ellipse cx="3" cy="-4" rx="2.6" ry="1.3" fill="#27AE60" transform="rotate(30, 3, -4)" />
+                    <circle cx="18" cy="12" r="2" fill="#F5A623" />
+                    <circle cx="-15" cy="15" r="1.5" fill="#FDE699" />
+                  </g>
+                </g>
+
+                {/* Ladoo 4: Bottom-Center (~5:45 position, Angle 105deg: x=145.5, y=356.1) */}
+                <g transform="translate(145.5, 356.1)">
+                  <g style={{ transformOrigin: '0px 0px', animation: isActive ? 'ladoo-counter-spin 48s linear infinite' : 'none' }}>
+                    <ellipse cx="0" cy="17" rx="14" ry="4.5" fill="rgba(74,45,20,0.28)" filter="blur(2px)" />
+                    {/* Organic Ladoo 4 Shape */}
+                    <path
+                      d="M -16 0 C -15 -10 -7 -15 0 -15 C 9 -15 16 -9 16 0 C 16 10 9 16 0 16 C -8 16 -16 8 -16 0 Z"
+                      fill="url(#ladoo3DGrad)"
+                      stroke="#B77B1A"
+                      strokeWidth="0.8"
+                    />
+                    <circle cx="-6" cy="-5" r="3.4" fill="url(#boondiGlow)" opacity="0.9" />
+                    <circle cx="6" cy="-6" r="3.2" fill="#F5A623" opacity="0.9" />
+                    <circle cx="-8" cy="4" r="3" fill="#D35400" opacity="0.75" />
+                    <circle cx="2" cy="7" r="3.5" fill="#F39C12" opacity="0.95" />
+                    <circle cx="8" cy="2" r="2.6" fill="#FDE699" opacity="0.85" />
+                    <circle cx="-1" cy="-9" r="2.8" fill="#FFF7C2" opacity="0.9" />
+                    <circle cx="0" cy="1" r="3.2" fill="#E67E22" />
+                    <ellipse cx="-2" cy="-6" rx="3.8" ry="1.8" fill="#FFFDE7" transform="rotate(-15, -2, -6)" />
+                    <ellipse cx="4" cy="-5" rx="2.8" ry="1.4" fill="#27AE60" transform="rotate(40, 4, -5)" />
+                    <circle cx="-18" cy="10" r="2" fill="#FDE699" />
+                    <circle cx="16" cy="-12" r="1.7" fill="#F5A623" />
+                  </g>
+                </g>
+
+                {/* Ladoo 5: Left-Mid (~8:45 position, Angle 195deg: x=23.8, y=145.5) */}
+                <g transform="translate(23.8, 145.5)">
+                  <g style={{ transformOrigin: '0px 0px', animation: isActive ? 'ladoo-counter-spin 48s linear infinite' : 'none' }}>
+                    <ellipse cx="0" cy="16" rx="13" ry="4" fill="rgba(74,45,20,0.28)" filter="blur(2px)" />
+                    {/* Organic Ladoo 5 Shape */}
+                    <path
+                      d="M -15 1 C -15 -8 -7 -16 0 -16 C 8 -16 16 -8 15 1 C 15 9 7 15 0 15 C -8 15 -15 8 -15 1 Z"
+                      fill="url(#ladoo3DGrad)"
+                      stroke="#B77B1A"
+                      strokeWidth="0.8"
+                    />
+                    <circle cx="-5" cy="-4" r="3.2" fill="url(#boondiGlow)" opacity="0.85" />
+                    <circle cx="5" cy="-5" r="3" fill="#F5A623" opacity="0.9" />
+                    <circle cx="-7" cy="4" r="2.8" fill="#D35400" opacity="0.75" />
+                    <circle cx="2" cy="6" r="3.2" fill="#F39C12" opacity="0.9" />
+                    <circle cx="7" cy="2" r="2.5" fill="#FDE699" opacity="0.85" />
+                    <circle cx="0" cy="1" r="3" fill="#E67E22" />
+                    <ellipse cx="-2" cy="-5" rx="3.5" ry="1.6" fill="#FFFDE7" transform="rotate(-25, -2, -5)" />
+                    <ellipse cx="3" cy="-4" rx="2.6" ry="1.3" fill="#27AE60" transform="rotate(30, 3, -4)" />
+                    <circle cx="-14" cy="-12" r="2" fill="#F5A623" />
+                    <circle cx="15" cy="14" r="1.6" fill="#FDE699" />
+                  </g>
+                </g>
+              </g>
+            )}
           </svg>
           )}
         </div>
