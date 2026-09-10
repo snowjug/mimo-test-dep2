@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { CV001BellsDecor } from './CV001BellsDecor';
 
 interface MainScreenProps {
     onNext: () => void;
     isActive: boolean;
     kioskId?: string | null;
 }
+
+
 
 export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskId }) => {
     const isCV001 = kioskId === 'CV-001';
@@ -108,6 +111,9 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
         >
             {/* Botanical background */}
             <div className="kiosk-bg" />
+
+            {/* CV-001 Symmetrical Golden Brass Bells */}
+            {isCV001 && <CV001BellsDecor />}
 
             {/* Ambient warm glows */}
             <div className="ambient-glow glow-1" />
