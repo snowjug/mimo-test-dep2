@@ -206,30 +206,16 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                             zIndex: 25,
                             pointerEvents: 'none'
                         }}>
-                            {/* Subtle realistic contact shadow under Mooshak's feet */}
+                            {/* Subtle natural contact shadow where Mooshak's feet meet the surface */}
                             <div style={{
                                 position: 'absolute',
-                                bottom: '8px',
-                                left: '24px',
-                                width: '174px',
-                                height: '20px',
+                                bottom: '4px',
+                                left: '36px',
+                                width: '150px',
+                                height: '10px',
                                 borderRadius: '50%',
-                                background: 'rgba(74, 45, 20, 0.18)',
-                                filter: 'blur(7px)',
-                                pointerEvents: 'none',
-                                zIndex: 0
-                            }} />
-
-                            {/* A second, softer shadow anchors the body against the printer-side surface. */}
-                            <div style={{
-                                position: 'absolute',
-                                bottom: '32px',
-                                left: '-12px',
-                                width: '96px',
-                                height: '58px',
-                                borderRadius: '50%',
-                                background: 'rgba(74, 45, 20, 0.10)',
-                                filter: 'blur(18px)',
+                                background: 'rgba(74, 45, 20, 0.14)',
+                                filter: 'blur(4px)',
                                 pointerEvents: 'none',
                                 zIndex: 0
                             }} />
@@ -243,8 +229,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                                     objectFit: 'contain',
                                     position: 'relative',
                                     zIndex: 1,
-                                    mixBlendMode: 'multiply',
-                                    filter: 'contrast(1.07) saturate(0.9) sepia(0.05) brightness(0.97) drop-shadow(0 8px 12px rgba(74, 45, 20, 0.16))'
+                                    filter: 'none'
                                 }}
                             />
                         </div>
