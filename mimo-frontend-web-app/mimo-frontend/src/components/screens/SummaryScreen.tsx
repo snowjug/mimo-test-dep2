@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import festiveRatImg from '../../assets/festive-rat-transparent.png';
 
 interface SummaryScreenProps {
     isActive: boolean;
@@ -77,24 +78,25 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 transform: 'translateY(-40px)'
             }}>
 
-                <div style={{ fontSize: '48px', fontWeight: 900, color: isSV002 ? 'var(--text-primary)' : '#ffffff', letterSpacing: '-1px', textShadow: isSV002 ? 'none' : '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <span style={{ color: isSV002 ? 'var(--gold-accent)' : '#ffffff', textDecoration: isSV002 ? 'none' : 'underline', textDecorationColor: isCV001 ? '#b47b37' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
+                <div style={{ fontSize: '48px', fontWeight: 900, color: isSV002 ? 'var(--text-primary)' : (isCV001 ? '#3C2113' : '#ffffff'), letterSpacing: '-1px', textShadow: isSV002 || isCV001 ? 'none' : '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <span style={{ color: isSV002 ? 'var(--gold-accent)' : (isCV001 ? '#A86F2B' : '#ffffff'), textDecoration: isSV002 ? 'none' : 'underline', textDecorationColor: isCV001 ? '#b47b37' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'DEMO'}</span>, your documents are ready.
                 </div>
             </div>
 
-            {/* Middle Section: Centered Animation */}
+            {/* Middle Section: Centered Animation & Character Scene */}
             <div style={{
                 display: 'flex',
                 justifyContent: 'center',
                 width: '100%',
                 alignItems: 'center',
-                transform: 'translateY(-50px)' // Shifted slightly more upwards
+                transform: 'translateY(-30px)'
             }}>
 
-                {/* ── RIGHT: Collection Guide Animation ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', transform: 'scale(0.95)', transformOrigin: 'center' }}>
+                {/* ── Collection Guide Animation & Side-by-Side Rat ── */}
+                <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', transform: 'scale(0.95)', transformOrigin: 'center' }}>
+                    {/* Printer Slot Assembly */}
                     <div style={{
-                        position: 'relative', width: '380px', height: '350px',
+                        position: 'relative', width: '380px', height: '240px',
                         display: 'flex', flexDirection: 'column', alignItems: 'center',
                         marginTop: '20px'
                     }}>
@@ -144,7 +146,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
 
                         {/* 3. Paper Clipping Wrapper */}
                         <div style={{
-                            position: 'absolute', top: '55px', left: '0', width: '380px', height: '350px',
+                            position: 'absolute', top: '55px', left: '0', width: '380px', height: '260px',
                             overflow: 'hidden', zIndex: 5, pointerEvents: 'none',
                         }}>
                             {/* The Animated Paper */}
@@ -170,28 +172,65 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                             </div>
                         </div>
 
-                        {/* 4. Hand Graphic */}
-                        <div style={{
-                            position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
-                            zIndex: 20, pointerEvents: 'none'
-                        }}>
+                        {/* SV-002 Hand Graphic */}
+                        {!isCV001 && (
                             <div style={{
-                                position: 'absolute', top: '0', left: '50%',
-                                animation: isActive ? 'handGrabAction 6s cubic-bezier(0.4, 0, 0.2, 1) infinite' : 'none',
-                                transformOrigin: 'top center'
+                                position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+                                zIndex: 20, pointerEvents: 'none'
                             }}>
-                                <span className="material-symbols-outlined" style={{ 
-                                    fontSize: '150px', 
-                                    color: '#dea370', 
-                                    /* Use the solid variation of the icon for realistic volume */
-                                    fontVariationSettings: '"FILL" 1, "wght" 400',
-                                    filter: 'drop-shadow(0 20px 25px rgba(0,0,0,0.7))',
+                                <div style={{
+                                    position: 'absolute', top: '0', left: '50%',
+                                    animation: isActive ? 'handGrabAction 6s cubic-bezier(0.4, 0, 0.2, 1) infinite' : 'none',
+                                    transformOrigin: 'top center'
                                 }}>
-                                    back_hand
-                                </span>
+                                    <span className="material-symbols-outlined" style={{ 
+                                        fontSize: '150px', 
+                                        color: '#dea370', 
+                                        fontVariationSettings: '"FILL" 1, "wght" 400',
+                                        filter: 'drop-shadow(0 20px 25px rgba(0,0,0,0.7))',
+                                    }}>
+                                        back_hand
+                                    </span>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
+
+                    {/* CV-001 3D Festive Rat Character (Mooshak) Positioned Immediately Adjacent to Printer Box */}
+                    {isCV001 && (
+                        <div style={{
+                            position: 'relative',
+                            marginLeft: '-52px',
+                            marginTop: '44px',
+                            zIndex: 25,
+                            pointerEvents: 'none'
+                        }}>
+                            {/* Subtle realistic contact shadow under Mooshak's feet */}
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '10px',
+                                left: '30px',
+                                width: '160px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                background: 'radial-gradient(ellipse at center, rgba(74, 45, 20, 0.22) 0%, rgba(74, 45, 20, 0.06) 60%, transparent 80%)',
+                                filter: 'blur(5px)',
+                                pointerEvents: 'none',
+                                zIndex: -1
+                            }} />
+
+                            <img
+                                src={festiveRatImg}
+                                alt="Festive Mooshak"
+                                style={{
+                                    width: '235px',
+                                    height: 'auto',
+                                    objectFit: 'contain',
+                                    filter: 'drop-shadow(0 10px 20px rgba(74, 45, 20, 0.12))'
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -210,7 +249,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 <div style={{
                     fontSize: '22px',
                     fontWeight: 900,
-                    color: isSV002 ? 'var(--text-primary)' : 'rgba(255,255,255,0.90)',
+                    color: isSV002 ? 'var(--text-primary)' : (isCV001 ? '#5A3D28' : 'rgba(255,255,255,0.90)'),
                     letterSpacing: '2px',
                     textTransform: 'uppercase',
                     animation: isActive ? 'fadeInUp 1s ease-out 0.3s forwards' : 'none',
@@ -218,7 +257,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '16px',
-                    textShadow: isSV002 ? 'none' : '0 2px 12px rgba(0,0,0,0.25)'
+                    textShadow: isSV002 || isCV001 ? 'none' : '0 2px 12px rgba(0,0,0,0.25)'
                 }}>
                     <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#a66d2b' : '#E8B86D' }}>south</span>
                     {isCV001 ? 'Please collect your document from below' : 'Please collect your documents from below'}

@@ -1,4 +1,3 @@
-// Deploy trigger: 2026-07-03 botanical redesign
 import React, { useState, useRef, useEffect } from 'react';
 
 interface MainScreenProps {
@@ -118,11 +117,13 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
             {/* Oversized watermark */}
             <div className="watermark-mimo">MIMO</div>
 
-            <main className="immersive-container">
-                <section className="brand-panel">
+            <main className="immersive-container" style={{ padding: isCV001 ? '35px 40px 50px' : '0 40px 200px', top: isCV001 ? '40px' : '20px' }}>
+                <section className="brand-panel" style={{ marginBottom: isCV001 ? '20px' : '50px' }}>
 
                     <div style={{ opacity: 0.88, transform: 'translateY(2px)' }}>
-                        <p className="tag-line">— WELCOME TO —</p>
+                        <p className="tag-line" style={{ color: isCV001 ? '#7C5A34' : 'rgba(255, 255, 255, 0.85)' }}>
+                            — WELCOME TO —
+                        </p>
                     </div>
 
                     <div className="main-heading">
@@ -183,11 +184,42 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                     </div>
 
                     <div className="sub-heading-wrap">
-                        <h2 className="sub-heading">
+                        <h2 className="sub-heading" style={{ color: isCV001 ? '#2C3E50' : 'rgba(255, 255, 255, 0.92)' }}>
                             Self-Service <span className={isCV001 ? "cv001-gold-text" : "cyan-text"}>Printing Kiosk</span>
                         </h2>
                     </div>
-                    <p className="brand-desc">Fast, secure document printing via Mimo code.</p>
+
+                    {isCV001 ? (
+                        <div className="cv001-festive-message" style={{ marginTop: '12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '17px', fontWeight: 600, color: '#8B5E0A', letterSpacing: '0.28em', textTransform: 'uppercase' }}>
+                                — Happy —
+                            </div>
+                            <h1
+                                style={{
+                                    fontFamily: "'Playfair Display', 'Cormorant Garamond', Georgia, serif",
+                                    fontStyle: 'italic',
+                                    fontSize: '48px',
+                                    fontWeight: 700,
+                                    color: '#7B241C',
+                                    margin: '2px 0 4px',
+                                    textShadow: '0 2px 8px rgba(123, 36, 28, 0.12)',
+                                    letterSpacing: '0.5px'
+                                }}
+                            >
+                                Ganesh Chaturthi
+                            </h1>
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', margin: '2px 0 6px' }}>
+                                <div style={{ width: '28px', height: '1px', background: 'linear-gradient(to right, transparent, #C8860A)' }} />
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#C8860A' }}>spa</span>
+                                <div style={{ width: '28px', height: '1px', background: 'linear-gradient(to left, transparent, #C8860A)' }} />
+                            </div>
+                            <p style={{ fontSize: '15px', fontWeight: 500, color: '#6A5644', letterSpacing: '0.2px' }}>
+                                May Lord Ganesha bring happiness, prosperity and success to all.
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="brand-desc">Fast, secure document printing via Mimo code.</p>
+                    )}
                 </section>
 
                 <section className="action-panel">
@@ -257,7 +289,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                 </section>
             </main>
 
-            <footer className="kiosk-footer" style={{ position: 'relative', zIndex: 10 }}>
+            <footer className="kiosk-footer" style={{ position: 'relative', zIndex: 10, color: isCV001 ? '#7C6756' : 'rgba(255,255,255,0.7)' }}>
                 Crafted with innovation by <strong>Md Huzaif, Rathin &amp; Atharv.</strong><br />
                 &copy; 2026 <strong>VisionPrintt</strong>. All rights reserved.
             </footer>
