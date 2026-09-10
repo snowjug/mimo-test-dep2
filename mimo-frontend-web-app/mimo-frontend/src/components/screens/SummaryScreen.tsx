@@ -93,12 +93,13 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
             }}>
 
                 {/* ── Collection Guide Animation & Side-by-Side Rat ── */}
-                <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', transform: 'scale(0.95)', transformOrigin: 'center' }}>
+                <div style={{ position: 'relative', width: '380px', height: '284px', transform: 'scale(0.95)', transformOrigin: 'center' }}>
                     {/* Printer Slot Assembly */}
                     <div style={{
                         position: 'relative', width: '380px', height: '240px',
                         display: 'flex', flexDirection: 'column', alignItems: 'center',
-                        marginTop: '20px'
+                        marginTop: '20px',
+                        marginLeft: 0
                     }}>
                         {/* 1. Slit Interior (Dark Void) */}
                         <div style={{
@@ -199,24 +200,38 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                     {/* CV-001 3D Festive Rat Character (Mooshak) Positioned Immediately Adjacent to Printer Box */}
                     {isCV001 && (
                         <div style={{
-                            position: 'relative',
-                            marginLeft: '-52px',
-                            marginTop: '44px',
+                            position: 'absolute',
+                            left: '328px',
+                            top: '42px',
                             zIndex: 25,
                             pointerEvents: 'none'
                         }}>
                             {/* Subtle realistic contact shadow under Mooshak's feet */}
                             <div style={{
                                 position: 'absolute',
-                                bottom: '10px',
-                                left: '30px',
-                                width: '160px',
-                                height: '16px',
+                                bottom: '8px',
+                                left: '24px',
+                                width: '174px',
+                                height: '20px',
                                 borderRadius: '50%',
-                                background: 'radial-gradient(ellipse at center, rgba(74, 45, 20, 0.22) 0%, rgba(74, 45, 20, 0.06) 60%, transparent 80%)',
-                                filter: 'blur(5px)',
+                                background: 'rgba(74, 45, 20, 0.18)',
+                                filter: 'blur(7px)',
                                 pointerEvents: 'none',
-                                zIndex: -1
+                                zIndex: 0
+                            }} />
+
+                            {/* A second, softer shadow anchors the body against the printer-side surface. */}
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '32px',
+                                left: '-12px',
+                                width: '96px',
+                                height: '58px',
+                                borderRadius: '50%',
+                                background: 'rgba(74, 45, 20, 0.10)',
+                                filter: 'blur(18px)',
+                                pointerEvents: 'none',
+                                zIndex: 0
                             }} />
 
                             <img
@@ -226,7 +241,10 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                                     width: '235px',
                                     height: 'auto',
                                     objectFit: 'contain',
-                                    filter: 'drop-shadow(0 10px 20px rgba(74, 45, 20, 0.12))'
+                                    position: 'relative',
+                                    zIndex: 1,
+                                    mixBlendMode: 'multiply',
+                                    filter: 'contrast(1.07) saturate(0.9) sepia(0.05) brightness(0.97) drop-shadow(0 8px 12px rgba(74, 45, 20, 0.16))'
                                 }}
                             />
                         </div>

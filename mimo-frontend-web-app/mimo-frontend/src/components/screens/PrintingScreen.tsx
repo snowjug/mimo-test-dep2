@@ -797,43 +797,48 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               <circle cx="190" cy="190" r="105" fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.28)" : "rgba(232,184,109,0.22)"} strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
             </g>
 
-            {/* Glassmorphic center circle background */}
-            <circle cx="190" cy="190" r="130" fill={isCV001 ? "rgba(255,249,235,0.92)" : "rgba(30, 18, 0, 0.62)"} stroke={isCV001 ? "rgba(180,123,55,0.3)" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
+            {/* Keep the CV-001 Ganesha on the page surface with no painted backdrop. */}
+            <circle cx="190" cy="190" r="130" fill="transparent" stroke={isCV001 ? "transparent" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
 
-            {/* Ganesha center artwork for CV-001 — Clean, Elegant & Contained Inside Center Circle */}
+            {/* Ganesha center artwork for CV-001 — perfectly centered, elegant transparent vector line art inside status circle */}
             {isCV001 && (
-              <g id="cv001-ganesha-center" pointerEvents="none" style={{ filter: 'drop-shadow(0 2px 4px rgba(120, 70, 20, 0.10))' }}>
-                {/* Subtle warm golden background aura inside center circle */}
-                <circle cx="190" cy="190" r="118" fill="url(#ganeshaAuraGrad)" opacity="0.32" />
+              <g id="cv001-ganesha-center" pointerEvents="none" opacity="0.88" style={{ filter: 'drop-shadow(0 2px 4px rgba(120, 70, 20, 0.15))' }}>
+                <g stroke="#8C5821" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  {/* Mukut (Crown) Peak & Tiers */}
+                  <path d="M190 82 L178 108 Q190 102 202 108 Z" fill="#D4973E" fillOpacity="0.35" strokeWidth="2" />
+                  <path d="M184 94 L190 84 L196 94" strokeWidth="1.8" />
+                  <path d="M168 110 Q190 96 212 110 Q190 122 168 110 Z" fill="#F5D061" fillOpacity="0.2" strokeWidth="2.2" />
+                  <path d="M164 118 Q190 128 216 118" strokeWidth="2.2" />
 
-                {/* Refined Warm Gold Line Art Watermark */}
-                <g opacity="0.28" stroke="#A86F2B" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                  {/* Mukut / Crown Apex */}
-                  <path d="M 190 84 L 184 102 Q 190 98 196 102 Z" fill="#D49B3F" opacity="0.4" strokeWidth="1" />
-                  <path d="M 176 104 Q 190 94 204 104 Q 190 110 176 104 Z" strokeWidth="1.6" />
-                  <path d="M 170 114 Q 190 122 210 114" strokeWidth="1.6" />
+                  {/* Left Ear */}
+                  <path d="M164 119 C136 122 122 150 140 176 C148 187 159 182 168 163 L164 119 Z" fill="#D4973E" fillOpacity="0.15" strokeWidth="2.8" />
+                  {/* Right Ear */}
+                  <path d="M216 119 C244 122 258 150 240 176 C232 187 221 182 212 163 L216 119 Z" fill="#D4973E" fillOpacity="0.15" strokeWidth="2.8" />
 
-                  {/* Sacred Bindi Mark */}
-                  <circle cx="190" cy="126" r="2.2" fill="#B71C1C" stroke="none" opacity="0.75" />
+                  {/* Eyes & Eyebrows */}
+                  <path d="M152 148 Q163 136 177 144" strokeWidth="2.8" />
+                  <path d="M203 144 Q217 136 228 148" strokeWidth="2.8" />
+                  <path d="M157 156 Q164 161 171 156" strokeWidth="1.6" />
+                  <path d="M209 156 Q216 161 223 156" strokeWidth="1.6" />
 
-                  {/* Left & Right Ears */}
-                  <path d="M 170 114 C 142 120 128 154 154 174 C 162 178 165 168 167 158 Z" strokeWidth="1.6" />
-                  <path d="M 210 114 C 238 120 252 154 226 174 C 218 178 215 168 213 158 Z" strokeWidth="1.6" />
+                  {/* Tilak Line & Crescent */}
+                  <path d="M190 117 L190 130" strokeWidth="2.2" stroke="#B83B28" />
+                  <path d="M184 123 Q190 128 196 123" strokeWidth="1.8" stroke="#D4973E" />
 
-                  {/* Eyes */}
-                  <path d="M 174 144 Q 180 138 186 144" strokeWidth="1.6" />
-                  <path d="M 194 144 Q 200 138 206 144" strokeWidth="1.6" />
+                  {/* Trunk (Sond) Graceful Curve */}
+                  <path d="M178 162 C178 183 175 204 185 220 C192 232 208 236 219 225 C225 219 221 210 214 211 C207 212 205 219 211 223" strokeWidth="3.4" />
+                  
+                  {/* Tusk Details */}
+                  <path d="M174 165 L168 168" strokeWidth="2.5" />
+                  <path d="M206 165 L213 169" strokeWidth="2.5" />
 
-                  {/* Sweeping Ganesha Trunk */}
-                  <path
-                    d="M 183 150 
-                       C 181 172 177 198 190 222 
-                       C 198 236 220 246 230 234 
-                       C 236 226 228 214 218 218 
-                       C 210 222 210 232 218 234 Z"
-                    strokeWidth="2.0"
-                  />
+                  {/* Trunk Wrinkles */}
+                  <path d="M177 178 Q187 184 197 178" strokeWidth="1.6" />
+                  <path d="M178 192 Q187 198 196 192" strokeWidth="1.6" />
+                  <path d="M180 206 Q188 211 196 206" strokeWidth="1.6" />
                 </g>
+                {/* Crimson Bindi/Tilak Spot */}
+                <circle cx="190" cy="123" r="2.8" fill="#B83B28" stroke="none" />
               </g>
             )}
 
