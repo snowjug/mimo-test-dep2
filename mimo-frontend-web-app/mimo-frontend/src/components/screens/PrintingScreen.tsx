@@ -113,10 +113,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   const finalTitle = isCompleted
     ? "Print Completed ✅"
+    : (isCV001 && statusTitle === "Print Completed ✅")
+    ? "Printing in Progress"
     : (statusTitle || "Printing in Progress");
 
   const finalSub = isCompleted
     ? "Your document has been printed successfully."
+    : (isCV001 && statusTitle === "Print Completed ✅")
+    ? "Printing in progress…\nPlease wait."
     : (statusSub || "Printing in progress…\nPlease wait.");
 
   // ─── helpers ───────────────────────────────────────────────────────────────
@@ -158,7 +162,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
-  const schedulePoll = useCallback((delayMs = 1000) => {
+  const schedulePoll = useCallback((delayMs = 250) => {
     if (!printCode || printCode === '0000' || !isActive) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
@@ -200,12 +204,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               setStatusMsg('Sending document to printer…');
             }
           }
-          // Still printing — poll again in 1 s for immediate completion sync
-          schedulePoll(1000);
+          // Still printing — poll again in 250 ms for immediate completion sync
+          schedulePoll(250);
         }
       } catch {
-        // Network hiccup — keep last known progress and retry in 1 s
-        pollTimerRef.current = window.setTimeout(() => schedulePoll(1000), 1000);
+        // Network hiccup — retry in 2 s
+        pollTimerRef.current = window.setTimeout(() => schedulePoll(250), 2000);
       }
     }, delayMs);
   }, [printCode, isActive, onError, clearAllTimers, isCV001]);
@@ -216,38 +220,34 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     if (manualProgress !== undefined || isCV001) return;
 
     const totalSheets = Math.max(1, pages * copies);
-
-    // ── Target total time for the 0→99% animation ─────────────────────────────
-    // Calibrated to match actual physical printer speeds so progress reaches
-    // ~95% exactly as the physical paper emerges from the machine.
-    // B&W laser:    ~1.5s per sheet (Brother HL-L2440DW prints at 32 ppm)
-    // Color inkjet: ~60s per sheet (Epson L3250 EcoTank 150 DPI fast color print speed)
     const isColor = colorMode === 'color';
-    const baseWarmup  = isColor ? 3000 : 2000;
-    const speedFactor = isColor ? 60000 : 1500;
+
+    // ── Calibrated realistic physical print timings ─────────────────────────
+    // B&W Laser (Brother 32 ppm): 2.5s warmup + 1.8s per sheet (~4.3s total for 1 sheet)
+    // Color Inkjet: 4.0s warmup + 9.0s per sheet (~13.0s total for 1 sheet)
+    const baseWarmup  = isColor ? 4000 : 2500;
+    const speedFactor = isColor ? 9000 : 1800;
     const totalAnimMs = baseWarmup + totalSheets * speedFactor;
-    const baseDelay   = Math.max(40, totalAnimMs / 99); // ms per 1% step
+
+    // Cap progress at 98% while waiting for real backend completion signal
+    const cap = (printCode && printCode !== '0000') ? 98 : 100;
+    const baseDelay = Math.max(40, totalAnimMs / cap); // ms per 1% step
 
     const tick = () => {
       if (isCompletingRef.current) return;
 
       const currentProgress = progressRef.current;
-      const cap = (printCode && printCode !== '0000') ? 85 : 100;
 
       if (currentProgress >= cap) {
         if (!printCode || printCode === '0000') {
           animateTo100AndComplete();
         } else {
-          // Creep very slowly above 85% so it never looks frozen
-          const nextCreep = Math.min(94, currentProgress + 1);
-          progressRef.current = nextCreep;
-          setProgress(nextCreep);
+          // Near completion cap (98%) — hold until backend confirms completion
           setStatusMsg(
             totalSheets > 1
-              ? `Ejecting paper (${totalSheets} of ${totalSheets})…`
-              : `Ejecting paper into tray…`
+              ? `Finalizing print job (${totalSheets} of ${totalSheets} sheets)…`
+              : `Finalizing print job…`
           );
-          tickTimerRef.current = window.setTimeout(tick, 8000); // 8 seconds per 1% creep
         }
         return;
       }
@@ -256,37 +256,19 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       progressRef.current = next;
       setProgress(next);
 
-      // ── Phase-based delay multipliers & status text ────────────────────────
-      let delay: number;
-      if (next <= 20) {
-        // Warm-up (0→20%): 1.1× — warm-up & feed
-        delay = baseDelay * 1.1;
+      // Status text updates
+      if (next <= 15) {
         setStatusMsg('Warming up printer…');
-      } else if (next <= 50) {
-        // Normal pace (20→50%): 0.85× — active spooling and print start
-        delay = baseDelay * 0.85;
-        const printingPct = next - 20; // 0…30
-        const currentPage = Math.min(
-          totalSheets,
-          Math.ceil((printingPct / 30) * Math.ceil(totalSheets / 2))
-        );
-        setStatusMsg(
-          totalSheets === 1
-            ? `Printing document…`
-            : `Printing page ${currentPage} of ${totalSheets}…`
-        );
       } else {
-        // Slowing pace (50→85%): 1.6× to 2.8× — physical paper passage
-        const slowFactor = 1.6 + ((next - 50) / 35) * 1.2;
-        delay = baseDelay * slowFactor;
-        const currentPage = Math.min(
+        const printProgressPct = (next - 15) / (cap - 15);
+        const currentSheetEstimate = Math.min(
           totalSheets,
-          Math.ceil(((next - 20) / 65) * totalSheets)
+          Math.max(1, Math.ceil(printProgressPct * totalSheets))
         );
         setStatusMsg(
           totalSheets === 1
             ? `Printing document…`
-            : `Printing page ${currentPage} of ${totalSheets}…`
+            : `Printing sheet ${currentSheetEstimate} of ${totalSheets}…`
         );
       }
 
@@ -294,8 +276,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         lastProgressRef.current = progressRef.current;
       }
 
-      const jitter = (Math.random() - 0.5) * delay * 0.05;
-      tickTimerRef.current = window.setTimeout(tick, Math.max(100, delay + jitter));
+      const jitter = (Math.random() - 0.5) * baseDelay * 0.05;
+      tickTimerRef.current = window.setTimeout(tick, Math.max(40, baseDelay + jitter));
     };
 
     tickTimerRef.current = window.setTimeout(tick, 600);
@@ -350,7 +332,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       }
     } else {
       startSlowTick();
-      if (printCode) schedulePoll(1000); // First check after 1s, then every 2s
+      if (printCode) schedulePoll(250); // First check after 250ms, then every 250ms
     }
 
     return () => {
