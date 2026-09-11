@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isFestivalActive } from '../../config/festivalConfig';
 
 interface CodeEntryScreenProps {
   onSuccess: () => void;
@@ -19,7 +20,7 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
   hasError,
   kioskId,
 }) => {
-  const isCV001 = kioskId === 'CV-001';
+  const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
   const [isShaking, setIsShaking] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -63,11 +64,11 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
 
   return (
     <div
-      className={`screen code-entry-wrap ${isActive ? 'visible' : ''} ${isCV001 ? 'cv001-code-entry' : ''}`}
+      className={`screen code-entry-wrap ${isActive ? 'visible' : ''} ${isFestiveMode ? 'cv001-code-entry' : ''}`}
       style={{ display: isActive ? 'flex' : 'none' }}
     >
       {/* Botanical background shared layer */}
-      {!isCV001 && (
+      {!isFestiveMode && (
         <>
           <div className="kiosk-bg" />
           <div className="ambient-glow glow-1" />

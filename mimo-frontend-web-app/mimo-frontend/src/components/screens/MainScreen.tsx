@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { CV001BellsDecor } from './CV001BellsDecor';
+import { isFestivalActive } from '../../config/festivalConfig';
 
 interface MainScreenProps {
     onNext: () => void;
@@ -10,7 +11,8 @@ interface MainScreenProps {
 
 
 export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskId }) => {
-    const isCV001 = kioskId === 'CV-001';
+    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+    const isSV002 = kioskId === 'SV-002';
     const [isDragging, setIsDragging] = useState(false);
     const [dragX, setDragX] = useState(0);
     const [isUnlocked, setIsUnlocked] = useState(false);
@@ -106,14 +108,14 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
 
     return (
         <div
-            className={`screen main-interface-wrap ${isActive ? 'visible' : ''} ${isCV001 ? 'cv001-main' : ''}`}
+            className={`screen main-interface-wrap ${isActive ? 'visible' : ''} ${isFestiveMode ? 'cv001-main' : ''}`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
             {/* Botanical background */}
             <div className="kiosk-bg" />
 
-            {/* CV-001 Symmetrical Golden Brass Bells */}
-            {isCV001 && <CV001BellsDecor />}
+            {/* Symmetrical Golden Brass Bells for Festive Mode */}
+            {isFestiveMode && <CV001BellsDecor />}
 
             {/* Ambient warm glows */}
             <div className="ambient-glow glow-1" />
@@ -123,17 +125,17 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
             {/* Oversized watermark */}
             <div className="watermark-mimo">MIMO</div>
 
-            <main className="immersive-container" style={{ padding: isCV001 ? '35px 40px 50px' : '0 40px 200px', top: isCV001 ? '40px' : '20px' }}>
-                <section className="brand-panel" style={{ marginBottom: isCV001 ? '20px' : '50px' }}>
+            <main className="immersive-container" style={{ padding: isFestiveMode ? '35px 40px 50px' : '0 40px 200px', top: isFestiveMode ? '40px' : '20px' }}>
+                <section className="brand-panel" style={{ marginBottom: isFestiveMode ? '20px' : '50px' }}>
 
                     <div style={{ opacity: 0.88, transform: 'translateY(2px)' }}>
-                        <p className="tag-line" style={{ color: isCV001 ? '#7C5A34' : 'rgba(255, 255, 255, 0.85)' }}>
+                        <p className="tag-line" style={{ color: isFestiveMode ? '#7C5A34' : 'rgba(255, 255, 255, 0.85)' }}>
                             — WELCOME TO —
                         </p>
                     </div>
 
                     <div className="main-heading">
-                        <svg width="820" height="180" viewBox="0 0 820 180" style={{ overflow: 'visible', filter: isCV001 ? 'drop-shadow(0 16px 28px rgba(74, 45, 20, 0.35))' : 'drop-shadow(0 10px 22px rgba(80,40,0,0.38))' }}>
+                        <svg width="820" height="180" viewBox="0 0 820 180" style={{ overflow: 'visible', filter: isFestiveMode ? 'drop-shadow(0 16px 28px rgba(74, 45, 20, 0.35))' : 'drop-shadow(0 10px 22px rgba(80,40,0,0.38))' }}>
                             <defs>
                                 <linearGradient id="mimoBotanicalGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%"   stopColor="#ffd97d" />
@@ -155,7 +157,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                 x="50%" y="52%"
                                 dominantBaseline="middle"
                                 textAnchor="middle"
-                                fill={isCV001 ? 'rgba(67, 38, 18, 0.28)' : 'rgba(80,40,0,0.45)'}
+                                fill={isFestiveMode ? 'rgba(67, 38, 18, 0.28)' : 'rgba(80,40,0,0.45)'}
                                 transform="translate(5, 18)"
                                 style={{
                                     fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -164,7 +166,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                     letterSpacing: '4px'
                                 }}
                             >
-                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">{isCV001 ? '1.0' : '2.0'}</tspan>
+                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">{isSV002 ? '2.0' : '1.0'}</tspan>
                             </text>
 
                             {/* Main text */}
@@ -172,9 +174,9 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                 x="50%" y="52%"
                                 dominantBaseline="middle"
                                 textAnchor="middle"
-                                fill={isCV001 ? 'url(#mimoCv001Grad)' : 'url(#mimoBotanicalGrad)'}
-                                stroke={isCV001 ? 'none' : 'rgba(255,255,255,0.35)'}
-                                strokeWidth={isCV001 ? '0' : '1.5'}
+                                fill={isFestiveMode ? 'url(#mimoCv001Grad)' : 'url(#mimoBotanicalGrad)'}
+                                stroke={isFestiveMode ? 'none' : 'rgba(255,255,255,0.35)'}
+                                strokeWidth={isFestiveMode ? '0' : '1.5'}
                                 paintOrder="stroke fill"
                                 transform="translate(0, 12)"
                                 style={{
@@ -184,18 +186,18 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                     letterSpacing: '4px'
                                 }}
                             >
-                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">{isCV001 ? '1.0' : '2.0'}</tspan>
+                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">{isSV002 ? '2.0' : '1.0'}</tspan>
                             </text>
                         </svg>
                     </div>
 
                     <div className="sub-heading-wrap">
-                        <h2 className="sub-heading" style={{ color: isCV001 ? '#2C3E50' : 'rgba(255, 255, 255, 0.92)' }}>
-                            Self-Service <span className={isCV001 ? "cv001-gold-text" : "cyan-text"}>Printing Kiosk</span>
+                        <h2 className="sub-heading" style={{ color: isFestiveMode ? '#2C3E50' : 'rgba(255, 255, 255, 0.92)' }}>
+                            Self-Service <span className={isFestiveMode ? "cv001-gold-text" : "cyan-text"}>Printing Kiosk</span>
                         </h2>
                     </div>
 
-                    {isCV001 ? (
+                    {isFestiveMode ? (
                         <div className="cv001-festive-message" style={{ marginTop: '12px', textAlign: 'center' }}>
                             <div style={{ fontSize: '17px', fontWeight: 600, color: '#8B5E0A', letterSpacing: '0.28em', textTransform: 'uppercase' }}>
                                 — Happy —
@@ -230,14 +232,14 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
 
                 <section className="action-panel">
                     <div
-                        className={`swipe-track-glass ${isUnlocked ? 'unlocked' : ''} ${isCV001 ? 'cv001-track' : ''}`}
+                        className={`swipe-track-glass ${isUnlocked ? 'unlocked' : ''} ${isFestiveMode ? 'cv001-track' : ''}`}
                         ref={trackRef}
                     >
                         <div className="glass-reflection" />
 
                         {/* Progress fill */}
                         <div
-                            className={`swipe-fill ${isCV001 ? 'cv001-swipe-fill' : ''}`}
+                            className={`swipe-fill ${isFestiveMode ? 'cv001-swipe-fill' : ''}`}
                             style={{
                                 width: dragX + (thumbRef.current?.offsetWidth || 360) / 2 + TRACK_PADDING + 'px',
                                 transition: isDragging ? 'none' : 'width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)',
@@ -255,7 +257,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                                 alignItems: 'center'
                             }}
                         >
-                            <div className={`shimmer-chevrons-container ${isCV001 ? 'cv001-chevrons' : ''}`}>
+                            <div className={`shimmer-chevrons-container ${isFestiveMode ? 'cv001-chevrons' : ''}`}>
                                 {[0, 1, 2, 3, 4].map((i) => (
                                     <span
                                         key={i}
@@ -270,7 +272,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
 
                         {/* Draggable thumb */}
                         <div
-                            className={`swipe-pill-thumb ${isDragging ? 'dragging' : ''} ${isCV001 ? 'cv001-thumb' : ''}`}
+                            className={`swipe-pill-thumb ${isDragging ? 'dragging' : ''} ${isFestiveMode ? 'cv001-thumb' : ''}`}
                             ref={thumbRef}
                             style={{
                                 transform: `translateX(${dragX}px)`,
@@ -285,7 +287,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                             <div className="arrow-circle">
                                 <span
                                     className="material-symbols-outlined"
-                                    style={{ color: isUnlocked ? '#4CAF50' : (isCV001 ? '#a66d2b' : '') }}
+                                    style={{ color: isUnlocked ? '#4CAF50' : (isFestiveMode ? '#a66d2b' : '') }}
                                 >
                                     {isUnlocked ? 'check' : 'arrow_forward'}
                                 </span>
@@ -295,7 +297,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                 </section>
             </main>
 
-            <footer className="kiosk-footer" style={{ position: 'relative', zIndex: 10, color: isCV001 ? '#7C6756' : 'rgba(255,255,255,0.7)' }}>
+            <footer className="kiosk-footer" style={{ position: 'relative', zIndex: 10, color: isFestiveMode ? '#7C6756' : 'rgba(255,255,255,0.7)' }}>
                 Crafted with innovation by <strong>Md Huzaif, Rathin &amp; Atharv.</strong><br />
                 &copy; 2026 <strong>VisionPrintt</strong>. All rights reserved.
             </footer>
