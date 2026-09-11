@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { isFestivalActive } from '../../config/festivalConfig';
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
 
@@ -47,6 +48,186 @@ const MusicNoteIcon2: React.FC = () => (
   </svg>
 );
 
+const FestivePlaqueArtwork: React.FC = () => (
+  <svg
+    width="100%"
+    height="100%"
+    viewBox="0 0 750 340"
+    preserveAspectRatio="none"
+    style={{
+      position: 'absolute',
+      inset: 0,
+      pointerEvents: 'none',
+      borderRadius: '28px',
+      overflow: 'hidden',
+      zIndex: 1,
+    }}
+  >
+    <defs>
+      {/* Rich Gold Gradient Palette for Linework */}
+      <linearGradient id="plaqueGoldPrime" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#FFF9C4" />
+        <stop offset="25%" stopColor="#F5D061" />
+        <stop offset="60%" stopColor="#D4973E" />
+        <stop offset="100%" stopColor="#8E5D24" />
+      </linearGradient>
+
+      {/* Center luminous spotlight keeping the HELLO text area dominant, crisp & readable */}
+      <radialGradient id="centerSpotlight" cx="36%" cy="50%" r="58%">
+        <stop offset="0%" stopColor="#FFFDF7" stopOpacity="0.95" />
+        <stop offset="65%" stopColor="#FAF2E4" stopOpacity="0.4" />
+        <stop offset="100%" stopColor="#F4E6CD" stopOpacity="0" />
+      </radialGradient>
+
+      {/* Repeating fine jaali micro-lattice for luxury parchment texture */}
+      <pattern id="plaqueMicroJaali" width="36" height="36" patternUnits="userSpaceOnUse">
+        <path d="M 18 0 L 36 18 L 18 36 L 0 18 Z" fill="none" stroke="#C48B36" strokeWidth="0.5" strokeOpacity="0.045" />
+        <circle cx="18" cy="18" r="7" fill="none" stroke="#D4973E" strokeWidth="0.4" strokeOpacity="0.04" strokeDasharray="1 2" />
+      </pattern>
+    </defs>
+
+    {/* 1. Micro Jaali Luxury Texture Layer */}
+    <rect width="100%" height="100%" fill="url(#plaqueMicroJaali)" />
+
+    {/* 2. Luminous Center Spotlight */}
+    <rect width="100%" height="100%" fill="url(#centerSpotlight)" />
+
+    {/* 3. Layered Mandala Artwork in Unused Right Space (Fading Naturally) */}
+    <g transform="translate(610, 150)" stroke="url(#plaqueGoldPrime)" fill="none" opacity="0.88">
+      {/* Concentric Mandala Rings & Petal Arcs */}
+      <circle cx="0" cy="0" r="140" strokeWidth="0.8" strokeDasharray="3 6" opacity="0.18" />
+      <circle cx="0" cy="0" r="115" strokeWidth="1" opacity="0.22" />
+      <circle cx="0" cy="0" r="95" strokeWidth="0.6" strokeDasharray="2 4" opacity="0.25" />
+      <circle cx="0" cy="0" r="75" strokeWidth="1.2" opacity="0.32" />
+      <circle cx="0" cy="0" r="55" strokeWidth="0.8" strokeDasharray="4 4" opacity="0.35" />
+      <circle cx="0" cy="0" r="35" strokeWidth="1.4" opacity="0.4" />
+      <circle cx="0" cy="0" r="18" strokeWidth="1.8" opacity="0.5" />
+      <circle cx="0" cy="0" r="4" fill="url(#plaqueGoldPrime)" opacity="0.6" />
+
+      {/* 12 Radiant Lotus Petal Arcs radiating out */}
+      {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map(deg => (
+        <g key={deg} transform={`rotate(${deg})`}>
+          <path d="M 0 -35 C 8 -55 8 -75 0 -95 C -8 -75 -8 -55 0 -35 Z" strokeWidth="0.7" opacity="0.2" />
+          <circle cx="0" cy="-75" r="1.8" fill="url(#plaqueGoldPrime)" opacity="0.35" />
+          <path d="M 0 -18 Q 6 -27 0 -35 Q -6 -27 0 -18 Z" fill="url(#plaqueGoldPrime)" fillOpacity="0.08" strokeWidth="0.8" opacity="0.3" />
+        </g>
+      ))}
+    </g>
+
+    {/* 4. Elegant Curved Gold Ornamental Flourishes Guiding the Eye toward HELLO */}
+    <g stroke="url(#plaqueGoldPrime)" fill="none" strokeLinecap="round">
+      {/* Top-Left Inward Guiding Sweep */}
+      <path
+        d="M 28 55 C 32 32 55 28 85 28 C 120 28 145 20 170 16"
+        strokeWidth="1.6"
+        opacity="0.45"
+      />
+      <path
+        d="M 38 65 C 42 45 60 40 85 40 Q 115 40 135 34"
+        strokeWidth="0.9"
+        strokeDasharray="2 4"
+        opacity="0.3"
+      />
+      <circle cx="170" cy="16" r="2.2" fill="url(#plaqueGoldPrime)" opacity="0.6" />
+
+      {/* Left Vertical Subtle Floral Spine */}
+      <path
+        d="M 24 100 Q 20 140 24 180 Q 28 220 24 260"
+        strokeWidth="1"
+        strokeDasharray="3 5"
+        opacity="0.25"
+      />
+      <path d="M 24 140 Q 32 140 30 130 Q 24 133 24 140 Z" fill="url(#plaqueGoldPrime)" fillOpacity="0.2" opacity="0.4" />
+      <path d="M 24 220 Q 32 220 30 210 Q 24 213 24 220 Z" fill="url(#plaqueGoldPrime)" fillOpacity="0.2" opacity="0.4" />
+
+      {/* Bottom-Left Guiding Flourish */}
+      <path
+        d="M 28 285 C 32 308 55 312 85 312 C 130 312 170 320 210 324"
+        strokeWidth="1.4"
+        opacity="0.4"
+      />
+      <circle cx="210" cy="324" r="2" fill="url(#plaqueGoldPrime)" opacity="0.5" />
+    </g>
+
+    {/* 5. Symmetrical Architectural Inset Frame with Engraved Gold Detailing */}
+    {/* Outer Inset Hairline Frame */}
+    <rect
+      x="12" y="12"
+      width="726" height="316"
+      rx="20"
+      fill="none"
+      stroke="url(#plaqueGoldPrime)"
+      strokeWidth="1.2"
+      opacity="0.38"
+    />
+
+    {/* Inner Fine Dotted Accent Frame with 3D Engraved Under-Shadow */}
+    <rect
+      x="18" y="18"
+      width="714" height="304"
+      rx="16"
+      fill="none"
+      stroke="url(#plaqueGoldPrime)"
+      strokeWidth="0.8"
+      strokeDasharray="2.5 5"
+      opacity="0.25"
+    />
+
+    {/* Symmetrical Border Jewels & Diamond Accents */}
+    {/* Top Center Jewel Motif */}
+    <g transform="translate(375, 12)" fill="url(#plaqueGoldPrime)">
+      <polygon points="0,-4 5,0 0,4 -5,0" opacity="0.6" />
+      <circle cx="-16" cy="0" r="1.5" opacity="0.4" />
+      <circle cx="16" cy="0" r="1.5" opacity="0.4" />
+    </g>
+    {/* Bottom Center Jewel Motif */}
+    <g transform="translate(375, 328)" fill="url(#plaqueGoldPrime)">
+      <polygon points="0,-4 5,0 0,4 -5,0" opacity="0.6" />
+      <circle cx="-16" cy="0" r="1.5" opacity="0.4" />
+      <circle cx="16" cy="0" r="1.5" opacity="0.4" />
+    </g>
+    {/* Right Mid Jewel Motif */}
+    <g transform="translate(738, 170)" fill="url(#plaqueGoldPrime)">
+      <polygon points="-4,0 0,5 4,0 0,-5" opacity="0.5" />
+      <circle cx="0" cy="-14" r="1.5" opacity="0.35" />
+      <circle cx="0" cy="14" r="1.5" opacity="0.35" />
+    </g>
+
+    {/* 6. Four Symmetrical Traditional Corner Crests */}
+    {/* Top-Left Corner Crest */}
+    <g transform="translate(18, 18)" stroke="url(#plaqueGoldPrime)" fill="none">
+      <path d="M 0 28 L 0 8 Q 0 0 8 0 L 28 0" strokeWidth="1.8" opacity="0.5" />
+      <path d="M 6 22 C 6 12 12 6 22 6" strokeWidth="1" strokeDasharray="1.5 3" opacity="0.35" />
+      <circle cx="6" cy="6" r="2.5" fill="url(#plaqueGoldPrime)" opacity="0.6" />
+      <path d="M 6 6 Q 16 6 16 16 Q 6 16 6 6 Z" fill="url(#plaqueGoldPrime)" fillOpacity="0.25" opacity="0.45" />
+    </g>
+
+    {/* Top-Right Corner Crest */}
+    <g transform="translate(732, 18) scale(-1, 1)" stroke="url(#plaqueGoldPrime)" fill="none">
+      <path d="M 0 28 L 0 8 Q 0 0 8 0 L 28 0" strokeWidth="1.8" opacity="0.5" />
+      <path d="M 6 22 C 6 12 12 6 22 6" strokeWidth="1" strokeDasharray="1.5 3" opacity="0.35" />
+      <circle cx="6" cy="6" r="2.5" fill="url(#plaqueGoldPrime)" opacity="0.6" />
+      <path d="M 6 6 Q 16 6 16 16 Q 6 16 6 6 Z" fill="url(#plaqueGoldPrime)" fillOpacity="0.25" opacity="0.45" />
+    </g>
+
+    {/* Bottom-Left Corner Crest */}
+    <g transform="translate(18, 322) scale(1, -1)" stroke="url(#plaqueGoldPrime)" fill="none">
+      <path d="M 0 28 L 0 8 Q 0 0 8 0 L 28 0" strokeWidth="1.8" opacity="0.5" />
+      <path d="M 6 22 C 6 12 12 6 22 6" strokeWidth="1" strokeDasharray="1.5 3" opacity="0.35" />
+      <circle cx="6" cy="6" r="2.5" fill="url(#plaqueGoldPrime)" opacity="0.6" />
+      <path d="M 6 6 Q 16 6 16 16 Q 6 16 6 6 Z" fill="url(#plaqueGoldPrime)" fillOpacity="0.25" opacity="0.45" />
+    </g>
+
+    {/* Bottom-Right Corner Crest */}
+    <g transform="translate(732, 322) scale(-1, -1)" stroke="url(#plaqueGoldPrime)" fill="none">
+      <path d="M 0 28 L 0 8 Q 0 0 8 0 L 28 0" strokeWidth="1.8" opacity="0.5" />
+      <path d="M 6 22 C 6 12 12 6 22 6" strokeWidth="1" strokeDasharray="1.5 3" opacity="0.35" />
+      <circle cx="6" cy="6" r="2.5" fill="url(#plaqueGoldPrime)" opacity="0.6" />
+      <path d="M 6 6 Q 16 6 16 16 Q 6 16 6 6 Z" fill="url(#plaqueGoldPrime)" fillOpacity="0.25" opacity="0.45" />
+    </g>
+  </svg>
+);
+
 interface PrintingScreenProps {
   isActive: boolean;
   statusTitle?: string;
@@ -85,8 +266,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   colorMode = 'bw',
   kioskId,
 }) => {
-  const isCV001 = kioskId === 'CV-001';
-  const isSV002 = kioskId === 'SV-002';
+  const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+  const isSV002NonFestive = kioskId === 'SV-002' && !isFestiveMode;
   const [progress, setProgress]         = useState(1);
   const [typedTitle, setTypedTitle]     = useState('');
   const [typedSub, setTypedSub]         = useState('');
@@ -113,13 +294,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   const finalTitle = isCompleted
     ? "Print Completed ✅"
-    : (isCV001 && statusTitle === "Print Completed ✅")
+    : (isFestiveMode && statusTitle === "Print Completed ✅")
     ? "Printing in Progress"
     : (statusTitle || "Printing in Progress");
 
   const finalSub = isCompleted
     ? "Your document has been printed successfully."
-    : (isCV001 && statusTitle === "Print Completed ✅")
+    : (isFestiveMode && statusTitle === "Print Completed ✅")
     ? "Printing in progress…\nPlease wait."
     : (statusSub || "Printing in progress…\nPlease wait.");
 
@@ -539,7 +720,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       {collectingPages && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 200,
-          background: isCV001 ? 'linear-gradient(135deg, #f5ecdc 0%, #e6cfad 100%)' : 'linear-gradient(135deg, #001a28 0%, #00101c 100%)',
+          background: isFestiveMode ? 'linear-gradient(135deg, #f5ecdc 0%, #e6cfad 100%)' : 'linear-gradient(135deg, #001a28 0%, #00101c 100%)',
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: '36px',
           animation: 'collect-fade-in 0.5s ease',
@@ -548,14 +729,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{
               width: '140px', height: '140px', borderRadius: '50%',
-              background: isCV001 ? 'rgba(180,123,55,0.10)' : 'rgba(0,242,254,0.08)',
-              border: isCV001 ? '3px solid rgba(180,123,55,0.5)' : '3px solid rgba(0,242,254,0.4)',
+              background: isFestiveMode ? 'rgba(180,123,55,0.10)' : 'rgba(0,242,254,0.08)',
+              border: isFestiveMode ? '3px solid rgba(180,123,55,0.5)' : '3px solid rgba(0,242,254,0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               animation: 'collect-pulse 2s ease-in-out infinite',
             }}>
               <span className="material-symbols-outlined" style={{
-                fontSize: '72px', color: isCV001 ? '#a66d2b' : '#00f2fe',
-                filter: isCV001 ? 'drop-shadow(0 0 16px rgba(180,123,55,0.45))' : 'drop-shadow(0 0 16px rgba(0,242,254,0.7))',
+                fontSize: '72px', color: isFestiveMode ? '#a66d2b' : '#00f2fe',
+                filter: isFestiveMode ? 'drop-shadow(0 0 16px rgba(180,123,55,0.45))' : 'drop-shadow(0 0 16px rgba(0,242,254,0.7))',
               }}>print</span>
             </div>
           </div>
@@ -565,7 +746,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             <h2 style={{
               fontSize: '62px', fontWeight: 800, letterSpacing: '-2px',
               lineHeight: 1.1, marginBottom: '20px',
-              background: isCV001 ? 'linear-gradient(135deg, #4b2d1d, #d5a45a)' : 'linear-gradient(135deg, #00f2fe, #4facfe)',
+              background: isFestiveMode ? 'linear-gradient(135deg, #4b2d1d, #d5a45a)' : 'linear-gradient(135deg, #00f2fe, #4facfe)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             }}>
               🖨️ Collecting your pages…
@@ -585,47 +766,63 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           }}>
             <div style={{
               width: '90px', height: '90px', borderRadius: '50%',
-              border: isCV001 ? '4px solid rgba(180,123,55,0.3)' : '4px solid rgba(0,242,254,0.25)',
+              border: isFestiveMode ? '4px solid rgba(180,123,55,0.3)' : '4px solid rgba(0,242,254,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: isCV001 ? 'rgba(180,123,55,0.08)' : 'rgba(0,242,254,0.06)',
-              boxShadow: isCV001 ? 'inset 0 0 20px rgba(180,123,55,0.12)' : 'inset 0 0 20px rgba(0,242,254,0.1)',
+              background: isFestiveMode ? 'rgba(180,123,55,0.08)' : 'rgba(0,242,254,0.06)',
+              boxShadow: isFestiveMode ? 'inset 0 0 20px rgba(180,123,55,0.12)' : 'inset 0 0 20px rgba(0,242,254,0.1)',
             }}>
               <span style={{
-                fontSize: '38px', fontWeight: 800, color: isCV001 ? '#8b5928' : '#00f2fe',
+                fontSize: '38px', fontWeight: 800, color: isFestiveMode ? '#8b5928' : '#00f2fe',
                 fontVariantNumeric: 'tabular-nums',
-                filter: isCV001 ? 'drop-shadow(0 0 8px rgba(180,123,55,0.45))' : 'drop-shadow(0 0 8px rgba(0,242,254,0.6))',
+                filter: isFestiveMode ? 'drop-shadow(0 0 8px rgba(180,123,55,0.45))' : 'drop-shadow(0 0 8px rgba(0,242,254,0.6))',
               }}>{collectCountdown}</span>
             </div>
-            <p style={{ fontSize: '16px', color: isCV001 ? 'rgba(75,45,29,0.6)' : 'rgba(255,255,255,0.4)', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            <p style={{ fontSize: '16px', color: isFestiveMode ? 'rgba(75,45,29,0.6)' : 'rgba(255,255,255,0.4)', letterSpacing: '1px', textTransform: 'uppercase' }}>
               seconds
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Left text block — glass card for readability on amber bg ── */}
+      {/* ── Left text block — Festive Traditional Card Presentation ── */}
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '30px',
         flex: 1, textAlign: 'left', maxWidth: '750px', zIndex: 10,
-          background: isSV002 ? 'rgba(255, 255, 255, 0.3)' : (isCV001 ? 'rgba(255,249,235,0.66)' : 'rgba(0,0,0,0.22)'),
-        backdropFilter: 'blur(18px)',
-        WebkitBackdropFilter: 'blur(18px)',
-          border: isSV002 ? '1px solid rgba(0,0,0,0.05)' : (isCV001 ? '1px solid rgba(139,93,42,0.22)' : '1px solid rgba(255,255,255,0.14)'),
+        position: 'relative',
+        background: isSV002NonFestive
+          ? 'rgba(255, 255, 255, 0.3)'
+          : (isFestiveMode
+            ? 'linear-gradient(145deg, rgba(255, 253, 247, 0.96) 0%, rgba(250, 242, 228, 0.91) 100%)'
+            : 'rgba(0,0,0,0.22)'),
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: isSV002NonFestive
+          ? '1px solid rgba(0,0,0,0.05)'
+          : (isFestiveMode
+            ? '1.5px solid rgba(196, 139, 54, 0.45)'
+            : '1px solid rgba(255,255,255,0.14)'),
         borderRadius: '28px',
-        padding: '40px 48px',
-          boxShadow: isSV002 ? '0 10px 40px rgba(0,0,0,0.06)' : (isCV001 ? '0 12px 38px rgba(89,52,23,0.16)' : '0 8px 40px rgba(0,0,0,0.18)'),
+        padding: '42px 50px',
+        boxShadow: isSV002NonFestive
+          ? '0 10px 40px rgba(0,0,0,0.06)'
+          : (isFestiveMode
+            ? '0 20px 50px rgba(74, 45, 20, 0.12), 0 4px 14px rgba(74, 45, 20, 0.06), inset 0 1px 1.5px rgba(255,255,255,0.95), inset 0 0 20px rgba(212, 151, 62, 0.07)'
+            : '0 8px 40px rgba(0,0,0,0.18)'),
       }}>
-        <div style={{ minHeight: '180px' }}>
-          <h2 style={{ fontSize: isSV002 ? '80px' : '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-2px', lineHeight: '1.05', display: 'flex', flexDirection: 'column', textShadow: isSV002 || isCV001 ? 'none' : '0 4px 24px rgba(0,0,0,0.4)' }}>
-            <span style={{ color: isSV002 ? 'var(--text-primary)' : (isCV001 ? '#3C2113' : 'inherit') }}>
+        {/* Unified Luxury Indian Festive Plaque Background Artwork */}
+        {isFestiveMode && <FestivePlaqueArtwork />}
+
+        <div style={{ minHeight: '180px', position: 'relative', zIndex: 2 }}>
+          <h2 style={{ fontSize: isSV002NonFestive ? '80px' : '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-2px', lineHeight: '1.05', display: 'flex', flexDirection: 'column', textShadow: isSV002NonFestive || isFestiveMode ? 'none' : '0 4px 24px rgba(0,0,0,0.4)' }}>
+            <span style={{ color: isSV002NonFestive ? 'var(--text-primary)' : (isFestiveMode ? '#3C2113' : 'inherit') }}>
               {typedTitle}
             </span>
           </h2>
-          <p style={{ color: isSV002 ? '#777777' : (isCV001 ? '#5A3D28' : 'rgba(255,255,255,0.95)'), fontSize: isSV002 ? '28px' : '36px', fontWeight: isSV002 || isCV001 ? 500 : 600, lineHeight: '1.5', whiteSpace: 'pre-line', marginBottom: '15px', textShadow: isSV002 || isCV001 ? 'none' : '0 2px 12px rgba(0,0,0,0.3)' }}>
+          <p style={{ color: isSV002NonFestive ? '#777777' : (isFestiveMode ? '#5A3D28' : 'rgba(255,255,255,0.95)'), fontSize: isSV002NonFestive ? '28px' : '36px', fontWeight: isSV002NonFestive || isFestiveMode ? 500 : 600, lineHeight: '1.5', whiteSpace: 'pre-line', marginBottom: '15px', textShadow: isSV002NonFestive || isFestiveMode ? 'none' : '0 2px 12px rgba(0,0,0,0.3)' }}>
             {typedSub}
           </p>
           {!isCompleted && (
-            <p style={{ color: isSV002 ? 'var(--amber-warm)' : (isCV001 ? '#a66d2b' : '#FFD97D'), fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: isSV002 ? 'none' : (isCV001 ? '0 0 16px rgba(180,123,55,0.35)' : '0 0 16px rgba(200,134,10,0.5)'), minHeight: '36px' }}>
+            <p style={{ color: isSV002NonFestive ? 'var(--amber-warm)' : (isFestiveMode ? '#a66d2b' : '#FFD97D'), fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: isSV002NonFestive ? 'none' : (isFestiveMode ? '0 0 16px rgba(180,123,55,0.35)' : '0 0 16px rgba(200,134,10,0.5)'), minHeight: '36px' }}>
               {statusMsg}
             </p>
           )}
@@ -639,13 +836,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           style={{ position: 'relative', width: '380px', height: '380px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           {/* Glow background — grows with progress */}
-          {!isSV002 && (
+          {!isSV002NonFestive && (
             <div style={{
               position: 'absolute',
               width: '300px',
               height: '300px',
               borderRadius: '50%',
-              background: isCV001 ? '#b47b37' : '#C8860A',
+              background: isFestiveMode ? '#b47b37' : '#C8860A',
               filter: 'blur(70px)',
               opacity: 0.10 + (progress / 100) * 0.22,
               transition: 'opacity 0.3s',
@@ -654,24 +851,24 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           )}
 
           {/* Pulse-ring halos */}
-          {isActive && progress < 100 && !isSV002 && (
+          {isActive && progress < 100 && !isSV002NonFestive && (
             <>
               <div style={{
                 position: 'absolute', inset: '45px', borderRadius: '50%',
-                border: isCV001 ? '2px solid rgba(180,123,55,0.55)' : '2px solid rgba(232,184,109,0.6)',
+                border: isFestiveMode ? '2px solid rgba(180,123,55,0.55)' : '2px solid rgba(232,184,109,0.6)',
                 animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite',
                 pointerEvents: 'none',
               }} />
               <div style={{
                 position: 'absolute', inset: '45px', borderRadius: '50%',
-                border: isCV001 ? '2px solid rgba(180,123,55,0.3)' : '2px solid rgba(200,134,10,0.28)',
+                border: isFestiveMode ? '2px solid rgba(180,123,55,0.3)' : '2px solid rgba(200,134,10,0.28)',
                 animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite 1.5s',
                 pointerEvents: 'none',
               }} />
             </>
           )}
-          {/* ── Floating particles (Music notes for CV-001, Petals for standard) ── */}
-          {isActive && !isSV002 && !isCV001 && noteParticles.map(note => (
+          {/* ── Floating particles (Music notes for Festive, Petals for standard) ── */}
+          {isActive && !isSV002NonFestive && !isFestiveMode && noteParticles.map(note => (
             <div
               key={note.id}
               className="music-note-particle"
@@ -685,17 +882,17 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 animationTimingFunction: 'ease-in-out',
                 animationIterationCount: 'infinite',
                 textShadow: 'none',
-                color: isCV001 ? '#80efff' : '#fff',
-                filter: isCV001 ? 'drop-shadow(0 0 10px rgba(0, 229, 255, 0.8))' : 'drop-shadow(0 4px 12px rgba(120, 60, 0, 0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+                color: isFestiveMode ? '#80efff' : '#fff',
+                filter: isFestiveMode ? 'drop-shadow(0 0 10px rgba(0, 229, 255, 0.8))' : 'drop-shadow(0 4px 12px rgba(120, 60, 0, 0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
               }}
             >
-              {isCV001 
+              {isFestiveMode
                 ? (note.id % 2 === 0 ? <MusicNoteIcon1 /> : <MusicNoteIcon2 />)
                 : (note.id % 2 === 0 ? <FlowerIcon1 /> : <FlowerIcon2 />)}
             </div>
           ))}
 
-          {isSV002 ? (
+          {isSV002NonFestive ? (
             <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2, overflow: 'visible' }}>
               <circle cx="190" cy="190" r="190" fill="#ffffff" opacity="0.95" />
               
@@ -786,19 +983,19 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
             {/* Outer dashed ring — slow clockwise spin */}
             <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow 24s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="176" fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.22)" : "rgba(255,255,255,0.08)"} strokeWidth="3" strokeDasharray="12 18" />
+              <circle cx="190" cy="190" r="176" fill="transparent" stroke={isFestiveMode ? "rgba(180,123,55,0.22)" : "rgba(255,255,255,0.08)"} strokeWidth="3" strokeDasharray="12 18" />
             </g>
 
             {/* Inner dotted ring — slow counter-clockwise spin */}
             <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow-reverse 18s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="105" fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.28)" : "rgba(232,184,109,0.22)"} strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
+              <circle cx="190" cy="190" r="105" fill="transparent" stroke={isFestiveMode ? "rgba(180,123,55,0.28)" : "rgba(232,184,109,0.22)"} strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
             </g>
 
-            {/* Keep the CV-001 Ganesha on the page surface with no painted backdrop. */}
-            <circle cx="190" cy="190" r="130" fill="transparent" stroke={isCV001 ? "transparent" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
+            {/* Keep the Festive Ganesha on the page surface with no painted backdrop. */}
+            <circle cx="190" cy="190" r="130" fill="transparent" stroke={isFestiveMode ? "transparent" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
 
-            {/* Ganesha center artwork for CV-001 — ultra-subtle transparent watermark behind percentage text */}
-            {isCV001 && (
+            {/* Ganesha center artwork for Festive Mode — ultra-subtle transparent watermark behind percentage text */}
+            {isFestiveMode && (
               <g id="cv001-ganesha-center" pointerEvents="none" opacity="0.15" style={{ filter: 'drop-shadow(0 1px 2px rgba(180, 123, 55, 0.08))' }}>
                 <g stroke="#C48B36" fill="none" strokeLinecap="round" strokeLinejoin="round">
                   {/* Mukut (Crown) Peak & Tiers */}
@@ -840,7 +1037,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             )}
 
             {/* Static background track */}
-            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isCV001 ? "rgba(180,123,55,0.15)" : "rgba(255,255,255,0.05)"} strokeWidth="10" />
+            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isFestiveMode ? "rgba(180,123,55,0.15)" : "rgba(255,255,255,0.05)"} strokeWidth="10" />
 
             {/* Center Percentage Display */}
             <text
@@ -849,11 +1046,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               dominantBaseline="middle"
               style={{
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
-                animation: isActive && progress < 100 && !isCV001 ? 'text-glow-pulse 2s infinite alternate' : 'none',
+                animation: isActive && progress < 100 && !isFestiveMode ? 'text-glow-pulse 2s infinite alternate' : 'none',
               }}
             >
-              <tspan fontSize="92px" fontWeight="800" fill={isCV001 ? "#3C2113" : "#ffffff"} letterSpacing="-2px" style={{ fontFeatureSettings: '"tnum"', fontVariantNumeric: 'tabular-nums' }}>{progress}</tspan>
-              <tspan fontSize="32px" fontWeight="700" fill={isCV001 ? "#b47b37" : "#FFD97D"} dx="4">%</tspan>
+              <tspan fontSize="92px" fontWeight="800" fill={isFestiveMode ? "#3C2113" : "#ffffff"} letterSpacing="-2px" style={{ fontFeatureSettings: '"tnum"', fontVariantNumeric: 'tabular-nums' }}>{progress}</tspan>
+              <tspan fontSize="32px" fontWeight="700" fill={isFestiveMode ? "#b47b37" : "#FFD97D"} dx="4">%</tspan>
             </text>
 
             {/* Rotated group for progress arc and comet tail */}
@@ -892,15 +1089,15 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 cx={pt.x}
                 cy={pt.y}
                 r={Math.max(0.5, pt.r)}
-                fill={pt.key === 0 ? '#ffffff' : (isCV001 ? '#b47b37' : '#E8B86D')}
+                fill={pt.key === 0 ? '#ffffff' : (isFestiveMode ? '#b47b37' : '#E8B86D')}
                 opacity={pt.opacity * (pt.key === 0 ? 1 : 0.65)}
                 filter={pt.key <= 2 ? 'url(#cometGlow)' : undefined}
                 style={{ transition: 'cx 0.14s linear, cy 0.14s linear' }}
               />
             ))}
 
-            {/* Decorative Festive Ladoos for CV-001 ONLY — Perfect Circular Orbit centered at (190, 190), R = 172px */}
-            {isCV001 && (
+            {/* Decorative Festive Ladoos for Festive Mode — Perfect Circular Orbit centered at (190, 190), R = 172px */}
+            {isFestiveMode && (
               <g
                 className="cv001-ladoo-decor-orbit"
                 style={{
