@@ -87,7 +87,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 }) => {
   const isCV001 = kioskId === 'CV-001';
   const isSV002 = kioskId === 'SV-002';
-  const [progress, setProgress]         = useState(0);
+  const [progress, setProgress]         = useState(1);
   const [typedTitle, setTypedTitle]     = useState('');
   const [typedSub, setTypedSub]         = useState('');
   const [printDone, setPrintDone]       = useState(false);   // true once Pi confirms
@@ -97,13 +97,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const [collectCountdown, setCollectCountdown] = useState(0);
   const collectTimerRef = useRef<number | null>(null);
 
-  const progressRef         = useRef(0);   // mirror of progress for closures
+  const progressRef         = useRef(1);   // mirror of progress for closures
   const tickTimerRef        = useRef<number | null>(null);
   const pollTimerRef        = useRef<number | null>(null);
   const completionTimerRef  = useRef<number | null>(null);
   const isCompletingRef     = useRef(false);
   const stallTimerRef       = useRef<number | null>(null);   // stall detector
-  const lastProgressRef     = useRef(0);                    // last recorded progress for stall check
+  const lastProgressRef     = useRef(1);                    // last recorded progress for stall check
   const startTimeRef        = useRef(Date.now());           // when the print screen was activated
   const lastSuccessfulPollTimeRef = useRef(Date.now());     // when we last successfully polled the backend
 
@@ -148,17 +148,24 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     tickTimerRef.current = null;
     stallTimerRef.current = null;
 
-    // Snap progress directly to 100% and display clear confirmation
-    progressRef.current = 100;
-    setProgress(100);
-    setStatusMsg('Print Completed ✅');
+    // Smooth final transition: 98% (or current) → 99% → 100%
+    const currentProgress = progressRef.current;
+    if (currentProgress < 99) {
+      progressRef.current = 99;
+      setProgress(99);
+    }
 
-    // Hold for 1.0 second before transitioning to summary screen
-    completionTimerRef.current = window.setTimeout(() => {
-      onComplete();
-    }, 1000);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onComplete, colorMode]);
+    window.setTimeout(() => {
+      progressRef.current = 100;
+      setProgress(100);
+      setStatusMsg('Print Completed ✅');
+
+      // Hold for 1.0 second before transitioning to summary screen
+      completionTimerRef.current = window.setTimeout(() => {
+        onComplete();
+      }, 1000);
+    }, 90);
+  }, [onComplete]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
@@ -176,11 +183,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         // Reset last successful poll timestamp — the network is alive
         lastSuccessfulPollTimeRef.current = Date.now();
 
+        // Authoritative completion signal from backend
         if (data.status === 'completed' || data.isPrinted === true) {
-          if (isCV001) {
-            progressRef.current = 100;
-            setProgress(100);
-          }
           setPrintDone(true);
           // animateTo100AndComplete will be called via the printDone effect
         } else if (data.status === 'failed') {
@@ -189,22 +193,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           clearAllTimers();
           if (onError) onError(errMsg);
         } else {
-          if (isCV001) {
-            if (data.status === 'printing') {
-              if (progressRef.current < 50) {
-                progressRef.current = 50;
-                setProgress(50);
-              }
-              setStatusMsg('Printing document on printer…');
-            } else if (data.status === 'paid') {
-              if (progressRef.current < 15) {
-                progressRef.current = 15;
-                setProgress(15);
-              }
-              setStatusMsg('Sending document to printer…');
-            }
-          }
-          // Still printing — poll again in 250 ms for immediate completion sync
+          // Still printing or paid — continue polling every 250 ms
           schedulePoll(250);
         }
       } catch {
@@ -212,26 +201,29 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         pollTimerRef.current = window.setTimeout(() => schedulePoll(250), 2000);
       }
     }, delayMs);
-  }, [printCode, isActive, onError, clearAllTimers, isCV001]);
+  }, [printCode, isActive, onError, clearAllTimers]);
 
-  // ─── slow progress simulation (CV-002 / SV-002 only) ──────────────────────
+  // ─── calibrated progress simulation (1% → 98% MAX) ──────────────────────
 
   const startSlowTick = useCallback(() => {
-    if (manualProgress !== undefined || isCV001) return;
+    if (manualProgress !== undefined) return;
 
     const totalSheets = Math.max(1, pages * copies);
     const isColor = colorMode === 'color';
 
     // ── Calibrated realistic physical print timings ─────────────────────────
-    // B&W Laser (Brother 32 ppm): 2.5s warmup + 1.8s per sheet (~4.3s total for 1 sheet)
-    // Color Inkjet: 4.0s warmup + 9.0s per sheet (~13.0s total for 1 sheet)
-    const baseWarmup  = isColor ? 4000 : 2500;
-    const speedFactor = isColor ? 9000 : 1800;
+    // B&W Laser (Brother HL-L5210DN / HL-L2440DW on CV-001):
+    // 3.2s warmup/spool + 2.2s per sheet (~5.4s for 1 sheet, ~14.2s for 5 sheets)
+    // Color Inkjet (Epson L3250 on SV-002):
+    // 4.2s warmup + 9.5s per sheet (~13.7s for 1 sheet)
+    const baseWarmup  = isColor ? 4200 : 3200;
+    const speedFactor = isColor ? 9500 : 2200;
     const totalAnimMs = baseWarmup + totalSheets * speedFactor;
 
-    // Cap progress at 98% while waiting for real backend completion signal
+    // Cap estimated progress strictly at 98% while waiting for real backend completion signal
     const cap = (printCode && printCode !== '0000') ? 98 : 100;
-    const baseDelay = Math.max(40, totalAnimMs / cap); // ms per 1% step
+    const totalSteps = Math.max(1, cap - 1); // 1% -> 98% is 97 steps
+    const baseDelay = Math.max(40, totalAnimMs / totalSteps); // ms per 1% step
 
     const tick = () => {
       if (isCompletingRef.current) return;
@@ -242,7 +234,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         if (!printCode || printCode === '0000') {
           animateTo100AndComplete();
         } else {
-          // Near completion cap (98%) — hold until backend confirms completion
+          // Strictly hold at 98% until backend confirms physical completion
           setStatusMsg(
             totalSheets > 1
               ? `Finalizing print job (${totalSheets} of ${totalSheets} sheets)…`
@@ -280,7 +272,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       tickTimerRef.current = window.setTimeout(tick, Math.max(40, baseDelay + jitter));
     };
 
-    tickTimerRef.current = window.setTimeout(tick, 600);
+    tickTimerRef.current = window.setTimeout(tick, baseDelay);
   }, [pages, copies, printCode, manualProgress, colorMode, animateTo100AndComplete]);
 
   // ─── main effect ──────────────────────────────────────────────────────────
@@ -288,9 +280,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   useEffect(() => {
     if (!isActive) {
       clearAllTimers();
-      setProgress(0);
-      progressRef.current = 0;
-      lastProgressRef.current = 0;
+      setProgress(1);
+      progressRef.current = 1;
+      lastProgressRef.current = 1;
       startTimeRef.current = Date.now();
       lastSuccessfulPollTimeRef.current = Date.now();
       setTypedTitle('');
@@ -303,6 +295,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       return;
     }
 
+    // Explicitly start at 1% on screen activation
+    setProgress(1);
+    progressRef.current = 1;
+    lastProgressRef.current = 1;
     setTypedTitle('');
     setTypedSub('');
     startTimeRef.current = Date.now();
