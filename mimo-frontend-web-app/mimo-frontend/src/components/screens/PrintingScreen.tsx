@@ -393,13 +393,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     const isColor = colorMode === 'color';
 
     // ── Calibrated realistic physical print timings ─────────────────────────
-    // B&W Laser (Brother HL-L5210DN / HL-L2440DW on CV-001):
-    // 3.2s warmup/spool + 2.2s per sheet (~5.4s for 1 sheet, ~14.2s for 5 sheets)
-    // Color Inkjet (Epson L3250 on SV-002):
-    // 4.2s warmup + 9.5s per sheet (~13.7s for 1 sheet)
-    const baseWarmup  = isColor ? 4200 : 3200;
-    const speedFactor = isColor ? 9500 : 2200;
-    const totalAnimMs = baseWarmup + totalSheets * speedFactor;
+    // MIMO 1.0 (CV-001):
+    // Physical printed page takes ~15–18 seconds to come out of the machine.
+    // Progress bar smoothly animates from 1% toward 98% over ~17 seconds,
+    // holding at 98% until the real backend completion signal arrives.
+    //
+    // MIMO 2.0 (SV-002):
+    // Color Inkjet (Epson L3250): 4.2s warmup + 9.5s per sheet (~13.7s for 1 sheet)
+    // B&W Laser (Brother HL-L2440DW): 3.2s warmup + 2.2s per sheet
+    const isMIMO10 = kioskId !== 'SV-002';
+    const totalAnimMs = isMIMO10
+      ? 17000
+      : (isColor ? 4200 : 3200) + totalSheets * (isColor ? 9500 : 2200);
 
     // Cap estimated progress strictly at 98% while waiting for real backend completion signal
     const cap = (printCode && printCode !== '0000') ? 98 : 100;
@@ -454,7 +459,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     };
 
     tickTimerRef.current = window.setTimeout(tick, baseDelay);
-  }, [pages, copies, printCode, manualProgress, colorMode, animateTo100AndComplete]);
+  }, [pages, copies, printCode, manualProgress, colorMode, kioskId, animateTo100AndComplete]);
 
   // ─── main effect ──────────────────────────────────────────────────────────
 
