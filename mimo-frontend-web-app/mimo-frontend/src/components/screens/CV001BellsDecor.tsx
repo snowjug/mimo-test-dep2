@@ -1,7 +1,7 @@
 import React from 'react';
 
 const SingleGoldenBell: React.FC = () => (
-  <svg width="150" height="375" viewBox="0 0 150 330" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+  <svg width="150" height="375" viewBox="0 0 150 330" preserveAspectRatio="none" style={{ overflow: 'visible', display: 'block' }}>
     <defs>
       {/* Rich Metallic Brass/Gold Gradient */}
       <linearGradient id="bellBrassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -38,9 +38,16 @@ const SingleGoldenBell: React.FC = () => (
     {/* Localized Soft Warm Aura around each bell (Not Page-Wide) */}
     <circle cx="75" cy="195" r="105" fill="url(#bellLocalizedGlow)" />
 
-    {/* Hanging Metallic Chain — Extended Length (7 interlocking links) */}
+    {/* Hanging Metallic Chain — Anchored Directly Beyond Ceiling (y <= 0) with Zero Gap */}
     <g stroke="url(#bellBrassGrad)" strokeWidth="3.8" fill="none">
-      <line x1="75" y1="0" x2="75" y2="25" strokeWidth="4" />
+      {/* Central solid wire anchor penetrating ceiling */}
+      <line x1="75" y1="-50" x2="75" y2="120" stroke="url(#bellBrassGrad)" strokeWidth="4" />
+
+      {/* Seamless chain loops continuing across top: 0 boundary */}
+      <ellipse cx="75" cy="-24" rx="4.8" ry="8.5" />
+      <ellipse cx="75" cy="-10" rx="4.8" ry="8.5" />
+      <ellipse cx="75" cy="4" rx="4.8" ry="8.5" />
+      <ellipse cx="75" cy="18" rx="4.8" ry="8.5" />
       <ellipse cx="75" cy="32" rx="4.8" ry="8.5" />
       <ellipse cx="75" cy="46" rx="4.8" ry="8.5" />
       <ellipse cx="75" cy="60" rx="4.8" ry="8.5" />
