@@ -21,6 +21,14 @@ export function Payment() {
   const [totalCost, setTotalCost] = useState(0);
   const [printOptions, setPrintOptions] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [mimoCoinsBalance, setMimoCoinsBalance] = useState(0);
+  const [userName, setUserName] = useState(() => localStorage.getItem("mimo_user_name") || null);
+  const [userEmail, setUserEmail] = useState(() => localStorage.getItem("mimo_user_email") || null);
+  const [applyCoins, setApplyCoins] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoError, setPromoError] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState(0);
 
   useEffect(() => {
     const storedFiles = sessionStorage.getItem("printFiles");
@@ -60,15 +68,6 @@ export function Payment() {
     };
     fetchData();
   }, [navigate]);
-
-  const [mimoCoinsBalance, setMimoCoinsBalance] = useState(0);
-  const [userName, setUserName] = useState(() => localStorage.getItem("mimo_user_name") || null);
-  const [userEmail, setUserEmail] = useState(() => localStorage.getItem("mimo_user_email") || null);
-  const [applyCoins, setApplyCoins] = useState(false);
-  const [promoCode, setPromoCode] = useState("");
-  const [promoError, setPromoError] = useState(false);
-  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
-  const [promoDiscount, setPromoDiscount] = useState(0);
 
 
 
