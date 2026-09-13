@@ -1,6 +1,10 @@
 // Deploy trigger: 2026-08-10 12:28:00
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { defineSecret } = require("firebase-functions/params");
+
+const gmailAppPassword = defineSecret("GMAIL_APP_PASSWORD");
+
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -154,8 +158,8 @@ app.get("/", (req, res) => res.send("Mimo Firebase Serverless is LIVE 🚀"));
 const SECRET_KEY = process.env.JWT_SECRET || "fallback_secret_key_change_me_in_prod";
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com");
 
-const CASHFREE_BASE_URL = process.env.CASHFREE_ENV === "production" 
-  ? "https://api.cashfree.com/pg" 
+const CASHFREE_BASE_URL = process.env.CASHFREE_ENV === "production"
+  ? "https://api.cashfree.com/pg"
   : "https://sandbox.cashfree.com/pg";
 
 const cashfreeHeaders = {
@@ -304,11 +308,11 @@ app.put("/profile", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { username, mobileNumber, photoUrl } = req.body;
-    
+
     const updateData = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    
+
     if (username !== undefined) updateData.username = username;
     if (mobileNumber !== undefined) updateData.mobileNumber = mobileNumber || "";
     if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
@@ -434,52 +438,187 @@ app.post("/settings", authMiddleware, async (req, res) => {
 app.post("/finalize-upload", authMiddleware, async (req, res) => {
   try {
     const { files } = req.body;
-    if (!files || files.length === 0) return res.status(400).json({ error: "No files provided" });
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ error: "No files provided" });
+    }
 
     // Validate all files have real URLs before touching the database
     for (const f of files) {
       if (!f.url || f.url === "undefined" || !f.url.startsWith("http")) {
         console.error("Invalid fileUrl received:", f.url, "for file:", f.name);
-        return res.status(400).json({ error: `Missing or invalid file URL for ${f.name}. Please re-upload.` });
+        return res.status(400).json({ error: `Missing or invalid file URL for ${f.name || f.fileName}. Please re-upload.` });
       }
     }
 
     let totalPages = 0;
     const userId = req.user.id || req.user.userId;
 
-    // Clear old pending jobs to prevent ghost cart pricing discrepancies
-    const staleJobs = await db.collection("print_jobs").where("userId", "==", userId).where("status", "==", "pending").get();
-    const deleteBatch = db.batch();
-    staleJobs.forEach(doc => deleteBatch.delete(doc.ref));
-    await deleteBatch.commit();
-
     const batch = db.batch();
-    
-    // Process files directly - no conversion loop, Pi handles it!
+    const registeredFiles = [];
+
+    // Process files directly: server generates fileId EXCLUSIVELY. Client input fileId is ignored.
     for (const f of files) {
+      const fileId = `file_${uuidv4().replace(/-/g, "").substring(0, 16)}`;
+      const pCount = f.pageCount || 1;
+      const fileRecord = {
+        fileId,
+        userId,
+        fileName: f.name || f.fileName,
+        fileUrl: f.url || f.fileUrl,
+        mimetype: f.type || f.mimetype || "application/pdf",
+        size: f.size || 0,
+        pageCount: pCount,
+        status: "registered",
+        uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      // Register file in files collection
+      const fileRef = db.collection("files").doc(fileId);
+      batch.set(fileRef, fileRecord);
+
+      // Legacy print_jobs doc for backwards compatibility
       const docRef = db.collection("print_jobs").doc();
       batch.set(docRef, {
-        userId: req.user.id || req.user.userId,
-        fileName: f.name,
-        fileUrl: f.url,
-        mimetype: f.type,
-        size: f.size,
-        status: "pending", // Direct to pending, bypassing 'pending_conversion'
-        pageCount: f.pageCount || 1, // Handled on frontend
-        uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+        ...fileRecord,
+        status: "pending"
       });
-      totalPages += (f.pageCount || 1);
+
+      totalPages += pCount;
+      registeredFiles.push({
+        fileId,
+        name: f.name || f.fileName,
+        fileName: f.name || f.fileName,
+        url: f.url || f.fileUrl,
+        fileUrl: f.url || f.fileUrl,
+        type: f.type || f.mimetype || "application/pdf",
+        size: f.size || 0,
+        pageCount: pCount
+      });
     }
-    
+
     await batch.commit();
 
     res.json({
       message: "Jobs created successfully.",
       amount: totalPages * 2,
-      totalPages: totalPages
+      totalPages: totalPages,
+      files: registeredFiles
     });
   } catch (err) {
     console.error("Error finalizing upload:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ================= CREATE PRINT MANIFEST =================
+app.post("/create-manifest", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user.userId;
+    const { files, globalOptions } = req.body;
+
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ error: "Cannot create empty manifest. At least one file must be selected." });
+    }
+
+    const resolvedFiles = [];
+    const fileIds = [];
+    let totalRawPages = 0;
+
+    for (const f of files) {
+      if (!f.fileId) {
+        return res.status(400).json({ error: "Missing required fileId for selected file." });
+      }
+
+      // Check authoritative file doc in 'files' collection or 'print_jobs' fallback
+      let fileDoc = await db.collection("files").doc(f.fileId).get();
+      if (!fileDoc.exists) {
+        const snap = await db.collection("print_jobs").where("fileId", "==", f.fileId).get();
+        if (!snap.empty) fileDoc = snap.docs[0];
+      }
+
+      if (!fileDoc.exists) {
+        return res.status(404).json({ error: `Authoritative file record missing: ${f.fileId}` });
+      }
+
+      const fileData = fileDoc.data();
+      // OWNERSHIP CHECK: File must belong to authenticated user
+      if (fileData.userId !== userId) {
+        return res.status(403).json({ error: `Unauthorized access to file: ${f.fileId}` });
+      }
+
+      // Authoritative raw page count from server record ONLY
+      const rawPageCount = Number(fileData.pageCount) || 1;
+      let selectedPageCount = rawPageCount;
+      let validatedPages = Array.from({ length: rawPageCount }, (_, i) => i + 1);
+
+      if (f.printConfig?.pageSelection === "custom") {
+        const pages = f.printConfig.selectedPages;
+        if (!Array.isArray(pages) || pages.length === 0) {
+          return res.status(400).json({ error: `Custom page selection cannot be empty for file: ${f.fileId}` });
+        }
+
+        const uniquePages = new Set();
+        for (const p of pages) {
+          const pageNum = Number(p);
+          if (isNaN(pageNum) || !Number.isInteger(pageNum) || pageNum < 1 || pageNum > rawPageCount) {
+            return res.status(400).json({ error: `Invalid page number ${p} for file: ${f.fileId} (valid range: 1-${rawPageCount})` });
+          }
+          if (uniquePages.has(pageNum)) {
+            return res.status(400).json({ error: `Duplicate page number ${p} in selection for file: ${f.fileId}` });
+          }
+          uniquePages.add(pageNum);
+        }
+        validatedPages = Array.from(uniquePages).sort((a, b) => a - b);
+        selectedPageCount = validatedPages.length;
+      }
+
+      totalRawPages += selectedPageCount;
+      fileIds.push(f.fileId);
+
+      resolvedFiles.push({
+        fileId: f.fileId,
+        fileName: fileData.fileName || f.fileName || f.name,
+        fileUrl: fileData.fileUrl || f.fileUrl || f.url,
+        mimetype: fileData.mimetype || f.mimetype || f.type || "application/pdf",
+        size: fileData.size || f.size || 0,
+        pageCount: selectedPageCount,
+        rawPageCount: rawPageCount,
+        printConfig: {
+          pageSelection: f.printConfig?.pageSelection || "all",
+          pageRange: f.printConfig?.pageRange || `1-${rawPageCount}`,
+          selectedPages: validatedPages,
+          pageCount: selectedPageCount
+        }
+      });
+    }
+
+    const manifestId = `mf_${uuidv4().replace(/-/g, "").substring(0, 16)}`;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const manifestData = {
+      manifestId,
+      userId,
+      fileIds,
+      files: resolvedFiles,
+      globalOptions: globalOptions || {},
+      totalCalculatedPages: totalRawPages,
+      schemaVersion: 1,
+      status: "active",
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await db.collection("manifests").doc(manifestId).set(manifestData);
+
+    res.json({
+      manifestId,
+      totalCalculatedPages: totalRawPages,
+      filesCount: resolvedFiles.length,
+      status: "active",
+      manifest: manifestData
+    });
+  } catch (err) {
+    console.error("Error creating manifest:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -567,13 +706,13 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { type, pageCount } = req.body; // "a4" or "graph"
-    
+
     // 1. Clear abandoned jobs to prevent overcharging
     const existingJobs = await db.collection("print_jobs")
       .where("userId", "==", userId)
       .where("status", "==", "pending")
       .get();
-      
+
     if (!existingJobs.empty) {
       const deleteBatch = db.batch();
       existingJobs.forEach(doc => deleteBatch.delete(doc.ref));
@@ -583,10 +722,10 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
     // 2. Create the blank job
     const isGraph = type === "graph";
     const fileName = isGraph ? "mimo_graph.pdf" : "blank_a4.pdf";
-    const actualUrl = isGraph 
-      ? "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fmimo_graph.pdf" 
+    const actualUrl = isGraph
+      ? "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fmimo_graph.pdf"
       : "https://storage.googleapis.com/mimo-v2-11868.firebasestorage.app/templates%2Fblank_a4.pdf";
-    
+
     // Determine exact size based on uploaded files
     const fileSize = isGraph ? 1806 : 583;
     const now = admin.firestore.FieldValue.serverTimestamp();
@@ -671,22 +810,15 @@ app.delete("/remove-file", authMiddleware, async (req, res) => {
 app.post("/create-order", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const { selectedFiles, printOptions, couponCode, coinsToUse } = req.body;
+    const { manifestId, couponCode, coinsToUse } = req.body;
+    let printOptions = req.body.printOptions;
+
+    if (!manifestId) {
+      return res.status(400).json({ error: "Missing required manifestId. Implicit cart query checkout is disabled." });
+    }
+
     const coinsDiscount = coinsToUse ? Number(coinsToUse) * 0.5 : 0; // 1 coin = ₹0.50
-    let { orderId } = req.body;
-    if (!orderId) {
-      orderId = `order_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
-    }
-
-    const jobsSnapshot = await db
-      .collection("print_jobs")
-      .where("userId", "==", userId)
-      .where("status", "==", "pending")
-      .get();
-
-    if (jobsSnapshot.empty) {
-      return res.status(400).send("No pending jobs to pay for");
-    }
+    let orderId = req.body.orderId || `order_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
 
     let discountPercentage = 0;
     if (couponCode) {
@@ -700,129 +832,167 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       }
     }
 
-    let totalAmount = 0;
-    const isBlankSheet = printOptions?.isBlankSheet === true || printOptions?.blankSheet === true;
-    const sheetType = printOptions?.sheetType || "a4";
-    const colorMode = printOptions?.colorMode || "bw";
-    
-    let pricePerPage = 2.30;
-    if (colorMode === "color") {
-      pricePerPage = 10.00;
-    } else if (isBlankSheet && sheetType === "graph") {
-      pricePerPage = 2.00;
-    }
-    const copies = Number(printOptions?.copies || 1);
+    const manifestRef = db.collection("manifests").doc(manifestId);
+    const newJobRef = db.collection("print_jobs").doc();
 
-    const batchUpdate = db.batch();
-    
-    // Group all pending jobs into a single unified job for the printer
-    const mergedFiles = [];
+    let jobPayload = null;
+    let finalAmountToPay = 0;
     let totalRawPages = 0;
+    let mergedFiles = [];
 
-    jobsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      const fileConfig = printOptions?.fileConfigs?.[data.fileName];
-      let numPages = fileConfig?.pageCount || data.pageCount || 1;
-      const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
-      const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
+    // EXECUTE CHECKOUT RACE-SAFE FIRESTORE TRANSACTION
+    try {
+      await db.runTransaction(async (transaction) => {
+        const manifestDoc = await transaction.get(manifestRef);
 
-      // Handle custom page ranges
-      if (jobPageSelection === "custom" && jobPageRange) {
-        const ranges = String(jobPageRange).split(",");
-        let customCount = 0;
-        for (const r of ranges) {
-          const parts = r.split("-").map(p => parseInt(p.trim()));
-          if (parts.length === 1 && !isNaN(parts[0])) {
-            if (parts[0] >= 1 && parts[0] <= numPages) customCount += 1;
-          } else if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-            if (parts[0] >= 1 && parts[1] <= numPages && parts[0] <= parts[1]) {
-              customCount += (parts[1] - parts[0] + 1);
+        if (!manifestDoc.exists) {
+          throw new Error("404: Print manifest not found.");
+        }
+
+        const manifestData = manifestDoc.data();
+
+        if (manifestData.userId !== userId) {
+          throw new Error("403: Unauthorized access to manifest.");
+        }
+
+        if (manifestData.status !== "active") {
+          throw new Error(`400: Manifest is not active (status: ${manifestData.status}).`);
+        }
+
+        if (!manifestData.files || !Array.isArray(manifestData.files) || manifestData.files.length === 0) {
+          throw new Error("400: Manifest contains no selected files.");
+        }
+
+        // Verify EVERY file exists in files/{fileId} and belongs to user
+        for (const f of manifestData.files) {
+          const fileRef = db.collection("files").doc(f.fileId);
+          let fileDoc = await transaction.get(fileRef);
+
+          if (!fileDoc.exists) {
+            // Fallback lookup in print_jobs if files collection entry missing
+            const snap = await db.collection("print_jobs").where("fileId", "==", f.fileId).get();
+            if (!snap.empty) {
+              fileDoc = { exists: true, data: () => snap.docs[0].data() };
             }
           }
+
+          if (!fileDoc.exists) {
+            throw new Error(`404: Authoritative file missing: ${f.fileId}`);
+          }
+          if (fileDoc.data().userId !== userId) {
+            throw new Error(`403: Unauthorized file access: ${f.fileId}`);
+          }
         }
-        if (customCount > 0) numPages = customCount;
-      }
 
-      totalRawPages += numPages;
-      mergedFiles.push({
-        name: data.fileName,
-        url: data.fileUrl,
-        type: data.mimetype,
-        size: data.size || data.fileSize || 0,
-        pageCount: numPages
+        printOptions = printOptions || manifestData.globalOptions || {};
+
+        const isBlankSheet = printOptions?.isBlankSheet === true || printOptions?.blankSheet === true;
+        const sheetType = printOptions?.sheetType || "a4";
+        const colorMode = printOptions?.colorMode || "bw";
+
+        let pricePerPage = 2.30;
+        if (colorMode === "color") {
+          pricePerPage = 10.00;
+        } else if (isBlankSheet && sheetType === "graph") {
+          pricePerPage = 2.00;
+        }
+        const copies = Number(printOptions?.copies || 1);
+
+        mergedFiles = [];
+        totalRawPages = 0;
+
+        for (const f of manifestData.files) {
+          let numPages = f.pageCount || 1;
+          totalRawPages += numPages;
+          mergedFiles.push({
+            fileId: f.fileId,
+            name: f.fileName,
+            fileName: f.fileName,
+            url: f.fileUrl,
+            fileUrl: f.fileUrl,
+            type: f.mimetype,
+            size: f.size || 0,
+            pageCount: numPages
+          });
+        }
+
+        let divisor = 1;
+        if (printOptions?.photoLayout === "2") divisor = 2;
+        if (printOptions?.photoLayout === "4") divisor = 4;
+        if (printOptions?.photoLayout === "6") divisor = 6;
+        if (printOptions?.photoLayout === "9") divisor = 9;
+
+        let actualPages = Math.ceil(totalRawPages / divisor);
+
+        if (printOptions?.doubleSided === "double") {
+          actualPages = Math.ceil(actualPages / 2);
+          if (colorMode === "bw") {
+            pricePerPage = 3.00;
+          }
+        }
+
+        const jobCost = actualPages * copies * pricePerPage;
+        finalAmountToPay = Math.max(0, jobCost - coinsDiscount);
+
+        jobPayload = {
+          userId,
+          manifestId,
+          fileName: mergedFiles.length > 1 ? `Multiple Files (${mergedFiles.length})` : mergedFiles[0].name,
+          fileUrl: mergedFiles[0].url,
+          mimetype: mergedFiles[0].type,
+          files: mergedFiles,
+          fileCount: mergedFiles.length,
+          size: mergedFiles.reduce((acc, f) => acc + (f.size || 0), 0),
+          status: "pending",
+          pageCount: totalRawPages,
+          printOptions: printOptions || {},
+          pricing: { pricePerPage, totalPages: actualPages, jobCost },
+          orderId,
+          colorMode,
+          color: colorMode === "color",
+          copies: copies,
+          duplex: printOptions?.doubleSided === "double",
+          finalCost: jobCost,
+          totalCost: jobCost,
+          kioskId: printOptions?.directKioskId || "CV-001",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Atomic State Transition inside transaction
+        transaction.update(manifestRef, {
+          status: "consumed",
+          consumedOrderId: orderId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        transaction.set(newJobRef, jobPayload);
       });
-      
-      // Delete the individual pending jobs so we can replace them with the merged group
-      batchUpdate.delete(doc.ref);
-    });
-
-    // Handle N-up photo layouts on the grouped total
-    let divisor = 1;
-    if (printOptions?.photoLayout === "2") divisor = 2;
-    if (printOptions?.photoLayout === "4") divisor = 4;
-    if (printOptions?.photoLayout === "6") divisor = 6;
-    if (printOptions?.photoLayout === "9") divisor = 9;
-    
-    let actualPages = Math.ceil(totalRawPages / divisor);
-
-    // Handle double-sided
-    if (printOptions?.doubleSided === "double") {
-      actualPages = Math.ceil(actualPages / 2);
-      if (colorMode === "bw") {
-        pricePerPage = 3.00;
-      }
+    } catch (txnError) {
+      const msg = txnError.message || "";
+      if (msg.startsWith("404:")) return res.status(404).json({ error: msg.substring(5) });
+      if (msg.startsWith("403:")) return res.status(403).json({ error: msg.substring(5) });
+      if (msg.startsWith("400:")) return res.status(400).json({ error: msg.substring(5) });
+      throw txnError;
     }
-
-    const jobCost = actualPages * copies * pricePerPage;
-    totalAmount += jobCost;
-
-    // Create the unified merged job
-    const newJobRef = db.collection("print_jobs").doc();
-    batchUpdate.set(newJobRef, { 
-      userId,
-      fileName: mergedFiles.length > 1 ? `Multiple Files (${mergedFiles.length})` : mergedFiles[0].name,
-      fileUrl: mergedFiles[0].url, // legacy support for older apps
-      mimetype: mergedFiles[0].type, // legacy support
-      files: mergedFiles, // The full array of files to print
-      size: mergedFiles.reduce((acc, f) => acc + (f.size || 0), 0),
-      status: "pending",
-      pageCount: totalRawPages,
-      printOptions: printOptions || {},
-      pricing: { pricePerPage, totalPages: actualPages, jobCost },
-      orderId,
-      colorMode,
-      color: colorMode === "color",
-      // Top-level fields for backward compat with older Pi listeners
-      copies: copies,
-      duplex: printOptions?.doubleSided === "double",
-      finalCost: jobCost,
-      totalCost: jobCost,
-      kioskId: printOptions?.directKioskId || "CV-001",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    const finalAmountToPay = Math.max(0, totalAmount - coinsDiscount);
-
-    await batchUpdate.commit();
 
     let amount = Number(finalAmountToPay.toFixed(2));
     if (discountPercentage > 0) {
       amount = Number((amount - (amount * (discountPercentage / 100))).toFixed(2));
     }
-    
+
     // ─── FREE ORDER BYPASS ──────────────────────────────────────────────────────
     if (amount <= 0 || amount < 1.00) {
       const printCode = Math.floor(1000 + Math.random() * 9000).toString();
       const now = admin.firestore.FieldValue.serverTimestamp();
-      
+
       await newJobRef.update({
         status: "paid",
         printCode,
         paymentTime: now,
         isPrinted: false
       });
-      
+
       // Deduct coins from user balance if coins were used
       if (coinsToUse && coinsToUse > 0) {
         await db.collection("users").doc(userId).update({
@@ -850,9 +1020,9 @@ app.post("/create-order", authMiddleware, async (req, res) => {
             console.log("Could not fetch user email from admin auth:", e.message);
           }
         }
-        
+
         console.log(`[EMAIL-DEBUG] Preparing to send FREE OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
-        
+
         if (userEmail && process.env.GMAIL_APP_PASSWORD) {
           const mailOptions = {
             from: '"Mimo Printing" <visionprintt@gmail.com>',
@@ -870,7 +1040,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
               </div>
             `
           };
-          await transporter.sendMail(mailOptions);
+          await getTransporter().sendMail(mailOptions);
           console.log(`[EMAIL] Free order receipt sent to ${userEmail}`);
         }
       } catch (emailErr) {
@@ -1050,7 +1220,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       }
       const orderBatch = db.batch();
       orders.forEach((doc) => {
-        orderBatch.update(doc.ref, { 
+        orderBatch.update(doc.ref, {
           status: "PAID",
           orderStatus: "completed",
           "paymentDetails.paymentStatus": "completed",
@@ -1064,14 +1234,14 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         .collection("print_jobs")
         .where("orderId", "==", orderId)
         .get();
-        
+
       const jobsBatch = db.batch();
       let newTotalPages = 0;
-      
+
       jobs.forEach((doc) => {
         const pages = doc.data().pageCount || 0;
         newTotalPages += pages;
-        jobsBatch.update(doc.ref, { 
+        jobsBatch.update(doc.ref, {
           status: "paid",
           "paymentStatus.status": "completed",
           "paymentStatus.paidAt": now,
@@ -1079,7 +1249,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         });
       });
       await jobsBatch.commit();
-      
+
       // ✅ Call /payment-success internally to generate the print code
       // Guard: only call if no print code exists yet on these jobs
       const existingCodeCheck = await db.collection("print_jobs")
@@ -1088,7 +1258,7 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
         .where("printCode", "!=", null)
         .limit(1)
         .get();
-      
+
       if (existingCodeCheck.empty) {
         try {
           const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
@@ -1103,14 +1273,14 @@ app.post("/cashfree-webhook", express.raw({ type: "application/json" }), async (
       } else {
         console.log(`[WEBHOOK] Print code already exists for user ${userId}, skipping duplicate generation.`);
       }
-      
+
       // Update User Statistics (V2 Schema)
       const userRef = db.collection("users").doc(userId);
       await userRef.update({
         totalSpent: admin.firestore.FieldValue.increment(paidAmount),
         totalPagesPrinted: admin.firestore.FieldValue.increment(newTotalPages)
       });
-      
+
       // Update Payment Transactions Audit (V2 Schema)
       const txnSnapshot = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
       if (!txnSnapshot.empty) {
@@ -1167,16 +1337,16 @@ app.post("/check-status", async (req, res) => {
     snapshot.forEach((doc) => {
       const data = doc.data();
       const printerStatus = data.printerStatus || "";
-      
+
       // Auto-cancelled jobs (bad URL) are NOT real failures - ignore them for status
       const isAutoCancelled = data.status === "failed" && (
         printerStatus.includes("Invalid file URL") ||
         printerStatus.includes("invalid file path") ||
         printerStatus.includes("Cancelled")
       );
-      
+
       if (isAutoCancelled) return; // skip — these are not real jobs
-      
+
       hasValidJob = true;
       if (data.status === "failed") anyRealFailed = true;
       if (data.status === "printing") anyPrinting = true;
@@ -1274,7 +1444,7 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
     let queryRef = db.collection("print_jobs")
       .where("userId", "==", userId)
       .where("status", "in", ["pending", "paid"]);
-    
+
     // If orderId provided, narrow query to only jobs from this order
     if (orderId) {
       queryRef = queryRef.where("orderId", "==", orderId);
@@ -1333,9 +1503,9 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
           console.log("Could not fetch user email from admin auth:", e.message);
         }
       }
-      
+
       console.log(`[EMAIL-DEBUG] Preparing to send OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
-      
+
       if (userEmail && process.env.GMAIL_APP_PASSWORD) {
         const mailOptions = {
           from: '"Mimo Printing" <visionprintt@gmail.com>',
@@ -1355,7 +1525,7 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
             </div>
           `
         };
-        await transporter.sendMail(mailOptions);
+        await getTransporter().sendMail(mailOptions);
         console.log(`[EMAIL] Receipt sent to ${userEmail}`);
       }
     } catch (emailErr) {
@@ -1426,11 +1596,11 @@ const adminAuthMiddleware = (req, res, next) => {
 // ================= ADMIN AUTH =================
 app.post("/admin/login", (req, res) => {
   const { email, password } = req.body;
-  
+
   // Defensively strip quotes and whitespace from both env vars and user input
   const envEmail = (process.env.ADMIN_EMAIL || "").replace(/^"|"$/g, '').trim();
   const envPassword = (process.env.ADMIN_PASSWORD || "").replace(/^"|"$/g, '').trim();
-  
+
   const reqEmail = (email || "").trim();
   const reqPassword = (password || "").trim();
 
@@ -1438,7 +1608,7 @@ app.post("/admin/login", (req, res) => {
     const token = jwt.sign({ isAdmin: true, email: reqEmail }, SECRET_KEY, { expiresIn: "24h" });
     return res.json({ token, message: "Admin Login Successful" });
   }
-  
+
   console.log(`[AUTH FAILED] Attempted: '${reqEmail}' / '${reqPassword}' against Env: '${envEmail}' / '${envPassword}'`);
   return res.status(401).json({ error: "Invalid admin credentials" });
 });
@@ -1458,7 +1628,7 @@ app.post("/admin/coupons", adminAuthMiddleware, async (req, res) => {
   try {
     const { code, discountPercentage, expiryDate } = req.body;
     if (!code || !discountPercentage) return res.status(400).json({ error: "Missing required fields" });
-    
+
     const couponRef = db.collection("coupons").doc(code.toUpperCase());
     await couponRef.set({
       code: code.toUpperCase(),
@@ -1467,7 +1637,7 @@ app.post("/admin/coupons", adminAuthMiddleware, async (req, res) => {
       expiryDate: expiryDate ? new Date(expiryDate) : null,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     res.json({ message: "Coupon created successfully" });
   } catch (err) {
     res.status(500).json({ error: "Failed to create coupon" });
@@ -1488,18 +1658,18 @@ app.get("/validate-coupon/:code", async (req, res) => {
   try {
     const code = req.params.code.toUpperCase();
     const couponDoc = await db.collection("coupons").doc(code).get();
-    
+
     if (!couponDoc.exists) {
       return res.status(404).json({ error: "Invalid promo code" });
     }
 
     const couponData = couponDoc.data();
     const now = new Date();
-    
+
     if (!couponData.isActive) {
       return res.status(400).json({ error: "Promo code is disabled" });
     }
-    
+
     if (couponData.expiryDate && couponData.expiryDate.toDate() < now) {
       return res.status(400).json({ error: "Promo code has expired" });
     }
@@ -1638,7 +1808,7 @@ app.get("/admin/metrics", adminAuthMiddleware, async (req, res) => {
 
     let totalRevenue = 0;
     let totalPages = 0;
-    
+
     ordersSnap.forEach((doc) => {
       const data = doc.data();
       if (data.status === "PAID" || data.status === "SUCCESS") {
@@ -1699,12 +1869,12 @@ app.get("/admin/recent-prints", adminAuthMiddleware, async (req, res) => {
       .orderBy("createdAt", "desc")
       .limit(30)
       .get();
-      
+
     const recentPrints = [];
     for (const doc of jobsSnapshot.docs) {
       const data = doc.data();
       let userEmail = data.userEmail || "Guest User";
-      
+
       try {
         if (!data.userEmail && data.userId && data.source !== "whatsapp") {
           const userDoc = await db.collection("users").doc(data.userId).get();
@@ -1734,7 +1904,7 @@ app.get("/admin/recent-prints", adminAuthMiddleware, async (req, res) => {
         refundAmount: data.refundAmount || null
       });
     }
-    
+
     res.json(recentPrints);
   } catch (err) {
     console.error("Recent prints error:", err);
@@ -1841,7 +2011,7 @@ app.get("/wa-pay-success/:orderId", async (req, res) => {
     const waJobs = await db.collection("print_jobs").where("orderId", "==", orderId).get();
     let printCode = null;
     waJobs.forEach(d => { if (d.data().printCode) printCode = d.data().printCode; });
-    
+
     if (!printCode) {
       // Payment just completed, trigger fulfillment
       const cfStatus = await axios.get(`${CASHFREE_BASE_URL}/links/${orderId}`, { headers: cashfreeHeaders });
@@ -1871,7 +2041,7 @@ app.get("/wa-pay-success/:orderId", async (req, res) => {
         }
       }
     }
-    
+
     res.send(`
       <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
       <title>Mimo - Payment Success!</title>
@@ -1910,7 +2080,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     const entry = body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
-    
+
     const phoneNumberId = value?.metadata?.phone_number_id;
     return waContext.run({ phoneNumberId }, async () => {
 
@@ -1925,8 +2095,8 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     // Strict Idempotency Check: Prevent race conditions by forcing an atomic write
     try {
-      await db.collection("whatsapp_msg_ids").doc(msgId).create({ 
-        processedAt: admin.firestore.FieldValue.serverTimestamp() 
+      await db.collection("whatsapp_msg_ids").doc(msgId).create({
+        processedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } catch (e) {
       if (e.code === 6 || e.message.includes("ALREADY_EXISTS")) {
@@ -1944,7 +2114,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     if (msgType === "document" || msgType === "image") {
       const doc = msg.document || msg.image;
       const mimeType = doc.mime_type || "";
-      
+
       const isPdf = mimeType.includes("pdf");
       const isImage = mimeType.includes("image/jpeg") || mimeType.includes("image/png") || mimeType.includes("image/jpg");
 
@@ -2039,8 +2209,8 @@ app.post("/whatsapp-webhook", async (req, res) => {
         pageCount
       });
 
-      await sendWhatsAppButtons(from, 
-        `📄 *${doc.filename || "document.pdf"}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`, 
+      await sendWhatsAppButtons(from,
+        `📄 *${doc.filename || "document.pdf"}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`,
         [
           { id: "dest_cv", title: "📍 CV B&W" },
           { id: "dest_sv", title: "📍 SV Color and B&W" }
@@ -2052,7 +2222,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     // ── Handle interactive button replies ───────────────────────────────────────
     if (msgType === "interactive" && msg.interactive.type === "button_reply") {
       const buttonId = msg.interactive.button_reply.id;
-      
+
       if (session.state === "awaiting_destination") {
          if (buttonId === "dest_cv") {
            // CV is B&W only, skip color selection
@@ -2100,7 +2270,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     // ── Handle text replies ───────────────────────────────────────────────────
     if (msgType === "text") {
       const textBody = msg.text.body.trim();
-      
+
       if (session.state === "awaiting_copies") {
         const copies = parseInt(textBody);
         if (!isNaN(copies) && copies > 0 && copies <= 100) {
@@ -2115,7 +2285,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
         await _finalizePayment(from, session, sessionRef, textBody.trim().toUpperCase());
         return res.sendStatus(200);
       }
-      
+
       // Default: Welcome message
       await sendWhatsAppMessage(from,
         `👋 *Welcome to Mimo Printing!*\n\nSend me a *PDF file* and I'll guide you through printing it at any Mimo kiosk.\n\n📄 Upload PDF → ⚙️ Select Settings → 💳 Pay → 🖨️ Collect!`
@@ -2200,18 +2370,18 @@ async function sendWhatsAppOrderCard(to, { orderId, fileName, colorMode, copies,
 async function _askForCoupon(from, session, sessionRef, copies) {
   const pricingDoc = await db.collection("settings").doc("pricing").get();
   const pricing = pricingDoc.exists ? pricingDoc.data() : {};
-  
+
   const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageWAColor || pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageWABW || pricing.pricePerPageBW || 2.30);
-  
+
   const pageCount = session.pageCount || 1;
   let totalAmount = Number((copies * pageCount * pricePerPage).toFixed(2));
 
   // Update session
   await sessionRef.update({ state: "awaiting_coupon", copies, rawTotal: totalAmount });
-  
+
   const kioskName = session.destination === "KIOSK-001-CV" ? "🖨️ CV B&W" : "🖨️ SV Color and B&W";
   const colorText = session.colorMode === "color" ? "🎨 Color" : "📄 B&W";
-  
+
   const receiptText = `🧾 *MIMO PRINT SUMMARY* 🧾
 ➖➖➖➖➖➖➖➖➖➖➖➖➖➖
 📄 *Document:* ${session.fileName}
@@ -2233,14 +2403,14 @@ Type the code below, or click *Skip & Pay* to proceed.`;
 async function _finalizePayment(from, session, sessionRef, couponCode) {
   let totalAmount = session.rawTotal || 1.00;
   let discountAmount = 0;
-  
+
   if (couponCode) {
     try {
       const couponDoc = await db.collection("coupons").doc(couponCode).get();
       if (couponDoc.exists) {
         const data = couponDoc.data();
         let isExpired = false;
-        
+
         if (data.expiryDate) {
           const expiryDate = data.expiryDate.toDate ? data.expiryDate.toDate() : new Date(data.expiryDate);
           if (expiryDate < new Date()) isExpired = true;
@@ -2296,7 +2466,7 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
     await db.collection("print_jobs").doc(session.jobId).update({
       orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: totalAmount, printDestination: session.destination || "Any", couponUsed: couponCode || null
     });
-    
+
     await sessionRef.update({ state: "idle" });
 
     const paymentLink = cfRes.data.link_url;
@@ -2363,7 +2533,7 @@ app.get("/kiosk/job-status", async (req, res) => {
     if (!printCode) return res.status(400).json({ error: "Print code required" });
     const snapshot = await db.collection("print_jobs").where("printCode", "==", printCode).get();
     if (snapshot.empty) return res.status(404).json({ error: "Job not found" });
-    
+
     // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
     const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     docs.sort((a, b) => {
@@ -2384,20 +2554,20 @@ app.get("/kiosk/job-status", async (req, res) => {
     // Only perform health checks if printing has not started yet.
     // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
     const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
-    const hasStarted = currentSessionDocs.some(d => 
+    const hasStarted = currentSessionDocs.some(d =>
       ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
     );
 
     if (!hasStarted) {
-      const kioskId = currentSessionDocs[0].printOptions?.directKioskId || 
-                      currentSessionDocs[0].settings?.directKioskId || 
-                      currentSessionDocs[0].kioskId || 
+      const kioskId = currentSessionDocs[0].printOptions?.directKioskId ||
+                      currentSessionDocs[0].settings?.directKioskId ||
+                      currentSessionDocs[0].kioskId ||
                       "CV-001";
       try {
         const statusDoc = await db.collection("system_status").doc(kioskId).get();
         if (statusDoc.exists) {
           const statusData = statusDoc.data();
-          
+
           // A. Kiosk Online Check (lastSeen)
           const lastSeen = statusData.lastSeen ? (statusData.lastSeen.toDate ? statusData.lastSeen.toDate() : new Date(statusData.lastSeen)) : null;
           if (lastSeen) {
@@ -2495,7 +2665,7 @@ app.get("/kiosk/job-status", async (req, res) => {
     if (allCompleted) {
       return res.json({ status: "completed", isPrinted: true });
     }
-    
+
     if (anyPrinting) {
       return res.json({ status: "printing", isPrinted: false });
     }
@@ -2546,7 +2716,7 @@ app.post("/kiosk/print", async (req, res) => {
           const timeB = b.data().createdAt?.toDate ? b.data().createdAt.toDate().getTime() : 0;
           return timeB - timeA;
         });
-        
+
         const jobDoc = sortedDocs[0];
         const jobData = jobDoc.data();
         targetKioskId = jobData?.kioskId || jobData?.printOptions?.directKioskId || jobData?.settings?.directKioskId || "CV-001";
@@ -2561,13 +2731,13 @@ app.post("/kiosk/print", async (req, res) => {
           transactionFailedError = { status: 400, message: "Print code already redeemed or job not paid" };
           throw new Error("TX_ABORT");
         }
-        
+
         // Set status to printing so the Pi's firebase_listener.py picks it up
-        transaction.update(jobDoc.ref, { 
-          status: "printing", 
-          printStartedAt: admin.firestore.FieldValue.serverTimestamp(), 
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(), 
-          kioskId: targetKioskId 
+        transaction.update(jobDoc.ref, {
+          status: "printing",
+          printStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          kioskId: targetKioskId
         });
         updatedJobData = { ...jobData, status: "printing", kioskId: targetKioskId };
       });
@@ -2582,7 +2752,7 @@ app.post("/kiosk/print", async (req, res) => {
     // The Pi's mimo-listener.service will poll this document, download the PDF, and print it.
     // The Kiosk UI will poll /kiosk/job-status until the Pi updates it to 'completed'.
     return res.json({ success: true, message: "Print job enqueued successfully", job: updatedJobData });
-    
+
   } catch (err) {
     console.error("❌ KIOSK PRINT ERROR:", err);
     res.status(500).json({ error: "Server error" });
@@ -2695,7 +2865,11 @@ app.post("/kiosk/report-failure", async (req, res) => {
 });
 
 
-exports.api = onRequest({ cors: true, maxInstances: 10 }, app);
+ exports.api = onRequest({
+  cors: true,
+  maxInstances: 10,
+  secrets: [gmailAppPassword]
+}, app);
 
 // ================= AUTO REFUND LISTENER =================
 exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
@@ -2782,7 +2956,7 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
   // Trigger ONLY if status changes to "completed"
   if (beforeData.status !== "completed" && afterData.status === "completed") {
     console.log(`[STORAGE] Print job ${event.params.jobId} completed. Cleaning up file...`);
-    
+
     if (!afterData.fileUrl) {
       console.log(`[STORAGE] No fileUrl found for job ${event.params.jobId}.`);
       return;
@@ -2791,10 +2965,10 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
     try {
       // fileUrl format: "gs://mimo-v2-11868.firebasestorage.app/uploads/username/filename.pdf"
       // Or: "https://firebasestorage.googleapis.com/v0/b/..."
-      
+
       const fileUrl = afterData.fileUrl;
       const bucket = admin.storage().bucket();
-      
+
       let filePath = "";
       if (fileUrl.startsWith("gs://")) {
         const bucketName = bucket.name;

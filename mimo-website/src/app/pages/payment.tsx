@@ -74,7 +74,8 @@ export function Payment() {
 
   // Helper to parse page range and get page count
   const getSelectedPageCount = (file: any) => {
-    const config = printOptions?.fileConfigs?.[file.name];
+    const fid = file.fileId || file.name;
+    const config = printOptions?.fileConfigs?.[fid];
     if (!config) return file.pageCount || 1;
     if (config.pageSelection === "all") return file.pageCount || 1;
     
@@ -192,8 +193,9 @@ export function Payment() {
     try {
       const storedOptions = sessionStorage.getItem("printOptions");
       const printOptions = storedOptions ? JSON.parse(storedOptions) : {};
+      const manifestId = sessionStorage.getItem("manifestId") || printOptions.manifestId;
       
-      const payload: any = { printOptions };
+      const payload: any = { manifestId, printOptions };
       if (appliedPromo) {
         payload.couponCode = appliedPromo;
       }
@@ -202,8 +204,7 @@ export function Payment() {
         payload.coinsToUse = coinsToUse;
       }
 
-      // 1. ALWAYS create order in backend first, regardless of amount.
-      // The backend securely verifies the coupon and 100% discount status.
+      // 1. ALWAYS create order in backend first using manifestId
       const orderResponse = await api.post("/create-order", payload);
       const { orderId, paymentSessionId, free, printCode } = orderResponse.data;
 
