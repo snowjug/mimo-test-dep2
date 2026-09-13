@@ -402,16 +402,23 @@ export function UploadFile() {
       // Store the full file metadata (with URLs) for later use in handlePrint
       setUploadedFilesData(prev => [...prev, ...uploadedFiles]);
 
-      // 3. Tell backend to finalize and create database records
-      // In Serverless architecture, this doesn't trigger conversion anymore. It just creates the job.
+      // 3. Tell backend to finalize and create database records with server-authoritative fileId
       const response = await api.post("/finalize-upload", { files: [...uploadedFilesData, ...uploadedFiles] });
       
+      let finalFilesData: any[] = [];
+      if (response.data && response.data.files && Array.isArray(response.data.files) && response.data.files.every((f: any) => f.fileId)) {
+        finalFilesData = response.data.files;
+        setUploadedFilesData(finalFilesData);
+      } else {
+        throw new Error("Server failed to issue authoritative file identity records.");
+      }
+
       // Update UI
       setFiles((prev) =>
         prev.map((f) => {
           const isTarget = newFiles.some((nf) => nf.name === f.name);
           if (isTarget) {
-            const meta = uploadedFiles.find(uf => uf.name === f.name);
+            const meta = finalFilesData.find((uf: any) => (uf.fileName || uf.name) === f.name);
             return { ...f, status: "completed", progress: 100, pageCount: meta?.pageCount || 1 };
           }
           return f;
@@ -420,10 +427,9 @@ export function UploadFile() {
       toast.success("Files ready for printing!");
 
       // Calculate total pages for pricing
-      const totalPages = uploadedFiles.reduce((acc: number, curr: any) => acc + curr.pageCount, 0);
+      const totalPages = finalFilesData.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
       setBackendTotalPages(totalPages);
       
-      // Assuming a base rate of 2 per page for estimation, backend handles real calculation
       sessionStorage.setItem("uploadAmount", (totalPages * 2).toString());
       sessionStorage.setItem("uploadTotalPages", totalPages.toString());
       setUploading(false);

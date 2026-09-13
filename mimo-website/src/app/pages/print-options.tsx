@@ -12,10 +12,13 @@ import { ArrowLeft, FileText, Minus, Plus, Eye, Printer, Palette, Contrast, File
 import api from "../api";
 
 interface UploadedFile {
+  fileId?: string;
   name: string;
+  fileName?: string;
   size: number;
   type?: string;
   url?: string;
+  fileUrl?: string;
   pageCount?: number;
 }
 
@@ -118,18 +121,28 @@ export function PrintOptions() {
       return;
     }
 
-    const parsedFiles = JSON.parse(storedFiles);
+    const parsedFiles: UploadedFile[] = JSON.parse(storedFiles);
+    // Strict requirement: missing fileId is an invalid/stale session state. No client fallbacks permitted.
+    const hasInvalidFiles = !Array.isArray(parsedFiles) || parsedFiles.length === 0 || parsedFiles.some(f => !f.fileId);
+    if (hasInvalidFiles) {
+      toast.error("Stale or invalid file session detected. Please re-upload your documents.");
+      sessionStorage.removeItem("printFiles");
+      navigate("/upload");
+      return;
+    }
+
     setFiles(parsedFiles);
 
-    // Initialize configs
+    // Initialize configs keyed strictly by fileId
     const initialConfigs: Record<string, {
       pageSelection: "all" | "custom";
       pageRange: string;
       selectedPages: number[];
     }> = {};
-    parsedFiles.forEach((file: any) => {
+    parsedFiles.forEach((file) => {
+      const fid = file.fileId!;
       const pCount = file.pageCount || 1;
-      initialConfigs[file.name] = {
+      initialConfigs[fid] = {
         pageSelection: "all",
         pageRange: `1-${pCount}`,
         selectedPages: Array.from({ length: pCount }, (_, i) => i + 1)
@@ -140,7 +153,6 @@ export function PrintOptions() {
     if (uploadTotalPages) setTotalPages(Number(uploadTotalPages));
     if (uploadAmount) setBaseTotalCost(Number(uploadAmount));
 
-
     // Scroll to top when page loads
     window.scrollTo(0, 0);
   }, [navigate]);
@@ -149,7 +161,7 @@ export function PrintOptions() {
   const actualImages = files.filter(f => f.type && f.type.startsWith('image/')).map(f => ({
     name: f.name,
     mimetype: f.type,
-    dataUrl: f.url
+    dataUrl: f.url || f.fileUrl
   }));
   const hasImages = actualImages.length > 0;
 
@@ -182,7 +194,8 @@ export function PrintOptions() {
 
     let totalPrintedPages = 0;
     files.forEach((file) => {
-      const config = fileConfigs[file.name];
+      if (!file.fileId) return;
+      const config = fileConfigs[file.fileId];
       if (config) {
         if (pageSelection === "all") {
           totalPrintedPages += (file.pageCount || 1);
@@ -198,12 +211,12 @@ export function PrintOptions() {
   }, [fileConfigs, pageSelection, files]);
 
   // Handler to toggle a single page
-  const handleTogglePage = (fileName: string, pageNum: number) => {
+  const handleTogglePage = (fileId: string, pageNum: number) => {
     setFileConfigs((prev) => {
-      const config = prev[fileName];
+      const config = prev[fileId];
       if (!config) return prev;
 
-      const maxPages = files.find(f => f.name === fileName)?.pageCount || 1;
+      const maxPages = files.find(f => f.fileId === fileId)?.pageCount || 1;
       let newSelected = [...config.selectedPages];
       if (newSelected.includes(pageNum)) {
         newSelected = newSelected.filter(p => p !== pageNum);
@@ -214,7 +227,7 @@ export function PrintOptions() {
 
       return {
         ...prev,
-        [fileName]: {
+        [fileId]: {
           ...config,
           selectedPages: newSelected,
           pageRange: generatePageRange(newSelected, maxPages)
@@ -224,12 +237,12 @@ export function PrintOptions() {
   };
 
   // Handler for quick actions
-  const handleQuickSelect = (fileName: string, type: "first-half" | "second-half" | "odds" | "evens") => {
+  const handleQuickSelect = (fileId: string, type: "first-half" | "second-half" | "odds" | "evens") => {
     setFileConfigs((prev) => {
-      const config = prev[fileName];
+      const config = prev[fileId];
       if (!config) return prev;
 
-      const maxPages = files.find(f => f.name === fileName)?.pageCount || 1;
+      const maxPages = files.find(f => f.fileId === fileId)?.pageCount || 1;
       let newSelected: number[] = [];
       if (type === "first-half") {
         const mid = Math.ceil(maxPages / 2);
@@ -245,7 +258,7 @@ export function PrintOptions() {
 
       return {
         ...prev,
-        [fileName]: {
+        [fileId]: {
           ...config,
           selectedPages: newSelected,
           pageRange: generatePageRange(newSelected, maxPages)
@@ -255,17 +268,17 @@ export function PrintOptions() {
   };
 
   // Handler for manual text input change
-  const handleTextRangeChange = (fileName: string, text: string) => {
+  const handleTextRangeChange = (fileId: string, text: string) => {
     setFileConfigs((prev) => {
-      const config = prev[fileName];
+      const config = prev[fileId];
       if (!config) return prev;
 
-      const maxPages = files.find(f => f.name === fileName)?.pageCount || 1;
+      const maxPages = files.find(f => f.fileId === fileId)?.pageCount || 1;
       const newSelected = parsePageRange(text, maxPages);
 
       return {
         ...prev,
-        [fileName]: {
+        [fileId]: {
           ...config,
           pageRange: text,
           selectedPages: newSelected
@@ -275,10 +288,9 @@ export function PrintOptions() {
   };
 
   // Handler to update page count manually (e.g. for non-PDFs)
-  const handleUpdatePageCount = (fileName: string, newCount: number) => {
-    // 1. Update files state
+  const handleUpdatePageCount = (fileId: string, newCount: number) => {
     const updatedFiles = files.map(f => {
-      if (f.name === fileName) {
+      if (f.fileId === fileId) {
         return { ...f, pageCount: newCount };
       }
       return f;
@@ -286,13 +298,12 @@ export function PrintOptions() {
     setFiles(updatedFiles);
     sessionStorage.setItem("printFiles", JSON.stringify(updatedFiles));
 
-    // 2. Update fileConfigs
     setFileConfigs(prev => {
-      const config = prev[fileName];
+      const config = prev[fileId];
       if (!config) return prev;
       return {
         ...prev,
-        [fileName]: {
+        [fileId]: {
           ...config,
           pageRange: `1-${newCount}`,
           selectedPages: Array.from({ length: newCount }, (_, i) => i + 1)
@@ -306,9 +317,9 @@ export function PrintOptions() {
     setPageSelection(val);
     setFileConfigs((prev) => {
       const updated = { ...prev };
-      Object.keys(updated).forEach(fileName => {
-        updated[fileName] = {
-          ...updated[fileName],
+      Object.keys(updated).forEach(fileId => {
+        updated[fileId] = {
+          ...updated[fileId],
           pageSelection: val
         };
       });
@@ -331,29 +342,31 @@ export function PrintOptions() {
   let hasSelectionError = false;
   if (pageSelection === "custom") {
     files.forEach((file) => {
-      const config = fileConfigs[file.name];
+      if (!file.fileId) return;
+      const config = fileConfigs[file.fileId];
       if (!config || config.selectedPages.length === 0) {
         hasSelectionError = true;
       }
     });
   }
 
-  const handleContinue = () => {
-    // Prepare simplified fileConfigs to save in sessionStorage
-    const simplifiedConfigs: Record<string, { pageSelection: string; pageRange: string; pageCount: number }> = {};
-    Object.keys(fileConfigs).forEach(fileName => {
-      simplifiedConfigs[fileName] = {
-        pageSelection: fileConfigs[fileName].pageSelection,
-        pageRange: fileConfigs[fileName].pageRange,
-        pageCount: files.find(f => f.name === fileName)?.pageCount || 1
+  const handleContinue = async () => {
+    const cleanKioskId = directKioskId?.startsWith("SV-002") ? "SV-002" : directKioskId;
+
+    const manifestFiles = files.map(f => {
+      if (!f.fileId) throw new Error("Missing fileId for upload");
+      const cfg = fileConfigs[f.fileId];
+      return {
+        fileId: f.fileId,
+        printConfig: {
+          pageSelection: cfg?.pageSelection || pageSelection || "all",
+          pageRange: cfg?.pageRange || `1-${f.pageCount || 1}`,
+          selectedPages: cfg?.selectedPages || Array.from({ length: f.pageCount || 1 }, (_, i) => i + 1)
+        }
       };
     });
 
-    // Clean the Kiosk ID for the backend (SV-002-COLOR -> SV-002)
-    const cleanKioskId = directKioskId?.startsWith("SV-002") ? "SV-002" : directKioskId;
-
-    // Store print options for payment page
-    sessionStorage.setItem("printOptions", JSON.stringify({
+    const globalOptions = {
       copies: Number(copies) || 1,
       colorMode,
       doubleSided,
@@ -362,14 +375,42 @@ export function PrintOptions() {
       imageScaling,
       customScale,
       photoLayout,
-      pageRange: files.length > 0 ? (fileConfigs[files[0].name]?.pageRange || "") : "", // fallback
-      fileConfigs: simplifiedConfigs,
-      totalCost,
-      totalPages: actualPages, // Store actual printable pages per set
       directKioskId: cleanKioskId
-    }));
+    };
 
-    navigate("/payment");
+    try {
+      const response = await api.post("/create-manifest", {
+        files: manifestFiles,
+        globalOptions
+      });
+
+      const { manifestId } = response.data;
+
+      // Prepare simplified fileConfigs keyed STRICTLY by fileId
+      const simplifiedConfigs: Record<string, { pageSelection: string; pageRange: string; pageCount: number }> = {};
+      files.forEach(f => {
+        if (!f.fileId) return;
+        simplifiedConfigs[f.fileId] = {
+          pageSelection: fileConfigs[f.fileId]?.pageSelection || pageSelection,
+          pageRange: fileConfigs[f.fileId]?.pageRange || "",
+          pageCount: f.pageCount || 1
+        };
+      });
+
+      sessionStorage.setItem("manifestId", manifestId);
+      sessionStorage.setItem("printOptions", JSON.stringify({
+        ...globalOptions,
+        manifestId,
+        fileConfigs: simplifiedConfigs,
+        totalCost,
+        totalPages: actualPages
+      }));
+
+      navigate("/payment");
+    } catch (err: any) {
+      console.error("Failed to create manifest:", err);
+      toast.error(err.response?.data?.error || "Failed to create print manifest");
+    }
   };
 
   const incrementCopies = () => {
@@ -756,11 +797,12 @@ export function PrintOptions() {
                         <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/40">
                           {files.map((file, idx) => {
                             const isActive = activeFileIndex === idx;
-                            const config = fileConfigs[file.name];
+                            const fid = file.fileId!;
+                            const config = fileConfigs[fid];
                             const selectedCount = config ? config.selectedPages.length : 0;
                             return (
                               <button
-                                key={idx}
+                                key={file.fileId || idx}
                                 type="button"
                                 onClick={() => setActiveFileIndex(idx)}
                                 className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${isActive
@@ -781,8 +823,9 @@ export function PrintOptions() {
                       {/* Active File Config */}
                       {(() => {
                         const activeFile = files[activeFileIndex];
-                        if (!activeFile) return null;
-                        const config = fileConfigs[activeFile.name] || {
+                        if (!activeFile || !activeFile.fileId) return null;
+                        const fid = activeFile.fileId;
+                        const config = fileConfigs[fid] || {
                           pageSelection: "custom",
                           pageRange: "",
                           selectedPages: []
@@ -808,7 +851,7 @@ export function PrintOptions() {
                                         if (val) {
                                           const num = parseInt(val);
                                           if (!isNaN(num) && num > 0) {
-                                            handleUpdatePageCount(activeFile.name, num);
+                                            handleUpdatePageCount(fid, num);
                                           }
                                         }
                                       }}
@@ -834,7 +877,7 @@ export function PrintOptions() {
                                   <button
                                     key={num}
                                     type="button"
-                                    onClick={() => handleTogglePage(activeFile.name, num)}
+                                    onClick={() => handleTogglePage(fid, num)}
                                     className={`h-8 w-8 text-xs font-bold rounded-lg border transition-all cursor-pointer flex items-center justify-center ${isSelected
                                       ? "bg-[#093765] text-white border-[#093765] shadow-xs active:scale-95"
                                       : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 active:scale-95"
@@ -850,28 +893,28 @@ export function PrintOptions() {
                             <div className="flex flex-wrap gap-1.5 pl-1">
                               <button
                                 type="button"
-                                onClick={() => handleQuickSelect(activeFile.name, "first-half")}
+                                onClick={() => handleQuickSelect(fid, "first-half")}
                                 className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
                               >
                                 First Half
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleQuickSelect(activeFile.name, "second-half")}
+                                onClick={() => handleQuickSelect(fid, "second-half")}
                                 className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
                               >
                                 Second Half
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleQuickSelect(activeFile.name, "odds")}
+                                onClick={() => handleQuickSelect(fid, "odds")}
                                 className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
                               >
                                 Odd Pages
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleQuickSelect(activeFile.name, "evens")}
+                                onClick={() => handleQuickSelect(fid, "evens")}
                                 className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 cursor-pointer transition-all active:scale-95"
                               >
                                 Even Pages
@@ -887,7 +930,7 @@ export function PrintOptions() {
                                 type="text"
                                 placeholder="e.g. 1-5, 8, 11-13"
                                 value={config.pageRange}
-                                onChange={(e) => handleTextRangeChange(activeFile.name, e.target.value)}
+                                onChange={(e) => handleTextRangeChange(fid, e.target.value)}
                                 className="bg-slate-50 border-2 border-slate-200/80 shadow-inner h-9 w-full text-slate-800 placeholder:text-slate-400 focus-visible:ring-[#093765] focus-visible:border-[#093765] focus-visible:bg-white font-semibold text-[16px] sm:text-xs rounded-lg"
                               />
                             </div>
