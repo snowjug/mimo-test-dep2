@@ -8,8 +8,9 @@ const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
 const crypto = require("crypto");
-const { OAuth2Client } = require("google-auth-library");
+const { OAuth2Client, GoogleAuth } = require("google-auth-library");
 const { PDFDocument } = require("pdf-lib");
+const path = require("path");
 
 // Lazy-loaded Nodemailer Transporter helper
 function getTransporter() {
@@ -432,7 +433,69 @@ app.post("/settings", authMiddleware, async (req, res) => {
   }
 });
 
-// ================= NEW FINAL UPLOAD (Serverless) =================
+// ================= OFFICE CONVERTER HELPER =================
+const CONVERTER_SERVICE_URL = process.env.CONVERTER_SERVICE_URL || "https://mimo-office-converter-upqxuj7evq-uc.a.run.app";
+const INTERNAL_CONVERTER_SECRET = process.env.INTERNAL_CONVERTER_SECRET || "";
+
+const SUPPORTED_OFFICE_EXTENSIONS = new Set([
+  ".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls",
+  ".odt", ".ods", ".odp", ".rtf", ".txt"
+]);
+
+/**
+ * Invokes the private LibreOffice converter service on Cloud Run via authenticated service-to-service call.
+ * Returns { pageCount, fileUrl, storagePath } where fileUrl is the rendered PDF in Cloud Storage.
+ */
+async function callOfficeConverter({ fileUrl, fileName, userId, jobId }) {
+  const converterUrl = (process.env.CONVERTER_SERVICE_URL || CONVERTER_SERVICE_URL).replace(/\/+$/, "");
+
+  const payload = {
+    fileUrl,
+    fileName,
+    jobId: jobId || userId || "general"
+  };
+
+  const isLocalOrDirect =
+    converterUrl.includes("localhost") ||
+    converterUrl.includes("127.0.0.1") ||
+    Boolean(process.env.INTERNAL_CONVERTER_SECRET || INTERNAL_CONVERTER_SECRET);
+
+  let response;
+  if (isLocalOrDirect) {
+    // Local development, container testing, or direct secret invocation
+    const secret = process.env.INTERNAL_CONVERTER_SECRET || INTERNAL_CONVERTER_SECRET;
+    response = await axios.post(`${converterUrl}/convert`, payload, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(secret ? { "x-internal-secret": secret } : {})
+      },
+      timeout: 75000
+    });
+  } else {
+    // Production Cloud Run service-to-service IAM authentication
+    const auth = new GoogleAuth();
+    const client = await auth.getIdTokenClient(converterUrl);
+    response = await client.request({
+      url: `${converterUrl}/convert`,
+      method: "POST",
+      data: payload,
+      timeout: 75000
+    });
+  }
+
+  const data = response.data;
+  if (!data || !data.success || typeof data.pageCount !== "number" || data.pageCount < 1) {
+    throw new Error(data?.error || "Converter returned an invalid response or page count");
+  }
+
+  return {
+    pageCount: data.pageCount,
+    fileUrl: data.fileUrl || fileUrl,
+    storagePath: data.storagePath || null
+  };
+}
+
+// ================= FINAL UPLOAD (Serverless with Verified Office Conversion) =================
 app.post("/finalize-upload", authMiddleware, async (req, res) => {
   try {
     const { files } = req.body;
@@ -446,53 +509,106 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
       }
     }
 
-    let totalPages = 0;
     const userId = req.user.id || req.user.userId;
 
+    // Phase 1: Validate and convert required files BEFORE performing any database writes.
+    // If any conversion fails, return HTTP 422 immediately with 0 jobs written to Firestore.
+    const finalizedFiles = [];
+    let totalPages = 0;
+
+    for (const f of files) {
+      const ext = path.extname(f.name || "").toLowerCase();
+      const isOfficeDoc = SUPPORTED_OFFICE_EXTENSIONS.has(ext);
+      const isPdf = ext === ".pdf" || f.type === "application/pdf";
+      const isImage = (typeof f.type === "string" && f.type.startsWith("image/")) || [".jpg", ".jpeg", ".png", ".webp", ".heic"].includes(ext);
+
+      let resolvedPageCount = 1;
+      let printableFileUrl = f.url;
+      let printableMimetype = f.type || "application/octet-stream";
+      let originalFileUrl = f.url;
+      let convertedStoragePath = null;
+
+      if (isPdf) {
+        // PDF flow: client pdf-lib count is accurate; fallback to 1 if missing or invalid
+        const rawCount = Number(f.pageCount);
+        const isValidCount = Number.isInteger(rawCount) && rawCount > 0 && Number.isFinite(rawCount);
+        resolvedPageCount = isValidCount ? rawCount : 1;
+        printableMimetype = "application/pdf";
+      } else if (isImage) {
+        // Images are always 1 page
+        resolvedPageCount = 1;
+      } else if (isOfficeDoc) {
+        // Office documents: DO NOT trust client pageCount.
+        // Invoke Cloud Run converter to render PDF and extract exact page count.
+        console.log(`[FINALIZE-UPLOAD] Converting Office document '${f.name}' via converter service...`);
+        try {
+          const conv = await callOfficeConverter({
+            fileUrl: f.url,
+            fileName: f.name,
+            userId: userId
+          });
+          resolvedPageCount = conv.pageCount;
+          printableFileUrl = conv.fileUrl; // Converted PDF becomes the printable file!
+          printableMimetype = "application/pdf";
+          convertedStoragePath = conv.storagePath;
+          console.log(`[FINALIZE-UPLOAD] Office conversion succeeded for '${f.name}': ${resolvedPageCount} pages, printable PDF: ${printableFileUrl}`);
+        } catch (convErr) {
+          console.error(`[FINALIZE-UPLOAD ERROR] Conversion failed for '${f.name}':`, convErr.message);
+          // CRITICAL: Fail fast. Do NOT create a payable job with unverified pageCount!
+          return res.status(422).json({
+            error: `Failed to process document '${f.name}': ${convErr.message}. Please ensure the file is valid and try again.`
+          });
+        }
+      } else {
+        // Unsupported non-office format: default to 1 or valid client count
+        const rawCount = Number(f.pageCount);
+        const isValidCount = Number.isInteger(rawCount) && rawCount > 0 && Number.isFinite(rawCount);
+        resolvedPageCount = isValidCount ? rawCount : 1;
+      }
+
+      totalPages += resolvedPageCount;
+      finalizedFiles.push({
+        name: f.name,
+        url: printableFileUrl,
+        originalUrl: originalFileUrl,
+        type: printableMimetype,
+        size: f.size,
+        pageCount: resolvedPageCount,
+        convertedStoragePath: convertedStoragePath
+      });
+    }
+
+    // Phase 2: Conversions succeeded for all files. Now update the database atomically.
     // Clear old pending jobs to prevent ghost cart pricing discrepancies
     const staleJobs = await db.collection("print_jobs").where("userId", "==", userId).where("status", "==", "pending").get();
     const deleteBatch = db.batch();
     staleJobs.forEach(doc => deleteBatch.delete(doc.ref));
     await deleteBatch.commit();
 
+    // Create the pending print_jobs in Firestore with verified pageCount and converted PDF url
     const batch = db.batch();
-    const processedFiles = [];
-
-    // Process files directly - no conversion loop, Pi handles it!
-    for (const f of files) {
-      const rawCount = Number(f.pageCount);
-      const isValidCount = Number.isInteger(rawCount) && rawCount > 0 && Number.isFinite(rawCount);
-      const isImage = typeof f.type === "string" && f.type.startsWith("image/");
-      const validPageCount = isImage ? 1 : (isValidCount ? rawCount : 1);
-
+    for (const f of finalizedFiles) {
       const docRef = db.collection("print_jobs").doc();
       batch.set(docRef, {
-        userId: req.user.id || req.user.userId,
+        userId: userId,
         fileName: f.name,
-        fileUrl: f.url,
-        mimetype: f.type,
+        fileUrl: f.url, // Points to converted PDF for Office files!
+        mimetype: f.type, // "application/pdf" for converted Office files!
         size: f.size,
-        status: "pending", // Direct to pending, bypassing 'pending_conversion'
-        pageCount: validPageCount,
+        status: "pending",
+        pageCount: f.pageCount, // Authoritative server-side page count!
+        originalFileUrl: f.originalUrl !== f.url ? f.originalUrl : null,
+        convertedStoragePath: f.convertedStoragePath || null,
         uploadedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      totalPages += validPageCount;
-
-      processedFiles.push({
-        name: f.name,
-        url: f.url,
-        type: f.type,
-        pageCount: validPageCount
-      });
     }
-
     await batch.commit();
 
     res.json({
       message: "Jobs created successfully.",
       amount: totalPages * 2,
       totalPages: totalPages,
-      files: processedFiles
+      files: finalizedFiles
     });
   } catch (err) {
     console.error("Error finalizing upload:", err);
@@ -738,7 +854,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     jobsSnapshot.forEach((doc) => {
       const data = doc.data();
       const fileConfig = printOptions?.fileConfigs?.[data.fileName];
-      let numPages = fileConfig?.pageCount || data.pageCount || 1;
+      let numPages = data.pageCount || fileConfig?.pageCount || 1;
       const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
       const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
 
@@ -760,8 +876,20 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       }
 
       totalRawPages += numPages;
+
+      // Determine printable filename for the Pi:
+      // If the file was converted to PDF (mimetype application/pdf, but original name is an Office extension),
+      // provide a .pdf filename so the Raspberry Pi CUPS daemon prints the PDF directly without attempting LibreOffice.
+      let printableName = data.fileName;
+      const isConvertedPdf = data.convertedStoragePath || (data.mimetype === "application/pdf" && SUPPORTED_OFFICE_EXTENSIONS.has(path.extname(data.fileName || "").toLowerCase()));
+      if (isConvertedPdf) {
+        const baseName = path.basename(data.fileName, path.extname(data.fileName));
+        printableName = `${baseName}.pdf`;
+      }
+
       mergedFiles.push({
-        name: data.fileName,
+        name: printableName,
+        originalFileName: data.fileName,
         url: data.fileUrl,
         type: data.mimetype,
         size: data.size || data.fileSize || 0,
