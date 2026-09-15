@@ -2310,6 +2310,19 @@ app.post("/kiosk/report-failure", async (req, res) => {
   }
 });
 
+// ── Helper: detect if print job is Color (case-insensitive across colorMode, printOptions, settings, and color flag) ──
+function isColorJob(data) {
+  if (!data) return false;
+  if (data.color === true) return true;
+  const mode = (
+    data.colorMode ||
+    data.printOptions?.colorMode ||
+    data.settings?.colorMode ||
+    ""
+  ).toString().toLowerCase();
+  return mode === "color";
+}
+
 // ================= PRINT BY CODE =================
 app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
   try {
@@ -2347,12 +2360,24 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       return res.status(404).json({ error: "Invalid code" });
     }
 
-    // ✅ Strict Machine Binding validation
+    // Capability-based Routing Validation:
+    // - Color jobs: ONLY allowed at MIMO 2.0 (SV-002)
+    // - B&W jobs: allowed at EITHER MIMO 1.0 (CV-001) OR MIMO 2.0 (SV-002)
     const firstDoc = snapshot.docs[0].data();
-    const targetKioskId = firstDoc.kioskId || firstDoc.printOptions?.directKioskId || firstDoc.settings?.directKioskId || "CV-001";
-    if (targetKioskId !== kioskId) {
-      const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
-      return res.status(400).json({ error: `This code belongs to another printer. Please use ${machineName}.` });
+    const isColor = snapshot.docs.some(doc => isColorJob(doc.data()));
+
+    if (isColor) {
+      if (kioskId !== "SV-002") {
+        return res.status(400).json({
+          error: "This is a Color print job. Color printing is only available at Machine 2 (SV-002). Please use Machine 2."
+        });
+      }
+    } else {
+      if (kioskId !== "CV-001" && kioskId !== "SV-002") {
+        return res.status(400).json({
+          error: "Invalid printer station. Please use Machine 1 (CV-001) or Machine 2 (SV-002)."
+        });
+      }
     }
 
     const validDocs = [];
@@ -2410,10 +2435,11 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
         url: signedUrl,
       });
 
-      // 🔄 Mark as printing
+      // 🔄 Mark as printing and bind active kioskId
       await doc.ref.update({
         printerStatus: "printing",
         status: "printing",
+        kioskId: kioskId,
       });
     }
 
@@ -2544,19 +2570,34 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
         }
 
         const firstData = querySnap.docs[0].data();
-        targetKioskId = firstData.kioskId || firstData.printOptions?.directKioskId || firstData.settings?.directKioskId || "CV-001";
         
-        // Strict machine binding validation inside transaction
-        if (targetKioskId !== kioskId) {
-          const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
-          transactionFailedError = { status: 400, message: `This code belongs to another printer. Please use ${machineName}.` };
-          throw new Error("TX_ABORT");
+        // Capability-based Routing Validation inside transaction:
+        // - Color jobs: ONLY allowed at MIMO 2.0 (SV-002)
+        // - B&W jobs: allowed at EITHER MIMO 1.0 (CV-001) OR MIMO 2.0 (SV-002)
+        const isColor = querySnap.docs.some(doc => isColorJob(doc.data()));
+
+        if (isColor) {
+          if (kioskId !== "SV-002") {
+            transactionFailedError = {
+              status: 400,
+              message: "This is a Color print job. Color printing is only available at Machine 2 (SV-002). Please use Machine 2."
+            };
+            throw new Error("TX_ABORT");
+          }
+        } else {
+          if (kioskId !== "CV-001" && kioskId !== "SV-002") {
+            transactionFailedError = {
+              status: 400,
+              message: "Invalid printer station. Please use Machine 1 (CV-001) or Machine 2 (SV-002)."
+            };
+            throw new Error("TX_ABORT");
+          }
         }
 
         for (const doc of querySnap.docs) {
           const data = doc.data();
-          if (data.status !== "paid") {
-            if (data.status === "printing" || data.status === "completed" || data.isPrinted) {
+          if (data.status !== "paid" && data.status !== "printing") {
+            if (data.status === "completed" || data.isPrinted) {
               transactionFailedError = { status: 409, message: "Print code already used or currently printing." };
             } else {
               transactionFailedError = { status: 400, message: `Job not ready for printing (status: ${data.status}).` };
@@ -2573,7 +2614,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
           transaction.update(doc.ref, {
             status: "printing",
             printerStatus: "Sending to Pi...",
-            kioskId: targetKioskId,
+            kioskId: kioskId,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         }
@@ -2596,7 +2637,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
     for (const doc of snapshot.docs) {
       const data = doc.data();
       const fileName = data.fileName || "file";
-      const finalKioskId = targetKioskId;
+      const finalKioskId = kioskId;
 
       try {
         const opts = data.printOptions || {};
