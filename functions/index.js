@@ -8,8 +8,10 @@ const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
 const crypto = require("crypto");
-const { OAuth2Client } = require("google-auth-library");
-const { PDFDocument } = require("pdf-lib");
+
+function getPDFDocument() {
+  return require("pdf-lib").PDFDocument;
+}
 
 // Lazy-loaded Nodemailer Transporter helper
 function getTransporter() {
@@ -152,7 +154,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/", (req, res) => res.send("Mimo Firebase Serverless is LIVE 🚀"));
 
 const SECRET_KEY = process.env.JWT_SECRET || "fallback_secret_key_change_me_in_prod";
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com");
+const googleClient = new (require("google-auth-library").OAuth2Client)(process.env.GOOGLE_CLIENT_ID || "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com");
 
 const CASHFREE_BASE_URL = process.env.CASHFREE_ENV === "production"
   ? "https://api.cashfree.com/pg"
@@ -551,6 +553,7 @@ app.post("/generate-text-pdf", authMiddleware, async (req, res, next) => {
     });
 
     // Get page count using pdf-lib
+    const PDFDocument = getPDFDocument();
     const pdfLibDoc = await PDFDocument.load(pdfBuffer);
     const pageCount = pdfLibDoc.getPageCount();
 
@@ -2036,6 +2039,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
         let pageCount = 1;
         if (isPdf) {
           try {
+            const PDFDocument = getPDFDocument();
             const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
             pageCount = pdfDoc.getPageCount();
           } catch (err) {
@@ -2885,10 +2889,10 @@ exports.sendFailureNotification = onDocumentUpdated(
   },
   async (event) => {
     try {
-      const beforeData = event.data.before.data();
-      const afterData = event.data.after.data();
+      const beforeData = event.data.before?.data() || {};
+      const afterData = event.data.after?.data() || {};
 
-      // Trigger only when the print job changes to "failed"
+      // Trigger only on transition to "failed" (prevents duplicate alerts)
       if (
         beforeData.status === "failed" ||
         afterData.status !== "failed"
@@ -2901,29 +2905,13 @@ exports.sendFailureNotification = onDocumentUpdated(
         afterData.error ||
         "Print job failed";
 
-      // Only send alerts for important kiosk hardware/system problems
-      const reasonLower = String(reason).toLowerCase();
-
-      const shouldAlert =
-        reasonLower.includes("network") ||
-        reasonLower.includes("power") ||
-        reasonLower.includes("paper jam") ||
-        reasonLower.includes("toner");
-
-      if (!shouldAlert) {
-        console.log(
-          `[EMAIL] No Gmail alert needed for job ${event.params.jobId}. Reason: ${reason}`
-        );
-        return;
-      }
-
-      const kioskId = afterData.kioskId || "Unknown Kiosk";
+      const kioskId = afterData.kioskId || afterData.printDestination || "Unknown Kiosk";
       const jobId = event.params.jobId;
 
       const transporter = getTransporter();
 
       await transporter.sendMail({
-        from: "visionprintt@gmail.com",
+        from: '"Mimo Printing" <visionprintt@gmail.com>',
         to: "visionprintt@gmail.com",
         subject: `MIMO Print Job Failed - ${kioskId}`,
         text:
@@ -2940,21 +2928,42 @@ exports.sendFailureNotification = onDocumentUpdated(
     } catch (err) {
       console.error(
         "[EMAIL] Failed to send failure notification:",
-        err
+        err.message || err
       );
     }
   }
 );
-// ================= GMAIL: LOW PAPER NOTIFICATION =================
-exports.lowPaperNotification = onDocumentUpdated(
+
+// ================= GMAIL: PRINTER HARDWARE NOTIFICATIONS =================
+exports.printerHardwareNotification = onDocumentUpdated(
   {
     document: "hardware/printers",
     secrets: ["GMAIL_APP_PASSWORD"],
   },
   async (event) => {
     try {
-      const beforeData = event.data.before.data() || {};
-      const afterData = event.data.after.data() || {};
+      const beforeData = event.data.before?.data() || {};
+      const afterData = event.data.after?.data() || {};
+
+      const isProblemStatus = (statusStr) => {
+        if (!statusStr || typeof statusStr !== "string") return false;
+        const s = statusStr.trim().toLowerCase();
+        return (
+          s === "offline" ||
+          s === "disconnected" ||
+          s === "unreachable" ||
+          s === "power off" ||
+          s === "powered off" ||
+          s === "unplugged" ||
+          s === "paused/error" ||
+          s.includes("offline") ||
+          s.includes("disconnect") ||
+          s.includes("unreachable") ||
+          s.includes("power off") ||
+          s.includes("powered off") ||
+          s.includes("unplugged")
+        );
+      };
 
       for (const [printerId, printer] of Object.entries(afterData)) {
         if (!printer || typeof printer !== "object") {
@@ -2963,183 +2972,189 @@ exports.lowPaperNotification = onDocumentUpdated(
 
         const beforePrinter = beforeData[printerId] || {};
 
-        const paperLevel = Number(printer.paperLevel);
-        const previousPaperLevel = Number(beforePrinter.paperLevel);
-
-        if (!Number.isFinite(paperLevel)) {
-          console.log(
-            `[EMAIL] Invalid paper level for ${printerId}. Skipping alert.`
-          );
-          continue;
-        }
-
-        const isColor = printer.type === "color";
-
-        if (isColor) {
-          continue;
-        }
-
-        const printerCapacity = isColor ? 100 : 250;
-        const alertLevel = isColor ? 70 : 50;
-
-        const crossedThreshold =
-          paperLevel <= alertLevel &&
-          (
-            previousPaperLevel > alertLevel ||
-            !Number.isFinite(previousPaperLevel)
-          );
-
-        if (!crossedThreshold) {
-          continue;
-        }
-
-        if (!process.env.GMAIL_APP_PASSWORD) {
-          console.error(
-            "[EMAIL] GMAIL_APP_PASSWORD is not configured."
-          );
-          continue;
-        }
-
-        const transporter = getTransporter();
+        const isColor =
+          printer.type === "color" ||
+          printerId.toLowerCase().includes("color");
 
         const printerName =
           printer.name ||
           printer.printerName ||
-          printerId ||
-          "Unknown Printer";
+          (printerId === "CV-001" ? "Brother HL-L5210DN (CV-001)" :
+            printerId === "SV-002-BW" ? "Brother HL-L2440DW (SV-002)" :
+              printerId === "SV-002-COLOR" ? "Epson EcoTank L3250 (SV-002)" :
+                printerId);
 
         const kioskId =
           printer.kioskId ||
           printer.kiosk ||
-          "Unknown Kiosk";
+          (printerId.startsWith("CV") ? "CV-001" :
+            printerId.startsWith("SV") ? "SV-002" :
+              "Unknown Kiosk");
 
-        await transporter.sendMail({
-          from: '"Mimo Printing" <visionprintt@gmail.com>',
-          to: "visionprintt@gmail.com",
-          subject: `MIMO Low Paper Alert - ${printerName}`,
-          text:
-            `MIMO Kiosk Low Paper Alert\n\n` +
-            `Printer ID: ${printerId}\n` +
-            `Printer: ${printerName}\n` +
-            `Kiosk: ${kioskId}\n` +
-            `Printer Type: ${isColor ? "Colour" : "B&W"}\n` +
-            `Printer Capacity: ${printerCapacity} sheets\n` +
-            `Alert Level: ${alertLevel} sheets\n` +
-            `Current Paper Level: ${paperLevel} sheets\n\n` +
-            `Please refill the printer.`,
-        });
+        const transporter = getTransporter();
 
-        console.log(
-          `[EMAIL] Low paper notification sent for ${printerId}. ` +
-          `Current level: ${paperLevel}`
-        );
+        // ── 1. LOW PAPER ALERTS ──
+        const paperLevel = Number(printer.paperLevel);
+        const prevPaperLevel = Number(beforePrinter.paperLevel);
+
+        if (Number.isFinite(paperLevel)) {
+          const paperCapacity = isColor ? 100 : 250;
+          const paperThreshold = isColor ? 70 : 50;
+
+          const paperCrossed =
+            paperLevel <= paperThreshold &&
+            (prevPaperLevel > paperThreshold || !Number.isFinite(prevPaperLevel));
+
+          if (paperCrossed) {
+            try {
+              await transporter.sendMail({
+                from: '"Mimo Printing" <visionprintt@gmail.com>',
+                to: "visionprintt@gmail.com",
+                subject: `MIMO Low Paper Alert - ${printerName}`,
+                text:
+                  `MIMO Kiosk Low Paper Alert\n\n` +
+                  `Alert Type: Low Paper\n` +
+                  `Printer ID: ${printerId}\n` +
+                  `Printer: ${printerName}\n` +
+                  `Kiosk: ${kioskId}\n` +
+                  `Printer Type: ${isColor ? "Colour" : "B&W"}\n` +
+                  `Printer Capacity: ${paperCapacity} sheets\n` +
+                  `Alert Threshold: ${paperThreshold} sheets\n` +
+                  `Current Paper Level: ${paperLevel} sheets\n\n` +
+                  `Recommended Action: Please refill the ${isColor ? "colour " : ""}paper tray immediately.`,
+              });
+
+              console.log(
+                `[EMAIL] Low paper notification sent for ${printerId}. Current level: ${paperLevel}`
+              );
+            } catch (mailErr) {
+              console.error(`[EMAIL ERROR] Low paper email failed for ${printerId}:`, mailErr.message || mailErr);
+            }
+          }
+        }
+
+        // ── 2. LOW TONER ALERT (B&W Printers) ──
+        if (!isColor && printer.tonerLevel !== undefined) {
+          const tonerLevel = Number(printer.tonerLevel);
+          const prevTonerLevel = Number(beforePrinter.tonerLevel);
+
+          if (Number.isFinite(tonerLevel)) {
+            const tonerThreshold = 20;
+            const tonerCrossed =
+              tonerLevel <= tonerThreshold &&
+              (prevTonerLevel > tonerThreshold || !Number.isFinite(prevTonerLevel));
+
+            if (tonerCrossed) {
+              try {
+                await transporter.sendMail({
+                  from: '"Mimo Printing" <visionprintt@gmail.com>',
+                  to: "visionprintt@gmail.com",
+                  subject: `MIMO Low Toner Alert - ${printerName}`,
+                  text:
+                    `MIMO Kiosk Low Toner Alert\n\n` +
+                    `Alert Type: Low Toner\n` +
+                    `Printer ID: ${printerId}\n` +
+                    `Printer: ${printerName}\n` +
+                    `Kiosk: ${kioskId}\n` +
+                    `Printer Type: B&W\n` +
+                    `Alert Threshold: ${tonerThreshold}%\n` +
+                    `Current Toner Level: ${tonerLevel}%\n\n` +
+                    `Recommended Action: Please replace or order a replacement toner cartridge.`,
+                });
+
+                console.log(
+                  `[EMAIL] Low toner notification sent for ${printerId}. Current level: ${tonerLevel}%`
+                );
+              } catch (mailErr) {
+                console.error(`[EMAIL ERROR] Low toner email failed for ${printerId}:`, mailErr.message || mailErr);
+              }
+            }
+          }
+        }
+
+        // ── 3. LOW INK ALERT (Colour Printers) ──
+        if (isColor && printer.inkLevel !== undefined) {
+          const inkLevel = Number(printer.inkLevel);
+          const prevInkLevel = Number(beforePrinter.inkLevel);
+
+          if (Number.isFinite(inkLevel)) {
+            const inkThreshold = 20;
+            const inkCrossed =
+              inkLevel <= inkThreshold &&
+              (prevInkLevel > inkThreshold || !Number.isFinite(prevInkLevel));
+
+            if (inkCrossed) {
+              try {
+                await transporter.sendMail({
+                  from: '"Mimo Printing" <visionprintt@gmail.com>',
+                  to: "visionprintt@gmail.com",
+                  subject: `MIMO Low Ink Alert - ${printerName}`,
+                  text:
+                    `MIMO Kiosk Low Ink Alert\n\n` +
+                    `Alert Type: Low Ink\n` +
+                    `Printer ID: ${printerId}\n` +
+                    `Printer: ${printerName}\n` +
+                    `Kiosk: ${kioskId}\n` +
+                    `Printer Type: Colour\n` +
+                    `Alert Threshold: ${inkThreshold}%\n` +
+                    `Current Ink Level: ${inkLevel}%\n\n` +
+                    `Recommended Action: Please refill the colour ink tanks immediately.`,
+                });
+
+                console.log(
+                  `[EMAIL] Low ink notification sent for ${printerId}. Current level: ${inkLevel}%`
+                );
+              } catch (mailErr) {
+                console.error(`[EMAIL ERROR] Low ink email failed for ${printerId}:`, mailErr.message || mailErr);
+              }
+            }
+          }
+        }
+
+        // ── 4. PRINTER POWER / OFFLINE / NETWORK ALERT ──
+        const currentStatus = String(printer.status || "").trim();
+        const prevStatus = String(beforePrinter.status || "").trim();
+
+        if (currentStatus) {
+          const isNowProblem = isProblemStatus(currentStatus);
+          const wasProblem = isProblemStatus(prevStatus);
+
+          // Trigger ONLY when transitioning from a healthy/online state to a problem state
+          if (isNowProblem && !wasProblem) {
+            try {
+              await transporter.sendMail({
+                from: '"Mimo Printing" <visionprintt@gmail.com>',
+                to: "visionprintt@gmail.com",
+                subject: `MIMO Printer Offline Alert - ${printerName}`,
+                text:
+                  `MIMO Kiosk Printer Offline Alert\n\n` +
+                  `Alert Type: Printer Offline / Disconnected\n` +
+                  `Printer ID: ${printerId}\n` +
+                  `Printer: ${printerName}\n` +
+                  `Kiosk: ${kioskId}\n` +
+                  `Current Status: ${currentStatus}\n` +
+                  `Previous Status: ${prevStatus || "Online"}\n\n` +
+                  `Recommended Action: Please check the printer power switch, USB cable, and network connectivity at ${kioskId}.`,
+              });
+
+              console.log(
+                `[EMAIL] Printer offline notification sent for ${printerId}. Status: ${currentStatus}`
+              );
+            } catch (mailErr) {
+              console.error(`[EMAIL ERROR] Offline email failed for ${printerId}:`, mailErr.message || mailErr);
+            }
+          }
+        }
       }
     } catch (err) {
       console.error(
-        "[EMAIL] Failed to send low paper notification:",
-        err.message
+        "[EMAIL] Failed to process printer hardware notification:",
+        err.message || err
       );
     }
   }
 );
-// ================= GMAIL: COLOUR PAPER USAGE NOTIFICATION =================
-exports.colourPaperUsageNotification = onDocumentUpdated(
-  {
-    document: "hardware/printers",
-    secrets: ["GMAIL_APP_PASSWORD"],
-  },
-  async (event) => {
-    try {
-      const beforeData = event.data.before.data() || {};
-      const afterData = event.data.after.data() || {};
 
-      // Only check the colour printer
-      const printerId = "SV-002-COLOR";
-      const printer = afterData[printerId];
 
-      if (!printer || typeof printer !== "object") {
-        console.log(
-          "[EMAIL] SV-002-COLOR printer data not found."
-        );
-        return;
-      }
 
-      const beforePrinter = beforeData[printerId] || {};
 
-      const paperLevel = Number(printer.paperLevel);
-      const previousPaperLevel = Number(beforePrinter.paperLevel);
-
-      if (!Number.isFinite(paperLevel)) {
-        console.log(
-          "[EMAIL] Invalid colour printer paper level. Skipping alert."
-        );
-        return;
-      }
-
-      // Epson L3250 actual paper capacity
-      const printerCapacity = 100;
-
-      // Send alert when remaining paper reaches 70 or below
-      const alertLevel = 70;
-
-      const crossedThreshold =
-        paperLevel <= alertLevel &&
-        (
-          previousPaperLevel > alertLevel ||
-          !Number.isFinite(previousPaperLevel)
-        );
-
-      if (!crossedThreshold) {
-        return;
-      }
-
-      // Calculate how many papers have been printed
-      const papersPrinted = printerCapacity - paperLevel;
-
-      if (papersPrinted <= 0) {
-        return;
-      }
-
-      if (!process.env.GMAIL_APP_PASSWORD) {
-        console.error(
-          "[EMAIL] GMAIL_APP_PASSWORD is not configured."
-        );
-        return;
-      }
-
-      const transporter = getTransporter();
-
-      const printerName =
-        printer.name ||
-        "Epson L3250";
-
-      const kioskId = "SV-002";
-
-      await transporter.sendMail({
-        from: '"Mimo Printing" <visionprintt@gmail.com>',
-        to: "visionprintt@gmail.com",
-        subject: `MIMO Paper Usage Alert - ${printerName}`,
-        text:
-          `MIMO Paper Usage Alert\n\n` +
-          `Printer: ${printerName}\n` +
-          `Kiosk: ${kioskId}\n\n` +
-          `${papersPrinted} papers have been printed.\n\n` +
-          `Please check/refill the paper if required.`,
-      });
-
-      console.log(
-        `[EMAIL] Colour paper usage alert sent. ` +
-        `Printer: ${printerName}, ` +
-        `Kiosk: ${kioskId}, ` +
-        `Paper remaining: ${paperLevel}, ` +
-        `Papers printed: ${papersPrinted}`
-      );
-
-    } catch (err) {
-      console.error(
-        "[EMAIL] Failed to send colour paper usage notification:",
-        err.message
-      );
-    }
-  }
-);
