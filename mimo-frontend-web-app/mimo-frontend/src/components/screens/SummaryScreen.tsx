@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import festiveRatImg from '../../assets/festive-rat-transparent.png';
+import { isFestivalActive } from '../../config/festivalConfig';
 
 interface SummaryScreenProps {
     isActive: boolean;
@@ -14,8 +16,8 @@ interface SummaryScreenProps {
 }
 
 export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId }) => {
-    const isCV001 = kioskId === 'CV-001';
-    const isSV002 = kioskId === 'SV-002';
+    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+    const isSV002NonFestive = kioskId === 'SV-002' && !isFestiveMode;
     const timeoutRef = useRef<number | null>(null);
     const [renderKey, setRenderKey] = useState(0);
 
@@ -77,26 +79,28 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 transform: 'translateY(-40px)'
             }}>
 
-                <div style={{ fontSize: '48px', fontWeight: 900, color: isSV002 ? 'var(--text-primary)' : '#ffffff', letterSpacing: '-1px', textShadow: isSV002 ? 'none' : '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <span style={{ color: isSV002 ? 'var(--gold-accent)' : '#ffffff', textDecoration: isSV002 ? 'none' : 'underline', textDecorationColor: isCV001 ? '#b47b37' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
+                <div style={{ fontSize: '48px', fontWeight: 900, color: isSV002NonFestive ? 'var(--text-primary)' : (isFestiveMode ? '#3C2113' : '#ffffff'), letterSpacing: '-1px', textShadow: isSV002NonFestive || isFestiveMode ? 'none' : '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <span style={{ color: isSV002NonFestive ? 'var(--gold-accent)' : (isFestiveMode ? '#A86F2B' : '#ffffff'), textDecoration: isSV002NonFestive ? 'none' : 'underline', textDecorationColor: isFestiveMode ? '#b47b37' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'DEMO'}</span>, your documents are ready.
                 </div>
             </div>
 
-            {/* Middle Section: Centered Animation */}
+            {/* Middle Section: Centered Animation & Character Scene */}
             <div style={{
                 display: 'flex',
                 justifyContent: 'center',
                 width: '100%',
                 alignItems: 'center',
-                transform: 'translateY(-50px)' // Shifted slightly more upwards
+                transform: 'translateY(-30px)'
             }}>
 
-                {/* ── RIGHT: Collection Guide Animation ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', transform: 'scale(0.95)', transformOrigin: 'center' }}>
+                {/* ── Collection Guide Animation & Side-by-Side Rat ── */}
+                <div style={{ position: 'relative', width: '380px', height: '284px', transform: 'scale(0.95)', transformOrigin: 'center' }}>
+                    {/* Printer Slot Assembly */}
                     <div style={{
-                        position: 'relative', width: '380px', height: '350px',
+                        position: 'relative', width: '380px', height: '240px',
                         display: 'flex', flexDirection: 'column', alignItems: 'center',
-                        marginTop: '20px'
+                        marginTop: '20px',
+                        marginLeft: 0
                     }}>
                         {/* 1. Slit Interior (Dark Void) */}
                         <div style={{
@@ -144,7 +148,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
 
                         {/* 3. Paper Clipping Wrapper */}
                         <div style={{
-                            position: 'absolute', top: '55px', left: '0', width: '380px', height: '350px',
+                            position: 'absolute', top: '55px', left: '0', width: '380px', height: '260px',
                             overflow: 'hidden', zIndex: 5, pointerEvents: 'none',
                         }}>
                             {/* The Animated Paper */}
@@ -157,7 +161,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                                 animation: isActive ? 'paperDispenseHand 6s ease-in-out infinite' : 'none',
                                 transformOrigin: 'top center'
                             }}>
-                                 <div style={{ width: '55px', height: '55px', borderRadius: '50%', background: isCV001 ? 'rgba(180,123,55,0.15)' : 'rgba(232,184,109,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', border: isCV001 ? '2px solid rgba(180,123,55,0.45)' : '2px solid rgba(232,184,109,0.45)', color: isCV001 ? '#a66d2b' : '#C8860A' }}>
+                                 <div style={{ width: '55px', height: '55px', borderRadius: '50%', background: isFestiveMode ? 'rgba(180,123,55,0.15)' : 'rgba(232,184,109,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', border: isFestiveMode ? '2px solid rgba(180,123,55,0.45)' : '2px solid rgba(232,184,109,0.45)', color: isFestiveMode ? '#a66d2b' : '#C8860A' }}>
                                       <span className="material-symbols-outlined" style={{ fontSize: '36px', fontWeight: 800 }}>check</span>
                                  </div>
                                  <div style={{ width: '90%', height: '10px', background: '#cbd5e1', borderRadius: '5px', marginBottom: '18px' }}></div>
@@ -170,28 +174,67 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                             </div>
                         </div>
 
-                        {/* 4. Hand Graphic */}
-                        <div style={{
-                            position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
-                            zIndex: 20, pointerEvents: 'none'
-                        }}>
+                        {/* SV-002 Hand Graphic (Non-festive mode only) */}
+                        {isSV002NonFestive && (
                             <div style={{
-                                position: 'absolute', top: '0', left: '50%',
-                                animation: isActive ? 'handGrabAction 6s cubic-bezier(0.4, 0, 0.2, 1) infinite' : 'none',
-                                transformOrigin: 'top center'
+                                position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+                                zIndex: 20, pointerEvents: 'none'
                             }}>
-                                <span className="material-symbols-outlined" style={{ 
-                                    fontSize: '150px', 
-                                    color: '#dea370', 
-                                    /* Use the solid variation of the icon for realistic volume */
-                                    fontVariationSettings: '"FILL" 1, "wght" 400',
-                                    filter: 'drop-shadow(0 20px 25px rgba(0,0,0,0.7))',
+                                <div style={{
+                                    position: 'absolute', top: '0', left: '50%',
+                                    animation: isActive ? 'handGrabAction 6s cubic-bezier(0.4, 0, 0.2, 1) infinite' : 'none',
+                                    transformOrigin: 'top center'
                                 }}>
-                                    back_hand
-                                </span>
+                                    <span className="material-symbols-outlined" style={{ 
+                                        fontSize: '150px', 
+                                        color: '#dea370', 
+                                        fontVariationSettings: '"FILL" 1, "wght" 400',
+                                        filter: 'drop-shadow(0 20px 25px rgba(0,0,0,0.5))',
+                                    }}>
+                                        back_hand
+                                    </span>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
+
+                    {/* Festive 3D Rat Character (Mooshak) Positioned Immediately Adjacent to Printer Box */}
+                    {isFestiveMode && (
+                        <div style={{
+                            position: 'absolute',
+                            left: '328px',
+                            top: '42px',
+                            zIndex: 25,
+                            pointerEvents: 'none'
+                        }}>
+                            {/* Subtle natural contact shadow where Mooshak's feet meet the surface */}
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '4px',
+                                left: '36px',
+                                width: '150px',
+                                height: '10px',
+                                borderRadius: '50%',
+                                background: 'rgba(74, 45, 20, 0.14)',
+                                filter: 'blur(4px)',
+                                pointerEvents: 'none',
+                                zIndex: 0
+                            }} />
+
+                            <img
+                                src={festiveRatImg}
+                                alt="Festive Mooshak"
+                                style={{
+                                    width: '235px',
+                                    height: 'auto',
+                                    objectFit: 'contain',
+                                    position: 'relative',
+                                    zIndex: 1,
+                                    filter: 'none'
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -210,7 +253,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 <div style={{
                     fontSize: '22px',
                     fontWeight: 900,
-                    color: isSV002 ? 'var(--text-primary)' : 'rgba(255,255,255,0.90)',
+                    color: isSV002NonFestive ? 'var(--text-primary)' : (isFestiveMode ? '#5A3D28' : 'rgba(255,255,255,0.90)'),
                     letterSpacing: '2px',
                     textTransform: 'uppercase',
                     animation: isActive ? 'fadeInUp 1s ease-out 0.3s forwards' : 'none',
@@ -218,29 +261,30 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '16px',
-                    textShadow: isSV002 ? 'none' : '0 2px 12px rgba(0,0,0,0.25)'
+                    textShadow: isSV002NonFestive || isFestiveMode ? 'none' : '0 2px 12px rgba(0,0,0,0.25)'
                 }}>
-                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#a66d2b' : '#E8B86D' }}>south</span>
-                    {isCV001 ? 'Please collect your document from below' : 'Please collect your documents from below'}
-                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#a66d2b' : '#E8B86D' }}>south</span>
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002NonFestive ? 'var(--gold-accent)' : isFestiveMode ? '#a66d2b' : '#E8B86D' }}>south</span>
+                    {isFestiveMode ? 'Please collect your document from below' : 'Please collect your documents from below'}
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002NonFestive ? 'var(--gold-accent)' : isFestiveMode ? '#a66d2b' : '#E8B86D' }}>south</span>
                 </div>
 
                 <button
                     className="done-button-dynamic"
                     style={{
                         padding: '0 50px', height: '64px', borderRadius: '32px',
-                        background: isCV001 ? 'linear-gradient(135deg, #4b2d1d, #b47b37)' : isSV002 ? 'var(--gold-accent)' : 'linear-gradient(135deg, #E8B86D, #C8860A)', color: isCV001 ? '#fff8e9' : '#fff', border: 'none',
+                        background: isFestiveMode ? 'linear-gradient(135deg, #4b2d1d, #b47b37)' : isSV002NonFestive ? 'var(--gold-accent)' : 'linear-gradient(135deg, #E8B86D, #C8860A)',
+                        color: isFestiveMode ? '#fff8e9' : '#fff', border: 'none',
                         fontSize: '20px', fontWeight: 900, letterSpacing: '4px',
                         textTransform: 'uppercase', cursor: 'pointer',
-                        boxShadow: isCV001 ? '0 20px 50px rgba(180,123,55,0.35), inset 0 1px 2px rgba(255,255,255,0.3)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45), inset 0 1px 2px rgba(255,255,255,0.3)',
+                        boxShadow: isFestiveMode ? '0 20px 50px rgba(180,123,55,0.35), inset 0 1px 2px rgba(255,255,255,0.3)' : isSV002NonFestive ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45), inset 0 1px 2px rgba(255,255,255,0.3)',
                         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)', 
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
                         animation: isActive ? 'fadeInUp 1s ease-out 0.5s forwards' : 'none',
                         opacity: 0
                     }}
                     onClick={onReset}
-                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = isCV001 ? '0 10px 25px rgba(180,123,55,0.22)' : isSV002 ? '0 5px 15px rgba(183,140,67,0.3)' : '0 10px 25px rgba(200,134,10,0.25)'; }}
-                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = isCV001 ? '0 20px 50px rgba(180,123,55,0.35)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45)'; }}
+                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = isFestiveMode ? '0 10px 25px rgba(180,123,55,0.22)' : isSV002NonFestive ? '0 5px 15px rgba(183,140,67,0.3)' : '0 10px 25px rgba(200,134,10,0.25)'; }}
+                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = isFestiveMode ? '0 20px 50px rgba(180,123,55,0.35)' : isSV002NonFestive ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45)'; }}
                 >
                     Done
                     <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>check_circle</span>

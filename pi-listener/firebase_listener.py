@@ -339,17 +339,129 @@ def download_file(file_url, file_name):
     except Exception as e:
         print(f"❌ Download failed: {e}")
         return None
+def update_colour_paper_usage(doc_ref, doc_id, doc):
+    """Decrease colour printer paper after a successful colour print."""
+    try:
+        color_mode = str(doc.get("colorMode", "monochrome")).lower()
 
+        # B&W jobs must not affect colour paper.
+        if color_mode not in ["color", "colour"]:
+            return
+
+        pricing = doc.get("pricing", {})
+        sheets_per_copy = pricing.get("totalPages")
+
+        if sheets_per_copy is None:
+            print(
+                f"⚠️ Job {doc_id}: pricing.totalPages is missing. "
+                "Colour paper was not deducted."
+            )
+            raise ValueError(
+                f"Job {doc_id}: pricing.totalPages is missing"
+            )
+
+        sheets_per_copy = int(sheets_per_copy)
+
+        print_options = doc.get("printOptions", {})
+        original_copies = int(
+            print_options.get("copies")
+            or doc.get("copies")
+            or 1
+        )
+
+        if sheets_per_copy <= 0 or original_copies <= 0:
+            print(
+                f"⚠️ Job {doc_id}: invalid sheet count. "
+                "Colour paper was not deducted."
+            )
+            raise ValueError(
+                f"Job {doc_id}: invalid sheet count"
+            )
+
+        sheets_used = sheets_per_copy * original_copies
+
+        printer_ref = db.collection("hardware").document("printers")
+
+        @firestore.transactional
+        def update_paper_transaction(transaction):
+            job_snapshot = doc_ref.get(transaction=transaction)
+
+            if not job_snapshot.exists:
+                raise ValueError(
+                    f"Job {doc_id}: job no longer exists"
+                )
+
+            job_data = job_snapshot.to_dict() or {}
+
+            # Prevent the same job from deducting paper twice.
+            if job_data.get("colourPaperUsageCounted") is True:
+                print(
+                    f"ℹ️ Job {doc_id}: colour paper usage already counted."
+                )
+                return
+
+            printer_snapshot = printer_ref.get(transaction=transaction)
+
+            if not printer_snapshot.exists:
+                raise ValueError(
+                    "hardware/printers document not found"
+                )
+
+            printer_data = printer_snapshot.to_dict() or {}
+            colour_printer = printer_data.get("SV-002-COLOR")
+
+            if not isinstance(colour_printer, dict):
+                raise ValueError(
+                    "SV-002-COLOR printer data not found"
+                )
+
+            current_level = colour_printer.get("paperLevel")
+
+            if current_level is None:
+                raise ValueError(
+                    "SV-002-COLOR paperLevel is missing"
+                )
+
+            current_level = int(current_level)
+            new_level = max(0, current_level - sheets_used)
+
+            transaction.update(
+                printer_ref,
+                {
+                    "SV-002-COLOR.paperLevel": new_level
+                }
+            )
+
+            transaction.update(
+                doc_ref,
+                {
+                    "colourPaperUsageCounted": True,
+                    "colourPaperSheetsUsed": sheets_used
+                }
+            )
+
+            print(
+                f"📄 Colour paper usage: {sheets_used} sheets. "
+                f"Paper level: {current_level} → {new_level}"
+            )
+
+        transaction = db.transaction()
+        update_paper_transaction(transaction)
+
+    except Exception as e:
+        print(
+            f"❌ Failed to update colour paper usage for "
+            f"job {doc_id}: {e}"
+        )
+        raise
 def process_job(doc_snapshot):
     doc = doc_snapshot.to_dict()
     doc_id = doc_snapshot.id
     doc_ref = db.collection('print_jobs').document(doc_id)
-    
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
     color_mode = doc.get("colorMode", "monochrome")
     is_color = color_mode.lower() == "color"
-    
     print_options = doc.get("printOptions", {})
     # Read copies from printOptions (where frontend stores it), fallback to top-level
     copies = int(print_options.get("copies", doc.get("copies", 1)))
@@ -477,22 +589,32 @@ def process_job(doc_snapshot):
         # N-up layout is handled ONLY by CUPS number-up option in print_file()
         # We do NOT do any manual PIL-based tiling — that was causing the double-layout bug
         
+
         success = print_file(
             final_paths, copies, page_range, target_printer,
             photo_layout, double_sided, is_blank_sheet
         )
-        
+
         if success:
+            # Deduct paper only for successful colour prints.
+            # B&W printing remains unchanged.
+            if is_color:
+                update_colour_paper_usage(doc_ref, doc_id, doc)
+
             doc_ref.update({
-                "status": "completed", 
-                "isPrinted": True, 
+                "status": "completed",
+                "isPrinted": True,
                 "printerStatus": "Printed",
                 "printedAt": firestore.SERVER_TIMESTAMP
             })
+
             print(f"🎉 Job {doc_id} marked as completed.")
+
         else:
-            doc_ref.update({"status": "failed", "printerStatus": "CUPS error on Pi"})
-            
+            doc_ref.update({
+                "status": "failed",
+                "printerStatus": "CUPS error on Pi"
+            })
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         doc_ref.update({"status": "failed", "printerStatus": f"Pi processing error: {str(e)[:50]}"})
