@@ -1215,6 +1215,19 @@ app.post("/check-status", async (req, res) => {
   }
 });
 
+// ── Helper: detect if print job is Color (case-insensitive across colorMode, printOptions, settings, and color flag) ──
+function isColorJob(data) {
+  if (!data) return false;
+  if (data.color === true) return true;
+  const mode = (
+    data.colorMode ||
+    data.printOptions?.colorMode ||
+    data.settings?.colorMode ||
+    ""
+  ).toString().toLowerCase();
+  return mode === "color";
+}
+
 // ================= KIOSK: GET DOCUMENTS BY CODE =================
 app.post("/get-documents-by-code", async (req, res) => {
   try {
@@ -1244,12 +1257,24 @@ app.post("/get-documents-by-code", async (req, res) => {
       return res.status(404).json({ error: "Invalid or expired print code" });
     }
 
-    // ✅ Strict Machine Binding validation
+    // Capability-based Routing Validation:
+    // - Color jobs: ONLY allowed at MIMO 2.0 (SV-002)
+    // - B&W jobs: allowed at EITHER MIMO 1.0 (CV-001) OR MIMO 2.0 (SV-002)
     const firstJob = snapshot.docs[0].data();
-    const targetKioskId = firstJob.kioskId || firstJob.printOptions?.directKioskId || firstJob.settings?.directKioskId || "CV-001";
-    if (targetKioskId !== kioskId) {
-      const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
-      return res.status(400).json({ error: `This code belongs to another printer. Please use ${machineName}.` });
+    const isColor = snapshot.docs.some(doc => isColorJob(doc.data()));
+
+    if (isColor) {
+      if (kioskId !== "SV-002") {
+        return res.status(400).json({
+          error: "This is a Color print job. Color printing is only available at Machine 2 (SV-002). Please use Machine 2."
+        });
+      }
+    } else {
+      if (kioskId !== "CV-001" && kioskId !== "SV-002") {
+        return res.status(400).json({
+          error: "Invalid printer station. Please use Machine 1 (CV-001) or Machine 2 (SV-002)."
+        });
+      }
     }
 
     const userId = firstJob.userId;
@@ -2551,12 +2576,28 @@ app.post("/kiosk/print", async (req, res) => {
 
         const jobDoc = sortedDocs[0];
         const jobData = jobDoc.data();
-        targetKioskId = jobData?.kioskId || jobData?.printOptions?.directKioskId || jobData?.settings?.directKioskId || "CV-001";
 
-        if (targetKioskId !== kioskId) {
-          const machineName = targetKioskId === "SV-002" ? "Machine 2 (SV-002)" : targetKioskId === "CV-001" ? "Machine 1 (CV-001)" : targetKioskId;
-          transactionFailedError = { status: 400, message: `This code belongs to another printer. Please use ${machineName}.` };
-          throw new Error("TX_ABORT");
+        // Capability-based Routing Validation inside transaction:
+        // - Color jobs: ONLY allowed at MIMO 2.0 (SV-002)
+        // - B&W jobs: allowed at EITHER MIMO 1.0 (CV-001) OR MIMO 2.0 (SV-002)
+        const isColor = querySnap.docs.some(doc => isColorJob(doc.data()));
+
+        if (isColor) {
+          if (kioskId !== "SV-002") {
+            transactionFailedError = {
+              status: 400,
+              message: "This is a Color print job. Color printing is only available at Machine 2 (SV-002). Please use Machine 2."
+            };
+            throw new Error("TX_ABORT");
+          }
+        } else {
+          if (kioskId !== "CV-001" && kioskId !== "SV-002") {
+            transactionFailedError = {
+              status: 400,
+              message: "Invalid printer station. Please use Machine 1 (CV-001) or Machine 2 (SV-002)."
+            };
+            throw new Error("TX_ABORT");
+          }
         }
 
         if (jobData.status !== "paid") {
@@ -2569,9 +2610,9 @@ app.post("/kiosk/print", async (req, res) => {
           status: "printing",
           printStartedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          kioskId: targetKioskId
+          kioskId: kioskId
         });
-        updatedJobData = { ...jobData, status: "printing", kioskId: targetKioskId };
+        updatedJobData = { ...jobData, status: "printing", kioskId: kioskId };
       });
     } catch (txErr) {
       if (txErr.message === "TX_ABORT" && transactionFailedError) {
