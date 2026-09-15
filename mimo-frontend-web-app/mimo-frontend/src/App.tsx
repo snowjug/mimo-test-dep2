@@ -7,6 +7,7 @@ import { SystemErrorScreen } from './components/screens/SystemErrorScreen';
 import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
 import { CV001Background } from './components/screens/CV001Background';
 import { Adds } from './components/screens/adds/Adds';
+import { isFestivalActive } from './config/festivalConfig';
 
 
 export type ScreenState =
@@ -21,6 +22,8 @@ function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const currentKioskId = urlParams.get("kioskId");
   const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID;
+  const isFestive = isFestivalActive();
+  const isFestiveForKiosk = dynamicKioskId === 'CV-001' || (dynamicKioskId === 'SV-002' && isFestive);
 
   useEffect(() => {
     const rootEl = document.getElementById('root');
@@ -28,14 +31,14 @@ function App() {
     document.body.classList.remove('theme-cv001', 'theme-sv002');
     rootEl?.classList.remove('theme-cv001', 'theme-sv002');
 
-    if (dynamicKioskId === 'CV-001') {
+    if (isFestiveForKiosk) {
       document.body.classList.add('theme-cv001');
       rootEl?.classList.add('theme-cv001');
     } else if (dynamicKioskId === 'SV-002') {
       document.body.classList.add('theme-sv002');
       rootEl?.classList.add('theme-sv002');
     }
-  }, [dynamicKioskId]);
+  }, [dynamicKioskId, isFestiveForKiosk]);
 
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('main-interface');
   const [code, setCode] = useState('');
@@ -269,7 +272,7 @@ function App() {
       />
 
       {/* ================= SCREENS ================= */}
-      {dynamicKioskId === 'CV-001' && <CV001Background />}
+      {isFestiveForKiosk && <CV001Background />}
 
       <MainScreen
         isActive={currentScreen === 'main-interface'}
