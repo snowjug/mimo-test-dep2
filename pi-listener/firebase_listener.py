@@ -321,7 +321,7 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
     return False
 
 def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, 
-               photo_layout=None, double_sided="single", is_blank_sheet=False, doc_ref=None):
+               photo_layout=None, double_sided="single", is_blank_sheet=False, is_color=False, doc_ref=None):
     """Send file(s) to CUPS printer.
     
     Args:
@@ -332,6 +332,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         photo_layout: N-up layout ("2", "4", "6", "9") — applied via CUPS number-up
         double_sided: "single" or "double"
         is_blank_sheet: if True, use print-scaling=none
+        is_color: True if job is color print (Epson cadence)
         doc_ref: Firestore document reference for live progress updates
     """
     try:
@@ -390,7 +391,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             sheets_per_copy = math.ceil(sheets_per_copy / 2)
             
         total_sheets = max(1, int(sheets_per_copy * copies))
-        is_color = (printer_name == COLOR_PRINTER_NAME)
+        effective_is_color = is_color or (printer_name == COLOR_PRINTER_NAME and BW_PRINTER_NAME != COLOR_PRINTER_NAME) or ("epson" in printer_name.lower())
 
         if doc_ref:
             try:
@@ -435,7 +436,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         if match:
             cups_job_id = int(match.group(1))
             print(f"✅ CUPS job {cups_job_id} accepted by queue. Waiting for physical completion...")
-            return wait_for_cups_job_completion(cups_job_id, total_sheets, is_color, doc_ref=doc_ref)
+            return wait_for_cups_job_completion(cups_job_id, total_sheets, effective_is_color, doc_ref=doc_ref)
         
         print("⚠️ Could not extract CUPS job ID from lp output. Assuming accepted.")
         if doc_ref:
@@ -737,6 +738,7 @@ def process_job(doc_snapshot):
         success = print_file(
             final_paths, copies, page_range, target_printer,
             photo_layout, double_sided, is_blank_sheet,
+            is_color=is_color,
             doc_ref=doc_ref
         )
 
