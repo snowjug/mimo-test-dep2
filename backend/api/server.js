@@ -2045,10 +2045,28 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
       ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
     );
 
+    // Calculate aggregate physical sheets and completion
+    let totalSheets = 0;
+    let sheetsCompleted = 0;
+    currentSessionDocs.forEach(d => {
+      const pCount = d.pageCount || 1;
+      const copies = d.printOptions ? (d.printOptions.copies || 1) : (d.copies || 1);
+      const fallbackSheets = pCount * copies;
+      const docTotal = (d.totalSheets !== undefined && d.totalSheets !== null) ? Number(d.totalSheets) : fallbackSheets;
+      totalSheets += docTotal;
+
+      if (d.status === "completed" || d.status === "printed" || d.isPrinted === true) {
+        sheetsCompleted += docTotal;
+      } else if (d.sheetsCompleted !== undefined && d.sheetsCompleted !== null) {
+        sheetsCompleted += Math.min(docTotal, Number(d.sheetsCompleted));
+      }
+    });
+    totalSheets = Math.max(1, totalSheets);
+
     if (!hasStarted) {
       // Job is paid and waiting for user to enter 4-digit code at the kiosk.
       // Do not prematurely fail the job due to Pi heartbeat intervals or transient network dips.
-      return res.json({ status: "paid", isPrinted: false });
+      return res.json({ status: "paid", isPrinted: false, sheetsCompleted: 0, totalSheets });
     }
 
     // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
@@ -2104,6 +2122,8 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
       return res.json({
         status: "failed",
         isPrinted: false,
+        sheetsCompleted,
+        totalSheets,
         printerStatus: "Print timed out. If you were charged, your refund will be processed automatically."
       });
     }
@@ -2129,19 +2149,21 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
       return res.json({
         status: "failed",
         isPrinted: false,
+        sheetsCompleted,
+        totalSheets,
         printerStatus: failedDoc ? (failedDoc.printerStatus || failedDoc.error || "Print failed") : "Print failed"
       });
     }
 
     if (allCompleted) {
-      return res.json({ status: "completed", isPrinted: true });
+      return res.json({ status: "completed", isPrinted: true, sheetsCompleted: totalSheets, totalSheets });
     }
     
     if (anyPrinting) {
-      return res.json({ status: "printing", isPrinted: false });
+      return res.json({ status: "printing", isPrinted: false, sheetsCompleted, totalSheets });
     }
 
-    return res.json({ status: "paid", isPrinted: false });
+    return res.json({ status: "paid", isPrinted: false, sheetsCompleted: 0, totalSheets });
 
   } catch (err) {
     console.error("❌ KIOSK JOB STATUS ERROR:", err);

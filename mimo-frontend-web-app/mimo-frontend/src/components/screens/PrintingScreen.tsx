@@ -373,43 +373,52 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           setStatusMsg(errMsg);
           clearAllTimers();
           if (onError) onError(errMsg);
+        } else if (data.status === 'printing') {
+          const total = Number(data.totalSheets) || Math.max(1, pages * copies);
+          const completed = Number(data.sheetsCompleted) || 0;
+
+          if (completed === 0) {
+            const initialWarmup = Math.min(15, Math.max(5, Math.round(10 / total)));
+            if (initialWarmup > progressRef.current) {
+              progressRef.current = initialWarmup;
+              setProgress(initialWarmup);
+            }
+            setStatusMsg('Warming up printer…');
+          } else {
+            const sheetPercent = Math.round((completed / total) * 100);
+            // Strictly cap at 98% during printing — 100% only on CUPS completion
+            const cappedPercent = Math.min(98, Math.max(progressRef.current, sheetPercent));
+            progressRef.current = cappedPercent;
+            setProgress(cappedPercent);
+
+            setStatusMsg(
+              total === 1
+                ? 'Printing document…'
+                : `Printing sheet ${completed} of ${total}…`
+            );
+          }
+
+          schedulePoll(300);
         } else {
-          // Still printing or paid — continue polling every 250 ms
-          schedulePoll(250);
+          // Status 'paid' or waiting for start
+          setStatusMsg('Warming up printer…');
+          schedulePoll(400);
         }
       } catch {
         // Network hiccup — retry in 2 s
         pollTimerRef.current = window.setTimeout(() => schedulePoll(250), 2000);
       }
     }, delayMs);
-  }, [printCode, isActive, onError, clearAllTimers]);
+  }, [printCode, isActive, pages, copies, onError, clearAllTimers]);
 
-  // ─── calibrated progress simulation (1% → 98% MAX) ──────────────────────
+  // ─── demo mode fallback (used ONLY when printCode is '0000' or missing) ──
 
   const startSlowTick = useCallback(() => {
     if (manualProgress !== undefined) return;
 
     const totalSheets = Math.max(1, pages * copies);
-    const isColor = colorMode === 'color';
-
-    // ── Calibrated realistic physical print timings ─────────────────────────
-    // MIMO 1.0 (CV-001):
-    // Physical printed page takes ~15–18 seconds to come out of the machine.
-    // Progress bar smoothly animates from 1% toward 98% over ~17 seconds,
-    // holding at 98% until the real backend completion signal arrives.
-    //
-    // MIMO 2.0 (SV-002):
-    // Color Inkjet (Epson L3250): 4.2s warmup + 9.5s per sheet (~13.7s for 1 sheet)
-    // B&W Laser (Brother HL-L2440DW): 3.2s warmup + 2.2s per sheet
-    const isMIMO10 = kioskId !== 'SV-002';
-    const totalAnimMs = isMIMO10
-      ? 17000
-      : (isColor ? 4200 : 3200) + totalSheets * (isColor ? 9500 : 2200);
-
-    // Cap estimated progress strictly at 98% while waiting for real backend completion signal
-    const cap = (printCode && printCode !== '0000') ? 98 : 100;
-    const totalSteps = Math.max(1, cap - 1); // 1% -> 98% is 97 steps
-    const baseDelay = Math.max(40, totalAnimMs / totalSteps); // ms per 1% step
+    const cap = 100;
+    const baseDelay = 150;
 
     const tick = () => {
       if (isCompletingRef.current) return;
@@ -417,16 +426,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       const currentProgress = progressRef.current;
 
       if (currentProgress >= cap) {
-        if (!printCode || printCode === '0000') {
-          animateTo100AndComplete();
-        } else {
-          // Strictly hold at 98% until backend confirms physical completion
-          setStatusMsg(
-            totalSheets > 1
-              ? `Finalizing print job (${totalSheets} of ${totalSheets} sheets)…`
-              : `Finalizing print job…`
-          );
-        }
+        animateTo100AndComplete();
         return;
       }
 
@@ -434,7 +434,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       progressRef.current = next;
       setProgress(next);
 
-      // Status text updates
       if (next <= 15) {
         setStatusMsg('Warming up printer…');
       } else {
@@ -450,16 +449,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         );
       }
 
-      if (next !== lastProgressRef.current) {
-        lastProgressRef.current = progressRef.current;
-      }
-
-      const jitter = (Math.random() - 0.5) * baseDelay * 0.05;
-      tickTimerRef.current = window.setTimeout(tick, Math.max(40, baseDelay + jitter));
+      tickTimerRef.current = window.setTimeout(tick, baseDelay);
     };
 
     tickTimerRef.current = window.setTimeout(tick, baseDelay);
-  }, [pages, copies, printCode, manualProgress, colorMode, kioskId, animateTo100AndComplete]);
+  }, [pages, copies, manualProgress, animateTo100AndComplete]);
 
   // ─── main effect ──────────────────────────────────────────────────────────
 
@@ -505,16 +499,17 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (subIdx >= finalSub.length) clearInterval(subInterval);
     }, 30);
 
-    // Handle manualProgress mode
+    // Handle manualProgress mode vs live polling vs demo mode
     if (manualProgress !== undefined) {
       setProgress(manualProgress);
       progressRef.current = manualProgress;
       if (manualProgress >= 100) {
         animateTo100AndComplete();
       }
+    } else if (printCode && printCode !== '0000') {
+      schedulePoll(200); // Live polling driven by backend sheet progress
     } else {
-      startSlowTick();
-      if (printCode) schedulePoll(250); // First check after 250ms, then every 250ms
+      startSlowTick(); // Demo mode simulation
     }
 
     return () => {
