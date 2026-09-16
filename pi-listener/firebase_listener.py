@@ -224,7 +224,7 @@ def slice_pdf_pages(input_pdf, page_range):
         print(f"❌ Page slicing failed: {e}")
         return input_pdf
 
-def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_color: bool = False, doc_ref=None) -> bool:
+def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_color: bool = False, is_duplex: bool = False, doc_ref=None) -> bool:
     """
     Polls CUPS via pycups for the specific job ID until IPP_JOB_COMPLETED (state 9)
     AND the calibrated physical print duration has elapsed.
@@ -236,14 +236,18 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
         return False
 
     # Calibrated mechanical cadence:
-    # Brother B&W Laser: 3.5s warmup + 2.2s per physical sheet
-    # Epson Color Inkjet: 4.5s warmup + 12.0s per physical sheet
-    warmup_sec = 4.5 if is_color else 3.5
-    per_sheet_sec = 12.0 if is_color else 2.2
+    # Brother B&W Laser: 3.5s warmup + 2.2s per simplex sheet / 8.5s per duplex physical sheet
+    # Epson Color Inkjet: 4.5s warmup + 12.0s per physical sheet (24.0s if duplex)
+    if is_color:
+        warmup_sec = 4.5
+        per_sheet_sec = 24.0 if is_duplex else 12.0
+        timeout_sec = max(90, int(60 + warmup_sec + (total_sheets * (35 if is_duplex else 25))))
+    else:
+        warmup_sec = 4.0 if is_duplex else 3.5
+        per_sheet_sec = 8.5 if is_duplex else 2.2
+        timeout_sec = max(60, int(60 + warmup_sec + (total_sheets * (20 if is_duplex else 8))))
+
     required_duration = warmup_sec + (total_sheets * per_sheet_sec)
-    
-    # Timeout buffer (guaranteed to exceed required_duration)
-    timeout_sec = max(60, int(30 + warmup_sec + (total_sheets * (25 if is_color else 6))))
     
     start_time = time.time()
     last_reported_sheets = 0
@@ -435,8 +439,9 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         
         if match:
             cups_job_id = int(match.group(1))
-            print(f"✅ CUPS job {cups_job_id} accepted by queue. Waiting for physical completion...")
-            return wait_for_cups_job_completion(cups_job_id, total_sheets, effective_is_color, doc_ref=doc_ref)
+            is_duplex = (double_sided == "double")
+            print(f"✅ CUPS job {cups_job_id} accepted by queue. Waiting for physical completion (duplex={is_duplex})...")
+            return wait_for_cups_job_completion(cups_job_id, total_sheets, effective_is_color, is_duplex=is_duplex, doc_ref=doc_ref)
         
         print("⚠️ Could not extract CUPS job ID from lp output. Assuming accepted.")
         if doc_ref:
