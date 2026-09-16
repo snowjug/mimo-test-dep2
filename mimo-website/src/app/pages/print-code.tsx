@@ -53,6 +53,8 @@ export function PrintCode() {
   const [printStatus, setPrintStatus] = useState<"paid" | "printing" | "completed" | "failed">(
     () => (sessionStorage.getItem("printStatus") as any) || "paid"
   );
+  const [sheetsInfo, setSheetsInfo] = useState<{ completed: number; total: number } | null>(null);
+  const [isPrinted, setIsPrinted] = useState(false);
   const [printProgress, setPrintProgress] = useState(0);
   const [refundRequested, setRefundRequested] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
@@ -100,6 +102,18 @@ export function PrintCode() {
         const res = await fetch(`${apiUrl}/kiosk/job-status?printCode=${printCode}`);
         const data = await res.json();
         
+        if (data.totalSheets !== undefined && data.sheetsCompleted !== undefined) {
+          const total = Number(data.totalSheets);
+          const completed = Number(data.sheetsCompleted);
+          if (total > 0) {
+            setSheetsInfo({ total, completed });
+          }
+        }
+
+        if (data.isPrinted) {
+          setIsPrinted(true);
+        }
+
         if (data.status && data.status !== printStatus) {
           // If the job is in 'paid' state waiting for the user to enter their code at the kiosk,
           // ignore transient heartbeat/offline warnings so the user can still walk over and print.
@@ -127,13 +141,13 @@ export function PrintCode() {
     return () => clearInterval(interval);
   }, [printCode, printStatus]);
 
-  // Animated progress during printing
+  // Synchronized progress tracking physical sheet cadence
   useEffect(() => {
     if (printStatus === "paid" || isProcessing) {
-      setPrintProgress(8);
+      setPrintProgress((prev) => Math.max(prev, 8));
       return;
     }
-    if (printStatus === "completed") {
+    if (printStatus === "completed" || isPrinted) {
       setPrintProgress(100);
       return;
     }
@@ -141,22 +155,18 @@ export function PrintCode() {
       // Freeze wherever we are
       return;
     }
-    // printStatus === "printing" — animate 20% → 90% over ~90 s
     if (printStatus === "printing") {
-      setPrintProgress(20);
-      const start = Date.now();
-      const DURATION_MS = 90_000; // 90 s max estimate
-      const tick = setInterval(() => {
-        const elapsed = Date.now() - start;
-        const frac = Math.min(elapsed / DURATION_MS, 1);
-        // Ease-out curve: grows fast at first then slows near 90%
-        const eased = 1 - Math.pow(1 - frac, 2.5);
-        const next = 20 + eased * 70; // 20% → 90%
-        setPrintProgress(Math.min(next, 90));
-      }, 500);
-      return () => clearInterval(tick);
+      if (sheetsInfo && sheetsInfo.total > 0) {
+        const frac = sheetsInfo.completed / sheetsInfo.total;
+        // Strictly capped at 98% while printing; only reaches 100% upon completed status
+        const computed = Math.min(98, Math.max(15, Math.round(frac * 100)));
+        setPrintProgress((prev) => Math.max(prev, computed));
+      } else {
+        // Safe non-completing fallback while awaiting first telemetry event
+        setPrintProgress((prev) => Math.max(prev, 18));
+      }
     }
-  }, [printStatus, isProcessing]);
+  }, [printStatus, isProcessing, sheetsInfo, isPrinted]);
 
   const handleRequestRefund = async () => {
     const orderId = sessionStorage.getItem("orderId");
