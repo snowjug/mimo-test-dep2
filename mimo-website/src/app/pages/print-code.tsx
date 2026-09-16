@@ -101,12 +101,18 @@ export function PrintCode() {
         const data = await res.json();
         
         if (data.status && data.status !== printStatus) {
+          // If the job is in 'paid' state waiting for the user to enter their code at the kiosk,
+          // ignore transient heartbeat/offline warnings so the user can still walk over and print.
+          if (printStatus === "paid" && data.status === "failed") {
+            console.warn("Ignoring transient failure before print has started:", data.printerStatus);
+            return;
+          }
           setPrintStatus(data.status);
           sessionStorage.setItem("printStatus", data.status);
           if (data.status === "completed") {
             toast.success("Your document has been printed!");
           } else if (data.status === "failed") {
-            toast.error("Print failed. Please contact support.");
+            toast.error(data.printerStatus || "Print failed. Please contact support.");
           }
         }
       } catch (err) {
