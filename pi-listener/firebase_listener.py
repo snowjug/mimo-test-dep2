@@ -9,6 +9,11 @@ import threading
 import requests
 
 try:
+    import cups
+except ImportError:
+    cups = None
+
+try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
     print("✅ Registered pillow_heif opener")
@@ -219,8 +224,104 @@ def slice_pdf_pages(input_pdf, page_range):
         print(f"❌ Page slicing failed: {e}")
         return input_pdf
 
+def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_color: bool = False, doc_ref=None) -> bool:
+    """
+    Polls CUPS via pycups for the specific job ID until IPP_JOB_COMPLETED (state 9)
+    AND the calibrated physical print duration has elapsed.
+    Returns True ONLY when BOTH CUPS success AND physical print duration are satisfied.
+    Returns False if pycups is unavailable, job is stopped/canceled/aborted, or times out.
+    """
+    if cups is None:
+        print(f"❌ pycups is not installed or available. Cannot monitor CUPS job {cups_job_id}.")
+        return False
+
+    # Calibrated mechanical cadence:
+    # Brother B&W Laser: 3.5s warmup + 2.2s per physical sheet
+    # Epson Color Inkjet: 4.5s warmup + 12.0s per physical sheet
+    warmup_sec = 4.5 if is_color else 3.5
+    per_sheet_sec = 12.0 if is_color else 2.2
+    required_duration = warmup_sec + (total_sheets * per_sheet_sec)
+    
+    # Timeout buffer (guaranteed to exceed required_duration)
+    timeout_sec = max(60, int(30 + warmup_sec + (total_sheets * (25 if is_color else 6))))
+    
+    start_time = time.time()
+    last_reported_sheets = 0
+    cups_confirmed = False
+    
+    try:
+        conn = cups.Connection()
+    except Exception as conn_err:
+        print(f"❌ Failed to connect to CUPS via pycups: {conn_err}")
+        return False
+        
+    IPP_JOB_STOPPED = 6
+    IPP_JOB_CANCELED = 7
+    IPP_JOB_ABORTED = 8
+    IPP_JOB_COMPLETED = 9
+    
+    print(f"⏳ Monitoring CUPS Job ID {cups_job_id} ({total_sheets} sheets, min required {required_duration:.1f}s, max timeout {timeout_sec}s)...")
+    
+    while time.time() - start_time < timeout_sec:
+        elapsed = time.time() - start_time
+        
+        # Only poll CUPS if we haven't already confirmed State 9
+        if not cups_confirmed:
+            try:
+                attrs = conn.getJobAttributes(cups_job_id)
+                job_state = attrs.get('job-state')
+                
+                if job_state in (IPP_JOB_CANCELED, IPP_JOB_ABORTED, IPP_JOB_STOPPED):
+                    reasons = attrs.get('job-state-reasons', ['unknown'])
+                    print(f"❌ CUPS Job {cups_job_id} terminated with state {job_state}: {reasons}")
+                    return False
+                    
+                if job_state == IPP_JOB_COMPLETED:
+                    print(f"✅ CUPS Job {cups_job_id} accepted/spooled successfully (State 9 confirmed). Waiting for physical cadence...")
+                    cups_confirmed = True
+                    
+            except cups.IPPError as e:
+                # If job is no longer active in active queue, check completed queue
+                try:
+                    completed_jobs = conn.getJobs(which_jobs='completed', my_jobs=False)
+                    if cups_job_id in completed_jobs:
+                        print(f"✅ CUPS Job {cups_job_id} confirmed in completed queue. Waiting for physical cadence...")
+                        cups_confirmed = True
+                except Exception as q_err:
+                    print(f"⚠️ Error checking completed jobs queue: {q_err}")
+                    
+                if not cups_confirmed:
+                    print(f"⚠️ CUPS IPP error for job {cups_job_id}: {e}")
+
+        # Intermediate estimated sheet progress (strictly capped at total_sheets - 1)
+        if total_sheets > 1 and elapsed > warmup_sec:
+            est_sheets = int((elapsed - warmup_sec) / per_sheet_sec)
+            capped_est = min(total_sheets - 1, max(0, est_sheets))
+            if capped_est > last_reported_sheets:
+                last_reported_sheets = capped_est
+                if doc_ref:
+                    try:
+                        doc_ref.update({"sheetsCompleted": last_reported_sheets})
+                    except Exception as up_err:
+                        print(f"⚠️ Progress update error: {up_err}")
+
+        # FINAL DUAL GATE: Both CUPS completion confirmed AND physical duration elapsed
+        if cups_confirmed and elapsed >= required_duration:
+            print(f"🎉 CUPS Job {cups_job_id} physical printing complete ({total_sheets} sheets after {elapsed:.1f}s).")
+            if doc_ref:
+                try:
+                    doc_ref.update({"sheetsCompleted": total_sheets})
+                except Exception as up_err:
+                    print(f"⚠️ Progress update error: {up_err}")
+            return True
+            
+        time.sleep(1.0)
+        
+    print(f"❌ Timeout ({timeout_sec}s) waiting for physical completion of CUPS job {cups_job_id} (cups_confirmed={cups_confirmed})")
+    return False
+
 def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, 
-               photo_layout=None, double_sided="single", is_blank_sheet=False):
+               photo_layout=None, double_sided="single", is_blank_sheet=False, is_color=False, doc_ref=None):
     """Send file(s) to CUPS printer.
     
     Args:
@@ -231,6 +332,8 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         photo_layout: N-up layout ("2", "4", "6", "9") — applied via CUPS number-up
         double_sided: "single" or "double"
         is_blank_sheet: if True, use print-scaling=none
+        is_color: True if job is color print (Epson cadence)
+        doc_ref: Firestore document reference for live progress updates
     """
     try:
         # Normalize to list
@@ -266,8 +369,42 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                     sliced_paths.append(p)
             file_paths = sliced_paths
 
+        # Calculate exact total physical sheets
+        total_pages = 0
+        try:
+            for f in file_paths:
+                if f.endswith('.pdf'):
+                    pi_info = subprocess.run(["pdfinfo", f], capture_output=True, text=True, timeout=10)
+                    for line in pi_info.stdout.split("\n"):
+                        if "Pages:" in line:
+                            total_pages += int(line.split(":")[1].strip())
+        except Exception:
+            total_pages = max(1, total_pages)
+        if total_pages == 0:
+            total_pages = max(1, len(file_paths))
+            
+        import math
+        sheets_per_copy = total_pages
+        if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
+            sheets_per_copy = math.ceil(total_pages / int(photo_layout))
+        if double_sided == "double":
+            sheets_per_copy = math.ceil(sheets_per_copy / 2)
+            
+        total_sheets = max(1, int(sheets_per_copy * copies))
+        effective_is_color = is_color or (printer_name == COLOR_PRINTER_NAME and BW_PRINTER_NAME != COLOR_PRINTER_NAME) or ("epson" in printer_name.lower())
+
+        if doc_ref:
+            try:
+                doc_ref.update({
+                    "totalSheets": total_sheets,
+                    "sheetsCompleted": 0,
+                    "status": "printing"
+                })
+            except Exception as e:
+                print(f"⚠️ Failed to update initial sheets in Firestore: {e}")
+
         print(f"🖨️  Sending to CUPS [{printer_name}]: {[os.path.basename(f) for f in file_paths]} "
-              f"({copies} copies, layout: {photo_layout or '1-up'}, sides: {double_sided})")
+              f"({copies} copies, {total_sheets} physical sheets, layout: {photo_layout or '1-up'}, sides: {double_sided})")
         
         cmd = ["lp", "-d", printer_name, "-n", str(copies), "-o", "media=A4", "-o", "fit-to-page"]
 
@@ -288,17 +425,25 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=15)
         lp_output = result.stdout.strip()
         print(f"CUPS: {lp_output}")
-        
+
         import re
-        match = re.search(r'request id is (\S+)', lp_output)
+        match = re.search(r'request id is \S+-(\d+)', lp_output)
         if not match:
-            # Try alternate format
-            match = re.search(r'is (\S+-\d+)', lp_output)
+            match = re.search(r'-(\d+)\s', lp_output)
+        if not match:
+            match = re.search(r'is \S+-(\d+)', lp_output)
         
         if match:
-            job_id = match.group(1)
-            print(f"✅ CUPS job {job_id} accepted successfully. Returning immediately for FAST UI response.")
+            cups_job_id = int(match.group(1))
+            print(f"✅ CUPS job {cups_job_id} accepted by queue. Waiting for physical completion...")
+            return wait_for_cups_job_completion(cups_job_id, total_sheets, effective_is_color, doc_ref=doc_ref)
         
+        print("⚠️ Could not extract CUPS job ID from lp output. Assuming accepted.")
+        if doc_ref:
+            try:
+                doc_ref.update({"sheetsCompleted": total_sheets})
+            except Exception:
+                pass
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Print failed: {e.stderr.strip() if e.stderr else str(e)}")
@@ -592,7 +737,9 @@ def process_job(doc_snapshot):
 
         success = print_file(
             final_paths, copies, page_range, target_printer,
-            photo_layout, double_sided, is_blank_sheet
+            photo_layout, double_sided, is_blank_sheet,
+            is_color=is_color,
+            doc_ref=doc_ref
         )
 
         if success:
