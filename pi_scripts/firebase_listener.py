@@ -857,11 +857,15 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         is_color = (printer_name == COLOR_PRINTER_NAME)
         cmd = ["lp", "-d", printer_name, "-n", str(copies),
-               "-o", "media=A4",
-               "-o", "page-left=0", "-o", "page-right=0",
-               "-o", "page-top=0", "-o", "page-bottom=0"]
+               "-o", "media=A4"]
 
-        if not is_color:
+        if is_color:
+            # Zero-margin overrides are specific to Epson inkjet color alignment
+            cmd.extend([
+                "-o", "page-left=0", "-o", "page-right=0",
+                "-o", "page-top=0", "-o", "page-bottom=0"
+            ])
+        else:
             cmd.extend(["-o", "InputSlot=Main"])
 
         # fit-to-page is skipped for:
