@@ -2342,8 +2342,10 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       .where("status", "==", "paid")
       .get();
 
-    if (snapshot.empty) {
-      // Secondary check: was this code already used (completed / refunded / printing)?
+    const activeDocs = snapshot.docs.filter(doc => !doc.data().fileDeleted);
+
+    if (activeDocs.length === 0) {
+      // Secondary check: was this code already used (completed / refunded / printing / expired)?
       const usedSnap = await db
         .collection("print_jobs")
         .where("printCode", "==", printCode)
@@ -2351,10 +2353,13 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
         .limit(1)
         .get();
       if (!usedSnap.empty) {
-        const usedStatus = usedSnap.docs[0].data().status || "used";
+        const usedData = usedSnap.docs[0].data();
+        const usedStatus = usedData.status || "used";
         const msg = usedStatus === "refunded"
           ? "This print code has been refunded and can no longer be used."
-          : "Print code already used. Your document has already been printed with this code.";
+          : (usedStatus === "expired" || usedData.fileDeleted)
+            ? "Print code expired. Associated files have been safely purged."
+            : "Print code already used. Your document has already been printed with this code.";
         return res.status(409).json({ error: msg });
       }
       return res.status(404).json({ error: "Invalid code" });
@@ -2363,8 +2368,8 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
     // Capability-based Routing Validation:
     // - Color jobs: ONLY allowed at MIMO 2.0 (SV-002)
     // - B&W jobs: allowed at EITHER MIMO 1.0 (CV-001) OR MIMO 2.0 (SV-002)
-    const firstDoc = snapshot.docs[0].data();
-    const isColor = snapshot.docs.some(doc => isColorJob(doc.data()));
+    const firstDoc = activeDocs[0].data();
+    const isColor = activeDocs.some(doc => isColorJob(doc.data()));
 
     if (isColor) {
       if (kioskId !== "SV-002") {
@@ -2398,7 +2403,7 @@ app.post("/get-documents-by-code", kioskLimiter, async (req, res) => {
       }
     }
 
-    for (const doc of snapshot.docs) {
+    for (const doc of activeDocs) {
       const data = doc.data();
 
       // ❌ Expired
@@ -2596,8 +2601,10 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
 
         for (const doc of querySnap.docs) {
           const data = doc.data();
-          if (data.status !== "paid" && data.status !== "printing") {
-            if (data.status === "completed" || data.isPrinted) {
+          if ((data.status !== "paid" && data.status !== "printing") || data.fileDeleted) {
+            if (data.fileDeleted || data.status === "expired") {
+              transactionFailedError = { status: 400, message: "Print code expired or files already purged." };
+            } else if (data.status === "completed" || data.isPrinted) {
               transactionFailedError = { status: 409, message: "Print code already used or currently printing." };
             } else {
               transactionFailedError = { status: 400, message: `Job not ready for printing (status: ${data.status}).` };
@@ -2865,24 +2872,58 @@ app.get("/cron/cleanup-files", async (req, res) => {
     let batchOperations = 0;
     
     for (const doc of jobsToDelete) {
-      if (batchOperations >= 450) break; // Firestore batch limits
+      if (batchOperations >= 400) break; // Firestore batch limits
       const data = doc.data();
-      
-      if (data.fileUrl) {
+
+      // Skip jobs actively printing
+      if (data.status === "printing") continue;
+      if (data.printStartedAt) {
+        const startedDate = data.printStartedAt.toDate ? data.printStartedAt.toDate() : new Date(data.printStartedAt);
+        if (Date.now() - startedDate.getTime() < 30 * 60 * 1000) continue;
+      }
+
+      const pathsToDelete = new Set();
+      const addPath = (urlOrPath) => {
+        const p = extractFilePath(urlOrPath, bucket.name);
+        if (p) pathsToDelete.add(p);
+      };
+
+      if (data.fileUrl) addPath(data.fileUrl);
+      if (data.originalFileUrl) addPath(data.originalFileUrl);
+      if (data.convertedStoragePath) addPath(data.convertedStoragePath);
+      if (Array.isArray(data.files)) {
+        for (const f of data.files) {
+          if (f.url) addPath(f.url);
+          if (f.originalUrl) addPath(f.originalUrl);
+          if (f.convertedStoragePath) addPath(f.convertedStoragePath);
+        }
+      }
+
+      let allDeleted = true;
+      for (const storagePath of pathsToDelete) {
         try {
-          const filePath = extractFilePath(data.fileUrl, bucket.name);
-          if (filePath) {
-            await bucket.file(filePath).delete();
-          }
+          await bucket.file(storagePath).delete();
         } catch (bucketErr) {
           // 404 means already deleted
           if (bucketErr.code !== 404) {
-             console.error(`[CRON] Failed deleting ${data.fileUrl}:`, bucketErr);
-             continue; // Skip DB update if delete failed
+            console.error(`[CRON] Failed deleting ${storagePath}:`, bucketErr.message);
+            allDeleted = false;
           }
         }
       }
-      batch.update(doc.ref, { fileDeleted: true, fileDeletedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+      if (!allDeleted) continue;
+
+      const updateFields = {
+        fileDeleted: true,
+        fileDeletedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      if (data.status === "paid") {
+        updateFields.status = "expired";
+        updateFields.printerStatus = "Expired (Files Purged)";
+      }
+
+      batch.update(doc.ref, updateFields);
       deletedCount++;
       batchOperations++;
     }

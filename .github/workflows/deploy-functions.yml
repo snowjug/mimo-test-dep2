@@ -42,7 +42,7 @@ jobs:
         env:
           FIREBASE_FUNCTIONS_DISCOVERY_TIMEOUT: "60000"
         run: |
-          firebase deploy --only functions:api --force --project mimo-v2-11868
+          firebase deploy --only functions:api,functions:scheduledFileRetentionCleanup --force --project mimo-v2-11868
 
       - name: Ensure Public Invoker Access
         run: |
