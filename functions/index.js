@@ -1,6 +1,7 @@
 // Deploy trigger: 2026-08-10 12:28:00
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -967,6 +968,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       await newJobRef.update({
         status: "paid",
         printCode,
+        codeCreatedAt: now,
         paymentTime: now,
         isPrinted: false
       });
@@ -1372,18 +1374,23 @@ app.post("/get-documents-by-code", async (req, res) => {
       .where("status", "==", "paid")
       .get();
 
-    if (snapshot.empty) {
-      // Secondary check: was this code already used (completed / refunded / printing)?
+    const activeDocs = snapshot.docs.filter(doc => !doc.data().fileDeleted);
+
+    if (activeDocs.length === 0) {
+      // Secondary check: was this code already used (completed / refunded / printing / expired)?
       const usedSnap = await db.collection("print_jobs")
         .where("printCode", "==", printCode)
         .where("status", "in", ["completed", "printing", "refunded", "printed", "expired"])
         .limit(1)
         .get();
       if (!usedSnap.empty) {
-        const usedStatus = usedSnap.docs[0].data().status || "used";
+        const usedData = usedSnap.docs[0].data();
+        const usedStatus = usedData.status || "used";
         const msg = usedStatus === "refunded"
           ? "This print code has been refunded and can no longer be used."
-          : "Print code already used. Your document has already been printed with this code.";
+          : (usedStatus === "expired" || usedData.fileDeleted)
+            ? "Print code expired. Associated files have been safely purged."
+            : "Print code already used. Your document has already been printed with this code.";
         return res.status(409).json({ error: msg });
       }
       return res.status(404).json({ error: "Invalid or expired print code" });
@@ -1392,8 +1399,8 @@ app.post("/get-documents-by-code", async (req, res) => {
     // Capability-based Routing Validation:
     // - Color jobs: ONLY allowed at MIMO 2.0 (SV-002)
     // - B&W jobs: allowed at EITHER MIMO 1.0 (CV-001) OR MIMO 2.0 (SV-002)
-    const firstJob = snapshot.docs[0].data();
-    const isColor = snapshot.docs.some(doc => isColorJob(doc.data()));
+    const firstJob = activeDocs[0].data();
+    const isColor = activeDocs.some(doc => isColorJob(doc.data()));
 
     if (isColor) {
       if (kioskId !== "SV-002") {
@@ -1417,7 +1424,7 @@ app.post("/get-documents-by-code", async (req, res) => {
       if (userDoc.exists) userName = userDoc.data().username || "User";
     } catch (e) { /* ignore */ }
 
-    const documents = snapshot.docs.map(doc => {
+    const documents = activeDocs.map(doc => {
       const data = doc.data();
       return {
         file: data.fileName || "Document",
@@ -2021,7 +2028,13 @@ app.get("/wa-pay-success/:orderId", async (req, res) => {
       if (cfStatus.data.link_status === "PAID") {
         printCode = Math.floor(1000 + Math.random() * 9000).toString();
         const batch = db.batch();
-        waJobs.forEach(d => batch.update(d.ref, { status: "paid", printCode, paymentTime: admin.firestore.FieldValue.serverTimestamp() }));
+        const now = admin.firestore.FieldValue.serverTimestamp();
+        waJobs.forEach(d => batch.update(d.ref, {
+          status: "paid",
+          printCode,
+          codeCreatedAt: now,
+          paymentTime: now
+        }));
         await batch.commit();
 
         // Notify on WhatsApp with native order card
@@ -2452,8 +2465,20 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
     const orderId = `WA-FREE-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
     const printCode = Math.floor(1000 + Math.random() * 9000).toString();
     const targetKioskId = session.kioskId || session.destination || "SV-002";
+    const now = admin.firestore.FieldValue.serverTimestamp();
     await db.collection("print_jobs").doc(session.jobId).update({
-      orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: 0, printDestination: targetKioskId, kioskId: targetKioskId, status: "paid", printCode, couponUsed: couponCode || null
+      orderId,
+      colorMode: session.colorMode,
+      copies: session.copies,
+      pageCount: session.pageCount,
+      totalCost: 0,
+      printDestination: targetKioskId,
+      kioskId: targetKioskId,
+      status: "paid",
+      printCode,
+      codeCreatedAt: now,
+      paymentTime: now,
+      couponUsed: couponCode || null
     });
     await sessionRef.update({ state: "idle" });
     await sendWhatsAppMessage(from, `🎉 *100% Free!* Your order is fully covered.\n\nYour Print Code is:\n*${printCode}*\n\nHead to the Mimo kiosk and enter this code! 🖨️`);
@@ -2733,8 +2758,8 @@ app.post("/kiosk/print", async (req, res) => {
           }
         }
 
-        if (jobData.status !== "paid") {
-          transactionFailedError = { status: 400, message: "Print code already redeemed or job not paid" };
+        if (jobData.status !== "paid" || jobData.fileDeleted) {
+          transactionFailedError = { status: 400, message: "Print code already redeemed, expired, or files purged" };
           throw new Error("TX_ABORT");
         }
 
@@ -2950,51 +2975,145 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
   }
 });
 
-// ================= STORAGE AUTO-CLEANUP =================
+// ================= STORAGE HELPERS =================
+/**
+ * Safely extracts a relative Cloud Storage object path from various URL/URI formats.
+ * Handles:
+ * - Plain relative paths (e.g. "converted/userId/doc.pdf", "uploads/user/doc.docx")
+ * - gs:// URIs (e.g. "gs://bucket-name/uploads/user/doc.pdf")
+ * - Firebase Storage URLs (e.g. "https://firebasestorage.googleapis.com/v0/b/.../o/path%2Fto%2Ffile?alt=media...")
+ * - GCS standard URLs (e.g. "https://storage.googleapis.com/bucket-name/path/to/file...")
+ */
+function extractStoragePath(fileUrl, bucketName) {
+  if (!fileUrl || typeof fileUrl !== "string") return null;
+  const trimmed = fileUrl.trim();
+  if (!trimmed) return null;
+
+  // 1. Plain relative storage path (e.g. "converted/userId/doc.pdf" or "uploads/...")
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://") && !trimmed.startsWith("gs://")) {
+    return trimmed.replace(/^\/+/, "").split("?")[0];
+  }
+
+  // 2. gs:// URI
+  if (trimmed.startsWith("gs://")) {
+    if (bucketName && trimmed.startsWith(`gs://${bucketName}/`)) {
+      return trimmed.replace(`gs://${bucketName}/`, "").replace(/^\/+/, "");
+    }
+    const match = trimmed.match(/^gs:\/\/[^\/]+\/(.+)$/);
+    return match ? match[1].replace(/^\/+/, "") : null;
+  }
+
+  // 3. Firebase Storage URL (firebasestorage.googleapis.com)
+  if (trimmed.includes("firebasestorage.googleapis.com")) {
+    try {
+      const urlObj = new URL(trimmed);
+      const pathParts = urlObj.pathname.split("/o/");
+      if (pathParts.length > 1) {
+        return decodeURIComponent(pathParts[1].split("?")[0]).replace(/^\/+/, "");
+      }
+    } catch (e) {
+      console.error("[STORAGE PATH PARSE ERROR] Invalid Firebase URL:", trimmed, e.message);
+    }
+  }
+
+  // 4. Standard GCS URL (storage.googleapis.com)
+  if (trimmed.includes("storage.googleapis.com")) {
+    try {
+      if (bucketName && trimmed.includes(`${bucketName}/`)) {
+        const parts = trimmed.split(`${bucketName}/`);
+        if (parts.length > 1) {
+          return decodeURIComponent(parts[1].split("?")[0]).replace(/^\/+/, "");
+        }
+      }
+      const urlObj = new URL(trimmed);
+      const segments = urlObj.pathname.split("/").filter(Boolean);
+      if (segments.length > 1) {
+        return decodeURIComponent(segments.slice(1).join("/")).replace(/^\/+/, "");
+      }
+    } catch (e) {
+      console.error("[STORAGE PATH PARSE ERROR] Invalid GCS URL:", trimmed, e.message);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolves the authoritative start timestamp for the 24-hour retention clock.
+ * Priority:
+ * 1. codeCreatedAt (moment print code was generated)
+ * 2. paymentTime (payment completion timestamp for legacy/unmigrated jobs)
+ * 3. createdAt (job creation timestamp)
+ * 4. uploadedAt (file upload timestamp fallback)
+ */
+function getRetentionStartTime(data) {
+  const ts = data.codeCreatedAt || data.paymentTime || data.createdAt || data.uploadedAt;
+  if (!ts) return null;
+  if (ts.toDate && typeof ts.toDate === "function") return ts.toDate();
+  if (ts instanceof Date) return ts;
+  if (typeof ts === "number") return new Date(ts);
+  if (typeof ts === "string") {
+    const d = new Date(ts);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+// ================= STORAGE AUTO-CLEANUP (ON COMPLETED) =================
 exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
   const beforeData = event.data.before.data();
   const afterData = event.data.after.data();
 
   // Trigger ONLY if status changes to "completed"
   if (beforeData.status !== "completed" && afterData.status === "completed") {
-    console.log(`[STORAGE] Print job ${event.params.jobId} completed. Cleaning up file...`);
+    console.log(`[STORAGE] Print job ${event.params.jobId} completed. Cleaning up files...`);
 
-    if (!afterData.fileUrl) {
-      console.log(`[STORAGE] No fileUrl found for job ${event.params.jobId}.`);
-      return;
+    const bucket = admin.storage().bucket();
+    const pathsToDelete = new Set();
+
+    const addPath = (urlOrPath) => {
+      const p = extractStoragePath(urlOrPath, bucket.name);
+      if (p) pathsToDelete.add(p);
+    };
+
+    if (afterData.fileUrl) addPath(afterData.fileUrl);
+    if (afterData.originalFileUrl) addPath(afterData.originalFileUrl);
+    if (afterData.convertedStoragePath) addPath(afterData.convertedStoragePath);
+
+    if (Array.isArray(afterData.files)) {
+      for (const f of afterData.files) {
+        if (f.url) addPath(f.url);
+        if (f.originalUrl) addPath(f.originalUrl);
+        if (f.convertedStoragePath) addPath(f.convertedStoragePath);
+      }
     }
 
-    try {
-      // fileUrl format: "gs://mimo-v2-11868.firebasestorage.app/uploads/username/filename.pdf"
-      // Or: "https://firebasestorage.googleapis.com/v0/b/..."
-
-      const fileUrl = afterData.fileUrl;
-      const bucket = admin.storage().bucket();
-
-      let filePath = "";
-      if (fileUrl.startsWith("gs://")) {
-        const bucketName = bucket.name;
-        filePath = fileUrl.replace(`gs://${bucketName}/`, "");
-      } else if (fileUrl.includes("firebasestorage.googleapis.com")) {
-        // Extract from HTTP URL
-        const urlObj = new URL(fileUrl);
-        const pathParts = urlObj.pathname.split("/o/");
-        if (pathParts.length > 1) {
-          filePath = decodeURIComponent(pathParts[1].split("?")[0]);
+    if (pathsToDelete.size === 0) {
+      console.log(`[STORAGE] No files found to clean up for completed job ${event.params.jobId}.`);
+    } else {
+      for (const storagePath of pathsToDelete) {
+        try {
+          const fileRef = bucket.file(storagePath);
+          await fileRef.delete();
+          console.log(`[STORAGE] Successfully deleted ${storagePath} for completed job ${event.params.jobId}`);
+        } catch (err) {
+          if (err.code === 404) {
+            console.log(`[STORAGE] File already deleted (404): ${storagePath} for completed job ${event.params.jobId}`);
+          } else {
+            console.error(`[STORAGE ERROR] Failed to delete ${storagePath} for completed job ${event.params.jobId}:`, err.message);
+          }
         }
       }
 
-      if (!filePath) {
-        console.error(`[STORAGE ERROR] Could not parse path from: ${fileUrl}`);
-        return;
+      // Mark fileDeleted: true on the completed job
+      try {
+        await event.data.after.ref.update({
+          fileDeleted: true,
+          fileDeletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (dbErr) {
+        console.error(`[STORAGE ERROR] Failed to update fileDeleted for job ${event.params.jobId}:`, dbErr.message);
       }
-
-      const fileRef = bucket.file(filePath);
-      await fileRef.delete();
-      console.log(`[STORAGE] Successfully deleted ${filePath}`);
-
-    } catch (err) {
-      console.error(`[STORAGE ERROR] Failed to delete file for job ${event.params.jobId}:`, err);
     }
 
     // Send WhatsApp Acknowledgement + "Need More Prints" button
@@ -3025,6 +3144,213 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
     }
   }
 });
+
+// ================= 24-HOUR FILE RETENTION CLEANUP (SCHEDULED) =================
+exports.scheduledFileRetentionCleanup = onSchedule(
+  {
+    schedule: "every 1 hours",
+    timeZone: "Asia/Kolkata",
+    timeoutSeconds: 300,
+    maxInstances: 1,
+  },
+  async (event) => {
+    console.log(`[RETENTION CLEANUP] Scheduled run started at ${new Date().toISOString()}`);
+
+    const bucket = admin.storage().bucket();
+    const now = Date.now();
+    const RETENTION_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const cutoffDate = new Date(now - RETENTION_MS);
+    const cutoffTimestamp = admin.firestore.Timestamp.fromDate(cutoffDate);
+
+    const PAGE_SIZE = 100;
+    const MAX_PAGES_PER_STREAM = 5;
+    const MAX_CANDIDATES_TOTAL = 150;
+
+    const candidateMap = new Map();
+
+    /**
+     * Paginates candidate documents for a specific timestamp field using startAfter cursor.
+     * Advances past historical documents (including fileDeleted: true).
+     */
+    async function fetchCandidatesForField(fieldName) {
+      let lastDoc = null;
+      let pagesRead = 0;
+
+      while (pagesRead < MAX_PAGES_PER_STREAM && candidateMap.size < MAX_CANDIDATES_TOTAL) {
+        let query = db.collection("print_jobs")
+          .where(fieldName, "<", cutoffTimestamp)
+          .orderBy(fieldName, "asc")
+          .limit(PAGE_SIZE);
+
+        if (lastDoc) {
+          query = query.startAfter(lastDoc);
+        }
+
+        const snap = await query.get();
+        pagesRead++;
+
+        if (snap.empty) {
+          break;
+        }
+
+        for (const doc of snap.docs) {
+          const data = doc.data();
+          // Skip if already marked as deleted to avoid adding to candidateMap
+          if (data.fileDeleted === true) continue;
+
+          if (!candidateMap.has(doc.id)) {
+            candidateMap.set(doc.id, doc);
+            if (candidateMap.size >= MAX_CANDIDATES_TOTAL) {
+              break;
+            }
+          }
+        }
+
+        // Advance cursor using the last document of the page
+        lastDoc = snap.docs[snap.docs.length - 1];
+
+        // If fewer than PAGE_SIZE documents were returned, stream is exhausted
+        if (snap.docs.length < PAGE_SIZE) {
+          break;
+        }
+      }
+
+      console.log(`[RETENTION CLEANUP] Stream '${fieldName}': examined ${pagesRead} page(s). Total candidates accumulated: ${candidateMap.size}`);
+    }
+
+    try {
+      // Process streams sequentially by timestamp priority
+      await fetchCandidatesForField("codeCreatedAt");
+
+      if (candidateMap.size < MAX_CANDIDATES_TOTAL) {
+        await fetchCandidatesForField("paymentTime");
+      }
+
+      if (candidateMap.size < MAX_CANDIDATES_TOTAL) {
+        await fetchCandidatesForField("createdAt");
+      }
+
+      console.log(`[RETENTION CLEANUP] Found ${candidateMap.size} unique candidate jobs older than 24 hours.`);
+
+      let processedCount = 0;
+      let skippedPrintingCount = 0;
+      let alreadyDeletedCount = 0;
+      let successCleanedCount = 0;
+      let errorCount = 0;
+
+      for (const [jobId, doc] of candidateMap.entries()) {
+        processedCount++;
+        const data = doc.data();
+
+        // 1. Skip if files already marked as deleted
+        if (data.fileDeleted === true) {
+          alreadyDeletedCount++;
+          continue;
+        }
+
+        // 2. ACTIVE PRINTING SAFETY: Skip if job is actively printing
+        if (data.status === "printing") {
+          console.log(`[RETENTION CLEANUP] Skipping job ${jobId}: Currently in 'printing' status.`);
+          skippedPrintingCount++;
+          continue;
+        }
+
+        // 3. ACTIVE PRINTING SAFETY: Skip if printStartedAt was within the last 30 minutes
+        if (data.printStartedAt) {
+          const startedDate = data.printStartedAt.toDate ? data.printStartedAt.toDate() : new Date(data.printStartedAt);
+          const elapsedPrintMs = now - startedDate.getTime();
+          if (elapsedPrintMs < 30 * 60 * 1000) {
+            console.log(`[RETENTION CLEANUP] Skipping job ${jobId}: printStartedAt within last 30m (${Math.round(elapsedPrintMs / 60000)}m ago).`);
+            skippedPrintingCount++;
+            continue;
+          }
+        }
+
+        // 4. Authoritative retention deadline check
+        const startTime = getRetentionStartTime(data);
+        if (!startTime) {
+          console.log(`[RETENTION CLEANUP] Skipping job ${jobId}: No valid timestamp found to calculate retention.`);
+          continue;
+        }
+
+        const elapsedRetentionMs = now - startTime.getTime();
+        if (elapsedRetentionMs < RETENTION_MS) {
+          // Retention timer has not yet reached 24 hours
+          continue;
+        }
+
+        console.log(`[RETENTION CLEANUP] Processing eligible job ${jobId} (status: ${data.status}, age: ${(elapsedRetentionMs / 3600000).toFixed(1)}h)...`);
+
+        // 5. Build unique set of storage paths to delete
+        const pathsToDelete = new Set();
+        const addPath = (urlOrPath) => {
+          const p = extractStoragePath(urlOrPath, bucket.name);
+          if (p) pathsToDelete.add(p);
+        };
+
+        if (data.fileUrl) addPath(data.fileUrl);
+        if (data.originalFileUrl) addPath(data.originalFileUrl);
+        if (data.convertedStoragePath) addPath(data.convertedStoragePath);
+
+        if (Array.isArray(data.files)) {
+          for (const f of data.files) {
+            if (f.url) addPath(f.url);
+            if (f.originalUrl) addPath(f.originalUrl);
+            if (f.convertedStoragePath) addPath(f.convertedStoragePath);
+          }
+        }
+
+        let allFilesDeletedSuccessfully = true;
+
+        for (const storagePath of pathsToDelete) {
+          try {
+            const fileRef = bucket.file(storagePath);
+            await fileRef.delete();
+            console.log(`[RETENTION CLEANUP] Deleted Storage file: ${storagePath} for job ${jobId}`);
+          } catch (bucketErr) {
+            if (bucketErr.code === 404) {
+              console.log(`[RETENTION CLEANUP] Storage file already gone (404): ${storagePath} for job ${jobId}`);
+            } else {
+              console.error(`[RETENTION CLEANUP ERROR] Could not delete ${storagePath} for job ${jobId}:`, bucketErr.message);
+              allFilesDeletedSuccessfully = false;
+            }
+          }
+        }
+
+        if (!allFilesDeletedSuccessfully) {
+          console.error(`[RETENTION CLEANUP ERROR] Skipping Firestore update for job ${jobId} due to partial storage deletion failure.`);
+          errorCount++;
+          continue;
+        }
+
+        // 6. Update Firestore document (DO NOT delete document, preserve admin history)
+        const updatePayload = {
+          fileDeleted: true,
+          fileDeletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        // If job was still paid/unprinted, transition to expired
+        if (data.status === "paid") {
+          updatePayload.status = "expired";
+          updatePayload.printerStatus = "Expired (Files Purged)";
+        }
+
+        try {
+          await doc.ref.update(updatePayload);
+          console.log(`[RETENTION CLEANUP] Successfully updated job ${jobId}: fileDeleted=true${data.status === "paid" ? ", status=expired" : ""}`);
+          successCleanedCount++;
+        } catch (updateErr) {
+          console.error(`[RETENTION CLEANUP ERROR] Failed updating Firestore for job ${jobId}:`, updateErr.message);
+          errorCount++;
+        }
+      }
+
+      console.log(`[RETENTION CLEANUP] Finished run. Processed: ${processedCount}, Cleaned: ${successCleanedCount}, Already Deleted: ${alreadyDeletedCount}, Active Printing Skipped: ${skippedPrintingCount}, Errors: ${errorCount}`);
+    } catch (queryErr) {
+      console.error("[RETENTION CLEANUP CRITICAL ERROR] Query failed:", queryErr);
+    }
+  }
+);
 exports.sendFailureNotification = onDocumentUpdated(
   {
     document: "print_jobs/{jobId}",
