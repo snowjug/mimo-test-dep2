@@ -19,6 +19,7 @@ export interface DashboardKPIs {
     formatted: string;
     lifetimeFormatted: string;
     subtext: string;
+    tagLabel?: string;
   };
   successRate: {
     rate: number;
@@ -32,17 +33,6 @@ export interface DashboardKPIs {
     subtext: string;
     badgeText: string;
     hasAlert: boolean;
-  };
-  kioskNetworkStatus: {
-    onlineCount: number;
-    totalCount: number;
-    formatted: string;
-    subtext: string;
-  };
-  activePrintQueue: {
-    jobCount: number;
-    formatted: string;
-    subtext: string;
   };
 }
 
@@ -81,10 +71,12 @@ export interface KioskSummary {
   successRate: number;
   paperLevel?: number;
   printerHealth?: string;
+  location?: string;
+  model?: string;
 }
 
-export type OperationStage = 'Processing' | 'Printing' | 'Merge' | 'Queued' | 'Completed';
-export type OperationStatus = 'ACTIVE' | 'PRINTING' | 'WARNING' | 'QUEUED' | 'COMPLETED';
+export type OperationStage = 'Processing' | 'Printing' | 'Merge' | 'Queued' | 'Completed' | 'Failed';
+export type OperationStatus = 'ACTIVE' | 'PRINTING' | 'WARNING' | 'QUEUED' | 'COMPLETED' | 'FAILED';
 
 export interface LiveOperationItem {
   id: string;
@@ -98,6 +90,7 @@ export interface LiveOperationItem {
   stage: OperationStage;
   duration: string;
   status: OperationStatus;
+  timestamp?: string;
 }
 
 export interface MIMOIntelligenceInsight {
@@ -110,6 +103,8 @@ export interface IncidentsSummary {
   critical: number;
   high: number;
   medium: number;
+  low?: number;
+  resolved?: number;
   timeframeLabel: string;
 }
 

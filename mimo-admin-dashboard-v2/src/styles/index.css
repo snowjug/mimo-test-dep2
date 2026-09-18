@@ -1,0 +1,84 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg-page: #07111F;
+  --color-bg-sidebar: #0A1728;
+  --color-bg-card: #10223A;
+  --color-bg-elevated: #132943;
+  --color-border: #1D3A59;
+  --color-accent: #20D3A2;
+  --color-text-primary: #F5F7FA;
+  --color-text-secondary: #8EA6BF;
+  --color-text-muted: #6F89A3;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #07111F;
+  color: #F5F7FA;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #07111F;
+}
+::-webkit-scrollbar-thumb {
+  background: #1D3A59;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #20D3A2;
+}
+
+/* Base Card & Container Classes */
+.mimo-card {
+  background-color: #10223A;
+  border: 1px solid #1D3A59;
+  border-radius: 1.25rem;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mimo-card:hover {
+  border-color: rgba(32, 211, 162, 0.4);
+}
+
+.mimo-card-elevated {
+  background-color: #132943;
+  border: 1px solid #1D3A59;
+  border-radius: 1rem;
+}
+
+.mimo-input {
+  background-color: #0A1728;
+  border: 1px solid #1D3A59;
+  color: #F5F7FA;
+  border-radius: 0.875rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mimo-input:focus {
+  outline: none;
+  border-color: #20D3A2;
+  box-shadow: 0 0 0 3px rgba(32, 211, 162, 0.15);
+}
+
+.mimo-input::placeholder {
+  color: #6F89A3;
+}

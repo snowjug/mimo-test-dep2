@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Printer,
   RefreshCw,
@@ -9,395 +9,272 @@ import {
   FileText,
   RotateCcw,
 } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext';
-
-interface PrintJob {
-  id: string;
-  fileName: string;
-  user: string;
-  kiosk: string;
-  kioskCode: string;
-  pageCount: number;
-  type: 'B&W' | 'Color';
-  amount: number;
-  stage: 'Queued' | 'Merging' | 'Printing' | 'Completed' | 'Failed';
-  status: 'ACTIVE' | 'PRINTING' | 'DONE' | 'FAILED' | 'WARNING';
-  timestamp: string;
-  duration: string;
-}
-
-const INITIAL_JOBS: PrintJob[] = [
-  {
-    id: 'JB-9041',
-    fileName: 'Application_Form_Final.pdf',
-    user: 'rahul.s@campus.edu',
-    kiosk: 'MIMO 1 (Main Library)',
-    kioskCode: 'CV-001',
-    pageCount: 7,
-    type: 'B&W',
-    amount: 16.10,
-    stage: 'Printing',
-    status: 'PRINTING',
-    timestamp: 'Just now',
-    duration: '12s',
-  },
-  {
-    id: 'JB-9040',
-    fileName: 'Hall_Ticket_Exam_2026.pdf',
-    user: 'priya.k@campus.edu',
-    kiosk: 'MIMO 2 (Admin Block)',
-    kioskCode: 'SV-002',
-    pageCount: 2,
-    type: 'Color',
-    amount: 20.00,
-    stage: 'Merging',
-    status: 'ACTIVE',
-    timestamp: '1m ago',
-    duration: '4s',
-  },
-  {
-    id: 'JB-9039',
-    fileName: 'Project_Assignment_Draft.pdf',
-    user: 'arjun.v@campus.edu',
-    kiosk: 'MIMO 2 (Admin Block)',
-    kioskCode: 'SV-002',
-    pageCount: 14,
-    type: 'B&W',
-    amount: 32.20,
-    stage: 'Queued',
-    status: 'WARNING',
-    timestamp: '3m ago',
-    duration: '45s',
-  },
-  {
-    id: 'JB-9038',
-    fileName: 'Campus_ID_Card.pdf',
-    user: 'sneha.m@campus.edu',
-    kiosk: 'MIMO 1 (Main Library)',
-    kioskCode: 'CV-001',
-    pageCount: 1,
-    type: 'Color',
-    amount: 10.00,
-    stage: 'Completed',
-    status: 'DONE',
-    timestamp: '6m ago',
-    duration: '8s',
-  },
-  {
-    id: 'JB-9037',
-    fileName: 'Lecture_Notes_Module4.pdf',
-    user: 'vikram.r@campus.edu',
-    kiosk: 'MIMO 3 (Cafeteria)',
-    kioskCode: 'SV-003',
-    pageCount: 22,
-    type: 'B&W',
-    amount: 50.60,
-    stage: 'Completed',
-    status: 'DONE',
-    timestamp: '14m ago',
-    duration: '26s',
-  },
-  {
-    id: 'JB-9036',
-    fileName: 'Research_Paper_IEEE.pdf',
-    user: 'ananya.d@campus.edu',
-    kiosk: 'MIMO 4 (Hostel Block)',
-    kioskCode: 'SV-004',
-    pageCount: 8,
-    type: 'B&W',
-    amount: 18.40,
-    stage: 'Failed',
-    status: 'FAILED',
-    timestamp: '22m ago',
-    duration: '1m 10s',
-  },
-];
+import { operationsService } from '../../services/operations.service';
+import { OperationsPageData } from '../../types/operations.types';
+import { OperationStage } from '../../types/dashboard.types';
+import { Badge } from '../../components/ui/Badge';
+import { MetricCard } from '../../components/ui/MetricCard';
 
 export const OperationsPage: React.FC = () => {
-  const { isDark } = useTheme();
-  const [jobs, setJobs] = useState<PrintJob[]>(INITIAL_JOBS);
-  const [filterTab, setFilterTab] = useState<'all' | 'processing' | 'completed' | 'failed'>('all');
+  const [data, setData] = useState<OperationsPageData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStage, setSelectedStage] = useState<OperationStage | 'All'>('All');
+  const [selectedKiosk, setSelectedKiosk] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const res = await operationsService.getOperations({
+        searchQuery: searchQuery || undefined,
+        stage: selectedStage !== 'All' ? selectedStage : undefined,
+        kioskId: selectedKiosk !== 'all' ? selectedKiosk : undefined,
+      });
+      setData(res);
+    } catch (e) {
+      console.error('Error fetching operations data', e);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [selectedStage, selectedKiosk]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchData();
+  };
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 600);
+    fetchData();
   };
 
-  const handleReprint = (jobId: string) => {
-    alert(`Initiating reprint dispatch for Job #${jobId}`);
-  };
-
-  const filteredJobs = jobs.filter((job) => {
-    const matchesSearch =
-      job.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.kiosk.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.id.toLowerCase().includes(searchQuery.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    if (filterTab === 'processing') return job.status === 'ACTIVE' || job.status === 'PRINTING' || job.status === 'WARNING';
-    if (filterTab === 'completed') return job.status === 'DONE';
-    if (filterTab === 'failed') return job.status === 'FAILED';
-    return true;
-  });
-
-  const totalJobs = jobs.length;
-  const inQueueCount = jobs.filter((j) => j.status === 'ACTIVE' || j.status === 'PRINTING').length;
-  const completedCount = jobs.filter((j) => j.status === 'DONE').length;
-  const actionNeededCount = jobs.filter((j) => j.status === 'FAILED' || j.status === 'WARNING').length;
+  const jobs = data?.jobs || [];
+  const kpis = data?.kpis;
 
   return (
-    <div className="w-full space-y-6 pb-12 select-none font-sans">
+    <div className="space-y-8 sm:space-y-10 select-none font-sans text-[#F5F7FA]">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${
-            isDark ? 'text-white' : 'text-[#1e1b4b]'
-          }`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="pl-6 sm:pl-8">
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#F5F7FA]">
             Print Operations & Queue
           </h1>
-          <p className={`text-xs sm:text-sm font-medium mt-0.5 ${
-            isDark ? 'text-slate-400' : 'text-gray-500'
-          }`}>
-            Real-time tracking of dispatch pipeline, queue processing, and reprint logs
+          <p className="text-base sm:text-lg font-medium mt-1.5 text-[#8EA6BF] leading-relaxed">
+            Real-time tracking of dispatch pipeline, queue processing, reprint requests and refund decisions.
           </p>
         </div>
 
-        <button
-          onClick={handleRefresh}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer self-start sm:self-auto border ${
-            isDark
-              ? 'bg-slate-800 border-slate-700 text-[#a78bfa] hover:bg-slate-700'
-              : 'bg-white border-[#ede9fe] text-[#7c3aed] hover:bg-purple-50'
-          }`}
-        >
-          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-          Refresh Jobs
-        </button>
-      </div>
-
-      {/* Summary KPI Row (4 equal cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1 */}
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              TOTAL PRINT JOBS
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-purple-500/15 text-[#a78bfa] flex items-center justify-center">
-              <FileText size={15} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className={`text-3xl font-black ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>{totalJobs}</div>
-            <p className="text-xs text-gray-400 mt-0.5">All sessions today</p>
-          </div>
-        </div>
-
-        {/* Card 2 */}
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              IN DISPATCH QUEUE
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center">
-              <Clock size={15} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-blue-500">{inQueueCount}</div>
-            <p className="text-xs text-gray-400 mt-0.5">Active pipeline processing</p>
-          </div>
-        </div>
-
-        {/* Card 3 */}
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              SUCCESSFUL PRINTS
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-              <CheckCircle2 size={15} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-emerald-500">{completedCount}</div>
-            <p className="text-xs text-gray-400 mt-0.5">Dispatched without error</p>
-          </div>
-        </div>
-
-        {/* Card 4 */}
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-amber-500/30' : 'bg-white border-amber-200/80'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              ACTION NEEDED
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center">
-              <AlertTriangle size={15} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-amber-500">{actionNeededCount}</div>
-            <p className="text-xs text-gray-400 mt-0.5">Warning or failed print</p>
-          </div>
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2.5 bg-[#10223A] border border-[#1D3A59] rounded-xl text-sm font-bold text-[#8EA6BF] hover:text-[#F5F7FA] hover:border-[#20D3A2]/50 transition-all shadow-xs cursor-pointer"
+          >
+            <RefreshCw size={15} className={isRefreshing ? 'animate-spin text-[#20D3A2]' : 'text-[#8EA6BF]'} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh Jobs'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Table Card */}
-      <div className={`border rounded-2xl p-6 shadow-sm space-y-4 ${
-        isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-      }`}>
-        {/* Table Controls (Filter Tabs + Search) */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-          {/* Filter Tabs */}
-          <div className={`flex items-center gap-1.5 p-1 rounded-xl border self-start md:self-auto overflow-x-auto max-w-full ${
-            isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50 border-gray-200'
-          }`}>
-            {[
-              { id: 'all', label: 'All Jobs' },
-              { id: 'processing', label: 'Processing' },
-              { id: 'completed', label: 'Completed' },
-              { id: 'failed', label: 'Failed' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setFilterTab(tab.id as any)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  filterTab === tab.id
-                    ? isDark ? 'bg-purple-950/80 text-[#a78bfa]' : 'bg-white text-[#7c3aed] shadow-xs'
-                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {/* 4 Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <MetricCard
+          title="TOTAL PRINT JOBS"
+          value={kpis?.totalJobs ?? 1420}
+          subtext="All active records"
+          icon={<Printer size={18} className="text-[#20D3A2]" />}
+        />
+        <MetricCard
+          title="IN QUEUE"
+          value={kpis?.processing ?? 2}
+          subtext="Active print passes"
+          icon={<Clock size={18} className="text-blue-400" />}
+          isLive={true}
+        />
+        <MetricCard
+          title="COMPLETED"
+          value={kpis?.completed ?? 7}
+          subtext="98.6% success"
+          icon={<CheckCircle2 size={18} className="text-[#20D3A2]" />}
+          trendBadge={{ text: '98.6% SLA', positive: true }}
+        />
+        <MetricCard
+          title="ACTION NEEDED"
+          value={kpis?.failed ?? 1}
+          subtext="Refunds eligible"
+          icon={<AlertTriangle size={18} className="text-amber-400" />}
+          trendBadge={{ text: '2 Pending', positive: false }}
+        />
+      </div>
 
-          {/* Search Input */}
-          <div className="relative w-full md:w-72">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+      {/* Filter and Search Bar Card */}
+      <div className="bg-[#10223A] rounded-2xl border border-[#1D3A59] p-5 sm:p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Stage Filter Pills matching Image 1 */}
+        <div className="flex items-center gap-2 p-1.5 rounded-xl bg-[#0A1728] border border-[#1D3A59] overflow-x-auto max-w-full">
+          {[
+            { id: 'All', label: 'All Jobs' },
+            { id: 'Processing', label: 'Processing' },
+            { id: 'Completed', label: 'Completed' },
+            { id: 'Failed', label: 'Failed' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setSelectedStage(tab.id as any)}
+              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+                selectedStage === tab.id
+                  ? 'bg-[#20D3A2]/20 text-[#20D3A2] border border-[#20D3A2]/40 shadow-xs'
+                  : 'text-[#8EA6BF] hover:text-[#F5F7FA]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search Input & Kiosk Select */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <form onSubmit={handleSearchSubmit} className="relative flex-1 md:w-72">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6F89A3]" />
             <input
               type="text"
               placeholder="Search file, user, kiosk..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl transition-all focus:outline-none ${
-                isDark
-                  ? 'bg-slate-800/80 border border-slate-700 text-white placeholder-slate-400 focus:border-[#8b5cf6]'
-                  : 'bg-gray-50 border border-gray-200 text-[#1e1b4b] placeholder-gray-400 focus:border-[#7c3aed] focus:bg-white'
-              }`}
+              className="w-full min-h-[44px] pl-10 pr-4 py-2 text-sm rounded-xl bg-[#0A1728] border border-[#1D3A59] text-[#F5F7FA] placeholder-[#6F89A3] focus:outline-none focus:border-[#20D3A2] focus:ring-2 focus:ring-[#20D3A2]/20"
             />
-          </div>
-        </div>
+          </form>
 
-        {/* Desktop Operations Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          {data?.kiosksList && (
+            <select
+              value={selectedKiosk}
+              onChange={(e) => setSelectedKiosk(e.target.value)}
+              aria-label="Filter operations by Kiosk Node"
+              className="min-h-[44px] px-4 py-2 text-sm rounded-xl bg-[#0A1728] border border-[#1D3A59] text-[#8EA6BF] focus:outline-none focus:border-[#20D3A2] cursor-pointer font-semibold"
+            >
+              <option value="all">All Kiosks</option>
+              {data.kiosksList.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
+
+      {/* Main Operations List / Table */}
+      <div className="bg-[#10223A] rounded-2xl border border-[#1D3A59] p-6 sm:p-7 shadow-xl space-y-5">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
             <thead>
-              <tr className={`border-b text-[10px] uppercase font-extrabold tracking-wider ${
-                isDark ? 'border-slate-700 text-slate-400' : 'border-gray-100 text-gray-400'
-              }`}>
-                <th className="pb-3 pl-2">Job ID</th>
-                <th className="pb-3">Document</th>
-                <th className="pb-3">User</th>
-                <th className="pb-3">Kiosk Node</th>
-                <th className="pb-3">Pages / Type</th>
-                <th className="pb-3">Amount</th>
-                <th className="pb-3">Stage / Duration</th>
-                <th className="pb-3">Status</th>
-                <th className="pb-3 pr-2 text-right">Action</th>
+              <tr className="border-b border-[#1D3A59] text-xs uppercase font-black tracking-wider text-[#8EA6BF]">
+                <th className="pb-4 pl-3">Job ID</th>
+                <th className="pb-4">Document Name</th>
+                <th className="pb-4">Kiosk Node</th>
+                <th className="pb-4">Files / Pages</th>
+                <th className="pb-4">Stage</th>
+                <th className="pb-4">Duration</th>
+                <th className="pb-4">Status</th>
+                <th className="pb-4 pr-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className={`divide-y font-medium ${
-              isDark ? 'divide-slate-700/60' : 'divide-gray-100'
-            }`}>
-              {filteredJobs.map((job) => (
-                <tr key={job.id} className="hover:bg-purple-500/10 transition-colors">
-                  <td className="py-3.5 pl-2 font-mono font-bold text-[#a78bfa]">{job.id}</td>
-                  <td className={`py-3.5 font-bold max-w-[180px] truncate ${
-                    isDark ? 'text-white' : 'text-[#1e1b4b]'
-                  }`}>
+            <tbody className="divide-y divide-[#1D3A59] font-medium">
+              {jobs.map((job) => (
+                <tr key={job.id} className="hover:bg-[#132943]/80 transition-colors">
+                  <td className="py-4 pl-3 font-mono font-bold text-[#20D3A2]">
+                    {job.jobCode}
+                  </td>
+                  <td className="py-4 max-w-[240px] truncate font-bold text-[#F5F7FA]">
                     {job.fileName}
                   </td>
-                  <td className="py-3.5 text-gray-400 text-[11px] max-w-[140px] truncate">
-                    {job.user}
+                  <td className="py-4 whitespace-nowrap">
+                    <span className="font-semibold text-[#F5F7FA]">{job.kioskName}</span>
+                    <span className="ml-1.5 font-mono text-xs text-[#8EA6BF]">({job.kioskCode})</span>
                   </td>
-                  <td className={`py-3.5 whitespace-nowrap font-semibold ${
-                    isDark ? 'text-slate-200' : 'text-gray-700'
-                  }`}>
-                    {job.kiosk}
-                  </td>
-                  <td className="py-3.5 whitespace-nowrap">
-                    <span className={`font-bold ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>{job.pageCount} pgs</span>
-                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
-                      isDark ? 'bg-slate-800 text-slate-300' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {job.type}
+                  <td className="py-4 whitespace-nowrap">
+                    <span className="font-bold text-[#F5F7FA]">{job.pageCount} pgs</span>
+                    <span className="ml-2 px-2 py-0.5 rounded text-xs font-bold bg-[#132943] text-[#8EA6BF] border border-[#1D3A59]">
+                      {job.fileCount} file{job.fileCount > 1 ? 's' : ''}
                     </span>
                   </td>
-                  <td className={`py-3.5 font-bold whitespace-nowrap ${
-                    isDark ? 'text-white' : 'text-[#1e1b4b]'
-                  }`}>
-                    ₹{job.amount.toFixed(2)}
-                  </td>
-                  <td className="py-3.5 whitespace-nowrap">
-                    <div className={`font-semibold ${isDark ? 'text-slate-200' : 'text-[#1e1b4b]'}`}>{job.stage}</div>
-                    <div className="text-[10px] text-gray-400">{job.duration} ({job.timestamp})</div>
-                  </td>
-                  <td className="py-3.5 whitespace-nowrap">
-                    <span
-                      className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                        job.status === 'DONE'
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                          : job.status === 'PRINTING'
-                          ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30 animate-pulse'
-                          : job.status === 'ACTIVE'
-                          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
-                          : job.status === 'WARNING'
-                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                          : 'bg-red-500/15 text-red-400 border border-red-500/30'
-                      }`}
-                    >
-                      {job.status}
+                  <td className="py-4 whitespace-nowrap">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#132943] text-[#8EA6BF] border border-[#1D3A59]">
+                      {job.stage}
                     </span>
                   </td>
-                  <td className="py-3.5 pr-2 text-right whitespace-nowrap">
+                  <td className="py-4 whitespace-nowrap text-[#8EA6BF] text-xs font-semibold">
+                    {job.duration} ({job.timestamp || 'Just now'})
+                  </td>
+                  <td className="py-4 whitespace-nowrap">
+                    <Badge status={job.status} />
+                  </td>
+                  <td className="py-4 pr-3 text-right whitespace-nowrap">
                     <button
-                      onClick={() => handleReprint(job.id)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
-                        isDark
-                          ? 'border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
-                          : 'border-gray-200 text-gray-600 hover:bg-purple-50 hover:text-[#7c3aed]'
-                      }`}
+                      type="button"
+                      onClick={() => alert(`Initiating reprint dispatch for Job #${job.jobCode}`)}
+                      className="inline-flex items-center gap-1.5 min-h-[36px] px-3.5 py-1.5 rounded-xl border border-[#1D3A59] bg-[#0A1728] text-[#8EA6BF] hover:text-[#F5F7FA] hover:border-[#20D3A2]/50 hover:bg-[#132943] transition-colors cursor-pointer text-xs font-bold shadow-xs"
                     >
-                      <RotateCcw size={12} />
-                      Reprint
+                      <RotateCcw size={13} />
+                      <span>Reprint</span>
                     </button>
                   </td>
                 </tr>
               ))}
-              {filteredJobs.length === 0 && (
+              {jobs.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-gray-400">
-                    No print operations matched your filter.
+                  <td colSpan={8} className="py-14 text-center text-[#8EA6BF] font-semibold text-sm">
+                    No active operations found matching this criteria.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Stacked Card View matching Image 1 */}
+        <div className="md:hidden space-y-3.5">
+          {jobs.map((job) => (
+            <div
+              key={job.id}
+              className="p-5 rounded-2xl border border-[#1D3A59] bg-[#0A1728] space-y-3 shadow-md"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="p-2.5 rounded-xl bg-[#132943] text-[#8EA6BF] shrink-0 border border-[#1D3A59]">
+                    <FileText size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-sm text-[#F5F7FA] truncate max-w-[200px]">
+                      {job.fileName}
+                    </h4>
+                    <p className="text-xs text-[#8EA6BF] mt-0.5">
+                      {job.kioskName} · {job.pageCount} pages · {job.duration}
+                    </p>
+                  </div>
+                </div>
+                <Badge status={job.status} />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-[#1D3A59] text-xs">
+                <span className="font-mono text-[#20D3A2] font-black text-sm">{job.jobCode}</span>
+                <button
+                  type="button"
+                  onClick={() => alert(`Initiating reprint dispatch for Job #${job.jobCode}`)}
+                  className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 rounded-xl border border-[#1D3A59] bg-[#132943] text-xs font-bold text-[#F5F7FA] hover:border-[#20D3A2]"
+                >
+                  <RotateCcw size={13} />
+                  <span>Reprint</span>
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

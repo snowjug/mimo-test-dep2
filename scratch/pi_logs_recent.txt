@@ -1,0 +1,120 @@
+Sep 18 10:57:52 pi python[952]: ⬇️  Downloading: DOC-20260918-WA0012.pdf
+Sep 18 10:57:52 pi python[952]: ⬇️  Downloading: DOC-20260918-WA0009.pdf
+Sep 18 10:57:53 pi python[952]: ✅ Downloaded 752 KB → /tmp/mimo_prints/1789708978_IMG_20260902_084244.jpg
+Sep 18 10:57:53 pi python[952]: ⚡ [PRE-FETCH CACHED] Job JkT7b8Pv9lKfow37Aq64 (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/JkT7b8Pv9lKfow37Aq64_0.jpg
+Sep 18 10:57:53 pi python[952]: ✅ Downloaded 920 KB → /tmp/mimo_prints/1789708978_CADD-LAB-13-FULL REPORT.pdf
+Sep 18 10:57:53 pi python[952]: ⚡ [PRE-FETCH CACHED] Job 3rWUiXpin4zYLtLfRTrD (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/3rWUiXpin4zYLtLfRTrD_0.pdf
+Sep 18 10:57:54 pi python[952]: ✅ Downloaded 522 KB → /tmp/mimo_prints/1789708978_REVA_University_Hall_Ticket_High_Quality.pdf
+Sep 18 10:57:54 pi python[952]: ⚡ [PRE-FETCH CACHED] Job OZ4DdLWK9IfE7SB5B33q (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/OZ4DdLWK9IfE7SB5B33q_0.pdf
+Sep 18 10:57:55 pi python[952]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789708978_Explainable Machine Learning Approach for Customer Churn Prediction Using SHAP 1.pdf'
+Sep 18 10:58:15 pi python[952]: ✅ Downloaded 260 KB → /tmp/mimo_prints/1789708978_ Synposis copy.pdf
+Sep 18 10:58:15 pi python[952]: ⚡ [PRE-FETCH CACHED] Job kRVppLgGMceSxBgjmoed (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/kRVppLgGMceSxBgjmoed_0.pdf
+Sep 18 10:58:15 pi python[952]: 🚀 [PRE-FETCH] Pre-downloading file 2/2 for job kRVppLgGMceSxBgjmoed (Letter .pdf) in background...
+Sep 18 10:58:15 pi python[952]: ⬇️  Downloading: Letter .pdf
+Sep 18 10:58:18 pi python[952]: ✅ Downloaded 60 KB → /tmp/mimo_prints/1789709267_Document from sreedhar.pdf
+Sep 18 10:58:18 pi python[952]: ⚡ [PRE-FETCH CACHED] Job yStJflQwHuu74mhj9lDw (file 3) pre-downloaded & cached → /tmp/mimo_pre_fetch/yStJflQwHuu74mhj9lDw_2.pdf
+Sep 18 10:58:18 pi python[952]: 🚀 [PRE-FETCH] Pre-downloading file 4/4 for job yStJflQwHuu74mhj9lDw (Document from sreedhar.pdf) in background...
+Sep 18 10:58:18 pi python[952]: ⬇️  Downloading: Document from sreedhar.pdf
+Sep 18 10:58:20 pi python[952]: ✅ Downloaded 146 KB → /tmp/mimo_prints/1789708978_14b373bb-cd60-49d3-acc1-4fb271c8b589.jpeg
+Sep 18 10:58:20 pi python[952]: ⚡ [PRE-FETCH CACHED] Job E4pe5X5syHFtyCKvbcVL (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/E4pe5X5syHFtyCKvbcVL_0.jpeg
+Sep 18 10:58:20 pi python[952]: 🚀 [PRE-FETCH] Pre-downloading file 2/2 for job E4pe5X5syHFtyCKvbcVL (05b9537a-a38b-489a-90c3-eb50343ae8c4.jpeg) in background...
+Sep 18 10:58:20 pi python[952]: ⬇️  Downloading: 05b9537a-a38b-489a-90c3-eb50343ae8c4.jpeg
+Sep 18 10:58:22 pi python[952]: ✅ Downloaded 206 KB → /tmp/mimo_prints/1789709252_IMG-20260908-WA00012.jpg
+Sep 18 10:58:22 pi python[952]: ⚡ [PRE-FETCH CACHED] Job 8Edh2ORwyHO6uHLKaMQv (file 2) pre-downloaded & cached → /tmp/mimo_pre_fetch/8Edh2ORwyHO6uHLKaMQv_1.jpg
+Sep 18 10:58:28 pi python[952]: ✅ Downloaded 259 KB → /tmp/mimo_prints/1789709295_Letter .pdf
+Sep 18 10:58:28 pi python[952]: ⚡ [PRE-FETCH CACHED] Job kRVppLgGMceSxBgjmoed (file 2) pre-downloaded & cached → /tmp/mimo_pre_fetch/kRVppLgGMceSxBgjmoed_1.pdf
+Sep 18 10:58:30 pi python[952]: ✅ Downloaded 303 KB → /tmp/mimo_prints/1789708979_IMG-20260901-WA0026.jpg
+Sep 18 10:58:30 pi python[952]: ⚡ [PRE-FETCH CACHED] Job wRic5hD7T0qyTwZTw27w (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/wRic5hD7T0qyTwZTw27w_0.jpg
+Sep 18 10:58:31 pi python[952]: ✅ Downloaded 379 KB → /tmp/mimo_prints/1789708978_sahana_coursera.pdf
+Sep 18 10:58:31 pi python[952]: ⚡ [PRE-FETCH CACHED] Job LOZ34A9Tc8SbjW0Pl8E2 (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/LOZ34A9Tc8SbjW0Pl8E2_0.pdf
+Sep 18 10:58:39 pi python[952]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789708978_Doc Scanner Document.pdf'
+Sep 18 10:58:39 pi python[952]: ✅ Downloaded 3128 KB → /tmp/mimo_prints/1789708978_DOC-20260918-WA0012.pdf
+Sep 18 10:58:39 pi python[952]: ⚡ [PRE-FETCH CACHED] Job XPSARi7qlf0N5jOlWVZL (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/XPSARi7qlf0N5jOlWVZL_0.pdf
+Sep 18 10:58:39 pi python[952]: 🚀 [PRE-FETCH] Pre-downloading file 2/2 for job XPSARi7qlf0N5jOlWVZL (DOC-20260918-WA0009.pdf) in background...
+Sep 18 10:58:39 pi python[952]: ⬇️  Downloading: DOC-20260918-WA0009.pdf
+Sep 18 10:58:44 pi python[952]: ❌ Download failed: Timeout of 120.0s exceeded, last exception: HTTPSConnectionPool(host='storage.googleapis.com', port=443): Read timed out.
+Sep 18 10:58:49 pi python[952]: ✅ Downloaded 3436 KB → /tmp/mimo_prints/1789709272_DOC-20260918-WA0009.pdf
+Sep 18 10:58:50 pi python[952]: 📄 Pre-rasterizing color PDF (3.36MB, 1p) at 180 DPI with JPEG compression...
+Sep 18 10:58:50 pi python[4405]: Merged 1 image(s) into PDF: /tmp/mimo_prints/1789709272_DOC-20260918-WA0009_rasterized.pdf
+Sep 18 10:58:50 pi python[952]: ✅ Pre-rasterized: 3.36MB → 0.21MB at 180 DPI (/tmp/mimo_prints/1789709272_DOC-20260918-WA0009_rasterized.pdf)
+Sep 18 10:58:50 pi python[952]: ✅ Downloaded 148 KB → /tmp/mimo_prints/1789709300_05b9537a-a38b-489a-90c3-eb50343ae8c4.jpeg
+Sep 18 10:58:50 pi python[952]: ⚡ [PRE-FETCH CACHED] Job E4pe5X5syHFtyCKvbcVL (file 2) pre-downloaded & cached → /tmp/mimo_pre_fetch/E4pe5X5syHFtyCKvbcVL_1.jpeg
+Sep 18 10:58:51 pi python[952]: ✅ Downloaded 1096 KB → /tmp/mimo_prints/1789708978_ml_exp1_outputs_2_pages_LARGER.pdf
+Sep 18 10:58:51 pi python[952]: ⚡ [PRE-FETCH CACHED] Job Lam8wB1apO6ocUMjuPNJ (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/Lam8wB1apO6ocUMjuPNJ_0.pdf
+Sep 18 10:58:51 pi python[952]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789708978_Explainable Machine Learning Approach for Customer Churn Prediction Using SHAP 1.pdf'
+Sep 18 10:58:54 pi python[952]: ✅ Downloaded 945 KB → /tmp/mimo_prints/1789708978_M.Sc III Sem OC _FGAIII.1.pdf
+Sep 18 10:58:54 pi python[952]: ⚡ [PRE-FETCH CACHED] Job LlOR4gaLd6OJO9YrVt2a (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/LlOR4gaLd6OJO9YrVt2a_0.pdf
+Sep 18 10:59:02 pi python[952]: ✅ Downloaded 130 KB → /tmp/mimo_prints/1789708978_RISHITH M-5.pdf
+Sep 18 10:59:02 pi python[952]: ⚡ [PRE-FETCH CACHED] Job QcA578ywEZVWPt2nhzxC (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/QcA578ywEZVWPt2nhzxC_0.pdf
+Sep 18 10:59:02 pi python[952]: 🚀 [PRE-FETCH] Pre-downloading file 2/2 for job QcA578ywEZVWPt2nhzxC (JLL Technologies - BTech July 2026 Admit Card.pdf) in background...
+Sep 18 10:59:02 pi python[952]: ⬇️  Downloading: JLL Technologies - BTech July 2026 Admit Card.pdf
+Sep 18 10:59:05 pi python[952]: ✅ Downloaded 383 KB → /tmp/mimo_prints/1789708978_gopika resume.pdf
+Sep 18 10:59:05 pi python[952]: ⚡ [PRE-FETCH CACHED] Job NSF0vT5c6YC3aGJ9l4N9 (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/NSF0vT5c6YC3aGJ9l4N9_0.pdf
+Sep 18 10:59:12 pi python[952]: ✅ Downloaded 1435 KB → /tmp/mimo_prints/1789708978_Mentoring diary.pdf
+Sep 18 10:59:12 pi python[952]: ⚡ [PRE-FETCH CACHED] Job 86tSAh83Mk4CbVuL3MTn (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/86tSAh83Mk4CbVuL3MTn_0.pdf
+Sep 18 10:59:12 pi python[952]: ✅ Downloaded 3128 KB → /tmp/mimo_prints/1789709272_DOC-20260918-WA0012.pdf
+Sep 18 10:59:13 pi python[952]: 📄 Pre-rasterizing color PDF (3.05MB, 1p) at 180 DPI with JPEG compression...
+Sep 18 10:59:13 pi python[4683]: Merged 1 image(s) into PDF: /tmp/mimo_prints/1789709272_DOC-20260918-WA0012_rasterized.pdf
+Sep 18 10:59:13 pi python[952]: ✅ Pre-rasterized: 3.05MB → 0.19MB at 180 DPI (/tmp/mimo_prints/1789709272_DOC-20260918-WA0012_rasterized.pdf)
+Sep 18 10:59:13 pi python[952]: 🔗 Merging 2 documents into a single PDF using Ghostscript...
+Sep 18 10:59:14 pi python[952]: 📄 Normalizing color PDF to A4: /tmp/mimo_prints/1789709353_merged_all.pdf -> /tmp/mimo_prints/1789709354_color_norm.pdf
+Sep 18 10:59:14 pi python[952]: 📄 Pre-rasterizing color PDF (0.41MB, 2p) at 180 DPI with JPEG compression...
+Sep 18 10:59:15 pi python[4710]: Merged 2 image(s) into PDF: /tmp/mimo_prints/1789709354_color_norm_rasterized.pdf
+Sep 18 10:59:15 pi python[952]: ✅ Pre-rasterized: 0.41MB → 0.40MB at 180 DPI (/tmp/mimo_prints/1789709354_color_norm_rasterized.pdf)
+Sep 18 10:59:15 pi python[952]: 🖨️  Sending to CUPS [Epson_L3250]: ['1789709354_color_norm_rasterized.pdf'] (1 copies, layout: 1, sides: single)
+Sep 18 10:59:15 pi python[952]: CUPS accepted: request id is Epson_L3250-1695 (1 file(s))
+Sep 18 10:59:15 pi python[952]: ✅ CUPS job Epson_L3250-1695 queued. Spawning sync thread to track physical completion (timeout: 1320s).
+Sep 18 10:59:15 pi python[952]: ⏳ [SYNC] Waiting for CUPS job Epson_L3250-1695 (2 sheet(s)) to physically finish printing on Epson_L3250...⏳ Job XPSARi7qlf0N5jOlWVZL submitted. Firestore will be updated after physical print completes.
+Sep 18 10:59:25 pi python[952]: ✅ Downloaded 262 KB → /tmp/mimo_prints/1789709298_Document from sreedhar.pdf
+Sep 18 10:59:25 pi python[952]: ⚡ [PRE-FETCH CACHED] Job yStJflQwHuu74mhj9lDw (file 4) pre-downloaded & cached → /tmp/mimo_pre_fetch/yStJflQwHuu74mhj9lDw_3.pdf
+Sep 18 10:59:42 pi python[952]: ✅ Downloaded 1335 KB → /tmp/mimo_prints/1789708978_IMG_20260902_111648.jpg
+Sep 18 10:59:42 pi python[952]: ⚡ [PRE-FETCH CACHED] Job 59ks1CnGcSmi3uGp6wRg (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/59ks1CnGcSmi3uGp6wRg_0.jpg
+Sep 18 10:59:42 pi python[952]: 🚀 [PRE-FETCH] Pre-downloading file 2/2 for job 59ks1CnGcSmi3uGp6wRg (IMG_20260902_111703.jpg) in background...
+Sep 18 10:59:42 pi python[952]: ⬇️  Downloading: IMG_20260902_111703.jpg
+Sep 18 10:59:45 pi python[952]: ✅ Downloaded 1079 KB → /tmp/mimo_prints/1789709342_JLL Technologies - BTech July 2026 Admit Card.pdf
+Sep 18 10:59:45 pi python[952]: ⚡ [PRE-FETCH CACHED] Job QcA578ywEZVWPt2nhzxC (file 2) pre-downloaded & cached → /tmp/mimo_pre_fetch/QcA578ywEZVWPt2nhzxC_1.pdf
+Sep 18 10:59:49 pi python[952]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789708978_certificate.pdf'
+Sep 18 10:59:51 pi python[952]: ✅ Downloaded 711 KB → /tmp/mimo_prints/1789708978_pavan h c survey.pdf
+Sep 18 10:59:51 pi python[952]: ⚡ [PRE-FETCH CACHED] Job eyOvPsKhE6ZAyswFXL7q (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/eyOvPsKhE6ZAyswFXL7q_0.pdf
+Sep 18 10:59:53 pi python[952]: ✅ Downloaded 1889 KB → /tmp/mimo_prints/1789708978_file_00000000fd14823082e7ddb1b89855af.png
+Sep 18 10:59:53 pi python[952]: ⚡ [PRE-FETCH CACHED] Job Tu4in54tCDIcmBV3zFdO (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/Tu4in54tCDIcmBV3zFdO_0.png
+Sep 18 10:59:56 pi sudo[5270]:       pi : PWD=/home/pi/mimo ; USER=root ; COMMAND=/usr/bin/grep -a -F '[Job 1695]' /var/log/cups/error_log
+Sep 18 10:59:56 pi sudo[5270]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+Sep 18 10:59:56 pi sudo[5270]: pam_unix(sudo:session): session closed for user root
+Sep 18 10:59:56 pi python[952]: ✅ [SYNC] CUPS error_log verified clean for job Epson_L3250-1695 — no filter crashes detected.
+Sep 18 10:59:56 pi python[952]: ✅ Downloaded 2810 KB → /tmp/mimo_prints/1789708979_OFFER LETTER VELANKANI.pdf
+Sep 18 10:59:56 pi python[952]: ⚡ [PRE-FETCH CACHED] Job zFyNUk1BRu3Ov5AhCGEP (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/zFyNUk1BRu3Ov5AhCGEP_0.pdf
+Sep 18 10:59:57 pi python[952]: ⏳ [SYNC] CUPS job Epson_L3250-1695 cleared queue. Waiting 44s for physical ejection of 2 color sheet(s)...
+Sep 18 11:00:10 pi python[952]: ✅ Downloaded 876 KB → /tmp/mimo_prints/1789709227_antenna.pptx
+Sep 18 11:00:10 pi python[952]: ⚡ [PRE-FETCH CACHED] Job PEHCq3bkGvOsHbExIHpc (file 2) pre-downloaded & cached → /tmp/mimo_pre_fetch/PEHCq3bkGvOsHbExIHpc_1.pptx
+Sep 18 11:00:13 pi python[952]: ✅ Downloaded 1203 KB → /tmp/mimo_prints/1789708978_RESEARCH PAPER 1.doc
+Sep 18 11:00:13 pi python[952]: ⚡ [PRE-FETCH CACHED] Job FsU2niU7D23WS5OUjhVk (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/FsU2niU7D23WS5OUjhVk_0.doc
+Sep 18 11:00:15 pi python[952]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789708978_file_00000000fd14823082e7ddb1b89855af.png'
+Sep 18 11:00:28 pi python[952]: ✅ Downloaded 2431 KB → /tmp/mimo_prints/1789708978_gate_timetable.pdf
+Sep 18 11:00:28 pi python[952]: ⚡ [PRE-FETCH CACHED] Job i18TRQrYSFlsDJ507Lph (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/i18TRQrYSFlsDJ507Lph_0.pdf
+Sep 18 11:00:37 pi python[952]: ✅ Downloaded 933 KB → /tmp/mimo_prints/1789708978_Copy of rec xerox.pdf
+Sep 18 11:00:37 pi python[952]: ⚡ [PRE-FETCH CACHED] Job Lz7ViIYQcEU6GyoVQdeW (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/Lz7ViIYQcEU6GyoVQdeW_0.pdf
+Sep 18 11:00:41 pi python[952]: ⏳ [SYNC] Hardware printhead complete. Finalizing physical paper ejection (44s)...
+Sep 18 11:00:44 pi python[952]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789708978_file_00000000fd14823082e7ddb1b89855af.png'
+Sep 18 11:00:46 pi python[952]: ✅ Downloaded 2263 KB → /tmp/mimo_prints/1789708978_20260806_172105.heic
+Sep 18 11:00:46 pi python[952]: ⚡ [PRE-FETCH CACHED] Job Jux2HvpumjLCZR23mPoH (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/Jux2HvpumjLCZR23mPoH_0.heic
+Sep 18 11:00:49 pi python[952]: ✅ Downloaded 3634 KB → /tmp/mimo_prints/1789708979_New Electrical Power Protection.docx
+Sep 18 11:00:49 pi python[952]: ⚡ [PRE-FETCH CACHED] Job vVlJbFVoUJ7dALnGvBIF (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/vVlJbFVoUJ7dALnGvBIF_0.docx
+Sep 18 11:00:53 pi python[952]: ✅ Downloaded 1811 KB → /tmp/mimo_prints/1789708979_image-1788689965851.jpg
+Sep 18 11:00:53 pi python[952]: ⚡ [PRE-FETCH CACHED] Job vYcrwoTYB0K6J3bxrxyD (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/vYcrwoTYB0K6J3bxrxyD_0.jpg
+Sep 18 11:01:00 pi python[952]: ✅ Downloaded 1481 KB → /tmp/mimo_prints/1789709382_IMG_20260902_111703.jpg
+Sep 18 11:01:00 pi python[952]: ⚡ [PRE-FETCH CACHED] Job 59ks1CnGcSmi3uGp6wRg (file 2) pre-downloaded & cached → /tmp/mimo_pre_fetch/59ks1CnGcSmi3uGp6wRg_1.jpg
+Sep 18 11:01:02 pi python[952]: ✅ Downloaded 4642 KB → /tmp/mimo_prints/1789708978_1000618315.jpeg
+Sep 18 11:01:02 pi python[952]: ⚡ [PRE-FETCH CACHED] Job WE30DOX2ZSv2VVbrisuf (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/WE30DOX2ZSv2VVbrisuf_0.jpeg
+Sep 18 11:01:09 pi python[952]: ✅ Downloaded 5043 KB → /tmp/mimo_prints/1789708978_IMG_2488.png
+Sep 18 11:01:09 pi python[952]: ⚡ [PRE-FETCH CACHED] Job 2FYJMSjlAufsg19RC5kk (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/2FYJMSjlAufsg19RC5kk_0.png
+Sep 18 11:01:25 pi python[952]: ✅ Downloaded 1857 KB → /tmp/mimo_prints/1789708978_MIMO 3.pdf
+Sep 18 11:01:25 pi python[952]: ⚡ [PRE-FETCH CACHED] Job 4gHexZgEU8rnDdLi3TQc (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/4gHexZgEU8rnDdLi3TQc_0.pdf
+Sep 18 11:01:26 pi python[952]: ✅ [SYNC] CUPS job Epson_L3250-1695 completed physically. Marking Firestore completed.
+Sep 18 11:01:26 pi python[952]: ℹ️ [SYNC] Job XPSARi7qlf0N5jOlWVZL removed from active jobs list.
+Sep 18 11:01:26 pi python[952]: Snapshot fired! Changes: 1
+Sep 18 11:01:27 pi python[952]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789708979_New Electrical Power Protection.docx'
+Sep 18 11:01:43 pi python[952]: ✅ Downloaded 3436 KB → /tmp/mimo_prints/1789709319_DOC-20260918-WA0009.pdf
+Sep 18 11:01:43 pi python[952]: ⚡ [PRE-FETCH CACHED] Job XPSARi7qlf0N5jOlWVZL (file 2) pre-downloaded & cached → /tmp/mimo_pre_fetch/XPSARi7qlf0N5jOlWVZL_1.pdf
+Sep 18 11:01:45 pi python[952]: ✅ Downloaded 2056 KB → /tmp/mimo_prints/1789708978_120 BL.pdf
+Sep 18 11:01:45 pi python[952]: ⚡ [PRE-FETCH CACHED] Job h8cG4gk3cmTIcoPwbmGV (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/h8cG4gk3cmTIcoPwbmGV_0.pdf
