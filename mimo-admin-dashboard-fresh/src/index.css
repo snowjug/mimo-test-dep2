@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-page: #07111F;
+  --bg-sidebar: #0A1728;
+  --bg-card: #10223A;
+  --bg-elevated: #132943;
+  --border-subtle: #1D3A59;
+  --border-light: rgba(29, 58, 89, 0.6);
+  --accent-emerald: #20D3A2;
+  --accent-emerald-glow: rgba(32, 211, 162, 0.2);
+  --accent-amber: #F59E0B;
+  --accent-purple: #8B5CF6;
+  --accent-rose: #F43F5E;
+  --text-primary: #F5F7FA;
+  --text-secondary: #8EA6BF;
+  --text-muted: #6F89A3;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #07111F;
+  color: #F5F7FA;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #07111F;
+}
+::-webkit-scrollbar-thumb {
+  background: #1D3A59;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #20D3A2;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Consistent Card Styling */
+.mimo-card {
+  background: #10223A;
+  border: 1px solid #1D3A59;
+  border-radius: 1.25rem;
+  transition: all 0.2s ease;
+}
+.mimo-card:hover {
+  border-color: rgba(32, 211, 162, 0.4);
+}
+
+/* Glass & Glow utilities */
+.mimo-glow-emerald {
+  box-shadow: 0 0 24px rgba(32, 211, 162, 0.12);
+}
+.mimo-glow-amber {
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.12);
+}
+.mimo-glow-purple {
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.12);
+}

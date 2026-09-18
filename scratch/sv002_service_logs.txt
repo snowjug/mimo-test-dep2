@@ -1,0 +1,30 @@
+Sep 18 11:16:52 pi python[17140]: ⬇️  Downloading: Internal Hackathon for SIH2026_Mentoring & Evaluation Session_Template.docx
+Sep 18 11:16:52 pi python[17140]: 🚀 [PRE-FETCH] Pre-downloading file 1/1 for job yUUdk7kKjVuttSAn22OF (blank_a4.pdf) in background...
+Sep 18 11:16:52 pi python[17140]: ⬇️  Downloading: blank_a4.pdf
+Sep 18 11:16:55 pi python[17140]: ✅ Downloaded 4 KB → /tmp/mimo_prints/1789710412_blank_a4.pdf
+Sep 18 11:16:55 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job sjs981YgULq0Qs5tZE0w (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/sjs981YgULq0Qs5tZE0w_0.pdf
+Sep 18 11:16:56 pi python[17140]: ✅ Downloaded 20 KB → /tmp/mimo_prints/1789710412_two major ways.docx
+Sep 18 11:16:56 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job kKrOM2GnWBqCI3rH9SJf (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/kKrOM2GnWBqCI3rH9SJf_0.docx
+Sep 18 11:16:56 pi python[17140]: ❌ Download failed: 404 GET https://storage.googleapis.com/download/storage/v1/b/mimo-v2-11868.firebasestorage.app/o/uploads%2FTarhat_Fatima%2F1788843344005_Event_Permission_Form.docx?alt=media: No such object: mimo-v2-11868.firebasestorage.app/uploads/Tarhat_Fatima/1788843344005_Event_Permission_Form.docx: ('Request failed with status code', 404, 'Expected one of', <HTTPStatus.OK: 200>, <HTTPStatus.PARTIAL_CONTENT: 206>)
+Sep 18 11:16:57 pi python[17140]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789710412_blank_a4.pdf'
+Sep 18 11:17:01 pi python[17140]: ✅ Downloaded 105 KB → /tmp/mimo_prints/1789710412_3. Student ID Card Application Form.pdf
+Sep 18 11:17:01 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job OFy8CYdcAbYyKZqSF1gG (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/OFy8CYdcAbYyKZqSF1gG_0.pdf
+Sep 18 11:17:03 pi python[17140]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789710412_3. Student ID Card Application Form.pdf'
+Sep 18 11:17:04 pi python[17140]: ✅ Downloaded 150 KB → /tmp/mimo_prints/1789710412_IMG_1629.jpeg
+Sep 18 11:17:04 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job Wy5zTSosbHPKdZQMInT4 (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/Wy5zTSosbHPKdZQMInT4_0.jpeg
+Sep 18 11:17:04 pi python[17140]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789710412_3. Student ID Card Application Form.pdf'
+Sep 18 11:17:04 pi python[17140]: ✅ Downloaded 133 KB → /tmp/mimo_prints/1789710412_Internal Hackathon for SIH2026_Mentoring  Evaluation Session_Template.docx
+Sep 18 11:17:04 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job yIZH88ZrqcWAvacaCITn (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/yIZH88ZrqcWAvacaCITn_0.docx
+Sep 18 11:17:04 pi python[17140]: ✅ Downloaded 139 KB → /tmp/mimo_prints/1789710412_Multiple Files 3
+Sep 18 11:17:04 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job kznJazkQPQqkl70WQzeA (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/kznJazkQPQqkl70WQzeA_0.pdf
+Sep 18 11:17:05 pi python[17140]: ❌ Download failed: [Errno 2] No such file or directory: '/tmp/mimo_prints/1789710412_Internal Hackathon for SIH2026_Mentoring  Evaluation Session_Template.docx'
+Sep 18 11:17:11 pi python[17140]: ✅ Downloaded 344 KB → /tmp/mimo_prints/1789710412_certificate.pdf
+Sep 18 11:17:11 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job eVjU9un2mw7Za7tkrkYU (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/eVjU9un2mw7Za7tkrkYU_0.pdf
+Sep 18 11:17:11 pi python[17140]: ✅ Downloaded 303 KB → /tmp/mimo_prints/1789710412_IMG-20260902-WA0001.jpg
+Sep 18 11:17:11 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job ZmCaDMmBng2sbUrUr4Gx (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/ZmCaDMmBng2sbUrUr4Gx_0.jpg
+Sep 18 11:17:13 pi python[17140]: ✅ Downloaded 260 KB → /tmp/mimo_prints/1789710412_Doc Scanner Document.pdf
+Sep 18 11:17:13 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job INsp5OOrO5PalZKMBOHa (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/INsp5OOrO5PalZKMBOHa_0.pdf
+Sep 18 11:17:14 pi python[17140]: ✅ Downloaded 534 KB → /tmp/mimo_prints/1789710412_Explainable Machine Learning Approach for Customer Churn Prediction Using SHAP 1.pdf
+Sep 18 11:17:14 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job 1foIpz1vbjOEZzjGplTa (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/1foIpz1vbjOEZzjGplTa_0.pdf
+Sep 18 11:17:17 pi python[17140]: ✅ Downloaded 904 KB → /tmp/mimo_prints/1789710412_image.jpg
+Sep 18 11:17:17 pi python[17140]: ⚡ [PRE-FETCH CACHED] Job 9FdEnr6abkWjNQGENjFJ (file 1) pre-downloaded & cached → /tmp/mimo_pre_fetch/9FdEnr6abkWjNQGENjFJ_0.jpg

@@ -1,0 +1,61 @@
+import type { AnalyticsPageData } from '../types/analytics';
+
+export const mockAnalyticsData: AnalyticsPageData = {
+  kpis: {
+    totalRevenue: 48320,
+    revenueTrend: 18.4,
+    totalPaidPages: 12842,
+    paidPagesTrend: 16.2,
+    printedPages: 12356,
+    printedPagesTrend: 15.7,
+    printSuccessRate: 96.2,
+    successRateTrend: -1.1,
+    uniqueCustomers: 1284,
+    customersTrend: 22.6,
+  },
+  revenueVolumeSeries: [
+    { date: 'Aug 14', revenue: 420, paidPages: 520, printedPages: 504 },
+    { date: 'Aug 17', revenue: 680, paidPages: 840, printedPages: 812 },
+    { date: 'Aug 20', revenue: 950, paidPages: 1180, printedPages: 1140 },
+    { date: 'Aug 23', revenue: 1120, paidPages: 1390, printedPages: 1345 },
+    { date: 'Aug 26', revenue: 890, paidPages: 1100, printedPages: 1065 },
+    { date: 'Aug 29', revenue: 1340, paidPages: 1650, printedPages: 1590 },
+    { date: 'Sep 01', revenue: 1210, paidPages: 1490, printedPages: 1435 },
+    { date: 'Sep 04', revenue: 1050, paidPages: 1300, printedPages: 1255 },
+    { date: 'Sep 07', revenue: 1480, paidPages: 1820, printedPages: 1760 },
+    { date: 'Sep 10', revenue: 1620, paidPages: 1980, printedPages: 1910 },
+    { date: 'Sep 12', revenue: 1450, paidPages: 1780, printedPages: 1715 },
+  ],
+  funnel: [
+    { stage: 'Pages Purchased', count: 12842, percentage: 100 },
+    { stage: 'Valid for Processing', count: 12621, percentage: 98.3 },
+    { stage: 'Physically Printed', count: 12356, percentage: 96.2 },
+    { stage: 'Collected by Users', count: 12210, percentage: 95.0 },
+  ],
+  categories: [
+    { category: 'Academic', percentage: 38, color: '#059669' },
+    { category: 'Office', percentage: 24, color: '#10B981' },
+    { category: 'Government', percentage: 16, color: '#34D399' },
+    { category: 'Personal', percentage: 12, color: '#6EE7B7' },
+    { category: 'Other', percentage: 10, color: '#CBD5E1' },
+  ],
+  kioskPerformance: [
+    { name: 'MIMO 1', pages: 4350, revenue: 16840, successRate: 98.8, activeHours: 112, trend: 12 },
+    { name: 'MIMO 2', pages: 3942, revenue: 15480, successRate: 97.8, activeHours: 108, trend: 8 },
+    { name: 'MIMO 3', pages: 2876, revenue: 10200, successRate: 94.6, activeHours: 96, trend: -4 },
+    { name: 'MIMO 4', pages: 1674, revenue: 5800, successRate: 92.1, activeHours: 78, trend: -6 },
+  ],
+  topDocuments: [
+    { rank: 1, documentType: 'PDF (General)', pages: 4832, percentage: 37.6, iconType: 'pdf' },
+    { rank: 2, documentType: 'Academic (Reports)', pages: 2420, percentage: 18.8, iconType: 'doc' },
+    { rank: 3, documentType: 'Forms', pages: 1648, percentage: 12.8, iconType: 'form' },
+    { rank: 4, documentType: 'ID Documents', pages: 1210, percentage: 9.4, iconType: 'id' },
+    { rank: 5, documentType: 'Presentations', pages: 984, percentage: 7.7, iconType: 'ppt' },
+  ],
+  insights: [
+    { id: '1', text: 'Revenue increased by 18.4% compared to the previous period.', icon: 'trend' },
+    { id: '2', text: 'MIMO 1 has the highest usage (4,350 pages).', icon: 'trophy' },
+    { id: '3', text: 'Print success rate is 96.2% (↓ 1.1%).', icon: 'alert' },
+    { id: '4', text: 'Peak usage time is 10 AM – 2 PM.', icon: 'clock' },
+  ],
+};

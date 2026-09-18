@@ -1,370 +1,247 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  CheckCircle2,
-  Save,
-  Loader2,
+  RefreshCw,
   Search,
+  CheckCircle2,
+  TrendingUp,
+  Receipt,
+  IndianRupee,
 } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext';
-
-interface Transaction {
-  id: string;
-  orderId: string;
-  user: string;
-  kiosk: string;
-  pages: number;
-  type: string;
-  amount: number;
-  paymentMethod: 'UPI' | 'Card' | 'Wallet';
-  status: 'SUCCESS' | 'REFUNDED' | 'PENDING';
-  timestamp: string;
-}
-
-const INITIAL_TRANSACTIONS: Transaction[] = [
-  { id: 'TXN-8801', orderId: 'ORD-9912', user: 'rahul.s@campus.edu', kiosk: 'MIMO 1', pages: 7, type: 'B&W', amount: 16.10, paymentMethod: 'UPI', status: 'SUCCESS', timestamp: '2m ago' },
-  { id: 'TXN-8800', orderId: 'ORD-9911', user: 'priya.k@campus.edu', kiosk: 'MIMO 2', pages: 2, type: 'Color', amount: 20.00, paymentMethod: 'Card', status: 'SUCCESS', timestamp: '14m ago' },
-  { id: 'TXN-8799', orderId: 'ORD-9910', user: 'arjun.v@campus.edu', kiosk: 'MIMO 2', pages: 14, type: 'B&W', amount: 32.20, paymentMethod: 'UPI', status: 'PENDING', timestamp: '28m ago' },
-  { id: 'TXN-8798', orderId: 'ORD-9909', user: 'sneha.m@campus.edu', kiosk: 'MIMO 1', pages: 1, type: 'Color', amount: 10.00, paymentMethod: 'Wallet', status: 'SUCCESS', timestamp: '45m ago' },
-  { id: 'TXN-8797', orderId: 'ORD-9908', user: 'vikram.r@campus.edu', kiosk: 'MIMO 3', pages: 22, type: 'B&W', amount: 50.60, paymentMethod: 'UPI', status: 'SUCCESS', timestamp: '1h ago' },
-  { id: 'TXN-8796', orderId: 'ORD-9907', user: 'ananya.d@campus.edu', kiosk: 'MIMO 4', pages: 8, type: 'B&W', amount: 18.40, paymentMethod: 'UPI', status: 'REFUNDED', timestamp: '2h ago' },
-];
+import { financeService } from '../../services/finance.service';
+import { FinancePageData } from '../../types/finance.types';
+import { Badge } from '../../components/ui/Badge';
+import { MetricCard } from '../../components/ui/MetricCard';
 
 export const FinancePage: React.FC = () => {
-  const { isDark } = useTheme();
-  const [pricing, setPricing] = useState({
-    pricePerPageBW: 2.30,
-    pricePerPageColor: 10.00,
-    pricePerPageA4: 2.30,
-    pricePerPageGraph: 2.00,
-  });
-  const [savingSettings, setSavingSettings] = useState(false);
-  const [savedSettings, setSavedSettings] = useState(false);
-
-  const [coupons, setCoupons] = useState([
-    { id: '1', code: 'CAMPUS50', discount: 50, isActive: true },
-    { id: '2', code: 'EXAM100', discount: 100, isActive: true },
-    { id: '3', code: 'WELCOME10', discount: 10, isActive: true },
-  ]);
-  const [newCouponCode, setNewCouponCode] = useState('');
-  const [newCouponDiscount, setNewCouponDiscount] = useState('');
-
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+  const [data, setData] = useState<FinancePageData | null>(null);
   const [searchTxn, setSearchTxn] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleSavePricing = () => {
-    setSavingSettings(true);
-    setTimeout(() => {
-      setSavingSettings(false);
-      setSavedSettings(true);
-      setTimeout(() => setSavedSettings(false), 3000);
-    }, 600);
+  const fetchData = async () => {
+    try {
+      const res = await financeService.getFinance();
+      setData(res);
+    } catch (e) {
+      console.error('Error fetching finance data', e);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
-  const handleAddCoupon = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCouponCode || !newCouponDiscount) return;
-    setCoupons([
-      ...coupons,
-      { id: Date.now().toString(), code: newCouponCode.toUpperCase(), discount: Number(newCouponDiscount), isActive: true },
-    ]);
-    setNewCouponCode('');
-    setNewCouponDiscount('');
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchData();
   };
 
-  const handleRevokeCoupon = (id: string) => {
-    setCoupons(coupons.filter((c) => c.id !== id));
-  };
-
-  const handleRefund = (id: string) => {
-    setTransactions(
-      transactions.map((t) => (t.id === id ? { ...t, status: 'REFUNDED' } : t))
-    );
-  };
+  const kpis = data?.kpis;
+  const paymentMethods = data?.paymentMethods || [];
+  const transactions = data?.transactions || [];
 
   const filteredTxns = transactions.filter(
     (t) =>
-      t.id.toLowerCase().includes(searchTxn.toLowerCase()) ||
-      t.orderId.toLowerCase().includes(searchTxn.toLowerCase()) ||
-      t.user.toLowerCase().includes(searchTxn.toLowerCase())
+      t.txCode.toLowerCase().includes(searchTxn.toLowerCase()) ||
+      t.jobCode.toLowerCase().includes(searchTxn.toLowerCase()) ||
+      t.kioskName.toLowerCase().includes(searchTxn.toLowerCase())
   );
 
   return (
-    <div className="w-full space-y-6 pb-12 select-none font-sans">
+    <div className="space-y-8 sm:space-y-10 select-none font-sans text-[#F5F7FA]">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${
-            isDark ? 'text-white' : 'text-[#1e1b4b]'
-          }`}>
-            Finance & Billing Hub
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#F5F7FA]">
+            Finance & Billing Operations
           </h1>
-          <p className={`text-xs sm:text-sm font-medium mt-0.5 ${
-            isDark ? 'text-slate-400' : 'text-gray-500'
-          }`}>
-            Campus print billing collections, transaction records, refunds, and promo discounts
+          <p className="text-base sm:text-lg font-medium mt-1.5 text-[#8EA6BF] leading-relaxed">
+            Campus payment collections, payment method distribution, and transaction ledger
           </p>
         </div>
 
-        <span className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider shadow-sm self-start sm:self-auto border ${
-          isDark
-            ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-400'
-            : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-        }`}>
-          ● Gateway Settlement Live
-        </span>
-      </div>
-
-      {/* 4 Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">TOTAL REVENUE</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">+14.2%</span>
-          </div>
-          <div className="mt-3">
-            <div className={`text-3xl font-black ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>₹14,250.00</div>
-            <p className="text-xs text-gray-400 mt-0.5">Daily print billing</p>
-          </div>
-        </div>
-
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-amber-500/30' : 'bg-white border-amber-200/80'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">VALUE AT RISK</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/15 text-amber-400 border border-amber-500/30">2 AT RISK</span>
-          </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-amber-500">₹580.00</div>
-            <p className="text-xs text-gray-400 mt-0.5">Pending user confirmation</p>
-          </div>
-        </div>
-
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">REFUND CLAIMS</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-500/15 text-red-400 border border-red-500/30">1 Settled</span>
-          </div>
-          <div className="mt-3">
-            <div className={`text-3xl font-black ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>₹18.40</div>
-            <p className="text-xs text-gray-400 mt-0.5">Paper jam autorefund</p>
-          </div>
-        </div>
-
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">PROMO SAVINGS</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/15 text-purple-400 border border-purple-500/30">Active</span>
-          </div>
-          <div className="mt-3">
-            <div className={`text-3xl font-black ${isDark ? 'text-purple-400' : 'text-[#7c3aed]'}`}>₹420.00</div>
-            <p className="text-xs text-gray-400 mt-0.5">Discount coupons applied</p>
-          </div>
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2.5 bg-[#10223A] border border-[#1D3A59] rounded-xl text-sm font-bold text-[#8EA6BF] hover:text-[#F5F7FA] hover:border-[#20D3A2]/50 transition-all shadow-xs cursor-pointer"
+          >
+            <RefreshCw size={15} className={isRefreshing ? 'animate-spin text-[#20D3A2]' : 'text-[#8EA6BF]'} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh Ledger'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Pricing & Coupon Settings Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Pricing Rules (7 cols) */}
-        <div className={`lg:col-span-7 border rounded-2xl p-6 shadow-sm flex flex-col justify-between ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div>
-            <h2 className={`text-base font-bold mb-1 ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>Print Pricing Configuration</h2>
-            <p className="text-xs text-gray-400 mb-5">Set campus rates per sheet and printing mode</p>
+      {/* 4 Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <MetricCard
+          title="TOTAL REVENUE"
+          value={`₹${(kpis?.totalRevenue ?? 14250).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+          subtext="Campus print billing"
+          trendBadge={{ text: '+14.2%', positive: true }}
+          icon={<IndianRupee size={18} className="text-[#20D3A2]" />}
+        />
+        <MetricCard
+          title="TOTAL TRANSACTIONS"
+          value={(kpis?.totalTransactions ?? 342).toLocaleString()}
+          subtext="Completed student checkouts"
+          trendBadge={{ text: '+12%', positive: true }}
+          icon={<Receipt size={18} className="text-blue-400" />}
+        />
+        <MetricCard
+          title="AVG ORDER VALUE"
+          value={`₹${(kpis?.avgOrderValue ?? 41.66).toFixed(2)}`}
+          subtext="Per print dispatch session"
+          icon={<TrendingUp size={18} className="text-amber-400" />}
+        />
+        <MetricCard
+          title="SETTLED AMOUNT"
+          value={`₹${(kpis?.settledAmount ?? 13670).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+          subtext="Processed to campus bank"
+          trendBadge={{ text: 'Settled', positive: true }}
+          icon={<CheckCircle2 size={18} className="text-[#20D3A2]" />}
+        />
+      </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                { label: 'B&W Print Rate', key: 'pricePerPageBW' },
-                { label: 'Color Print Rate', key: 'pricePerPageColor' },
-                { label: 'A4 Blank Sheet Rate', key: 'pricePerPageA4' },
-                { label: 'Graph Sheet Rate', key: 'pricePerPageGraph' },
-              ].map((f) => (
-                <div key={f.key} className={`border rounded-xl p-3.5 ${
-                  isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50/80 border-gray-200'
-                }`}>
-                  <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">
-                    {f.label}
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-gray-400">₹</span>
-                    <input
-                      type="number"
-                      step="0.10"
-                      value={(pricing as any)[f.key]}
-                      onChange={(e) => setPricing({ ...pricing, [f.key]: parseFloat(e.target.value) || 0 })}
-                      className={`w-full pl-8 pr-3 py-2 border rounded-lg text-base font-black focus:outline-none ${
-                        isDark
-                          ? 'bg-slate-900 border-slate-700 text-white focus:border-[#8b5cf6]'
-                          : 'bg-white border-gray-200 text-[#1e1b4b] focus:border-[#7c3aed]'
-                      }`}
-                    />
-                  </div>
-                </div>
-              ))}
+      {/* Payment Method Distribution */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        {paymentMethods.map((pm) => (
+          <div key={pm.method} className="bg-[#10223A] rounded-2xl border border-[#1D3A59] p-6 sm:p-7 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-xs sm:text-sm uppercase tracking-wider text-[#8EA6BF]">
+                {pm.method} PAYMENTS
+              </span>
+              <span className="font-mono text-xs font-black px-2.5 py-1 rounded-md bg-[#0A1728] border border-[#1D3A59] text-[#20D3A2]">
+                {pm.percentage}%
+              </span>
+            </div>
+            <div>
+              <div className="text-3xl font-black text-[#F5F7FA]">
+                ₹{pm.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs sm:text-sm text-[#8EA6BF] font-medium mt-1">
+                {pm.transactionCount} transactions
+              </p>
+            </div>
+            <div className="h-2.5 rounded-full overflow-hidden bg-[#0A1728] border border-[#1D3A59]">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${pm.percentage}%`, backgroundColor: pm.color }}
+              />
             </div>
           </div>
-
-          <div className={`flex justify-end pt-5 mt-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
-            <button
-              onClick={handleSavePricing}
-              disabled={savingSettings}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold text-xs shadow-md shadow-purple-500/20 transition-all cursor-pointer"
-            >
-              {savingSettings ? <Loader2 size={14} className="animate-spin" /> : savedSettings ? <CheckCircle2 size={14} /> : <Save size={14} />}
-              {savedSettings ? 'Pricing Saved!' : 'Save Pricing Rules'}
-            </button>
-          </div>
-        </div>
-
-        {/* Coupons (5 cols) */}
-        <div className={`lg:col-span-5 border rounded-2xl p-6 shadow-sm flex flex-col justify-between ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div>
-            <h2 className={`text-base font-bold mb-1 ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>Promotional Coupons</h2>
-            <p className="text-xs text-gray-400 mb-4">Generate and revoke student discount codes</p>
-
-            {/* Add Coupon Form */}
-            <form onSubmit={handleAddCoupon} className="flex gap-2 mb-4">
-              <input
-                type="text"
-                placeholder="CODE (e.g. SEM2026)"
-                value={newCouponCode}
-                onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
-                className={`flex-1 px-3 py-1.5 border rounded-xl text-xs font-bold uppercase focus:outline-none ${
-                  isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-[#1e1b4b]'
-                }`}
-              />
-              <input
-                type="number"
-                placeholder="%"
-                value={newCouponDiscount}
-                onChange={(e) => setNewCouponDiscount(e.target.value)}
-                className={`w-16 px-2 py-1.5 border rounded-xl text-xs font-bold text-center focus:outline-none ${
-                  isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-[#1e1b4b]'
-                }`}
-              />
-              <button
-                type="submit"
-                className="px-3.5 py-1.5 bg-[#7c3aed] text-white rounded-xl text-xs font-bold hover:bg-[#6d28d9] cursor-pointer"
-              >
-                + Add
-              </button>
-            </form>
-
-            {/* Coupons List */}
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {coupons.map((c) => (
-                <div
-                  key={c.id}
-                  className={`flex items-center justify-between p-2.5 border rounded-xl text-xs ${
-                    isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50 border-gray-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`font-mono font-black ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>{c.code}</span>
-                    <span className="font-bold text-[#a78bfa]">{c.discount}% OFF</span>
-                  </div>
-                  <button
-                    onClick={() => handleRevokeCoupon(c.id)}
-                    className="text-red-500 font-bold hover:underline text-[11px] cursor-pointer"
-                  >
-                    Revoke
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Transaction Records Table */}
-      <div className={`border rounded-2xl p-6 shadow-sm space-y-4 ${
-        isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-      }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Transactions Ledger Table Card */}
+      <div className="bg-[#10223A] rounded-2xl border border-[#1D3A59] p-6 sm:p-7 space-y-5 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className={`text-base font-bold ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>Billing & Transaction Ledger</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Real-time payment settlements from kiosk terminals</p>
+            <h2 className="text-lg sm:text-xl font-extrabold text-[#F5F7FA]">Billing & Transaction Ledger</h2>
+            <p className="text-xs sm:text-sm text-[#8EA6BF] mt-0.5 font-medium">
+              Live payment records from UPI, Card, and Cash terminals
+            </p>
           </div>
 
-          <div className="relative w-full sm:w-72">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <div className="relative w-full sm:w-80">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6F89A3]" />
             <input
               type="text"
-              placeholder="Search by Txn ID, Order, User..."
+              placeholder="Search by Txn, Job #..."
               value={searchTxn}
               onChange={(e) => setSearchTxn(e.target.value)}
-              className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl transition-all focus:outline-none ${
-                isDark
-                  ? 'bg-slate-800/80 border border-slate-700 text-white placeholder-slate-400 focus:border-[#8b5cf6]'
-                  : 'bg-gray-50 border border-gray-200 text-[#1e1b4b] placeholder-gray-400 focus:border-[#7c3aed] focus:bg-white'
-              }`}
+              className="w-full min-h-[44px] pl-10 pr-4 py-2 text-sm rounded-xl bg-[#0A1728] border border-[#1D3A59] text-[#F5F7FA] placeholder-[#6F89A3] focus:outline-none focus:border-[#20D3A2] focus:ring-2 focus:ring-[#20D3A2]/20"
             />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+        {/* Desktop View */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
             <thead>
-              <tr className={`border-b text-[10px] uppercase font-extrabold tracking-wider ${
-                isDark ? 'border-slate-700 text-slate-400' : 'border-gray-100 text-gray-400'
-              }`}>
-                <th className="pb-3 pl-2">Txn ID</th>
-                <th className="pb-3">Order Code</th>
-                <th className="pb-3">Student User</th>
-                <th className="pb-3">Kiosk Node</th>
-                <th className="pb-3">Pages</th>
-                <th className="pb-3">Amount</th>
-                <th className="pb-3">Payment</th>
-                <th className="pb-3">Status</th>
-                <th className="pb-3 pr-2 text-right">Action</th>
+              <tr className="border-b border-[#1D3A59] text-xs uppercase font-black tracking-wider text-[#8EA6BF]">
+                <th className="pb-4 pl-3">Transaction ID</th>
+                <th className="pb-4">Job Code</th>
+                <th className="pb-4">Kiosk Node</th>
+                <th className="pb-4">Amount</th>
+                <th className="pb-4">Payment Mode</th>
+                <th className="pb-4">Status</th>
+                <th className="pb-4 pr-3 text-right">Timestamp</th>
               </tr>
             </thead>
-            <tbody className={`divide-y font-medium ${isDark ? 'divide-slate-700/60' : 'divide-gray-100'}`}>
-              {filteredTxns.map((t) => (
-                <tr key={t.id} className="hover:bg-purple-500/10 transition-colors">
-                  <td className="py-3 pl-2 font-mono font-bold text-[#a78bfa]">{t.id}</td>
-                  <td className={`py-3 font-mono font-semibold ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{t.orderId}</td>
-                  <td className="py-3 text-gray-400 max-w-[150px] truncate">{t.user}</td>
-                  <td className={`py-3 font-semibold ${isDark ? 'text-slate-200' : 'text-gray-800'}`}>{t.kiosk}</td>
-                  <td className={`py-3 font-bold ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>{t.pages} pgs ({t.type})</td>
-                  <td className={`py-3 font-black ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>₹{t.amount.toFixed(2)}</td>
-                  <td className="py-3 text-gray-400 font-semibold">{t.paymentMethod}</td>
-                  <td className="py-3 whitespace-nowrap">
-                    <span
-                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                        t.status === 'SUCCESS'
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                          : t.status === 'PENDING'
-                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                          : 'bg-gray-500/15 text-gray-400 border border-gray-500/30'
-                      }`}
-                    >
-                      {t.status}
-                    </span>
+            <tbody className="divide-y divide-[#1D3A59] font-medium">
+              {filteredTxns.map((tx) => (
+                <tr key={tx.id} className="hover:bg-[#132943]/80 transition-colors">
+                  <td className="py-4 pl-3 font-mono font-bold text-[#20D3A2]">
+                    {tx.txCode}
                   </td>
-                  <td className="py-3 pr-2 text-right whitespace-nowrap">
-                    {t.status !== 'REFUNDED' && (
-                      <button
-                        onClick={() => handleRefund(t.id)}
-                        className="text-xs font-bold text-[#a78bfa] hover:underline cursor-pointer"
-                      >
-                        Refund
-                      </button>
-                    )}
+                  <td className="py-4 font-mono font-semibold text-[#8EA6BF]">
+                    {tx.jobCode}
+                  </td>
+                  <td className="py-4 font-semibold text-[#F5F7FA]">{tx.kioskName}</td>
+                  <td className="py-4 font-black text-[#F5F7FA]">
+                    ₹{tx.amount.toFixed(2)}
+                  </td>
+                  <td className="py-4 font-semibold text-[#8EA6BF]">{tx.method}</td>
+                  <td className="py-4 whitespace-nowrap">
+                    <Badge status={tx.status} />
+                  </td>
+                  <td className="py-4 pr-3 text-right text-[#8EA6BF] text-xs font-semibold whitespace-nowrap">
+                    {tx.timestamp}
                   </td>
                 </tr>
               ))}
+              {filteredTxns.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-14 text-center text-[#8EA6BF] font-semibold text-sm">
+                    No transaction records match your search.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View */}
+        <div className="md:hidden space-y-3.5">
+          {filteredTxns.map((tx) => (
+            <div
+              key={tx.id}
+              className="p-5 rounded-2xl border border-[#1D3A59] bg-[#0A1728] space-y-3 shadow-md"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="font-mono text-xs font-bold text-[#20D3A2]">
+                    {tx.txCode}
+                  </span>
+                  <div className="font-black text-lg text-[#F5F7FA] mt-0.5">
+                    ₹{tx.amount.toFixed(2)}
+                  </div>
+                </div>
+                <Badge status={tx.status} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs py-2.5 border-t border-b border-[#1D3A59]">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#6F89A3]">Job Code</span>
+                  <div className="font-mono font-semibold text-[#F5F7FA] mt-0.5">{tx.jobCode}</div>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#6F89A3]">Kiosk</span>
+                  <div className="font-semibold text-[#F5F7FA] mt-0.5">{tx.kioskName}</div>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#6F89A3]">Method</span>
+                  <div className="font-semibold text-[#F5F7FA] mt-0.5">{tx.method}</div>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#6F89A3]">Time</span>
+                  <div className="text-[#8EA6BF] mt-0.5">{tx.timestamp}</div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
