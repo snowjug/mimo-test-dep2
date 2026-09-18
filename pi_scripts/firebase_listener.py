@@ -737,22 +737,14 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                         # Color Epson inkjet: ~22s per sheet for physical printhead sweep & paper ejection
                         # B&W Brother laser: ~2s per sheet
                         if is_color_printer:
-                            paper_exit_delay = max(18, total_sheets * 22)
-                            print(f"⏳ [SYNC] CUPS job {job_id} cleared queue. Waiting {paper_exit_delay}s for physical ejection of {total_sheets} color sheet(s)...")
-                            # Poll up to paper_exit_delay for printer queue to become idle
-                            idle_start = time.time()
-                            while time.time() - idle_start < paper_exit_delay:
-                                p_stat = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=5).stdout.lower()
-                                # Keep waiting if hardware is actively printing pages
-                                if "now printing" in p_stat:
-                                    time.sleep(3)
-                                    continue
-                                time.sleep(2)
+                            # Epson L3250 physical printhead sweep & ejection cadence: ~20s per sheet
+                            paper_exit_delay = max(18, total_sheets * 20)
+                            print(f"⏳ [SYNC] CUPS job {job_id} cleared queue. Synchronizing physical paper exit ({paper_exit_delay}s for {total_sheets} sheet(s))...")
+                            time.sleep(paper_exit_delay)
                         else:
+                            # Brother laser physical ejection cadence: ~2s per sheet
                             paper_exit_delay = max(2, total_sheets * 2)
-
-                        print(f"⏳ [SYNC] Hardware printhead complete. Finalizing physical paper ejection ({paper_exit_delay}s)...")
-                        time.sleep(paper_exit_delay)
+                            time.sleep(paper_exit_delay)
 
                         # Final status check after completion buffer
                         doc_snap_final = doc_ref.get()
