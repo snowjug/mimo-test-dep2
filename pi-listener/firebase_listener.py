@@ -306,10 +306,12 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
                     except Exception as up_err:
                         print(f"⚠️ Progress update error: {up_err}")
 
-        # FINAL DUAL GATE: When CUPS completes, wait fixed 2.0s for the final sheet to exit rollers
+        # FINAL DUAL GATE: When CUPS completes, wait physical buffer for the final sheet (4.0s for Color inkjet, 0.0s for B&W laser)
         if cups_confirmed:
-            print(f"⏳ [SYNC] CUPS confirmed job {cups_job_id}. Waiting 2.0s for final sheet physical ejection...")
-            time.sleep(2.0)
+            paper_exit_delay = 4.0 if is_color else 0.0
+            if paper_exit_delay > 0:
+                print(f"⏳ [SYNC] CUPS confirmed job {cups_job_id}. Waiting {paper_exit_delay}s for Color final sheet physical ejection...")
+                time.sleep(paper_exit_delay)
             print(f"🎉 CUPS Job {cups_job_id} physical printing complete ({total_sheets} sheets).")
             if doc_ref:
                 try:
@@ -318,7 +320,7 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
                     print(f"⚠️ Progress update error: {up_err}")
             return True
             
-        time.sleep(1.0)
+        time.sleep(0.5)
         
     print(f"❌ Timeout ({timeout_sec}s) waiting for physical completion of CUPS job {cups_job_id} (cups_confirmed={cups_confirmed})")
     return False
