@@ -18,6 +18,7 @@ import { BlankPages } from "./app/pages/blank-pages";
 import { DirectSuccess } from "./app/pages/direct-success";
 import AdminDashboard from "./app/pages/mimo-admin-dashboard";
 import { TextEditor } from "./app/pages/text-editor";
+import { FindMachine } from "./app/pages/find-machine";
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(false);
@@ -89,6 +90,7 @@ export default function App() {
           <Route path="/direct-success" element={<DirectSuccess />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/text-editor" element={<TextEditor />} />
+          <Route path="/find-machine" element={<FindMachine />} />
         </Routes>
         <Toaster />
       </BrowserRouter>

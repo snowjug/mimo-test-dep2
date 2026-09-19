@@ -6,9 +6,10 @@ import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Upload, FileText, X, Printer, CheckCircle, AlertCircle, ImageIcon, History, Layers, Wallet, FileIcon, Grid3X3, Loader2, QrCode, FileCheck } from "lucide-react";
+import { Upload, FileText, X, Printer, CheckCircle, AlertCircle, ImageIcon, History, Layers, Wallet, FileIcon, Grid3X3, Loader2, QrCode, FileCheck, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
+import { HackathonBanner } from "../components/HackathonBanner";
 import { PDFDocument } from "pdf-lib";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase";
@@ -748,6 +749,9 @@ export function UploadFile() {
           </CardContent>
         </Card>
 
+        {/* Hackathon Event Spotlight Banner */}
+        <HackathonBanner />
+
         {/* Upload Area */}
         <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-xl">
           <div className="p-3 sm:p-5">
@@ -808,55 +812,76 @@ export function UploadFile() {
         {/* Quick Print - A4 Sheet, Mimo Graph & Custom Document */}
         {files.length === 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            {/* Blank A4 Sheet */}
             <button
               onClick={() => navigate("/blank-pages?type=a4")}
-              className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="group relative overflow-hidden rounded-2xl p-3.5 sm:p-5 border border-slate-200/80 shadow-sm sm:shadow-lg bg-white/90 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-blue-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative z-10 flex flex-col items-center sm:items-start gap-3">
-                <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-slate-300 bg-white flex items-center justify-center shadow-sm group-hover:border-[#093765] group-hover:shadow-md transition-all duration-300">
-                  <FileIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-400 group-hover:text-[#093765] transition-colors duration-300" />
+              <div className="relative z-10 flex flex-row sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-3">
+                <div className="flex items-center sm:flex-col sm:items-start gap-3">
+                  <div className="w-12 h-12 sm:w-14 sm:h-20 rounded-xl sm:rounded-lg border-2 border-slate-200 bg-white flex items-center justify-center shadow-2xs group-hover:border-[#093765] group-hover:shadow-md transition-all duration-300 shrink-0">
+                    <FileIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-400 group-hover:text-[#093765] transition-colors duration-300" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-[#093765] transition-colors">Blank A4 Sheet</h3>
+                    <p className="text-xs text-slate-400 sm:hidden mt-0.5">Print a blank A4 sheet</p>
+                  </div>
                 </div>
-                <div className="text-center sm:text-left">
-                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-[#093765] transition-colors">Blank A4 Sheet</h3>
+                <div className="sm:hidden w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+                  <ArrowRight className="w-4 h-4" />
                 </div>
               </div>
               <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-blue-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
             </button>
 
+            {/* MIMO Graph */}
             <button
               onClick={() => navigate("/blank-pages?type=graph")}
-              className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="group relative overflow-hidden rounded-2xl p-3.5 sm:p-5 border border-slate-200/80 shadow-sm sm:shadow-lg bg-white/90 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative z-10 flex flex-col items-center sm:items-start gap-3">
-                <div
-                  className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-emerald-300 bg-white flex items-center justify-center shadow-sm group-hover:border-emerald-500 group-hover:shadow-md transition-all duration-300"
-                  style={{
-                    backgroundImage: "linear-gradient(rgba(16, 185, 129, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.12) 1px, transparent 1px)",
-                    backgroundSize: "6px 6px",
-                  }}
-                >
-                  <Grid3X3 className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-400 group-hover:text-emerald-600 transition-colors duration-300" />
+              <div className="relative z-10 flex flex-row sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-3">
+                <div className="flex items-center sm:flex-col sm:items-start gap-3">
+                  <div
+                    className="w-12 h-12 sm:w-14 sm:h-20 rounded-xl sm:rounded-lg border-2 border-emerald-300 bg-white flex items-center justify-center shadow-2xs group-hover:border-emerald-500 group-hover:shadow-md transition-all duration-300 shrink-0"
+                    style={{
+                      backgroundImage: "linear-gradient(rgba(16, 185, 129, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.12) 1px, transparent 1px)",
+                      backgroundSize: "6px 6px",
+                    }}
+                  >
+                    <Grid3X3 className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-500 group-hover:text-emerald-600 transition-colors duration-300" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-emerald-700 transition-colors">MIMO Graph</h3>
+                    <p className="text-xs text-slate-400 sm:hidden mt-0.5">Print MIMO Graph paper</p>
+                  </div>
                 </div>
-                <div className="text-center sm:text-left">
-                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-emerald-700 transition-colors">MIMO Graph</h3>
+                <div className="sm:hidden w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 shadow-2xs">
+                  <ArrowRight className="w-4 h-4" />
                 </div>
               </div>
               <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-emerald-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
             </button>
 
+            {/* Custom Document */}
             <button
               onClick={() => navigate("/text-editor")}
-              className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 border-0 shadow-lg bg-white/80 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="group relative overflow-hidden rounded-2xl p-3.5 sm:p-5 border border-slate-200/80 shadow-sm sm:shadow-lg bg-white/90 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-indigo-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative z-10 flex flex-col items-center sm:items-start gap-3">
-                <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-purple-300 bg-white flex items-center justify-center shadow-sm group-hover:border-purple-500 group-hover:shadow-md transition-all duration-300">
-                  <FileText className="w-6 h-6 sm:w-7 sm:h-7 text-purple-400 group-hover:text-purple-600 transition-colors duration-300" />
+              <div className="relative z-10 flex flex-row sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-3">
+                <div className="flex items-center sm:flex-col sm:items-start gap-3">
+                  <div className="w-12 h-12 sm:w-14 sm:h-20 rounded-xl sm:rounded-lg border-2 border-purple-200 bg-white flex items-center justify-center shadow-2xs group-hover:border-purple-500 group-hover:shadow-md transition-all duration-300 shrink-0">
+                    <FileText className="w-6 h-6 sm:w-7 sm:h-7 text-purple-500 group-hover:text-purple-600 transition-colors duration-300" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-purple-700 transition-colors">Custom Document</h3>
+                    <p className="text-xs text-slate-400 sm:hidden mt-0.5">Upload &amp; print your own file</p>
+                  </div>
                 </div>
-                <div className="text-center sm:text-left">
-                  <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-purple-700 transition-colors">Custom Document</h3>
+                <div className="sm:hidden w-8 h-8 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 shadow-2xs">
+                  <ArrowRight className="w-4 h-4" />
                 </div>
               </div>
               <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-purple-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
@@ -939,7 +964,16 @@ export function UploadFile() {
                   );
                 })}
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 mt-5 pt-4 border-t border-slate-200 w-full">
+
+              {/* Privacy Statement */}
+              <div className="mt-4 flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs sm:text-[13px] text-slate-600 leading-relaxed shadow-2xs">
+                <span className="text-sm shrink-0 select-none" role="img" aria-label="privacy">🔒</span>
+                <p>
+                  <strong className="font-semibold text-slate-700">Your files stay private:</strong> Files are securely deleted immediately after a successful print. Unprinted files are automatically removed after <strong className="font-semibold text-slate-700">24 hours</strong>.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-slate-200 w-full">
                 <Button
                   className="flex-1 h-12 text-sm sm:text-base font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl w-full sm:w-auto"
                   disabled={files.length === 0 || files.some((f) => f.status === "uploading")}
