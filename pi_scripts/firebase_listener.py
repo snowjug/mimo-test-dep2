@@ -733,18 +733,10 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             auto_heal_cups_queue(printer_name, job_id)
                             return
 
-                        # Calculate dynamic physical paper exit delay based on sheet count
-                        # Color Epson inkjet: ~22s per sheet for physical printhead sweep & paper ejection
-                        # B&W Brother laser: ~2s per sheet
-                        if is_color_printer:
-                            # Epson L3250 physical printhead sweep & ejection cadence: ~20s per sheet
-                            paper_exit_delay = max(18, total_sheets * 20)
-                            print(f"⏳ [SYNC] CUPS job {job_id} cleared queue. Synchronizing physical paper exit ({paper_exit_delay}s for {total_sheets} sheet(s))...")
-                            time.sleep(paper_exit_delay)
-                        else:
-                            # Brother laser physical ejection cadence: ~2s per sheet
-                            paper_exit_delay = max(2, total_sheets * 2)
-                            time.sleep(paper_exit_delay)
+                        # Fixed final-sheet physical exit buffer.
+                        # CUPS clears only after the final page has been transferred.
+                        paper_exit_delay = 2.0
+                        time.sleep(paper_exit_delay)
 
                         # Final status check after completion buffer
                         doc_snap_final = doc_ref.get()
