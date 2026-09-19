@@ -236,15 +236,12 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
         return False
 
     # Calibrated mechanical cadence:
-    # Brother B&W Laser: 3.5s warmup + 2.2s per simplex sheet / 8.5s per duplex physical sheet
-    # Epson Color Inkjet: 4.5s warmup + 12.0s per physical sheet (24.0s if duplex)
+    # Uses the same reliable completion cadence as B&W Laser: 3.5s warmup + 2.2s per simplex sheet / 8.5s per duplex physical sheet
+    warmup_sec = 4.0 if is_duplex else 3.5
+    per_sheet_sec = 8.5 if is_duplex else 2.2
     if is_color:
-        warmup_sec = 4.5
-        per_sheet_sec = 24.0 if is_duplex else 12.0
         timeout_sec = max(90, int(60 + warmup_sec + (total_sheets * (35 if is_duplex else 25))))
     else:
-        warmup_sec = 4.0 if is_duplex else 3.5
-        per_sheet_sec = 8.5 if is_duplex else 2.2
         timeout_sec = max(60, int(60 + warmup_sec + (total_sheets * (20 if is_duplex else 8))))
 
     required_duration = warmup_sec + (total_sheets * per_sheet_sec)
@@ -309,9 +306,11 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
                     except Exception as up_err:
                         print(f"⚠️ Progress update error: {up_err}")
 
-        # FINAL DUAL GATE: Both CUPS completion confirmed AND physical duration elapsed
-        if cups_confirmed and elapsed >= required_duration:
-            print(f"🎉 CUPS Job {cups_job_id} physical printing complete ({total_sheets} sheets after {elapsed:.1f}s).")
+        # FINAL DUAL GATE: When CUPS completes, wait fixed 2.0s for the final sheet to exit rollers
+        if cups_confirmed:
+            print(f"⏳ [SYNC] CUPS confirmed job {cups_job_id}. Waiting 2.0s for final sheet physical ejection...")
+            time.sleep(2.0)
+            print(f"🎉 CUPS Job {cups_job_id} physical printing complete ({total_sheets} sheets).")
             if doc_ref:
                 try:
                     doc_ref.update({"sheetsCompleted": total_sheets})
@@ -506,9 +505,7 @@ def update_colour_paper_usage(doc_ref, doc_id, doc):
                 f"⚠️ Job {doc_id}: pricing.totalPages is missing. "
                 "Colour paper was not deducted."
             )
-            raise ValueError(
-                f"Job {doc_id}: pricing.totalPages is missing"
-            )
+            return
 
         sheets_per_copy = int(sheets_per_copy)
 
@@ -524,9 +521,7 @@ def update_colour_paper_usage(doc_ref, doc_id, doc):
                 f"⚠️ Job {doc_id}: invalid sheet count. "
                 "Colour paper was not deducted."
             )
-            raise ValueError(
-                f"Job {doc_id}: invalid sheet count"
-            )
+            return
 
         sheets_used = sheets_per_copy * original_copies
 
@@ -537,9 +532,7 @@ def update_colour_paper_usage(doc_ref, doc_id, doc):
             job_snapshot = doc_ref.get(transaction=transaction)
 
             if not job_snapshot.exists:
-                raise ValueError(
-                    f"Job {doc_id}: job no longer exists"
-                )
+                return
 
             job_data = job_snapshot.to_dict() or {}
 
@@ -553,24 +546,21 @@ def update_colour_paper_usage(doc_ref, doc_id, doc):
             printer_snapshot = printer_ref.get(transaction=transaction)
 
             if not printer_snapshot.exists:
-                raise ValueError(
-                    "hardware/printers document not found"
-                )
+                print(f"⚠️ Job {doc_id}: hardware/printers document not found.")
+                return
 
             printer_data = printer_snapshot.to_dict() or {}
             colour_printer = printer_data.get("SV-002-COLOR")
 
             if not isinstance(colour_printer, dict):
-                raise ValueError(
-                    "SV-002-COLOR printer data not found"
-                )
+                print(f"⚠️ Job {doc_id}: SV-002-COLOR printer data not found.")
+                return
 
             current_level = colour_printer.get("paperLevel")
 
             if current_level is None:
-                raise ValueError(
-                    "SV-002-COLOR paperLevel is missing"
-                )
+                print(f"⚠️ Job {doc_id}: SV-002-COLOR paperLevel is missing.")
+                return
 
             current_level = int(current_level)
             new_level = max(0, current_level - sheets_used)
@@ -600,10 +590,10 @@ def update_colour_paper_usage(doc_ref, doc_id, doc):
 
     except Exception as e:
         print(
-            f"❌ Failed to update colour paper usage for "
+            f"⚠️ Warning: Failed to update colour paper usage for "
             f"job {doc_id}: {e}"
         )
-        raise
+        return
 def process_job(doc_snapshot):
     doc = doc_snapshot.to_dict()
     doc_id = doc_snapshot.id
@@ -748,10 +738,13 @@ def process_job(doc_snapshot):
         )
 
         if success:
-            # Deduct paper only for successful colour prints.
+            # Deduct paper only for successful colour prints (non-blocking).
             # B&W printing remains unchanged.
             if is_color:
-                update_colour_paper_usage(doc_ref, doc_id, doc)
+                try:
+                    update_colour_paper_usage(doc_ref, doc_id, doc)
+                except Exception as paper_err:
+                    print(f"⚠️ Warning: Non-blocking error in colour paper update: {paper_err}")
 
             doc_ref.update({
                 "status": "completed",
