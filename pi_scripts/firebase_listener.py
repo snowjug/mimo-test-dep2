@@ -724,25 +724,11 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             print(f"⚠️ [SYNC] Could not check error_log for filter crash: {filter_chk_err}")
 
                     if job_ok:
-                        doc_snap_latest = doc_ref.get()
-                        doc_dict = doc_snap_latest.to_dict() or {} if doc_snap_latest.exists else {}
-                        
-                        # Double check that job wasn't failed/refunded while waiting
-                        if doc_dict.get("status") == "failed":
-                            print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed in Firestore. Cancelling CUPS job {job_id} and aborting completion.")
-                            auto_heal_cups_queue(printer_name, job_id)
-                            return
-
-                        # Fixed final-sheet physical exit buffer.
-                        # CUPS clears only after the final page has been transferred.
-                        paper_exit_delay = 2.0
-                        time.sleep(paper_exit_delay)
-
-                        # Final status check after completion buffer
-                        doc_snap_final = doc_ref.get()
-                        if doc_snap_final.exists and doc_snap_final.to_dict().get("status") == "failed":
-                            print(f"⚠️ [SYNC] Job {doc_ref.id} was marked failed during completion buffer. Aborting completion.")
-                            return
+                        # Physical exit buffer: 4.0s for Color inkjet; 0.0s for B&W laser (already ejected when CUPS clears)
+                        paper_exit_delay = 4.0 if is_color_printer else 0.0
+                        if paper_exit_delay > 0:
+                            print(f"⏳ [SYNC] CUPS confirmed job {job_id}. Waiting {paper_exit_delay}s for Color final sheet physical ejection...")
+                            time.sleep(paper_exit_delay)
 
                         print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
                         safe_update(doc_ref, {
@@ -758,7 +744,7 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                     return
             except Exception as e:
                 print(f"⚠️ [SYNC] lpstat poll error: {e}")
-            time.sleep(2)
+            time.sleep(0.5)
         # Timeout — mark failed
         print(f"❌ [SYNC] Timed out waiting for CUPS job {job_id}. Reporting failure for auto-refund.")
         auto_heal_cups_queue(printer_name, job_id)
