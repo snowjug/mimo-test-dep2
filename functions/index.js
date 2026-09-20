@@ -1,6 +1,7 @@
 // Deploy trigger: 2026-08-10 12:28:00
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -582,14 +583,24 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
     }
 
     // Phase 2: Conversions succeeded for all files. Now update the database atomically.
-    // Clear old pending jobs to prevent ghost cart pricing discrepancies
+    // Mark old pending jobs as abandoned to prevent ghost cart pricing while preserving storage ownership records
     const staleJobs = await db.collection("print_jobs").where("userId", "==", userId).where("status", "==", "pending").get();
-    const deleteBatch = db.batch();
-    staleJobs.forEach(doc => deleteBatch.delete(doc.ref));
-    await deleteBatch.commit();
+    if (!staleJobs.empty) {
+      const abandonBatch = db.batch();
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      staleJobs.forEach((doc) => {
+        abandonBatch.update(doc.ref, {
+          status: "abandoned",
+          abandonedAt: now,
+          updatedAt: now
+        });
+      });
+      await abandonBatch.commit();
+    }
 
     // Create the pending print_jobs in Firestore with verified pageCount and converted PDF url
     const batch = db.batch();
+    const now = admin.firestore.FieldValue.serverTimestamp();
     for (const f of finalizedFiles) {
       const docRef = db.collection("print_jobs").doc();
       batch.set(docRef, {
@@ -602,7 +613,8 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
         pageCount: f.pageCount, // Authoritative server-side page count!
         originalFileUrl: f.originalUrl !== f.url ? f.originalUrl : null,
         convertedStoragePath: f.convertedStoragePath || null,
-        uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+        uploadedAt: now,
+        retentionStartAt: now
       });
     }
     await batch.commit();
@@ -704,16 +716,23 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
     const userId = req.user.userId || req.user.id;
     const { type, pageCount } = req.body; // "a4" or "graph"
 
-    // 1. Clear abandoned jobs to prevent overcharging
+    // 1. Mark superseded pending jobs as abandoned to prevent overcharging while preserving storage ownership records
     const existingJobs = await db.collection("print_jobs")
       .where("userId", "==", userId)
       .where("status", "==", "pending")
       .get();
 
     if (!existingJobs.empty) {
-      const deleteBatch = db.batch();
-      existingJobs.forEach(doc => deleteBatch.delete(doc.ref));
-      await deleteBatch.commit();
+      const abandonBatch = db.batch();
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      existingJobs.forEach((doc) => {
+        abandonBatch.update(doc.ref, {
+          status: "abandoned",
+          abandonedAt: now,
+          updatedAt: now
+        });
+      });
+      await abandonBatch.commit();
     }
 
     // 2. Create the blank job
@@ -738,6 +757,7 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
       isImage: false,
       createdAt: now,
       updatedAt: now,
+      retentionStartAt: now,
       status: "pending",
       pageCount: 1, // The physical PDF template is exactly 1 page. The quantity is controlled purely by 'copies'.
       files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
@@ -772,28 +792,75 @@ app.delete("/remove-file", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "File not found or already processed" });
     }
 
-    // Delete Firestore document
-    const batch = db.batch();
-    jobsSnapshot.forEach(doc => batch.delete(doc.ref));
-    await batch.commit();
-
-    // Delete from Firebase Storage
     const bucket = admin.storage().bucket();
-    let filePath = "";
-    if (fileUrl.startsWith("gs://")) {
-      const bucketName = bucket.name;
-      filePath = fileUrl.replace(`gs://${bucketName}/`, "");
-    } else if (fileUrl.includes("firebasestorage.googleapis.com")) {
-      const urlObj = new URL(fileUrl);
-      const pathParts = urlObj.pathname.split("/o/");
-      if (pathParts.length > 1) {
-        filePath = decodeURIComponent(pathParts[1].split("?")[0]);
+    const batch = db.batch();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    for (const doc of jobsSnapshot.docs) {
+      const data = doc.data();
+      const rawPaths = [
+        data.fileUrl,
+        data.originalFileUrl,
+        data.convertedStoragePath
+      ].filter(Boolean);
+
+      for (const raw of rawPaths) {
+        let filePath = "";
+        if (raw.startsWith("gs://")) {
+          const bucketName = bucket.name;
+          filePath = raw.replace(`gs://${bucketName}/`, "");
+        } else if (raw.includes("firebasestorage.googleapis.com")) {
+          try {
+            const urlObj = new URL(raw);
+            const pathParts = urlObj.pathname.split("/o/");
+            if (pathParts.length > 1) {
+              filePath = decodeURIComponent(pathParts[1].split("?")[0]);
+            }
+          } catch (_) {}
+        } else if (raw.includes("storage.googleapis.com")) {
+          try {
+            const urlObj = new URL(raw);
+            const pathname = decodeURIComponent(urlObj.pathname);
+            const bucketName = bucket.name;
+            const prefix = `/${bucketName}/`;
+            if (pathname.startsWith(prefix)) {
+              filePath = pathname.slice(prefix.length);
+            } else if (pathname.startsWith("/")) {
+              filePath = pathname.slice(1);
+            }
+          } catch (_) {}
+        } else if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+          filePath = raw;
+        }
+
+        // Never delete shared template files
+        const isTemplate = filePath.toLowerCase().includes("templates/blank_a4.pdf") ||
+                           filePath.toLowerCase().includes("templates/mimo_graph.pdf") ||
+                           filePath.toLowerCase().startsWith("templates/");
+
+        if (filePath && !isTemplate) {
+          // Check if another active job still references this path globally across all users
+          const isReferenced = await isStoragePathReferencedByOtherActiveJob(db, filePath, doc.id);
+
+          if (!isReferenced) {
+            await bucket.file(filePath).delete().catch((e) => {
+              if (e.code !== 404) console.error("[REMOVE-FILE] Storage delete error:", e.message);
+            });
+          }
+        }
       }
+
+      // Preserve document record in Firestore with status: "cleaned", fileDeleted: true
+      batch.update(doc.ref, {
+        status: "cleaned",
+        fileDeleted: true,
+        fileDeletedAt: now,
+        removedByUser: true,
+        updatedAt: now
+      });
     }
 
-    if (filePath) {
-      await bucket.file(filePath).delete().catch(e => console.error("Storage delete error:", e));
-    }
+    await batch.commit();
 
     res.json({ message: "File successfully deleted from cloud" });
   } catch (err) {
@@ -854,51 +921,120 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     // Group all pending jobs into a single unified job for the printer
     const mergedFiles = [];
     let totalRawPages = 0;
+    let earliestRetentionStartAt = null;
 
     jobsSnapshot.forEach((doc) => {
       const data = doc.data();
-      const fileConfig = printOptions?.fileConfigs?.[data.fileName];
-      let numPages = data.pageCount || fileConfig?.pageCount || 1;
-      const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
-      const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
 
-      // Handle custom page ranges
-      if (jobPageSelection === "custom" && jobPageRange) {
-        const ranges = String(jobPageRange).split(",");
-        let customCount = 0;
-        for (const r of ranges) {
-          const parts = r.split("-").map(p => parseInt(p.trim()));
-          if (parts.length === 1 && !isNaN(parts[0])) {
-            if (parts[0] >= 1 && parts[0] <= numPages) customCount += 1;
-          } else if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-            if (parts[0] >= 1 && parts[1] <= numPages && parts[0] <= parts[1]) {
-              customCount += (parts[1] - parts[0] + 1);
-            }
+      // Preserve earliest retentionStartAt across predecessor jobs
+      const jobRetention = data.retentionStartAt || data.uploadedAt || data.createdAt;
+      if (jobRetention) {
+        if (!earliestRetentionStartAt) {
+          earliestRetentionStartAt = jobRetention;
+        } else {
+          const candTime = (jobRetention.toDate ? jobRetention.toDate() : new Date(jobRetention)).getTime();
+          const earliestTime = (earliestRetentionStartAt.toDate ? earliestRetentionStartAt.toDate() : new Date(earliestRetentionStartAt)).getTime();
+          if (!isNaN(candTime) && !isNaN(earliestTime) && candTime < earliestTime) {
+            earliestRetentionStartAt = jobRetention;
           }
         }
-        if (customCount > 0) numPages = customCount;
       }
 
-      totalRawPages += numPages;
+      // If this document is already a merged job containing a files array, unpack its files!
+      if (Array.isArray(data.files) && data.files.length > 0) {
+        data.files.forEach((fileItem) => {
+          const fileName = fileItem.originalFileName || fileItem.name;
+          const fileConfig = printOptions?.fileConfigs?.[fileName] || printOptions?.fileConfigs?.[fileItem.name];
+          let numPages = fileItem.pageCount || fileConfig?.pageCount || 1;
+          const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
+          const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
 
-      // Determine printable filename for the Pi:
-      // If the file was converted to PDF (mimetype application/pdf, but original name is an Office extension),
-      // provide a .pdf filename so the Raspberry Pi CUPS daemon prints the PDF directly without attempting LibreOffice.
-      let printableName = data.fileName;
-      const isConvertedPdf = data.convertedStoragePath || (data.mimetype === "application/pdf" && SUPPORTED_OFFICE_EXTENSIONS.has(path.extname(data.fileName || "").toLowerCase()));
-      if (isConvertedPdf) {
-        const baseName = path.basename(data.fileName, path.extname(data.fileName));
-        printableName = `${baseName}.pdf`;
+          // Handle custom page ranges
+          if (jobPageSelection === "custom" && jobPageRange) {
+            const ranges = String(jobPageRange).split(",");
+            let customCount = 0;
+            for (const r of ranges) {
+              const parts = r.split("-").map(p => parseInt(p.trim()));
+              if (parts.length === 1 && !isNaN(parts[0])) {
+                if (parts[0] >= 1 && parts[0] <= numPages) customCount += 1;
+              } else if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                if (parts[0] >= 1 && parts[1] <= numPages && parts[0] <= parts[1]) {
+                  customCount += (parts[1] - parts[0] + 1);
+                }
+              }
+            }
+            if (customCount > 0) numPages = customCount;
+          }
+
+          totalRawPages += numPages;
+
+          const printableName = fileItem.name;
+          const originalFileUrl = fileItem.originalFileUrl || fileItem.originalUrl || null;
+          const convertedStoragePath = fileItem.convertedStoragePath || null;
+
+          mergedFiles.push({
+            name: printableName,
+            originalFileName: fileItem.originalFileName || fileItem.name,
+            url: fileItem.url,
+            originalFileUrl: originalFileUrl,
+            originalUrl: originalFileUrl,
+            convertedStoragePath: convertedStoragePath,
+            type: fileItem.type || "application/octet-stream",
+            size: fileItem.size || fileItem.fileSize || 0,
+            pageCount: numPages
+          });
+        });
+      } else {
+        // Single pending file document (e.g. from /finalize-upload)
+        const fileConfig = printOptions?.fileConfigs?.[data.fileName];
+        let numPages = data.pageCount || fileConfig?.pageCount || 1;
+        const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
+        const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
+
+        // Handle custom page ranges
+        if (jobPageSelection === "custom" && jobPageRange) {
+          const ranges = String(jobPageRange).split(",");
+          let customCount = 0;
+          for (const r of ranges) {
+            const parts = r.split("-").map(p => parseInt(p.trim()));
+            if (parts.length === 1 && !isNaN(parts[0])) {
+              if (parts[0] >= 1 && parts[0] <= numPages) customCount += 1;
+            } else if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+              if (parts[0] >= 1 && parts[1] <= numPages && parts[0] <= parts[1]) {
+                customCount += (parts[1] - parts[0] + 1);
+              }
+            }
+          }
+          if (customCount > 0) numPages = customCount;
+        }
+
+        totalRawPages += numPages;
+
+        // Determine printable filename for the Pi:
+        // If the file was converted to PDF (mimetype application/pdf, but original name is an Office extension),
+        // provide a .pdf filename so the Raspberry Pi CUPS daemon prints the PDF directly without attempting LibreOffice.
+        let printableName = data.fileName;
+        const isConvertedPdf = data.convertedStoragePath || (data.mimetype === "application/pdf" && SUPPORTED_OFFICE_EXTENSIONS.has(path.extname(data.fileName || "").toLowerCase()));
+        if (isConvertedPdf) {
+          const baseName = path.basename(data.fileName, path.extname(data.fileName));
+          printableName = `${baseName}.pdf`;
+        }
+
+        const originalFileUrl = data.originalFileUrl || data.originalUrl || null;
+        const convertedStoragePath = data.convertedStoragePath || null;
+
+        mergedFiles.push({
+          name: printableName,
+          originalFileName: data.fileName,
+          url: data.fileUrl,
+          originalFileUrl: originalFileUrl,
+          originalUrl: originalFileUrl,
+          convertedStoragePath: convertedStoragePath,
+          type: data.mimetype || "application/octet-stream",
+          size: data.size || data.fileSize || 0,
+          pageCount: numPages
+        });
       }
-
-      mergedFiles.push({
-        name: printableName,
-        originalFileName: data.fileName,
-        url: data.fileUrl,
-        type: data.mimetype,
-        size: data.size || data.fileSize || 0,
-        pageCount: numPages
-      });
 
       // Delete the individual pending jobs so we can replace them with the merged group
       batchUpdate.delete(doc.ref);
@@ -930,6 +1066,8 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       userId,
       fileName: mergedFiles.length > 1 ? `Multiple Files (${mergedFiles.length})` : mergedFiles[0].name,
       fileUrl: mergedFiles[0].url, // legacy support for older apps
+      originalFileUrl: mergedFiles[0].originalFileUrl || null,
+      convertedStoragePath: mergedFiles[0].convertedStoragePath || null,
       mimetype: mergedFiles[0].type, // legacy support
       files: mergedFiles, // The full array of files to print
       size: mergedFiles.reduce((acc, f) => acc + (f.size || 0), 0),
@@ -947,7 +1085,8 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       totalCost: jobCost,
       kioskId: printOptions?.directKioskId || "CV-001",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      retentionStartAt: earliestRetentionStartAt || admin.firestore.FieldValue.serverTimestamp()
     });
 
     const finalAmountToPay = Math.max(0, totalAmount - coinsDiscount);
@@ -967,7 +1106,9 @@ app.post("/create-order", authMiddleware, async (req, res) => {
       await newJobRef.update({
         status: "paid",
         printCode,
+        codeCreatedAt: now,
         paymentTime: now,
+        retentionStartAt: now,
         isPrinted: false
       });
 
@@ -1488,6 +1629,7 @@ app.post("/payment-success", authMiddleware, async (req, res) => {
         paymentTime: admin.firestore.FieldValue.serverTimestamp(),
         printCode,
         codeCreatedAt: now,
+        retentionStartAt: now,
         isPrinted: false,
       });
     });
@@ -2020,8 +2162,15 @@ app.get("/wa-pay-success/:orderId", async (req, res) => {
       const cfStatus = await axios.get(`${CASHFREE_BASE_URL}/links/${orderId}`, { headers: cashfreeHeaders });
       if (cfStatus.data.link_status === "PAID") {
         printCode = Math.floor(1000 + Math.random() * 9000).toString();
+        const now = admin.firestore.FieldValue.serverTimestamp();
         const batch = db.batch();
-        waJobs.forEach(d => batch.update(d.ref, { status: "paid", printCode, paymentTime: admin.firestore.FieldValue.serverTimestamp() }));
+        waJobs.forEach(d => batch.update(d.ref, {
+          status: "paid",
+          printCode,
+          codeCreatedAt: now,
+          paymentTime: now,
+          retentionStartAt: now
+        }));
         await batch.commit();
 
         // Notify on WhatsApp with native order card
@@ -2173,6 +2322,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
         const ext = isImage ? (mimeType.includes("png") ? "png" : "jpg") : "pdf";
         const actualFileName = doc.filename || `whatsapp_${Date.now()}.${ext}`;
 
+        const now = admin.firestore.FieldValue.serverTimestamp();
         // Create a print job in Firestore
         const jobRef = await db.collection("print_jobs").add({
           userId,
@@ -2183,8 +2333,9 @@ app.post("/whatsapp-webhook", async (req, res) => {
           fileSize: doc.file_size || 0,
           fileType: isImage ? "image" : "pdf",
           isImage: isImage,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: now,
+          updatedAt: now,
+          retentionStartAt: now,
           status: "pending",
           source: "whatsapp"
         });
@@ -2451,9 +2602,22 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
     // FREE ORDER
     const orderId = `WA-FREE-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
     const printCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const now = admin.firestore.FieldValue.serverTimestamp();
     const targetKioskId = session.kioskId || session.destination || "SV-002";
     await db.collection("print_jobs").doc(session.jobId).update({
-      orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: 0, printDestination: targetKioskId, kioskId: targetKioskId, status: "paid", printCode, couponUsed: couponCode || null
+      orderId,
+      colorMode: session.colorMode,
+      copies: session.copies,
+      pageCount: session.pageCount,
+      totalCost: 0,
+      printDestination: targetKioskId,
+      kioskId: targetKioskId,
+      status: "paid",
+      printCode,
+      codeCreatedAt: now,
+      paymentTime: now,
+      retentionStartAt: now,
+      couponUsed: couponCode || null
     });
     await sessionRef.update({ state: "idle" });
     await sendWhatsAppMessage(from, `🎉 *100% Free!* Your order is fully covered.\n\nYour Print Code is:\n*${printCode}*\n\nHead to the Mimo kiosk and enter this code! 🖨️`);
@@ -2642,44 +2806,64 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
 
   // Trigger ONLY if status changes to "completed"
   if (beforeData.status !== "completed" && afterData.status === "completed") {
-    console.log(`[STORAGE] Print job ${event.params.jobId} completed. Cleaning up file...`);
+    const jobId = event.params.jobId;
+    console.log(`[STORAGE] Print job ${jobId} completed. Cleaning up files...`);
 
-    if (!afterData.fileUrl) {
-      console.log(`[STORAGE] No fileUrl found for job ${event.params.jobId}.`);
-      return;
-    }
+    const bucket = admin.storage().bucket();
+    const storagePaths = discoverStoragePaths(afterData, bucket.name);
 
-    try {
-      // fileUrl format: "gs://mimo-v2-11868.firebasestorage.app/uploads/username/filename.pdf"
-      // Or: "https://firebasestorage.googleapis.com/v0/b/..."
+    let allSucceeded = true;
+    let failureError = null;
 
-      const fileUrl = afterData.fileUrl;
-      const bucket = admin.storage().bucket();
+    for (const p of storagePaths) {
+      // 1. Template protection guard
+      if (isProtectedTemplate(p)) {
+        console.log(`[STORAGE] Protected template skipped: ${p} for job ${jobId}`);
+        continue;
+      }
 
-      let filePath = "";
-      if (fileUrl.startsWith("gs://")) {
-        const bucketName = bucket.name;
-        filePath = fileUrl.replace(`gs://${bucketName}/`, "");
-      } else if (fileUrl.includes("firebasestorage.googleapis.com")) {
-        // Extract from HTTP URL
-        const urlObj = new URL(fileUrl);
-        const pathParts = urlObj.pathname.split("/o/");
-        if (pathParts.length > 1) {
-          filePath = decodeURIComponent(pathParts[1].split("?")[0]);
+      // 2. Global active cross-job reference check
+      const isReferenced = await isStoragePathReferencedByOtherActiveJob(db, p, jobId);
+      if (isReferenced) {
+        console.log(`[STORAGE] Preserving active referenced path: ${p} for job ${jobId}`);
+        continue;
+      }
+
+      // 3. Physical Storage deletion
+      try {
+        await bucket.file(p).delete();
+        console.log(`[STORAGE] Successfully deleted ${p} for job ${jobId}`);
+      } catch (err) {
+        if (err.code === 404) {
+          console.log(`[STORAGE] Object already absent (404): ${p} for job ${jobId}`);
+        } else {
+          console.error(`[STORAGE ERROR] Failed to delete ${p} for job ${jobId}:`, err.message);
+          allSucceeded = false;
+          failureError = err.message;
         }
       }
+    }
 
-      if (!filePath) {
-        console.error(`[STORAGE ERROR] Could not parse path from: ${fileUrl}`);
-        return;
+    const docRef = db.collection("print_jobs").doc(jobId);
+    if (allSucceeded) {
+      try {
+        await docRef.update({
+          fileDeleted: true,
+          fileDeletedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cleanupState: "completed"
+        });
+        console.log(`[STORAGE] Print job ${jobId} cleanup metadata updated: fileDeleted=true`);
+      } catch (updateErr) {
+        console.error(`[STORAGE ERROR] Failed to update cleanup metadata for ${jobId}:`, updateErr.message);
       }
-
-      const fileRef = bucket.file(filePath);
-      await fileRef.delete();
-      console.log(`[STORAGE] Successfully deleted ${filePath}`);
-
-    } catch (err) {
-      console.error(`[STORAGE ERROR] Failed to delete file for job ${event.params.jobId}:`, err);
+    } else {
+      try {
+        await docRef.update({
+          cleanupState: "failed",
+          cleanupError: failureError || "Partial immediate deletion failure"
+        });
+        console.log(`[STORAGE] Print job ${jobId} marked cleanupState=failed for scheduler retry`);
+      } catch (_) {}
     }
 
     // Send WhatsApp Acknowledgement + "Need More Prints" button
@@ -2979,6 +3163,406 @@ exports.printerHardwareNotification = onDocumentUpdated(
         "[EMAIL] Failed to process printer hardware notification:",
         err.message || err
       );
+    }
+  }
+);
+
+// ================= 24-HOUR FILE RETENTION CLEANUP (SCHEDULED) =================
+
+/**
+ * Normalizes and extracts the relative GCS storage path from any supported URL scheme.
+ */
+function extractStoragePath(fileUrl, bucketName) {
+  if (!fileUrl || typeof fileUrl !== "string") return null;
+
+  if (fileUrl.startsWith("gs://")) {
+    return fileUrl.replace(`gs://${bucketName}/`, "");
+  }
+
+  if (fileUrl.includes("firebasestorage.googleapis.com")) {
+    try {
+      const urlObj = new URL(fileUrl);
+      const pathParts = urlObj.pathname.split("/o/");
+      if (pathParts.length > 1) {
+        return decodeURIComponent(pathParts[1].split("?")[0]);
+      }
+    } catch (_) {}
+  }
+
+  if (fileUrl.includes("storage.googleapis.com")) {
+    try {
+      const urlObj = new URL(fileUrl);
+      const pathname = decodeURIComponent(urlObj.pathname);
+      const prefix = `/${bucketName}/`;
+      if (pathname.startsWith(prefix)) {
+        return pathname.slice(prefix.length);
+      } else if (pathname.startsWith("/")) {
+        return pathname.slice(1);
+      }
+    } catch (_) {}
+  }
+
+  if (!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://")) {
+    return fileUrl;
+  }
+
+  return null;
+}
+
+/**
+ * Checks whether a given storage path belongs to an immutable shared template.
+ */
+function isProtectedTemplate(storagePath) {
+  if (!storagePath || typeof storagePath !== "string") return false;
+  const lower = storagePath.toLowerCase().trim();
+  return lower.startsWith("templates/") ||
+         lower.includes("templates/blank_a4.pdf") ||
+         lower.includes("templates/mimo_graph.pdf");
+}
+
+/**
+ * Extracts and deduplicates all potential storage paths associated with a print job document.
+ */
+function discoverStoragePaths(data, bucketName) {
+  const paths = new Set();
+  const add = (urlOrPath) => {
+    const p = extractStoragePath(urlOrPath, bucketName);
+    if (p) paths.add(p);
+  };
+
+  if (data.fileUrl) add(data.fileUrl);
+  if (data.originalFileUrl) add(data.originalFileUrl);
+  if (data.originalUrl) add(data.originalUrl);
+  if (data.convertedStoragePath) add(data.convertedStoragePath);
+
+  if (Array.isArray(data.files)) {
+    for (const f of data.files) {
+      if (!f || typeof f !== "object") continue;
+      if (f.url) add(f.url);
+      if (f.originalFileUrl) add(f.originalFileUrl);
+      if (f.originalUrl) add(f.originalUrl);
+      if (f.convertedStoragePath) add(f.convertedStoragePath);
+    }
+  }
+
+  return Array.from(paths);
+}
+
+/**
+ * Resolves the authoritative retention start timestamp, applying canonical fallback for legacy records.
+ */
+function getRetentionStartTime(data) {
+  if (data.retentionStartAt) {
+    const d = data.retentionStartAt.toDate ? data.retentionStartAt.toDate() : new Date(data.retentionStartAt);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // Audited fallback ordering for legacy records lacking retentionStartAt
+  const fallbacks = [data.codeCreatedAt, data.paymentTime, data.uploadedAt, data.createdAt];
+  for (const fb of fallbacks) {
+    if (fb) {
+      const d = fb.toDate ? fb.toDate() : new Date(fb);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Checks if another active job (pending, paid, printing) still references this storage path globally across all users.
+ */
+async function isStoragePathReferencedByOtherActiveJob(db, filePath, excludeJobId, _userId) {
+  const activeSnapshot = await db.collection("print_jobs")
+    .where("status", "in", ["pending", "paid", "printing"])
+    .get();
+
+  const matchesPath = (candidate) => {
+    if (!candidate || typeof candidate !== "string") return false;
+    try {
+      if (candidate.includes(filePath)) return true;
+      if (decodeURIComponent(candidate).includes(filePath)) return true;
+      if (candidate.includes(encodeURIComponent(filePath))) return true;
+    } catch (_) {}
+    return false;
+  };
+
+  for (const oDoc of activeSnapshot.docs) {
+    if (oDoc.id === excludeJobId) continue;
+    const oData = oDoc.data();
+    if (oData.fileDeleted === true) continue;
+
+    if (matchesPath(oData.fileUrl)) return true;
+    if (matchesPath(oData.originalFileUrl)) return true;
+    if (matchesPath(oData.originalUrl)) return true;
+    if (matchesPath(oData.convertedStoragePath)) return true;
+
+    if (Array.isArray(oData.files)) {
+      for (const f of oData.files) {
+        if (!f || typeof f !== "object") continue;
+        if (matchesPath(f.url)) return true;
+        if (matchesPath(f.originalFileUrl)) return true;
+        if (matchesPath(f.originalUrl)) return true;
+        if (matchesPath(f.convertedStoragePath)) return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+exports.scheduledFileRetentionCleanup = onSchedule(
+  {
+    schedule: "every 1 hours",
+    timeZone: "Asia/Kolkata",
+    timeoutSeconds: 300,
+    maxInstances: 1,
+  },
+  async (event) => {
+    console.log(`[RETENTION CLEANUP] Run started at ${new Date().toISOString()}`);
+
+    const bucket = admin.storage().bucket();
+    const nowMs = Date.now();
+    const RETENTION_MS = 24 * 60 * 60 * 1000;
+    const LEASE_MS = 15 * 60 * 1000; // 15-minute recoverable lease
+    const cutoffDate = new Date(nowMs - RETENTION_MS);
+    const cutoffTimestamp = admin.firestore.Timestamp.fromDate(cutoffDate);
+
+    const PAGE_SIZE = 100;
+    const MAX_CANDIDATES_TOTAL = 200;
+    const candidateMap = new Map();
+
+    async function fetchCandidatesForField(fieldName) {
+      let lastDoc = null;
+      let pagesRead = 0;
+      const MAX_PAGES = 5;
+
+      while (pagesRead < MAX_PAGES && candidateMap.size < MAX_CANDIDATES_TOTAL) {
+        let query = db.collection("print_jobs")
+          .where(fieldName, "<", cutoffTimestamp)
+          .orderBy(fieldName, "asc")
+          .limit(PAGE_SIZE);
+
+        if (lastDoc) {
+          query = query.startAfter(lastDoc);
+        }
+
+        const snap = await query.get();
+        pagesRead++;
+
+        if (snap.empty) break;
+
+        for (const doc of snap.docs) {
+          const d = doc.data();
+          if (d.fileDeleted === true) continue;
+          if (!candidateMap.has(doc.id)) {
+            candidateMap.set(doc.id, doc);
+            if (candidateMap.size >= MAX_CANDIDATES_TOTAL) break;
+          }
+        }
+
+        lastDoc = snap.docs[snap.docs.length - 1];
+        if (snap.docs.length < PAGE_SIZE) break;
+      }
+    }
+
+    try {
+      // 1. Primary candidate stream: retentionStartAt
+      await fetchCandidatesForField("retentionStartAt");
+
+      // 2. Fallback candidate streams for legacy jobs (if ceiling not reached)
+      if (candidateMap.size < MAX_CANDIDATES_TOTAL) {
+        await fetchCandidatesForField("codeCreatedAt");
+      }
+      if (candidateMap.size < MAX_CANDIDATES_TOTAL) {
+        await fetchCandidatesForField("paymentTime");
+      }
+      if (candidateMap.size < MAX_CANDIDATES_TOTAL) {
+        await fetchCandidatesForField("uploadedAt");
+      }
+      if (candidateMap.size < MAX_CANDIDATES_TOTAL) {
+        await fetchCandidatesForField("createdAt");
+      }
+
+      console.log(`[RETENTION CLEANUP] Found ${candidateMap.size} unique candidates older than 24h.`);
+
+      let processedCount = 0;
+      let cleanedCount = 0;
+      let skippedProtectedCount = 0;
+      let leaseLockedCount = 0;
+      let failedCount = 0;
+
+      for (const [jobId, docSnapshot] of candidateMap.entries()) {
+        processedCount++;
+        const docRef = db.collection("print_jobs").doc(jobId);
+
+        let leaseAcquired = false;
+        let freshData = null;
+
+        // Atomic recoverable lease claim with race protections
+        try {
+          await db.runTransaction(async (transaction) => {
+            const freshDoc = await transaction.get(docRef);
+            if (!freshDoc.exists) return;
+            const data = freshDoc.data();
+
+            // Guard: Already deleted
+            if (data.fileDeleted === true) return;
+
+            // Guard: Hard-protected active states
+            if (["printing", "pending_conversion", "processing"].includes(data.status)) return;
+
+            // Guard: Active print 30-minute buffer
+            if (data.printStartedAt) {
+              const printStartedDate = data.printStartedAt.toDate ? data.printStartedAt.toDate() : new Date(data.printStartedAt);
+              if (!isNaN(printStartedDate.getTime()) && (Date.now() - printStartedDate.getTime() < 30 * 60 * 1000)) {
+                return;
+              }
+            }
+
+            // Guard: Authoritative retention deadline
+            const startTime = getRetentionStartTime(data);
+            if (!startTime || (Date.now() - startTime.getTime() < RETENTION_MS)) {
+              return;
+            }
+
+            // Guard: Recoverable Lease check
+            const currentMs = Date.now();
+            if (data.cleanupLeaseExpiresAt) {
+              const leaseExpires = data.cleanupLeaseExpiresAt.toDate ? data.cleanupLeaseExpiresAt.toDate() : new Date(data.cleanupLeaseExpiresAt);
+              if (leaseExpires.getTime() > currentMs && data.cleanupState === "claiming") {
+                return;
+              }
+            }
+
+            // Atomically acquire lease
+            const leaseExpiresTimestamp = admin.firestore.Timestamp.fromDate(new Date(currentMs + LEASE_MS));
+            transaction.update(docRef, {
+              cleanupState: "claiming",
+              cleanupLeaseExpiresAt: leaseExpiresTimestamp,
+              cleanupClaimedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            leaseAcquired = true;
+            freshData = data;
+          });
+        } catch (txnErr) {
+          console.error(`[RETENTION CLEANUP] Transaction error claiming lease for ${jobId}:`, txnErr.message);
+          failedCount++;
+          continue;
+        }
+
+        if (!leaseAcquired || !freshData) {
+          leaseLockedCount++;
+          continue;
+        }
+
+        // Discover and normalize all storage paths
+        const storagePaths = discoverStoragePaths(freshData, bucket.name);
+        let allSucceeded = true;
+        let failureError = null;
+
+        for (const p of storagePaths) {
+          // Pre-deletion defense-in-depth re-read of latest job document
+          const latestDocSnap = await docRef.get();
+          if (!latestDocSnap.exists) {
+            console.log(`[RETENTION CLEANUP] Job ${jobId} was deleted, aborting file cleanup`);
+            allSucceeded = false;
+            break;
+          }
+          const latestData = latestDocSnap.data();
+
+          // Hard abort if job became active in the interim
+          if (["printing", "pending_conversion", "processing"].includes(latestData.status)) {
+            console.log(`[RETENTION CLEANUP] Aborting cleanup for ${jobId}: job became ${latestData.status}`);
+            allSucceeded = false;
+            break;
+          }
+
+          // Verify lease still belongs to this cleanup operation and has not expired
+          const nowCheckMs = Date.now();
+          const leaseExpires = latestData.cleanupLeaseExpiresAt
+            ? (latestData.cleanupLeaseExpiresAt.toDate ? latestData.cleanupLeaseExpiresAt.toDate().getTime() : new Date(latestData.cleanupLeaseExpiresAt).getTime())
+            : 0;
+          if (latestData.cleanupState !== "claiming" || leaseExpires <= nowCheckMs) {
+            console.log(`[RETENTION CLEANUP] Aborting cleanup for ${jobId}: lease expired or superseded`);
+            allSucceeded = false;
+            break;
+          }
+
+          // Template protection guard immediately before physical deletion
+          if (isProtectedTemplate(p)) {
+            console.log(`[RETENTION CLEANUP] Protected template skipped: ${p} for job ${jobId}`);
+            continue;
+          }
+
+          // Active cross-job reference check
+          const isReferenced = await isStoragePathReferencedByOtherActiveJob(db, p, jobId);
+          if (isReferenced) {
+            console.log(`[RETENTION CLEANUP] Preserving active referenced path: ${p} for job ${jobId}`);
+            continue;
+          }
+
+          // Physical GCS deletion
+          try {
+            await bucket.file(p).delete();
+            console.log(`[RETENTION CLEANUP] Deleted GCS object: ${p} for job ${jobId}`);
+          } catch (delErr) {
+            if (delErr.code === 404) {
+              console.log(`[RETENTION CLEANUP] Object already gone (404): ${p} for job ${jobId}`);
+            } else {
+              console.error(`[RETENTION CLEANUP ERROR] Could not delete ${p} for job ${jobId}:`, delErr.message);
+              allSucceeded = false;
+              failureError = delErr.message;
+            }
+          }
+        }
+
+        if (allSucceeded) {
+          const updatePayload = {
+            fileDeleted: true,
+            fileDeletedAt: admin.firestore.FieldValue.serverTimestamp(),
+            cleanupState: "completed",
+            cleanupLeaseExpiresAt: admin.firestore.FieldValue.delete()
+          };
+
+          // Validated state transitions:
+          if (freshData.status === "paid") {
+            updatePayload.status = "expired";
+            updatePayload.printerStatus = "Expired (Files Purged)";
+          } else if (freshData.status === "pending") {
+            updatePayload.status = "abandoned";
+            updatePayload.abandonedAt = admin.firestore.FieldValue.serverTimestamp();
+          }
+
+          try {
+            await docRef.update(updatePayload);
+            cleanedCount++;
+            console.log(`[RETENTION CLEANUP] Successfully completed job ${jobId}: fileDeleted=true`);
+          } catch (updateErr) {
+            console.error(`[RETENTION CLEANUP ERROR] Failed updating Firestore for ${jobId}:`, updateErr.message);
+            failedCount++;
+          }
+        } else {
+          // Allow retry on future invocation once lease expires
+          try {
+            const freshDocAfterAbort = await docRef.get();
+            const freshDataAfterAbort = freshDocAfterAbort.data() || {};
+            // Only record failed cleanupState if the job did not actively transition to printing or completed
+            if (!["printing", "completed"].includes(freshDataAfterAbort.status)) {
+              await docRef.update({
+                cleanupState: "failed",
+                cleanupError: failureError || "Cleanup aborted or partial deletion failure"
+              });
+            }
+          } catch (_) {}
+          failedCount++;
+        }
+      }
+
+      console.log(`[RETENTION CLEANUP] Run complete. Processed: ${processedCount}, Cleaned: ${cleanedCount}, LeaseLocked/Skipped: ${leaseLockedCount}, Failures: ${failedCount}`);
+    } catch (queryErr) {
+      console.error("[RETENTION CLEANUP CRITICAL ERROR] Query execution failed:", queryErr);
     }
   }
 );
