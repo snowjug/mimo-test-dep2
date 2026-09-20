@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test __tests__/*.test.js",
+    "test:sync": "node --test __tests__/kioskSyncContract.test.js",
+    "predeploy:check": "npm test"
   },
   "keywords": [],
   "author": "",
