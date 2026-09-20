@@ -118,7 +118,7 @@ export function HackathonBanner() {
                 </div>
                 <div className="leading-tight">
                   <p className="text-[6.5px] sm:text-[10px] font-bold text-red-500 uppercase tracking-wider leading-none">Date</p>
-                  <p className="text-[8.5px] sm:text-sm font-extrabold text-slate-800 leading-tight">October 08, 2026</p>
+                  <p className="text-[8.5px] sm:text-sm font-extrabold text-slate-800 leading-tight">October 09, 2026</p>
                 </div>
               </div>
 
