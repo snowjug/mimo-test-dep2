@@ -616,7 +616,6 @@ app.get("/print-history", authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const snapshot = await db.collection("print_jobs")
       .where("userId", "==", userId)
-      .orderBy("createdAt", "desc")
       .get();
       
     const history = snapshot.docs
@@ -645,6 +644,8 @@ app.get("/print-history", authenticateToken, async (req, res) => {
       if (opts.doubleSided === 'double') details += ' • 2-Sided';
       else details += ' • 1-Sided';
 
+      const createdAtTime = data.createdAt?.toDate ? data.createdAt.toDate().getTime() : (data.createdAt ? new Date(data.createdAt).getTime() : 0);
+
       return {
         id: doc.id,
         printCode: data.printCode || "-",
@@ -657,11 +658,12 @@ app.get("/print-history", authenticateToken, async (req, res) => {
         colorMode,
         copies,
         details,
+        createdAtTime,
         date: data.createdAt?.toDate
           ? new Date(data.createdAt.toDate()).toISOString()
-          : new Date().toISOString(),
+          : (data.createdAt ? new Date(data.createdAt).toISOString() : new Date().toISOString()),
       };
-    });
+    }).sort((a, b) => b.createdAtTime - a.createdAtTime);
     
     res.json(history);
   } catch (err) {

@@ -6,7 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { MimoCoinsDisplay } from "../components/mimo-coins-display";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Upload, FileText, X, Printer, CheckCircle, AlertCircle, ImageIcon, History, Layers, Wallet, FileIcon, Grid3X3, Loader2, QrCode, FileCheck, ArrowRight } from "lucide-react";
+import { Upload, FileText, X, Printer, CheckCircle, AlertCircle, ImageIcon, History, Layers, Wallet, FileIcon, Grid3X3, Loader2, QrCode, FileCheck, ArrowRight, Copy, Clock } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { HackathonBanner } from "../components/HackathonBanner";
@@ -21,6 +21,21 @@ interface UploadedFile {
   status: "uploading" | "completed" | "failed";
   progress: number;
   pageCount?: number;
+}
+
+interface ActivePrintCodeJob {
+  id: string;
+  printCode: string;
+  status: string;
+  printerStatus?: string;
+  file?: string;
+  colorMode?: string;
+  copies?: number;
+  pageCount?: number;
+  details?: string;
+  cost?: string;
+  date?: string;
+  isPrinted?: boolean;
 }
 
 const estimateDocxPages = async (file: File): Promise<number> => {
@@ -303,6 +318,67 @@ export function UploadFile() {
   const [userStats, setUserStats] = useState({ totalDocs: 0, totalPages: 0, totalSpent: 0 });
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [activePrintCodes, setActivePrintCodes] = useState<ActivePrintCodeJob[]>([]);
+
+  const fetchActiveCodes = async () => {
+    try {
+      const historyRes = await api.get("/print-history");
+      if (Array.isArray(historyRes.data)) {
+        const now = Date.now();
+        const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+        const unused = historyRes.data.filter((job: any) => {
+          if (job.status !== "paid" || !job.printCode || job.printCode === "-" || job.isPrinted === true) {
+            return false;
+          }
+
+          // Calculate creation timestamp in ms from createdAtTime or ISO date string
+          const jobTimestamp = typeof job.createdAtTime === "number" && job.createdAtTime > 0
+            ? job.createdAtTime
+            : job.date
+            ? new Date(job.date).getTime()
+            : 0;
+
+          if (!jobTimestamp || isNaN(jobTimestamp)) {
+            return false;
+          }
+
+          // Retain for a maximum of 24 hours from creation
+          const ageMs = now - jobTimestamp;
+          return ageMs >= 0 && ageMs <= TWENTY_FOUR_HOURS_MS;
+        });
+
+        setActivePrintCodes(unused);
+      }
+    } catch (err) {
+      // Ignore background errors
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveCodes();
+
+    const handleFocus = () => {
+      fetchActiveCodes();
+    };
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
+  // Poll every 10 seconds while active unused codes exist
+  useEffect(() => {
+    if (activePrintCodes.length === 0) return;
+
+    const intervalId = setInterval(() => {
+      fetchActiveCodes();
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [activePrintCodes.length]);
 
   useEffect(() => {
     const storedName = localStorage.getItem("mimo_user_name");
@@ -748,6 +824,119 @@ export function UploadFile() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Active Print Codes (Ready to Print) */}
+        {activePrintCodes.length > 0 && (
+          <Card className="border border-blue-200/80 shadow-md bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/50 backdrop-blur-xl rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <CardHeader className="p-4 sm:p-5 pb-2 sm:pb-3 border-b border-blue-100/70">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#093765] text-white flex items-center justify-center shadow-xs">
+                    <Printer className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base sm:text-lg font-extrabold text-[#093765] tracking-tight">
+                      Active Print Codes
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-500 font-medium">
+                      Enter code at the kiosk or scan QR to collect prints
+                    </CardDescription>
+                  </div>
+                </div>
+                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                  {activePrintCodes.length} Ready to Print
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-3 sm:p-5 space-y-3">
+              {activePrintCodes.map((job) => {
+                const isColor = job.colorMode === "color" || (job.details && job.details.toLowerCase().includes("color"));
+                const pageText = job.pageCount
+                  ? `${job.pageCount} ${job.pageCount === 1 ? "page" : "pages"}`
+                  : job.details
+                  ? job.details.split("•")[0].trim()
+                  : "1 page";
+                const copies = job.copies || 1;
+                const formattedDate = job.date
+                  ? new Date(job.date).toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : null;
+
+                return (
+                  <div
+                    key={job.id || job.printCode}
+                    className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200/90 shadow-xs hover:shadow-sm hover:border-blue-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4"
+                  >
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                      <div
+                        className="cursor-pointer group flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded-xl px-3 py-1.5 shrink-0 transition-colors"
+                        title="Click to copy code"
+                        onClick={() => {
+                          navigator.clipboard.writeText(job.printCode);
+                          toast.success(`Print code ${job.printCode} copied!`);
+                        }}
+                      >
+                        <span className="font-mono text-xl sm:text-2xl font-black text-[#093765] tracking-widest">
+                          {job.printCode}
+                        </span>
+                        <Copy className="w-3.5 h-3.5 text-blue-500 group-hover:text-blue-700 transition-colors" />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-800 truncate" title={job.file || "Document"}>
+                          {job.file || "Document"}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
+                          <span>{pageText}</span>
+                          <span className="w-1 h-1 rounded-full bg-slate-300" />
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] sm:text-xs font-semibold px-2 py-0.2 rounded-md ${
+                              isColor
+                                ? "bg-purple-100 text-purple-800 border border-purple-200"
+                                : "bg-slate-100 text-slate-700 border border-slate-200"
+                            }`}
+                          >
+                            {isColor ? "Color" : "B&W"}
+                          </Badge>
+                          {copies > 1 && (
+                            <>
+                              <span className="w-1 h-1 rounded-full bg-slate-300" />
+                              <span>{copies} copies</span>
+                            </>
+                          )}
+                          {formattedDate && (
+                            <>
+                              <span className="w-1 h-1 rounded-full bg-slate-300" />
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-slate-400" />
+                                {formattedDate}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <div className="mt-1.5">
+                          {isColor ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-2 py-0.5">
+                              Available on MIMO 2.0 only
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-md px-2 py-0.5">
+                              Available on MIMO 1.0 &amp; MIMO 2.0
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Hackathon Event Spotlight Banner */}
         <HackathonBanner />
