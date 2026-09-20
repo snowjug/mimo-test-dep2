@@ -827,28 +827,28 @@ export function UploadFile() {
 
         {/* Active Print Codes (Ready to Print) */}
         {activePrintCodes.length > 0 && (
-          <Card className="border border-blue-200/80 shadow-md bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/50 backdrop-blur-xl rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <CardHeader className="p-4 sm:p-5 pb-2 sm:pb-3 border-b border-blue-100/70">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-[#093765] text-white flex items-center justify-center shadow-xs">
-                    <Printer className="w-4 h-4" />
+          <Card className="gap-0 border border-blue-200/80 shadow-md bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/50 backdrop-blur-xl rounded-xl sm:rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <CardHeader className="p-2 sm:p-5 pb-1.5 sm:pb-3 border-b border-blue-100/70 block">
+              <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
+                  <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-md sm:rounded-xl bg-[#093765] text-white flex items-center justify-center shadow-xs shrink-0">
+                    <Printer className="w-3 h-3 sm:w-4 sm:h-4" />
                   </div>
-                  <div>
-                    <CardTitle className="text-base sm:text-lg font-extrabold text-[#093765] tracking-tight">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-xs sm:text-lg font-extrabold text-[#093765] tracking-tight leading-none truncate">
                       Active Print Codes
                     </CardTitle>
-                    <CardDescription className="text-xs text-slate-500 font-medium">
-                      Enter code at the kiosk or scan QR to collect prints
+                    <CardDescription className="text-[9.5px] sm:text-xs text-slate-500 font-medium leading-tight truncate mt-0.5">
+                      Enter code at the kiosk to collect prints
                     </CardDescription>
                   </div>
                 </div>
-                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 text-[9px] sm:text-xs font-bold px-1.5 sm:px-2.5 py-0.5 rounded-full shrink-0 whitespace-nowrap leading-none">
                   {activePrintCodes.length} Ready to Print
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="p-3 sm:p-5 space-y-3">
+            <CardContent className="p-1.5 sm:p-5 pt-1.5 sm:pt-5 space-y-1 sm:space-y-3 [&:last-child]:pb-1.5 sm:[&:last-child]:pb-5">
               {activePrintCodes.map((job) => {
                 const isColor = job.colorMode === "color" || (job.details && job.details.toLowerCase().includes("color"));
                 const pageText = job.pageCount
@@ -868,33 +868,33 @@ export function UploadFile() {
                 return (
                   <div
                     key={job.id || job.printCode}
-                    className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200/90 shadow-xs hover:shadow-sm hover:border-blue-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4"
+                    className="p-1.5 sm:p-4 rounded-lg sm:rounded-xl bg-white border border-slate-200/90 shadow-xs hover:shadow-sm hover:border-blue-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4"
                   >
-                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                       <div
-                        className="cursor-pointer group flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded-xl px-3 py-1.5 shrink-0 transition-colors"
+                        className="cursor-pointer group flex items-center gap-1 sm:gap-1.5 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded-md sm:rounded-xl px-2 py-1 sm:px-3 sm:py-1.5 shrink-0 transition-colors"
                         title="Click to copy code"
                         onClick={() => {
                           navigator.clipboard.writeText(job.printCode);
                           toast.success(`Print code ${job.printCode} copied!`);
                         }}
                       >
-                        <span className="font-mono text-xl sm:text-2xl font-black text-[#093765] tracking-widest">
+                        <span className="font-mono text-sm sm:text-2xl font-black text-[#093765] tracking-wider sm:tracking-widest">
                           {job.printCode}
                         </span>
-                        <Copy className="w-3.5 h-3.5 text-blue-500 group-hover:text-blue-700 transition-colors" />
+                        <Copy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500 group-hover:text-blue-700 transition-colors" />
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-800 truncate" title={job.file || "Document"}>
+                        <p className="text-xs sm:text-sm font-bold text-slate-800 truncate leading-tight" title={job.file || "Document"}>
                           {job.file || "Document"}
                         </p>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
+                        <div className="flex items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-slate-500 flex-wrap leading-none">
                           <span>{pageText}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300" />
                           <Badge
                             variant="secondary"
-                            className={`text-[10px] sm:text-xs font-semibold px-2 py-0.2 rounded-md ${
+                            className={`text-[9px] sm:text-xs font-semibold px-1 sm:px-2 py-0 sm:py-0.2 rounded leading-none ${
                               isColor
                                 ? "bg-purple-100 text-purple-800 border border-purple-200"
                                 : "bg-slate-100 text-slate-700 border border-slate-200"
@@ -911,20 +911,20 @@ export function UploadFile() {
                           {formattedDate && (
                             <>
                               <span className="w-1 h-1 rounded-full bg-slate-300" />
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-slate-400" />
+                              <span className="flex items-center gap-0.5">
+                                <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400" />
                                 {formattedDate}
                               </span>
                             </>
                           )}
-                        </div>
-                        <div className="mt-1.5">
+                          <span className="w-1 h-1 rounded-full bg-slate-300 hidden sm:inline-block" />
+                          <span className="sm:hidden block w-full" />
                           {isColor ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-2 py-0.5">
+                            <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded px-1 sm:px-2 py-0.2 sm:py-0.5">
                               Available on MIMO 2.0 only
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-md px-2 py-0.5">
+                            <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded px-1 sm:px-2 py-0.2 sm:py-0.5">
                               Available on MIMO 1.0 &amp; MIMO 2.0
                             </span>
                           )}
