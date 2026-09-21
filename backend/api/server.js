@@ -815,7 +815,7 @@ app.post("/payment-success", authenticateToken, async (req, res) => {
         const sheetType = storedPrintOptions.sheetType || "a4";
         const totalPages = Number(storedPrintOptions.totalPages || 1);
         const fileName = sheetType === "graph" ? "mimo_graph.pdf" : "blank_a4.pdf";
-        const pricePerPage = sheetType === "graph" ? 2.00 : 2.30;
+        const pricePerPage = sheetType === "graph" ? 2.00 : 2.80;
 
         console.log(`[PAYMENT-SUCCESS] Creating virtual print_job for blank sheet (${sheetType}), ${totalPages} pages, userId: ${userId}`);
 
@@ -1302,7 +1302,7 @@ app.post("/create-blank-job", authenticateToken, async (req, res, next) => {
       pageCount: parsedPageCount, // Used for stats and logic
       files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
       printOptions: { copies: parsedPageCount, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
-      pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: parsedPageCount },
+      pricing: { pricePerPage: isGraph ? 2.0 : 2.80, totalPages: parsedPageCount },
       paymentStatus: { status: "pending" },
       printStatus: { status: "pending" }
     });
@@ -1380,7 +1380,7 @@ app.get("/api/settings", async (req, res) => {
     if (doc.exists) {
       res.json(doc.data());
     } else {
-      res.json({ pricePerPageBW: 2.30, pricePerPageColor: 10.00, pricePerPageA4: 2.30, pricePerPageGraph: 2.00 });
+      res.json({ pricePerPageBW: 2.80, pricePerPageColor: 10.00, pricePerPageA4: 2.80, pricePerPageBWDuplex: 3.30, pricePerPageGraph: 2.00 });
     }
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1454,11 +1454,13 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     const isBlankSheet = printOptions?.isBlankSheet === true;
     const sheetType = printOptions?.sheetType || "a4";
     
-    let pricePerPage = 2.30; // Default A4 BW
+    let pricePerPage = 2.80; // Default A4 BW simplex
     if (colorMode === "color") {
       pricePerPage = 10.00;
     } else if (isBlankSheet && sheetType === "graph") {
       pricePerPage = 2.00;
+    } else if (printOptions?.doubleSided === "double" || printOptions?.duplex === true) {
+      pricePerPage = 3.30; // B&W duplex rate
     }
     const copies = Number(printOptions?.copies || 1);
 
@@ -3146,7 +3148,7 @@ app.get("/admin/metrics", authenticateAdmin, async (req, res) => {
 app.get("/admin/settings", authenticateAdmin, async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("pricing").get();
-    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00 });
+    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.80, pricePerPageColor: 10.00, pricePerPageBWDuplex: 3.30 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -3154,12 +3156,13 @@ app.get("/admin/settings", authenticateAdmin, async (req, res) => {
 
 app.post("/admin/settings", authenticateAdmin, async (req, res) => {
   try {
-    const { pricePerPageBW, pricePerPageColor, pricePerPageA4, pricePerPageGraph } = req.body;
+    const { pricePerPageBW, pricePerPageColor, pricePerPageA4, pricePerPageGraph, pricePerPageBWDuplex } = req.body;
     const updateData = {};
     if (pricePerPageBW !== undefined) updateData.pricePerPageBW = Number(pricePerPageBW);
     if (pricePerPageColor !== undefined) updateData.pricePerPageColor = Number(pricePerPageColor);
     if (pricePerPageA4 !== undefined) updateData.pricePerPageA4 = Number(pricePerPageA4);
     if (pricePerPageGraph !== undefined) updateData.pricePerPageGraph = Number(pricePerPageGraph);
+    if (pricePerPageBWDuplex !== undefined) updateData.pricePerPageBWDuplex = Number(pricePerPageBWDuplex);
 
     await db.collection("mimo_settings").doc("pricing").set(updateData, { merge: true });
     res.json({ success: true });

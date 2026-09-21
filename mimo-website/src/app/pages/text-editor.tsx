@@ -21,7 +21,7 @@ export function TextEditor() {
   const [copies, setCopies] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const [pricePerPage, setPricePerPage] = useState(2.30); // Dynamic from settings
+  const [pricePerPage, setPricePerPage] = useState(2.80); // Dynamic from settings
 
   useEffect(() => {
     api.get('/api/settings')
