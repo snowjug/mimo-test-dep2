@@ -3568,6 +3568,105 @@ exports.scheduledFileRetentionCleanup = onSchedule(
   }
 );
 
+// ================= GMAIL: COLOUR PAPER USAGE NOTIFICATION =================
+exports.colourPaperUsageNotification = onDocumentUpdated(
+  {
+    document: "print_jobs/{jobId}",
+    secrets: ["GMAIL_APP_PASSWORD"],
+  },
+  async (event) => {
+    try {
+      const before = event.data.before.data() || {};
+      const after = event.data.after.data() || {};
 
+      // Run only when a print job becomes completed
+      if (before.status === "completed" || after.status !== "completed") {
+        return;
+      }
 
+      // Only colour printing jobs
+      const colorMode = String(after.colorMode || "").toLowerCase();
 
+      if (colorMode !== "color" && colorMode !== "colour") {
+        return;
+      }
+
+      // Actual physical sheets used by this job
+      const sheetsUsed = Number(after.paperSheetsUsed);
+
+      if (!Number.isFinite(sheetsUsed) || sheetsUsed <= 0) {
+        return;
+      }
+
+      const usageRef = db
+        .collection("printer_usage")
+        .doc("SV-002-COLOR");
+
+      let milestone = null;
+      let totalSheets = 0;
+
+      await db.runTransaction(async (transaction) => {
+        const snap = await transaction.get(usageRef);
+        const data = snap.exists ? snap.data() : {};
+
+        const previousTotal = Number(data.totalSheets) || 0;
+        const previousMilestone = Number(data.lastAlertMilestone) || 0;
+
+        totalSheets = previousTotal + sheetsUsed;
+
+        const newMilestone = Math.floor(totalSheets / 50) * 50;
+
+        if (newMilestone > previousMilestone) {
+          milestone = newMilestone;
+        }
+
+        transaction.set(
+          usageRef,
+          {
+            totalSheets: totalSheets,
+            lastAlertMilestone: milestone || previousMilestone,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      });
+
+      if (!milestone) {
+        console.log(
+          `[EMAIL] Colour usage: ${totalSheets} sheets. No 50-sheet milestone.`
+        );
+        return;
+      }
+
+      if (!process.env.GMAIL_APP_PASSWORD) {
+        console.error("[EMAIL] GMAIL_APP_PASSWORD is not configured.");
+        return;
+      }
+
+      const transporter = getTransporter();
+
+      await transporter.sendMail({
+        from: '"Mimo Printing" <visionprintt@gmail.com>',
+        to: "visionprintt@gmail.com",
+        subject: `MIMO Colour Paper Usage Alert - ${milestone} Pages`,
+        text:
+          `MIMO Colour Paper Usage Alert\n\n` +
+          `Printer: SV-002-COLOR\n` +
+          `Kiosk: SV-002 (MIMO 2.0)\n\n` +
+          `Total colour pages/sheets printed: ${totalSheets}\n` +
+          `Milestone reached: ${milestone}\n\n` +
+          `The colour printer has reached another 50-page usage milestone.`,
+      });
+
+      console.log(
+        `[EMAIL] Colour usage alert sent. Total: ${totalSheets}, milestone: ${milestone}`
+      );
+
+    } catch (err) {
+      console.error(
+        "[EMAIL] Failed to send colour paper usage notification:",
+        err.message || err
+      );
+    }
+  }
+);
