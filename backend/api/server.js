@@ -3213,8 +3213,8 @@ app.get("/admin/hardware", authenticateAdmin, async (req, res) => {
     const doc = await db.collection("hardware").doc("printers").get();
     if (!doc.exists) {
         const defaultData = {
-          "CV-001": { type: "bw", tonerLevel: 100, paperLevel: 500, status: "Online" },
-          "SV-002-COLOR": { type: "color", inkLevel: 100, paperLevel: 500, status: "Online" }
+         "CV-001": { type: "bw", tonerLevel: 100, paperLevel: 250, status: "Online" },
+         "SV-002-COLOR": { type: "color", inkLevel: 100, paperLevel: 100, status: "Online" }
         };
         await db.collection("hardware").doc("printers").set(defaultData);
         return res.json(defaultData);

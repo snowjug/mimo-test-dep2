@@ -750,7 +750,8 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {Object.entries(hardware).map(([kioskId, data]: any) => {
                 const consumableLevel = data.type === 'color' ? (data.inkLevel || 0) : (data.tonerLevel || 0);
-                const paperPct = Math.min(100, ((data.paperLevel || 0) / 5));
+                const paperCapacity = data.type === 'color' ? 100 : 250;
+                const paperPct = Math.min(100, ((data.paperLevel || 0) / paperCapacity) * 100);
 
                 return (
                   <div key={kioskId} className="bg-[#112F4B] rounded-xl border border-[#1A4971] shadow-sm overflow-hidden">
@@ -824,7 +825,7 @@ export default function AdminDashboard() {
                           </button>
                         )}
                         <button
-                          onClick={() => updateHardwareLevel(kioskId, { paperLevel: 500 })}
+                          onClick={() => updateHardwareLevel(kioskId, { paperLevel: paperCapacity })}
                           className="flex-1 bg-[#041E34] hover:bg-[#163C5D] text-[#6EE7B7] hover:text-white border border-[#1A4971] hover:border-[#6EE7B7] font-bold py-3 rounded-lg text-sm transition-all"
                         >
                           Add Paper

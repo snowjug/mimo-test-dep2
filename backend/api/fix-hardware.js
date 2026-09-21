@@ -13,21 +13,21 @@ async function run() {
     "CV-001": { 
       type: "bw", 
       tonerLevel: 100, 
-      paperLevel: 500, 
+      paperLevel: 250, 
       status: "Online",
       name: "Kiosk 001 (Boys Hostel)" 
     },
     "SV-002-BW": { 
       type: "bw", 
       tonerLevel: 100, 
-      paperLevel: 500, 
+      paperLevel: 250, 
       status: "Online",
       name: "Brother HL-L2440DW" 
     },
     "SV-002-COLOR": { 
       type: "color", 
       inkLevel: 100, 
-      paperLevel: 500, 
+      paperLevel: 100, 
       status: "Online",
       name: "Epson EcoTank L3250" 
     }
