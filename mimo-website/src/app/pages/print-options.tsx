@@ -155,7 +155,8 @@ export function PrintOptions() {
 
   const [totalPages, setTotalPages] = useState(0);
   const [baseTotalCost, setBaseTotalCost] = useState(0);
-  const [priceBW, setPriceBW] = useState(2.30);
+  const [priceBW, setPriceBW] = useState(2.80);
+  const [priceBWDuplex, setPriceBWDuplex] = useState(3.30);
   const [priceColor, setPriceColor] = useState(10.00);
   const [pricesLoaded, setPricesLoaded] = useState(false);
 
@@ -165,6 +166,7 @@ export function PrintOptions() {
         const response = await api.get('/api/settings');
         if (response.data) {
           if (response.data.pricePerPageBW) setPriceBW(response.data.pricePerPageBW);
+          if (response.data.pricePerPageBWDuplex) setPriceBWDuplex(response.data.pricePerPageBWDuplex);
           if (response.data.pricePerPageColor) setPriceColor(response.data.pricePerPageColor);
         }
       } catch (error) {
@@ -322,8 +324,8 @@ export function PrintOptions() {
   }
   const actualPages = doubleSided === "double" ? Math.ceil(sheetsNeeded / 2) : sheetsNeeded;
 
-  // Pricing: 3.00 Rs per double-sided sheet in B&W, otherwise standard price per sheet
-  const basePrice = colorMode === "bw" ? (doubleSided === "double" ? 3.00 : priceBW) : priceColor;
+  // Pricing: 3.30 Rs per double-sided sheet in B&W, otherwise standard price per sheet
+  const basePrice = colorMode === "bw" ? (doubleSided === "double" ? (priceBWDuplex || 3.30) : priceBW) : priceColor;
 
   const totalCost = actualPages * (Number(copies) || 1) * basePrice;
 

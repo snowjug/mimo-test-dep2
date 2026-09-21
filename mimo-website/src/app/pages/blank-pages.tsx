@@ -16,7 +16,7 @@ export function BlankPages() {
 
   const isGraph = type === "graph";
   const label = isGraph ? "Mimo Graph Sheet" : "A4 Blank Sheet";
-  const [pricePerPageA4, setPricePerPageA4] = useState(2.30);
+  const [pricePerPageA4, setPricePerPageA4] = useState(2.80);
   const [pricePerPageGraph, setPricePerPageGraph] = useState(2.00);
 
   useEffect(() => {
