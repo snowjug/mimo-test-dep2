@@ -58,8 +58,8 @@ export function UserProfile() {
         setPhone(profileRes.data.mobileNumber || "");
         setPhotoUrl(profileRes.data.photoUrl || null);
 
-        const settingsRes = await api.get("/api/settings").catch(() => ({ data: { pricePerPageBW: 2.3, pricePerPageColor: 10.0 } }));
-        const priceBW = settingsRes.data.pricePerPageBW || 2.3;
+        const settingsRes = await api.get("/api/settings").catch(() => ({ data: { pricePerPageBW: 2.8, pricePerPageColor: 10.0 } }));
+        const priceBW = settingsRes.data.pricePerPageBW || 2.8;
         const priceColor = settingsRes.data.pricePerPageColor || 10.0;
 
         const historyRes = await api.get("/print-history");

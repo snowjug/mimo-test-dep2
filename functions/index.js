@@ -397,7 +397,7 @@ app.get("/print-history", authMiddleware, async (req, res) => {
       const opts = data.printOptions || {};
       const colorMode = opts.colorMode || "bw";
       const copies = opts.copies || 1;
-      const cost = (data.pageCount || 0) * copies * (colorMode === "color" ? 9.2 : 2.3);
+      const cost = (data.pageCount || 0) * copies * (colorMode === "color" ? 10.00 : (opts.doubleSided === "double" ? 3.30 : 2.80));
       const createdAtTime = data.createdAt?.toDate ? data.createdAt.toDate().getTime() : 0;
       return {
         id: doc.id, printCode: data.printCode || "-", status: data.status,
@@ -762,7 +762,7 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
       pageCount: 1, // The physical PDF template is exactly 1 page. The quantity is controlled purely by 'copies'.
       files: [{ name: fileName, size: fileSize, type: "application/pdf", url: actualUrl }],
       printOptions: { copies: Number(pageCount) || 1, colorMode: "bw", layout: "single", duplexMode: "simplex", isBlankSheet: true, sheetType: type },
-      pricing: { pricePerPage: isGraph ? 2.0 : 2.30, totalPages: Number(pageCount) || 1 },
+      pricing: { pricePerPage: isGraph ? 2.0 : 2.80, totalPages: Number(pageCount) || 1 },
       paymentStatus: { status: "pending" },
       printStatus: { status: "pending" }
     });
@@ -908,7 +908,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     const sheetType = printOptions?.sheetType || "a4";
     const colorMode = printOptions?.colorMode || "bw";
 
-    let pricePerPage = 2.30;
+    let pricePerPage = 2.80; // Default A4 BW simplex
     if (colorMode === "color") {
       pricePerPage = 10.00;
     } else if (isBlankSheet && sheetType === "graph") {
@@ -1053,7 +1053,7 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     if (printOptions?.doubleSided === "double") {
       actualPages = Math.ceil(actualPages / 2);
       if (colorMode === "bw") {
-        pricePerPage = 3.00;
+        pricePerPage = 3.30;
       }
     }
 
@@ -1830,7 +1830,7 @@ app.get("/validate-coupon/:code", async (req, res) => {
 app.get("/api/settings", async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("pricing").get();
-    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00, pricePerPageA4: 2.30, pricePerPageGraph: 2.00 });
+    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.80, pricePerPageColor: 10.00, pricePerPageA4: 2.80, pricePerPageBWDuplex: 3.30, pricePerPageGraph: 2.00 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1857,7 +1857,7 @@ app.get("/api/screensaver", async (req, res) => {
 app.get("/admin/settings", adminAuthMiddleware, async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("pricing").get();
-    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.30, pricePerPageColor: 10.00, pricePerPageA4: 2.30, pricePerPageGraph: 2.00 });
+    res.json(doc.exists ? doc.data() : { pricePerPageBW: 2.80, pricePerPageColor: 10.00, pricePerPageA4: 2.80, pricePerPageBWDuplex: 3.30, pricePerPageGraph: 2.00 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1865,11 +1865,12 @@ app.get("/admin/settings", adminAuthMiddleware, async (req, res) => {
 
 app.post("/admin/settings", adminAuthMiddleware, async (req, res) => {
   try {
-    const { pricePerPageBW, pricePerPageColor, pricePerPageA4, pricePerPageGraph } = req.body;
+    const { pricePerPageBW, pricePerPageColor, pricePerPageA4, pricePerPageGraph, pricePerPageBWDuplex } = req.body;
     await db.collection("mimo_settings").doc("pricing").set({
       pricePerPageBW: Number(pricePerPageBW),
       pricePerPageColor: Number(pricePerPageColor),
-      pricePerPageA4: Number(pricePerPageA4 || 2.30),
+      pricePerPageA4: Number(pricePerPageA4 || 2.80),
+      pricePerPageBWDuplex: Number(pricePerPageBWDuplex || 3.30),
       pricePerPageGraph: Number(pricePerPageGraph || 2.00)
     }, { merge: true });
     res.json({ success: true });
@@ -2394,7 +2395,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
             // MIMO V2 (SV-002 / pi@pi) has both options
             await sessionRef.update({ state: "awaiting_color", destination: "SV-002", kioskId: "SV-002" });
             await sendWhatsAppButtons(from, "Please select Print Type:", [
-              { id: "color_bw", title: "⚫ B&W (₹2.30/pg)" },
+              { id: "color_bw", title: "⚫ B&W (₹2.80/pg)" },
               { id: "color_color", title: "🎨 Color (₹10.00/pg)" }
             ]);
           }
@@ -2537,7 +2538,7 @@ async function _askForCoupon(from, session, sessionRef, copies) {
   const pricingDoc = await db.collection("settings").doc("pricing").get();
   const pricing = pricingDoc.exists ? pricingDoc.data() : {};
 
-  const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageWAColor || pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageWABW || pricing.pricePerPageBW || 2.30);
+  const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageWAColor || pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageWABW || pricing.pricePerPageBW || 2.80);
 
   const pageCount = session.pageCount || 1;
   let totalAmount = Number((copies * pageCount * pricePerPage).toFixed(2));
