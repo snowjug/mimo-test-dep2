@@ -221,7 +221,7 @@ function createKioskRouter(dependencies) {
           // Capability-based Routing Validation inside transaction:
           // - Color jobs: ONLY allowed at MIMO 2.0 (SV-002)
           // - B&W jobs: allowed at EITHER MIMO 1.0 (CV-001) OR MIMO 2.0 (SV-002)
-          const isColor = querySnap.docs.some(doc => isColorJob ? isColorJob(doc.data()) : (doc.data().colorMode === "color"));
+          const isColor = isColorJob ? isColorJob(jobData) : (jobData.colorMode === "color");
 
           if (isColor) {
             if (kioskId !== "SV-002") {
