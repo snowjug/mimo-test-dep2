@@ -368,7 +368,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         if (data.status === 'completed' || data.isPrinted === true) {
           setPrintDone(true);
           // animateTo100AndComplete will be called via the printDone effect
-        } else if (data.status === 'failed') {
+        } else if (data.status === 'failed' || data.status === 'refunded') {
           const errMsg = data.printerStatus || data.error || 'Printer reported an error.';
           setStatusMsg(errMsg);
           clearAllTimers();
