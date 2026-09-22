@@ -1167,6 +1167,7 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
       });
 
       processedFiles.push({
+        clientUploadId: file.clientUploadId || null,
         jobId: jobRef.id,
         name: file.name,
         url: fileUrl,
@@ -1418,12 +1419,18 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     }
 
     // Retrieve and strictly validate every requested job document from Firestore
+    const seenJobIds = new Set();
     const targetJobs = [];
     for (const rawJobId of jobIds) {
       if (typeof rawJobId !== "string" || !rawJobId.trim()) {
         return res.status(400).json({ error: "Invalid jobId format in checkout selection." });
       }
       const jobId = rawJobId.trim();
+      if (seenJobIds.has(jobId)) {
+        return res.status(400).json({ error: `Duplicate jobId detected in checkout request: ${jobId}` });
+      }
+      seenJobIds.add(jobId);
+
       const doc = await db.collection("print_jobs").doc(jobId).get();
       if (!doc.exists) {
         return res.status(400).json({ error: `Print job not found: ${jobId}` });
