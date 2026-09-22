@@ -98,9 +98,10 @@ async function runDuplexTests() {
 
       // 4. Finalize Upload
       console.log("   [3/6] Finalizing upload (creating Firestore job)...");
-      await axios.post(`${API_URL}/finalize-upload`, {
+      const finalizeRes = await axios.post(`${API_URL}/finalize-upload`, {
         files: [{ ...signedUrlData, pageCount }]
       }, { headers: authHeader });
+      const jobIds = (finalizeRes.data?.files || []).map(f => f.jobId).filter(Boolean);
 
       // 5. Create Order to apply duplex printOptions to Firestore job
       console.log("   [4/6] Creating order with doubleSided: 'double' option...");
@@ -118,6 +119,7 @@ async function runDuplexTests() {
       };
 
       await axios.post(`${API_URL}/create-order`, {
+        jobIds,
         printOptions,
         couponCode: "ASDFG"
       }, { headers: authHeader });

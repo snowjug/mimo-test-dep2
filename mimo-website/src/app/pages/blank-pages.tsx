@@ -48,7 +48,7 @@ export function BlankPages() {
   const handleContinue = async () => {
     setIsProcessing(true);
     try {
-      await api.post("/create-blank-job", 
+      const blankRes = await api.post("/create-blank-job",
         { type, pageCount }
       );
 
@@ -74,6 +74,7 @@ export function BlankPages() {
         "printFiles",
         JSON.stringify([
           {
+            jobId: blankRes.data?.jobId,
             name: fileName,
             size: isGraph ? 1172734 : 9198,
             type: "application/pdf"
