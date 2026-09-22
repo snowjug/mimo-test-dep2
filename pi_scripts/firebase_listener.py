@@ -735,6 +735,7 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             "status": "completed",
                             "isPrinted": True,
                             "printerStatus": "Printed",
+                            "paperSheetsUsed": total_sheets,
                             "printedAt": firestore.SERVER_TIMESTAMP
                         })
                     else:
