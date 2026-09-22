@@ -61,9 +61,10 @@ export function TextEditor() {
       const fileData = response.data; // { name, url, type, size, pageCount }
 
       // 2. Finalize upload (creates print_jobs records in firestore with pending status)
-      await api.post("/finalize-upload", {
+      const finalizeRes = await api.post("/finalize-upload", {
         files: [fileData]
       });
+      const finalizedJob = finalizeRes.data?.files?.[0];
 
       // 3. Save options and file details to sessionStorage for payment flow
       sessionStorage.setItem(
@@ -86,6 +87,7 @@ export function TextEditor() {
         "printFiles",
         JSON.stringify([
           {
+            jobId: finalizedJob?.jobId,
             name: fileData.name,
             size: fileData.size,
             type: fileData.type,
