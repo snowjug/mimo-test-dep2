@@ -572,6 +572,7 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
 
       totalPages += resolvedPageCount;
       finalizedFiles.push({
+        clientUploadId: f.clientUploadId || null,
         name: f.name,
         url: printableFileUrl,
         originalUrl: originalFileUrl,
@@ -887,12 +888,18 @@ app.post("/create-order", authMiddleware, async (req, res) => {
     }
 
     // Retrieve and strictly validate every requested job document from Firestore
+    const seenJobIds = new Set();
     const targetJobs = [];
     for (const rawJobId of jobIds) {
       if (typeof rawJobId !== "string" || !rawJobId.trim()) {
         return res.status(400).json({ error: "Invalid jobId format in checkout selection." });
       }
       const jobId = rawJobId.trim();
+      if (seenJobIds.has(jobId)) {
+        return res.status(400).json({ error: `Duplicate jobId detected in checkout request: ${jobId}` });
+      }
+      seenJobIds.add(jobId);
+
       const doc = await db.collection("print_jobs").doc(jobId).get();
       if (!doc.exists) {
         return res.status(400).json({ error: `Print job not found: ${jobId}` });
