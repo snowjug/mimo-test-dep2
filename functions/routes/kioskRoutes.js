@@ -66,7 +66,7 @@ function createKioskRouter(dependencies) {
       // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
       const isColor = currentSessionDocs.some(d => isColorJob ? isColorJob(d) : (d.colorMode && d.colorMode.toLowerCase() === "color"));
       const hasStarted = currentSessionDocs.some(d =>
-        ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
+        ["printing", "completed", "printed", "failed", "refunded"].includes(d.status) || d.isPrinted === true
       );
 
       if (!hasStarted) {
@@ -132,7 +132,7 @@ function createKioskRouter(dependencies) {
       let failedDoc = null;
 
       currentSessionDocs.forEach((data) => {
-        if (data.status === "failed") {
+        if (data.status === "failed" || data.status === "refunded") {
           anyFailed = true;
           failedDoc = data;
         }
@@ -146,7 +146,7 @@ function createKioskRouter(dependencies) {
         const responsePayload = {
           status: "failed",
           isPrinted: false,
-          printerStatus: failedDoc ? (failedDoc.printerStatus || failedDoc.error || "Print failed") : "Print failed"
+          printerStatus: failedDoc ? (failedDoc.printerStatus || failedDoc.error || (failedDoc.status === "refunded" ? "Print refunded" : "Print failed")) : "Print failed"
         };
         return res.json(responsePayload);
       }
