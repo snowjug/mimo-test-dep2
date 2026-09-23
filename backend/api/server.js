@@ -1160,13 +1160,15 @@ app.post("/finalize-upload", authenticateToken, async (req, res, next) => {
         metadata: { ipAddress: req.ip || "", userAgent: req.get("user-agent") || "", tags: [] }
       };
 
-      await db.collection("print_jobs").add({
+      const jobRef = await db.collection("print_jobs").add({
         ...baseJobData,
         status: "pending",
         pageCount: resolvedPageCount,
       });
 
       processedFiles.push({
+        clientUploadId: file.clientUploadId || null,
+        jobId: jobRef.id,
         name: file.name,
         url: fileUrl,
         pageCount: resolvedPageCount,
@@ -1411,16 +1413,40 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     console.log(`[CREATE-ORDER] userId from token: ${userId}`);
     
-    const jobsSnapshot = await db
-      .collection("print_jobs")
-      .where("userId", "==", userId)
-      .where("status", "==", "pending")
-      .get();
-    
-    console.log(`[CREATE-ORDER] Found ${jobsSnapshot.size} pending jobs for userId: ${userId}`);
+    const { jobIds, printOptions, couponCode } = req.body;
+    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+      return res.status(400).json({ error: "Explicit non-empty jobIds array is required for checkout." });
+    }
 
-    const { printOptions, couponCode } = req.body;
-    if (jobsSnapshot.empty) return res.status(400).send("No pending jobs");
+    // Retrieve and strictly validate every requested job document from Firestore
+    const seenJobIds = new Set();
+    const targetJobs = [];
+    for (const rawJobId of jobIds) {
+      if (typeof rawJobId !== "string" || !rawJobId.trim()) {
+        return res.status(400).json({ error: "Invalid jobId format in checkout selection." });
+      }
+      const jobId = rawJobId.trim();
+      if (seenJobIds.has(jobId)) {
+        return res.status(400).json({ error: `Duplicate jobId detected in checkout request: ${jobId}` });
+      }
+      seenJobIds.add(jobId);
+
+      const doc = await db.collection("print_jobs").doc(jobId).get();
+      if (!doc.exists) {
+        return res.status(400).json({ error: `Print job not found: ${jobId}` });
+      }
+      const data = doc.data();
+      if (data.userId !== userId) {
+        return res.status(403).json({ error: `Unauthorized access to print job: ${jobId}` });
+      }
+      if (data.status !== "pending") {
+        return res.status(400).json({ error: `Print job ${jobId} is not in pending status (current status: ${data.status}).` });
+      }
+      if (data.removedByUser === true || data.fileDeleted === true) {
+        return res.status(400).json({ error: `Print job ${jobId} has been removed or deleted.` });
+      }
+      targetJobs.push(doc);
+    }
 
     // Validate coupon if provided
     let couponDiscount = 0;
@@ -1438,7 +1464,7 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     }
 
     const orderId = "order_" + Date.now();
-    const jobIds = [];
+    const orderedJobIds = [];
 
     const userDoc = await db.collection("users").doc(userId).get();
     const userData = userDoc.exists ? userDoc.data() : {};
@@ -1465,8 +1491,8 @@ app.post("/create-order", authenticateToken, async (req, res) => {
     const copies = Number(printOptions?.copies || 1);
 
     const batchUpdate = db.batch();
-    jobsSnapshot.forEach((doc) => {
-      jobIds.push(doc.id);
+    targetJobs.forEach((doc) => {
+      orderedJobIds.push(doc.id);
       const fileConfig = printOptions?.fileConfigs?.[doc.data().fileName];
       const originalPageCount = fileConfig?.pageCount || doc.data().pageCount || 0;
       let pages = originalPageCount;
