@@ -106,10 +106,9 @@ async function runTestPrints() {
 
       // 4. Finalize Upload
       console.log("   [3/6] Finalizing upload (creating Firestore job)...");
-      const finalizeRes = await axios.post(`${API_URL}/finalize-upload`, {
+      await axios.post(`${API_URL}/finalize-upload`, {
         files: [{ ...signedUrlData, pageCount }]
       }, { headers: authHeader });
-      const jobIds = (finalizeRes.data?.files || []).map(f => f.jobId).filter(Boolean);
 
       // 5. Create Order to apply printOptions (copies, colorMode) to Firestore job
       console.log("   [4/6] Creating order (saving print options)...");
@@ -126,7 +125,6 @@ async function runTestPrints() {
       };
 
       await axios.post(`${API_URL}/create-order`, {
-        jobIds,
         printOptions,
         couponCode: "ASDFG"
       }, { headers: authHeader });

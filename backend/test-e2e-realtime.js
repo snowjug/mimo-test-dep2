@@ -75,8 +75,7 @@ async function runE2E() {
 
     // 3. Simulate checkout
     console.log(`[3] Calling /create-order...`);
-    const jobIds = (finalizeRes.data.files || []).map(f => f.jobId).filter(Boolean);
-    const orderRes = await axios.post(`${API_BASE}/create-order`, { jobIds, printOptions: { colorMode: "bw", copies: 1 } }, { headers: authHeaders });
+    const orderRes = await axios.post(`${API_BASE}/create-order`, { printOptions: { colorMode: "bw", copies: 1 } }, { headers: authHeaders });
     const orderId = orderRes.data.orderId;
     
     console.log(`[3b] Simulating Webhook for order ${orderId}...`);
