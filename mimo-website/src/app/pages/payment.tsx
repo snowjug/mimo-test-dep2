@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
-import { ArrowLeft, FileText, CheckCircle, Printer, Gift, X } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle, Printer, Gift, X, ExternalLink } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { Switch } from "../components/ui/switch";
 import { Input } from "../components/ui/input";
@@ -491,6 +491,34 @@ export function Payment() {
                 <p className="text-[9px] text-slate-500 font-medium tracking-wider mt-0.5 leading-relaxed">
                   Collect your print at the kiosk using the code
                 </p>
+
+                {/* Instagram Follow Row */}
+                <div className="flex justify-center items-center mt-2">
+                  <a
+                    href="https://www.instagram.com/printwithmimo?stkn=YzEyN3prc2VyOGh2"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-slate-900 transition-all text-[11px] sm:text-xs font-semibold normal-case tracking-normal group py-0.5 px-1.5 rounded hover:bg-slate-100/60"
+                  >
+                    <svg className="w-4 h-4 rounded-[4px] shrink-0" viewBox="0 0 24 24" fill="none">
+                      <defs>
+                        <linearGradient id="ig-grad-receipt" x1="0" y1="1" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#f09433" />
+                          <stop offset="25%" stopColor="#e6683c" />
+                          <stop offset="50%" stopColor="#dc2743" />
+                          <stop offset="75%" stopColor="#cc2366" />
+                          <stop offset="100%" stopColor="#bc1888" />
+                        </linearGradient>
+                      </defs>
+                      <rect width="24" height="24" rx="5.5" fill="url(#ig-grad-receipt)" />
+                      <rect x="4" y="4" width="16" height="16" rx="4" stroke="white" strokeWidth="1.8" fill="none" />
+                      <circle cx="12" cy="12" r="3.8" stroke="white" strokeWidth="1.8" fill="none" />
+                      <circle cx="16.5" cy="7.5" r="1.1" fill="white" />
+                    </svg>
+                    <span className="font-semibold text-slate-700 group-hover:text-slate-900">Follow us</span>
+                    <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-slate-600 ml-0.5 stroke-[2.2]" />
+                  </a>
+                </div>
               </div>
             </Card>
           </div>
