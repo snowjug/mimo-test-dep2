@@ -192,7 +192,17 @@ export function Payment() {
       const storedOptions = sessionStorage.getItem("printOptions");
       const printOptions = storedOptions ? JSON.parse(storedOptions) : {};
       
-      const payload: any = { printOptions };
+      const storedFiles = sessionStorage.getItem("printFiles");
+      const parsedFiles = storedFiles ? JSON.parse(storedFiles) : [];
+      const jobIds = parsedFiles.map((f: any) => f.jobId).filter(Boolean);
+
+      if (!jobIds || jobIds.length === 0) {
+        toast.error("No valid print jobs selected. Please return to upload.");
+        setIsProcessing(false);
+        return;
+      }
+
+      const payload: any = { jobIds, printOptions };
       if (appliedPromo) {
         payload.couponCode = appliedPromo;
       }
