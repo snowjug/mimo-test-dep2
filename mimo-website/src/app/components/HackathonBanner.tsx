@@ -37,43 +37,12 @@ export function HackathonBanner() {
               </div>
 
               {/* Institution / Association Logos */}
-              <div className="flex items-center gap-1 sm:gap-3 py-0.5 px-1 bg-white/70 backdrop-blur-xs rounded-lg sm:rounded-xl border border-slate-100 shadow-2xs">
-                {/* IEEE Logo */}
-                <div className="flex items-center gap-0.5 sm:gap-1">
-                  <div className="w-3.5 h-3.5 sm:w-6 sm:h-6 rounded bg-[#EA580C] flex items-center justify-center p-0.5 text-white font-black text-[7px] sm:text-[10px] shadow-2xs">
-                    ❖
-                  </div>
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[8px] sm:text-xs font-black text-[#EA580C] tracking-tight">IEEE</span>
-                    <span className="text-[5.5px] sm:text-[8px] font-bold text-slate-500">REVA Student Branch</span>
-                  </div>
-                </div>
-
-                <div className="h-2.5 sm:h-4 w-[1px] bg-slate-200" />
-
-                {/* CIS Logo */}
-                <div className="flex items-center gap-0.5 sm:gap-1">
-                  <div className="w-3.5 h-3.5 sm:w-6 sm:h-6 rounded-full bg-[#0284C7] flex items-center justify-center text-white font-bold text-[6px] sm:text-[9px] shadow-2xs">
-                    CIS
-                  </div>
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[7px] sm:text-[10px] font-extrabold text-[#0284C7]">IEEE</span>
-                    <span className="text-[5px] sm:text-[7.5px] font-bold text-slate-500">Computational Intelligence</span>
-                  </div>
-                </div>
-
-                <div className="h-2.5 sm:h-4 w-[1px] bg-slate-200" />
-
-                {/* REVA UNIVERSITY Logo */}
-                <div className="flex items-center gap-0.5 sm:gap-1">
-                  <div className="w-3.5 h-3.5 sm:w-6 sm:h-6 rounded bg-[#EA580C] flex items-center justify-center text-white font-black text-[7px] sm:text-[10px] shadow-2xs">
-                    ❖
-                  </div>
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[8px] sm:text-xs font-black text-[#EA580C] tracking-tight">REVA</span>
-                    <span className="text-[5.5px] sm:text-[8.5px] font-black text-[#1E3A8A]">UNIVERSITY</span>
-                  </div>
-                </div>
+              <div className="flex items-center py-0.5 px-1 sm:px-2 bg-white/80 backdrop-blur-xs rounded-lg sm:rounded-xl border border-slate-100 shadow-2xs">
+                <img
+                  src="/images/hackathon-logos.png"
+                  alt="REVA University IEEE Student Branch | IEEE Computational Intelligence Society Bangalore Chapter | REVA University"
+                  className="h-4 sm:h-7 md:h-8 w-auto object-contain"
+                />
               </div>
             </div>
 
