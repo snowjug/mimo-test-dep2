@@ -47,7 +47,7 @@ const fallbackRecentJobs: RecentPrintJob[] = [
     time: '22:13',
     customerName: 'Amit Verma',
     kiosk: 'M2',
-    isColor: true,
+    isColor: false,
     pages: 3,
     isDuplex: false,
     status: 'processing',

@@ -12,6 +12,8 @@ export interface KioskEntityRecord {
   id: string;
   name: string;
   kioskCode: string;
+  printerType?: 'B&W' | 'Color' | string;
+  isColor?: boolean;
   status: KioskStatus;
   currentJobName?: string;
   currentJobPages?: number;
