@@ -423,6 +423,7 @@ export function UploadFile() {
           const parsed = JSON.parse(storedPrintFiles);
           setUploadedFilesData(parsed);
           setFiles(parsed.map((f: any) => ({
+            clientUploadId: f.clientUploadId || `upload_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
             name: f.name,
             size: f.size,
             type: f.type,
@@ -700,12 +701,14 @@ export function UploadFile() {
       }
 
       // Update uploadedFilesData with explicit jobIds (strictly correlated by clientUploadId)
-      setUploadedFilesData((prev) => [
-        ...prev.filter(
+      const allActiveUploaded = [
+        ...uploadedFilesData.filter(
           (p) => !finalUploadedFiles.some((f) => f.clientUploadId === p.clientUploadId)
         ),
         ...finalUploadedFiles,
-      ]);
+      ];
+      setUploadedFilesData(allActiveUploaded);
+      sessionStorage.setItem("printFiles", JSON.stringify(allActiveUploaded));
 
       // Update UI files (strictly correlated by clientUploadId)
       setFiles((prev) =>
@@ -831,13 +834,16 @@ export function UploadFile() {
 
   const handlePrint = () => {
     // Use uploadedFilesData which contains the full metadata WITH Firebase download URLs and explicit jobIds
-    const completedFiles = uploadedFilesData.filter((f) =>
-      files.some(
-        (uf) =>
-          uf.clientUploadId === f.clientUploadId &&
-          uf.status === "completed"
-      )
-    );
+    let completedFiles = uploadedFilesData.filter((f) => f && f.jobId);
+    if (completedFiles.length === 0) {
+      const stored = sessionStorage.getItem("printFiles");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          completedFiles = parsed.filter((f: any) => f && f.jobId);
+        } catch (_) {}
+      }
+    }
     sessionStorage.setItem("printFiles", JSON.stringify(completedFiles));
     navigate("/print-options");
   };
