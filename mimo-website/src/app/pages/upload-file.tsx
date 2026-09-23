@@ -900,12 +900,17 @@ export function UploadFile() {
                   </div>
                 );
               })}
+
+              {/* Privacy Statement */}
+              <div className="mt-1.5 sm:mt-2 flex items-center gap-2 px-2.5 py-2 sm:px-3.5 sm:py-2.5 rounded-md sm:rounded-xl bg-white/90 border border-blue-200/60 text-[11px] sm:text-xs text-slate-600 leading-relaxed shadow-2xs">
+                <span className="text-xs sm:text-sm shrink-0 select-none" role="img" aria-label="privacy">🔒</span>
+                <p>
+                  <strong className="font-semibold text-slate-700">Your files stay private:</strong> Files are securely deleted immediately after a successful print. Unprinted files are automatically removed after <strong className="font-semibold text-slate-700">24 hours</strong>.
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
-
-        {/* Hackathon Event Spotlight Banner */}
-        <HackathonBanner />
 
         {/* Upload Area */}
         <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-xl">
@@ -1120,14 +1125,6 @@ export function UploadFile() {
                 })}
               </div>
 
-              {/* Privacy Statement */}
-              <div className="mt-4 flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs sm:text-[13px] text-slate-600 leading-relaxed shadow-2xs">
-                <span className="text-sm shrink-0 select-none" role="img" aria-label="privacy">🔒</span>
-                <p>
-                  <strong className="font-semibold text-slate-700">Your files stay private:</strong> Files are securely deleted immediately after a successful print. Unprinted files are automatically removed after <strong className="font-semibold text-slate-700">24 hours</strong>.
-                </p>
-              </div>
-
               <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-slate-200 w-full">
                 <Button
                   className="flex-1 h-12 text-sm sm:text-base font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl w-full sm:w-auto"
@@ -1155,6 +1152,9 @@ export function UploadFile() {
             </CardContent>
           </Card>
         )}
+
+        {/* Hackathon Event Spotlight Banner */}
+        <HackathonBanner />
       </div>
     </div>
   );
