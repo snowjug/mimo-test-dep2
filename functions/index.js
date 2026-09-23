@@ -572,6 +572,7 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
 
       totalPages += resolvedPageCount;
       finalizedFiles.push({
+        clientUploadId: f.clientUploadId || null,
         name: f.name,
         url: printableFileUrl,
         originalUrl: originalFileUrl,
@@ -603,6 +604,7 @@ app.post("/finalize-upload", authMiddleware, async (req, res) => {
     const now = admin.firestore.FieldValue.serverTimestamp();
     for (const f of finalizedFiles) {
       const docRef = db.collection("print_jobs").doc();
+      f.jobId = docRef.id;
       batch.set(docRef, {
         userId: userId,
         fileName: f.name,
@@ -746,7 +748,7 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
     const fileSize = isGraph ? 1806 : 583;
     const now = admin.firestore.FieldValue.serverTimestamp();
 
-    await db.collection("print_jobs").add({
+    const docRef = await db.collection("print_jobs").add({
       userId,
       fileName,
       documentUrl: actualUrl,
@@ -767,7 +769,7 @@ app.post("/create-blank-job", authMiddleware, async (req, res, next) => {
       printStatus: { status: "pending" }
     });
 
-    res.json({ message: "Blank job queued successfully" });
+    res.json({ message: "Blank job queued successfully", jobId: docRef.id });
   } catch (err) {
     next(err);
   }
@@ -874,21 +876,45 @@ app.delete("/remove-file", authMiddleware, async (req, res) => {
 app.post("/create-order", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const { selectedFiles, printOptions, couponCode, coinsToUse } = req.body;
+    const { jobIds, selectedFiles, printOptions, couponCode, coinsToUse } = req.body;
     const coinsDiscount = coinsToUse ? Number(coinsToUse) * 0.5 : 0; // 1 coin = ₹0.50
     let { orderId } = req.body;
     if (!orderId) {
       orderId = `order_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
     }
 
-    const jobsSnapshot = await db
-      .collection("print_jobs")
-      .where("userId", "==", userId)
-      .where("status", "==", "pending")
-      .get();
+    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+      return res.status(400).json({ error: "Explicit non-empty jobIds array is required for checkout." });
+    }
 
-    if (jobsSnapshot.empty) {
-      return res.status(400).send("No pending jobs to pay for");
+    // Retrieve and strictly validate every requested job document from Firestore
+    const seenJobIds = new Set();
+    const targetJobs = [];
+    for (const rawJobId of jobIds) {
+      if (typeof rawJobId !== "string" || !rawJobId.trim()) {
+        return res.status(400).json({ error: "Invalid jobId format in checkout selection." });
+      }
+      const jobId = rawJobId.trim();
+      if (seenJobIds.has(jobId)) {
+        return res.status(400).json({ error: `Duplicate jobId detected in checkout request: ${jobId}` });
+      }
+      seenJobIds.add(jobId);
+
+      const doc = await db.collection("print_jobs").doc(jobId).get();
+      if (!doc.exists) {
+        return res.status(400).json({ error: `Print job not found: ${jobId}` });
+      }
+      const data = doc.data();
+      if (data.userId !== userId) {
+        return res.status(403).json({ error: `Unauthorized access to print job: ${jobId}` });
+      }
+      if (data.status !== "pending") {
+        return res.status(400).json({ error: `Print job ${jobId} is not in pending status (current status: ${data.status}).` });
+      }
+      if (data.removedByUser === true || data.fileDeleted === true) {
+        return res.status(400).json({ error: `Print job ${jobId} has been removed or deleted.` });
+      }
+      targetJobs.push(doc);
     }
 
     let discountPercentage = 0;
@@ -918,12 +944,12 @@ app.post("/create-order", authMiddleware, async (req, res) => {
 
     const batchUpdate = db.batch();
 
-    // Group all pending jobs into a single unified job for the printer
+    // Group all validated pending jobs into a single unified job for the printer
     const mergedFiles = [];
     let totalRawPages = 0;
     let earliestRetentionStartAt = null;
 
-    jobsSnapshot.forEach((doc) => {
+    targetJobs.forEach((doc) => {
       const data = doc.data();
 
       // Preserve earliest retentionStartAt across predecessor jobs

@@ -29,14 +29,16 @@ async function runE2E() {
     fs.writeFileSync('dummy.pdf', Buffer.from(pdfBase64, 'base64'));
     const formData = new FormData();
     formData.append('files', fs.createReadStream('dummy.pdf'));
-    await axios.post(`${API_URL}/upload`, formData, {
+    const uploadRes = await axios.post(`${API_URL}/upload`, formData, {
       headers: { ...formData.getHeaders(), Authorization: `Bearer ${token}` }
     });
     console.log(`? Uploaded document!`);
 
     // 3. Create Order
     console.log('\n[3] Creating Order...');
+    const jobIds = uploadRes.data?.jobIds || (uploadRes.data?.files || []).map(f => f.jobId).filter(Boolean);
     const orderRes = await axios.post(`${API_URL}/create-order`, {
+      jobIds,
       printOptions: { colorMode: 'bw', copies: 1, layout: 'single' }
     }, { headers: { Authorization: `Bearer ${token}` }});
     const orderId = orderRes.data.orderId;
