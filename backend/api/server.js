@@ -2046,7 +2046,7 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
     const isColorJob = currentSessionDocs.some(d => d.colorMode && d.colorMode.toLowerCase() === "color");
     const hasStarted = currentSessionDocs.some(d => 
-      ["printing", "completed", "printed"].includes(d.status) || d.isPrinted === true
+      ["printing", "completed", "printed", "failed", "refunded"].includes(d.status) || d.isPrinted === true
     );
 
     // Calculate aggregate physical sheets and completion
@@ -2139,7 +2139,7 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
     let failedDoc = null;
 
     currentSessionDocs.forEach((data) => {
-      if (data.status === "failed") {
+      if (data.status === "failed" || data.status === "refunded") {
         anyFailed = true;
         failedDoc = data;
       }
@@ -2155,7 +2155,7 @@ app.get("/kiosk/job-status", kioskLimiter, async (req, res) => {
         isPrinted: false,
         sheetsCompleted,
         totalSheets,
-        printerStatus: failedDoc ? (failedDoc.printerStatus || failedDoc.error || "Print failed") : "Print failed"
+        printerStatus: failedDoc ? (failedDoc.printerStatus || failedDoc.error || (failedDoc.status === "refunded" ? "Print refunded" : "Print failed")) : "Print failed"
       });
     }
 
