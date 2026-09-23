@@ -15,7 +15,6 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 
 interface UploadedFile {
-  clientUploadId?: string;
   name: string;
   size: number;
   type?: string;
@@ -29,26 +28,14 @@ interface ActivePrintCodeJob {
   printCode: string;
   status: string;
   printerStatus?: string;
-  fileName?: string;
-  totalPages?: number;
-  totalPagesToPrint?: number;
-  copiesRequested?: number;
+  file?: string;
   colorMode?: string;
+  copies?: number;
   pageCount?: number;
   details?: string;
   cost?: string;
   date?: string;
   isPrinted?: boolean;
-}
-
-interface ActiveUpload {
-  clientUploadId: string;
-  name: string;
-  file?: File;
-  uploadTask?: any;
-  downloadURL?: string;
-  jobId?: string;
-  isCancelled: boolean;
 }
 
 const estimateDocxPages = async (file: File): Promise<number> => {
@@ -331,12 +318,6 @@ export function UploadFile() {
   const [userStats, setUserStats] = useState({ totalDocs: 0, totalPages: 0, totalSpent: 0 });
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const activeUploadsRef = useRef<Map<string, ActiveUpload>>(new Map());
-  const cancelledUploadIdsRef = useRef<Set<string>>(new Set());
-  const filesRef = useRef<UploadedFile[]>(files);
-  useEffect(() => {
-    filesRef.current = files;
-  }, [files]);
 
   const [activePrintCodes, setActivePrintCodes] = useState<ActivePrintCodeJob[]>([]);
 
@@ -464,37 +445,14 @@ export function UploadFile() {
     const formData = new FormData();
     const fileArray = Array.from(fileList);
 
-    const newFiles: UploadedFile[] = fileArray.map((file) => {
-      const clientUploadId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      return {
-        clientUploadId,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        status: "uploading",
-        progress: 0,
-        pageCount: 0,
-      };
-    });
-
-    newFiles.forEach((nf, idx) => {
-      activeUploadsRef.current.set(nf.clientUploadId!, {
-        clientUploadId: nf.clientUploadId!,
-        name: nf.name,
-        file: fileArray[idx],
-        isCancelled: false,
-      });
-    });
-
     // Extract image data URLs BEFORE upload using memory-efficient Object URLs
-    const imageDataUrls: { clientUploadId: string; name: string; mimetype: string; dataUrl: string }[] = [];
-    newFiles.forEach((nf, idx) => {
-      const file = fileArray[idx];
+    const imageDataUrls: { name: string; mimetype: string; dataUrl: string }[] = [];
+    for (const file of fileArray) {
       if (file.type.startsWith("image/") || file.type === "application/pdf") {
         const dataUrl = URL.createObjectURL(file);
-        imageDataUrls.push({ clientUploadId: nf.clientUploadId!, name: file.name, mimetype: file.type, dataUrl });
+        imageDataUrls.push({ name: file.name, mimetype: file.type, dataUrl });
       }
-    });
+    }
     const existingRaw = sessionStorage.getItem("uploadedImages");
     let existingImages = [];
     if (existingRaw) {
@@ -508,14 +466,23 @@ export function UploadFile() {
       sessionStorage.removeItem("uploadedImages");
     }
 
+    const newFiles: UploadedFile[] = fileArray.map((file) => {
+      return {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        status: "uploading",
+        progress: 0,
+        pageCount: 0,
+      };
+    });
+
     setFiles((prev) => [...prev, ...newFiles]);
     setUploading(true);
 
     try {
-      // 1. Parse PDFs locally for page counts keyed by clientUploadId
-      const filesMeta = await Promise.all(newFiles.map(async (nf) => {
-        const tracker = activeUploadsRef.current.get(nf.clientUploadId!)!;
-        const f = tracker.file!;
+      // 1. Parse PDFs locally for page counts
+      const filesMeta = await Promise.all(fileArray.map(async (f) => {
         let pageCount = 1;
         const nameLower = f.name.toLowerCase();
         const isDocx = nameLower.endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -539,191 +506,83 @@ export function UploadFile() {
           // Fallback for legacy .doc, .ppt, .xls, .txt — 1 page estimate
           pageCount = 1;
         }
-        return { clientUploadId: nf.clientUploadId!, name: f.name, type: f.type, size: f.size, pageCount };
+        return { name: f.name, type: f.type, size: f.size, pageCount };
       }));
 
-      // 2. Upload directly to Firebase Storage with task tracking & cancellation support
-      const uploadPromises = newFiles.map(async (nf) => {
-        const tracker = activeUploadsRef.current.get(nf.clientUploadId!)!;
-        const file = tracker.file!;
+      // 2. Upload directly to Firebase Storage
+      const uploadPromises = fileArray.map(async (file) => {
         const uniqueFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
         const storageRef = ref(storage, `uploads/${userName.replace(/[^a-zA-Z0-9]/g, '_')}/${uniqueFileName}`);
         const uploadTask = uploadBytesResumable(storageRef, file);
 
-        tracker.uploadTask = uploadTask;
-
-        return new Promise<any>((resolve) => {
+        return new Promise((resolve, reject) => {
           uploadTask.on(
             "state_changed",
             (snapshot) => {
-              if (cancelledUploadIdsRef.current.has(nf.clientUploadId!)) {
-                return;
-              }
               const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
               const displayProgress = progress === 100 ? 99 : progress;
               setFiles((prev) =>
                 prev.map((f) =>
-                  f.clientUploadId === nf.clientUploadId ? { ...f, progress: displayProgress } : f
+                  f.name === file.name ? { ...f, progress: displayProgress } : f
                 )
               );
             },
-            (error: any) => {
-              // Handle cancellation gracefully without throwing or rejecting concurrent uploads
-              if (cancelledUploadIdsRef.current.has(nf.clientUploadId!) || error?.code === "storage/canceled") {
-                console.log(`[UPLOAD] Upload intentionally cancelled for ${nf.name} (${nf.clientUploadId})`);
-                resolve(null);
-                return;
-              }
-              console.error(`[UPLOAD ERROR] ${nf.name}:`, error);
-              resolve({ error, clientUploadId: nf.clientUploadId, name: nf.name });
+            (error) => {
+              reject(error);
             },
             async () => {
-              // RACE CHECK 1: Was this upload cancelled before completion callback fired?
-              if (cancelledUploadIdsRef.current.has(nf.clientUploadId!)) {
-                console.log(`[UPLOAD RACE] Upload completed after cancellation for ${nf.name}. Discarding and cleaning up.`);
-                try {
-                  const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                  await api.delete("/remove-file", { data: { fileUrl: downloadURL } }).catch(() => {});
-                } catch (_) {}
-                resolve(null);
-                return;
-              }
-
-              try {
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                // RACE CHECK 2: Cancelled while fetching download URL?
-                if (cancelledUploadIdsRef.current.has(nf.clientUploadId!)) {
-                  await api.delete("/remove-file", { data: { fileUrl: downloadURL } }).catch(() => {});
-                  resolve(null);
-                  return;
-                }
-                tracker.downloadURL = downloadURL;
-                const meta = filesMeta.find((m) => m.clientUploadId === nf.clientUploadId);
-                resolve({
-                  clientUploadId: nf.clientUploadId,
-                  name: file.name,
-                  url: downloadURL,
-                  type: file.type,
-                  size: file.size,
-                  pageCount: meta?.pageCount || 1,
-                });
-              } catch (urlErr) {
-                console.error("Failed to get download URL:", urlErr);
-                resolve({ error: urlErr, clientUploadId: nf.clientUploadId, name: nf.name });
-              }
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              const meta = filesMeta.find(m => m.name === file.name);
+              resolve({ name: file.name, url: downloadURL, type: file.type, size: file.size, pageCount: meta?.pageCount || 1 });
             }
           );
         });
       });
 
-      const uploadResults = await Promise.all(uploadPromises);
-
-      // Separate errors and non-cancelled successes
-      const failedFiles = uploadResults.filter((r): r is any => r && r.error);
-      const validUploadedFiles = uploadResults.filter(
-        (r): r is any => r && !r.error && !cancelledUploadIdsRef.current.has(r.clientUploadId)
-      );
-
-      // Update UI for failed uploads
-      if (failedFiles.length > 0) {
-        setFiles((prev) =>
-          prev.map((f) =>
-            failedFiles.some((ff) => ff.clientUploadId === f.clientUploadId)
-              ? { ...f, status: "failed", progress: 0 }
-              : f
-          )
-        );
-        toast.error("Upload failed for one or more files");
-      }
-
-      // If no valid non-cancelled files, terminate sequence
-      if (validUploadedFiles.length === 0) {
-        setUploading(false);
-        return;
-      }
-
-      // Filter existing uploadedFilesData to exclude any cancelled files and ensure they match current UI files
-      const currentActiveFiles = uploadedFilesData.filter((d) =>
-        !cancelledUploadIdsRef.current.has(d.clientUploadId) &&
-        filesRef.current.some(
-          (f) => f.clientUploadId === d.clientUploadId && f.status !== "failed"
-        )
-      );
-
-      const filesToFinalize = [...currentActiveFiles, ...validUploadedFiles].map((f) => ({
-        clientUploadId: f.clientUploadId,
-        name: f.name,
-        url: f.url,
-        type: f.type,
-        size: f.size,
-        pageCount: f.pageCount,
-      }));
+      const uploadedFiles = await Promise.all(uploadPromises) as any[];
 
       // 3. Tell backend to finalize, perform conversion, and create database records
-      const response = await api.post("/finalize-upload", { files: filesToFinalize });
-
-      let backendFiles: any[] = [];
+      const response = await api.post("/finalize-upload", { files: [...uploadedFilesData, ...uploadedFiles] });
+      
+      // Override local estimations with verified page counts and converted URLs returned by backend
+      let finalUploadedFiles = uploadedFiles;
       if (response && response.data && Array.isArray(response.data.files)) {
-        backendFiles = response.data.files;
-      }
-
-      // Post-finalize race check: Was any file cancelled while finalize was in flight?
-      const finalUploadedFiles: any[] = [];
-      for (const uf of validUploadedFiles) {
-        // Correlate backendFiles strictly by clientUploadId or positional index in filesToFinalize (zero filename fallback)
-        const finalizeIndex = filesToFinalize.findIndex((f) => f.clientUploadId === uf.clientUploadId);
-        const bf = backendFiles.find((b: any) => b.clientUploadId === uf.clientUploadId)
-          || (finalizeIndex >= 0 && finalizeIndex < backendFiles.length ? backendFiles[finalizeIndex] : undefined);
-
-        if (cancelledUploadIdsRef.current.has(uf.clientUploadId)) {
-          console.log(`[FINALIZE RACE] File was cancelled while /finalize-upload was in flight: ${uf.name} (${uf.clientUploadId})`);
-          const cleanupUrl = bf?.url || uf.url;
-          if (cleanupUrl) {
-            api.delete("/remove-file", { data: { fileUrl: cleanupUrl } }).catch(() => {});
+        const backendFiles = response.data.files;
+        finalUploadedFiles = uploadedFiles.map((uf) => {
+          const bf = backendFiles.find((b: any) => b.name === uf.name);
+          if (bf) {
+            return {
+              ...uf,
+              url: bf.url || uf.url,
+              type: bf.type || uf.type,
+              pageCount: typeof bf.pageCount === "number" ? bf.pageCount : uf.pageCount,
+            };
           }
-          continue;
-        }
-
-        if (bf) {
-          finalUploadedFiles.push({
-            clientUploadId: uf.clientUploadId,
-            jobId: bf.jobId, // Explicitly capture jobId from backend
-            name: uf.name,
-            url: bf.url || uf.url,
-            type: bf.type || uf.type,
-            size: uf.size,
-            pageCount: typeof bf.pageCount === "number" ? bf.pageCount : uf.pageCount,
-          });
-        } else {
-          finalUploadedFiles.push(uf);
-        }
+          return uf;
+        });
       }
 
-      // Update uploadedFilesData with explicit jobIds (strictly correlated by clientUploadId)
-      setUploadedFilesData((prev) => [
-        ...prev.filter(
-          (p) => !finalUploadedFiles.some((f) => f.clientUploadId === p.clientUploadId)
-        ),
-        ...finalUploadedFiles,
-      ]);
+      // Store the full verified file metadata (with converted URLs and exact page counts)
+      setUploadedFilesData(prev => [...prev.filter(p => !finalUploadedFiles.some(f => f.name === p.name)), ...finalUploadedFiles]);
 
-      // Update UI files (strictly correlated by clientUploadId)
+      // Update UI
       setFiles((prev) =>
         prev.map((f) => {
-          const matchingFinal = finalUploadedFiles.find((uf) =>
-            uf.clientUploadId === f.clientUploadId
-          );
-          if (matchingFinal) {
-            return { ...f, status: "completed", progress: 100, pageCount: matchingFinal.pageCount || 1 };
+          const isTarget = newFiles.some((nf) => nf.name === f.name);
+          if (isTarget) {
+            const meta = finalUploadedFiles.find(uf => uf.name === f.name);
+            return { ...f, status: "completed", progress: 100, pageCount: meta?.pageCount || 1 };
           }
           return f;
         })
       );
       toast.success("Files ready for printing!");
 
+      // Calculate total pages for pricing using verified page counts
       const totalPages = finalUploadedFiles.reduce((acc: number, curr: any) => acc + curr.pageCount, 0);
       setBackendTotalPages(totalPages);
-
+      
+      // Assuming a base rate of 2 per page for estimation, backend handles real calculation
       sessionStorage.setItem("uploadAmount", (totalPages * 2).toString());
       sessionStorage.setItem("uploadTotalPages", totalPages.toString());
       setUploading(false);
@@ -732,7 +591,7 @@ export function UploadFile() {
       console.error(err);
       setFiles((prev) =>
         prev.map((f) =>
-          newFiles.some((nf) => nf.clientUploadId === f.clientUploadId) ? { ...f, status: "failed", progress: 0 } : f
+          newFiles.some((nf) => nf.name === f.name) ? { ...f, status: "failed", progress: 0 } : f
         )
       );
       toast.error("Upload failed");
@@ -750,54 +609,27 @@ export function UploadFile() {
 
   const removeFile = async (index: number) => {
     const fileToRemove = files[index];
-    if (!fileToRemove) return;
+    const meta = uploadedFilesData.find((f) => f.name === fileToRemove.name);
 
-    const clientUploadId = fileToRemove.clientUploadId;
-
-    // 1. Mark as cancelled FIRST so any in-flight completion callback drops it
-    if (clientUploadId) {
-      cancelledUploadIdsRef.current.add(clientUploadId);
-      const tracker = activeUploadsRef.current.get(clientUploadId);
-      if (tracker) {
-        tracker.isCancelled = true;
-        if (tracker.uploadTask) {
-          try {
-            tracker.uploadTask.cancel();
-            console.log(`[REMOVE-FILE] Cancelled in-flight uploadTask for ${fileToRemove.name}`);
-          } catch (cancelErr) {
-            console.warn("Error cancelling upload task:", cancelErr);
-          }
-        }
-      }
-    }
-
-    // 2. If a backend record or storage URL exists, call /remove-file
-    const meta = uploadedFilesData.find((f) => f.clientUploadId === clientUploadId);
-    const fileUrl = meta?.url || (clientUploadId ? activeUploadsRef.current.get(clientUploadId)?.downloadURL : undefined);
-
-    if (fileUrl) {
+    if (fileToRemove.status === "completed" && meta && meta.url) {
       try {
-        await api.delete("/remove-file", { data: { fileUrl } });
-        console.log(`[REMOVE-FILE] Cleaned cloud resource for ${fileToRemove.name} (${clientUploadId})`);
+        await api.delete("/remove-file", { data: { fileUrl: meta.url } });
       } catch (err) {
         console.error("Failed to delete from cloud:", err);
       }
     }
 
-    // 3. Update frontend files array and uploadedFilesData
     const updatedFiles = files.filter((_, i) => i !== index);
-    const updatedData = uploadedFilesData.filter((f) => f.clientUploadId !== clientUploadId);
+    const updatedData = uploadedFilesData.filter((f) => f.name !== fileToRemove.name);
 
     setFiles(updatedFiles);
     setUploadedFilesData(updatedData);
 
-    // 4. Remove from sessionStorage image list
+    // Remove from sessionStorage image list
     const existingRaw = sessionStorage.getItem("uploadedImages");
     if (existingRaw) {
       const existingImages = JSON.parse(existingRaw);
-      const updatedImages = existingImages.filter((img: any) =>
-        img.clientUploadId ? img.clientUploadId !== clientUploadId : img.name !== fileToRemove.name
-      );
+      const updatedImages = existingImages.filter((img: any) => img.name !== fileToRemove.name);
       if (updatedImages.length > 0) {
         sessionStorage.setItem("uploadedImages", JSON.stringify(updatedImages));
       } else {
@@ -805,7 +637,14 @@ export function UploadFile() {
       }
     }
 
-    // 5. Update printFiles in sessionStorage (NO bogus /finalize-upload call here!)
+    // Sync Firestore with the remaining files list!
+    try {
+      await api.post("/finalize-upload", { files: updatedData });
+    } catch (err) {
+      console.error("Failed to sync remaining files with backend:", err);
+    }
+
+    // Update printFiles in sessionStorage
     if (updatedData.length > 0) {
       sessionStorage.setItem("printFiles", JSON.stringify(updatedData));
       const totalPages = updatedData.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
@@ -830,13 +669,9 @@ export function UploadFile() {
   const displayTotalPages = backendTotalPages || files.filter((f) => f.status === "completed").reduce((acc, f) => acc + (f.pageCount || 1), 0);
 
   const handlePrint = () => {
-    // Use uploadedFilesData which contains the full metadata WITH Firebase download URLs and explicit jobIds
-    const completedFiles = uploadedFilesData.filter((f) =>
-      files.some(
-        (uf) =>
-          uf.clientUploadId === f.clientUploadId &&
-          uf.status === "completed"
-      )
+    // Use uploadedFilesData which contains the full metadata WITH Firebase download URLs
+    const completedFiles = uploadedFilesData.filter(f =>
+      files.some(uf => uf.name === f.name && uf.status === "completed")
     );
     sessionStorage.setItem("printFiles", JSON.stringify(completedFiles));
     navigate("/print-options");

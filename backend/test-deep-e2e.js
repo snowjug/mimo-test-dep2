@@ -89,8 +89,7 @@ async function runDeepE2E() {
     // 4. CHECKOUT (Create Order)
     // ---------------------------------------------------------
     console.log("\n--- 4. CHECKOUT ---");
-    const jobIds = (finalizeRes.data.files || []).map(f => f.jobId).filter(Boolean);
-    const orderRes = await axios.post(`${API_BASE}/create-order`, { jobIds, printOptions: { colorMode: "color", copies: 2 } }, { headers: authHeaders });
+    const orderRes = await axios.post(`${API_BASE}/create-order`, { printOptions: { colorMode: "color", copies: 2 } }, { headers: authHeaders });
     const orderId = orderRes.data.orderId;
     console.log(`[+] Create Order API Response: OrderID=${orderId}, Amount=${orderRes.data.amount}`);
 
