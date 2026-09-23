@@ -26,6 +26,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { SearchInput } from '../../components/ui/SearchInput';
+import { KioskBadge } from '../../components/cards/RecentPrintJobsCard';
 import type { KioskEntityRecord } from '../../types/kiosk';
 
 export interface KiosksPageProps {
@@ -196,9 +197,10 @@ export const KiosksPage: React.FC<KiosksPageProps> = ({
                     >
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xs font-bold shadow-xs">
-                            M{k.name.slice(-1)}
-                          </div>
+                          <KioskBadge 
+                            kiosk={k.name.includes('MIMO 1') || k.kioskCode.startsWith('CV-001') ? 'M1' : 'M2'} 
+                            isColor={k.isColor ?? (k.printerType === 'Color')} 
+                          />
                           <div>
                             <p className="font-semibold text-slate-900 dark:text-[#F1F5F9] text-[14px] sm:text-[15px] leading-tight">{k.name}</p>
                             <span className="text-xs text-slate-400 dark:text-[#8495AA] font-mono">{k.kioskCode}</span>
@@ -252,6 +254,10 @@ export const KiosksPage: React.FC<KiosksPageProps> = ({
             {/* 1. Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-[#1E314B]">
               <div className="flex items-center gap-3">
+                <KioskBadge 
+                  kiosk={activeKiosk.name.includes('MIMO 1') || activeKiosk.kioskCode.startsWith('CV-001') ? 'M1' : 'M2'} 
+                  isColor={activeKiosk.isColor ?? (activeKiosk.printerType === 'Color')} 
+                />
                 <h3 className="text-lg sm:text-[20px] font-bold text-slate-900 dark:text-[#F1F5F9] tracking-tight">{activeKiosk.name}</h3>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#EEF2FF] text-[#6366F1] dark:bg-indigo-950/70 dark:text-[#A5B4FC] border border-indigo-200/80 dark:border-indigo-800/70">
                   <span className="w-2 h-2 rounded-full bg-[#6366F1] animate-pulse" />
