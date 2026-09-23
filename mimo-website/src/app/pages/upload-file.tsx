@@ -900,14 +900,6 @@ export function UploadFile() {
                   </div>
                 );
               })}
-
-              {/* Privacy Statement */}
-              <div className="mt-1.5 sm:mt-2 flex items-center gap-2 px-2.5 py-2 sm:px-3.5 sm:py-2.5 rounded-md sm:rounded-xl bg-white/90 border border-blue-200/60 text-[11px] sm:text-xs text-slate-600 leading-relaxed shadow-2xs">
-                <span className="text-xs sm:text-sm shrink-0 select-none" role="img" aria-label="privacy">🔒</span>
-                <p>
-                  <strong className="font-semibold text-slate-700">Your files stay private:</strong> Files are securely deleted immediately after a successful print. Unprinted files are automatically removed after <strong className="font-semibold text-slate-700">24 hours</strong>.
-                </p>
-              </div>
             </CardContent>
           </Card>
         )}

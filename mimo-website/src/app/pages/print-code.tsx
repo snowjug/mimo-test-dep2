@@ -435,30 +435,38 @@ export function PrintCode() {
         </div>
 
         {/* Print Code Card */}
-          <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-100 p-2 sm:p-2.5 animate-in slide-in-from-bottom-4 duration-700 delay-100">
-            <div className="bg-gradient-to-br from-blue-50 to-slate-50 border-2 border-blue-100 rounded-xl p-3 sm:p-4 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-2 opacity-5 pointer-events-none">
-                <Printer className="w-20 h-20 rotate-[-15deg]" />
-              </div>
-              <p className="text-center text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-widest mb-1">
-                Your Print Code
+        <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-100 p-2 sm:p-2.5 animate-in slide-in-from-bottom-4 duration-700 delay-100">
+          <div className="bg-gradient-to-br from-blue-50 to-slate-50 border-2 border-blue-100 rounded-xl p-3 sm:p-4 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-2 opacity-5 pointer-events-none">
+              <Printer className="w-20 h-20 rotate-[-15deg]" />
+            </div>
+            <p className="text-center text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-widest mb-1">
+              Your Print Code
+            </p>
+            <div className="text-center">
+              <p className="text-5xl sm:text-6xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-[#093765] to-blue-600 font-mono mb-2 drop-shadow-sm">
+                {printCode}
               </p>
-              <div className="text-center">
-                <p className="text-5xl sm:text-6xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-[#093765] to-blue-600 font-mono mb-2 drop-shadow-sm">
-                  {printCode}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyCode}
-                  className="mx-auto rounded-full bg-white hover:bg-slate-50 text-indigo-700 hover:text-indigo-800 border-indigo-200 hover:border-indigo-300 transition-all shadow-sm font-bold tracking-wide cursor-pointer px-4 h-7 sm:h-8 text-[9px] sm:text-[10px]"
-                >
-                  <Copy className="w-3 h-3 mr-1.5" />
-                  COPY CODE
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyCode}
+                className="mx-auto rounded-full bg-white hover:bg-slate-50 text-indigo-700 hover:text-indigo-800 border-indigo-200 hover:border-indigo-300 transition-all shadow-sm font-bold tracking-wide cursor-pointer px-4 h-7 sm:h-8 text-[9px] sm:text-[10px]"
+              >
+                <Copy className="w-3 h-3 mr-1.5" />
+                COPY CODE
+              </Button>
             </div>
           </div>
+        </div>
+
+        {/* Privacy Statement */}
+        <div className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/95 backdrop-blur-xl border border-slate-200/80 text-xs sm:text-[13px] text-slate-600 leading-relaxed shadow-2xs animate-in slide-in-from-bottom-4 duration-700 delay-150">
+          <span className="text-sm shrink-0 select-none" role="img" aria-label="privacy">🔒</span>
+          <p>
+            <strong className="font-semibold text-slate-700">Your files stay private:</strong> Files are securely deleted immediately after a successful print. Unprinted files are automatically removed after <strong className="font-semibold text-slate-700">24 hours</strong>.
+          </p>
+        </div>
 
           <Button
             variant="outline"
