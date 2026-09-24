@@ -263,7 +263,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   copies = 1,
   printCode,
   manualProgress,
-  colorMode = 'bw',
+  colorMode: _colorMode = 'bw',
   kioskId,
 }) => {
   const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
@@ -354,11 +354,24 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     if (!printCode || printCode === '0000' || !isActive) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
+      // Enforce global 120-second maximum timeout from the start of printing
+      if (Date.now() - startTimeRef.current >= 120000) {
+        if (!isCompletingRef.current) {
+          clearAllTimers();
+          if (onError) onError('Print timed out. If your document was not printed, please contact support.');
+        }
+        return;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+
       try {
         const res = await fetch(
           `${BACKEND_URL}/kiosk/job-status?printCode=${encodeURIComponent(printCode)}`,
-          { cache: 'no-store' }
+          { cache: 'no-store', signal: controller.signal }
         );
+        window.clearTimeout(timeoutId);
         const data = await res.json();
 
         // Reset last successful poll timestamp — the network is alive
@@ -405,8 +418,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           schedulePoll(400);
         }
       } catch {
-        // Network hiccup — retry in 2 s
-        pollTimerRef.current = window.setTimeout(() => schedulePoll(250), 2000);
+        window.clearTimeout(timeoutId);
+        // Network hiccup — retry in 2 s without failing immediately if transient
+        if (isActive && !isCompletingRef.current) {
+          pollTimerRef.current = window.setTimeout(() => schedulePoll(250), 2000);
+        }
       }
     }, delayMs);
   }, [printCode, isActive, pages, copies, onError, clearAllTimers]);
@@ -528,22 +544,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   }, [printDone, isActive, animateTo100AndComplete]);
 
   // ── Stall & Timeout detector ──────────────────────────────────────────────
-  // Fires every 5 seconds.
-  // 1. Connection Stall Check: If we haven't received a successful poll response
-  //    for > 45 seconds, we assume network connectivity is lost.
-  // 2. Physical Printing Timeout Check: Based on page count and color mode,
-  //    we calculate a generous print time limit (matching the backend). If the
-  //    total elapsed time exceeds this limit, we time out.
+  // Fires every 1 second.
+  // 1. Global 120-Second Print Timeout: Absolute cutoff from the moment the print screen activates.
+  // 2. Network Stall Check: If no poll response received for > 45 seconds, assume network loss.
   useEffect(() => {
     if (!isActive || !printCode || printCode === '0000') return;
 
-    const totalSheets = Math.max(1, pages * copies);
-    const isColor = colorMode === 'color';
-    const baseWarmupSec = 600; // 600 seconds (10 min) base warmup/spooling/rendering time
-    const secPerPage = isColor ? 360 : 20; // 360s (6 min) per color page for EcoTank inkjet; 20s/page for B&W laser
-    // Timeout matching backend plus a 30 seconds buffer to prioritize backend failure message/refund trigger
-    const printTimeoutMs = (baseWarmupSec + totalSheets * secPerPage + 30) * 1000;
-    const networkStallThresholdMs = 90000; // 90 seconds with no network response (for large rendering operations)
+    const PRINT_TIMEOUT_MS = 120000; // 120-second maximum global deadline
+    const networkStallThresholdMs = 45000; // 45 seconds with no network response
 
     const checkTimeout = () => {
       if (isCompletingRef.current) return; // already finishing — no action needed
@@ -551,12 +559,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       const elapsedMs = Date.now() - startTimeRef.current;
       const msSinceLastPoll = Date.now() - lastSuccessfulPollTimeRef.current;
 
-      // Check for total print timeout
-      if (elapsedMs > printTimeoutMs) {
-        console.warn(`[PrintingScreen] Print timeout exceeded: ${elapsedMs}ms > ${printTimeoutMs}ms. Surfacing error.`);
+      // Enforce absolute 120-second maximum timeout from start of printing
+      if (elapsedMs >= PRINT_TIMEOUT_MS) {
+        console.warn(`[PrintingScreen] Global 120s print timeout reached (${elapsedMs}ms). Surfacing error.`);
         clearAllTimers();
         if (onError) {
-          onError('Print timed out. If you were charged, your refund will be processed automatically.');
+          onError('Print timed out. Please contact support if your document was not printed.');
         }
         return;
       }
@@ -571,16 +579,15 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         return;
       }
 
-      stallTimerRef.current = window.setTimeout(checkTimeout, 5000);
+      stallTimerRef.current = window.setTimeout(checkTimeout, 1000);
     };
 
-    // Start checking after 10s
-    stallTimerRef.current = window.setTimeout(checkTimeout, 10000);
+    stallTimerRef.current = window.setTimeout(checkTimeout, 1000);
 
     return () => {
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
     };
-  }, [isActive, printCode, pages, copies, colorMode, clearAllTimers, onError]);
+  }, [isActive, printCode, clearAllTimers, onError]);
 
   // ─── SVG geometry ─────────────────────────────────────────────────────────
 
