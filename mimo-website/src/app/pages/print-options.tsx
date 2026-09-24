@@ -506,7 +506,7 @@ export function PrintOptions() {
         {/* ── Page Header ── */}
         <div className="flex items-center gap-2 py-2">
           <button
-            onClick={() => navigate("/upload")}
+            onClick={() => navigate("/upload", { state: { returnFromOptions: true } })}
             className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-200/40 -ml-1"
             aria-label="Back"
           >

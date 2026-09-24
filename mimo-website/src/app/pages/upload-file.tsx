@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -324,6 +324,7 @@ const estimateXlsxSheets = async (file: File): Promise<number> => {
 
 export function UploadFile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [uploadedFilesData, setUploadedFilesData] = useState<any[]>([]); // holds full metadata with URLs
   const [isDragging, setIsDragging] = useState(false);
@@ -403,10 +404,13 @@ export function UploadFile() {
     const storedName = localStorage.getItem("mimo_user_name");
     if (storedName) setUserName(storedName);
 
-    // If a print code is present, it means the user just finished a print job.
-    // Clear the print session to start fresh.
     const storedPrintCode = sessionStorage.getItem("printCode");
-    if (storedPrintCode) {
+    const storedPrintOptions = sessionStorage.getItem("printOptions");
+    const isReturningFromOptions = Boolean((location.state as any)?.returnFromOptions);
+
+    // If print code is present (completed job), OR if there is an uncompleted checkout session
+    // and the user did not explicitly navigate back from print-options, clear the stale session to start fresh.
+    if (storedPrintCode || (storedPrintOptions && !isReturningFromOptions)) {
       sessionStorage.removeItem("printCode");
       sessionStorage.removeItem("printFiles");
       sessionStorage.removeItem("printOptions");
@@ -415,27 +419,33 @@ export function UploadFile() {
       sessionStorage.removeItem("uploadTotalPages");
       sessionStorage.removeItem("totalPages");
       sessionStorage.removeItem("printStatus");
+      setUploadedFilesData([]);
+      setFiles([]);
+      setBackendTotalPages(0);
     } else {
       // Initialize from sessionStorage if exists
       const storedPrintFiles = sessionStorage.getItem("printFiles");
       if (storedPrintFiles) {
         try {
           const parsed = JSON.parse(storedPrintFiles);
-          setUploadedFilesData(parsed);
-          setFiles(parsed.map((f: any) => ({
-            clientUploadId: f.clientUploadId || `upload_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-            name: f.name,
-            size: f.size,
-            type: f.type,
-            status: "completed",
-            progress: 100,
-            pageCount: f.pageCount || 1
-          })));
-          // Re-calculate total pages
-          const totalPages = parsed.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
-          setBackendTotalPages(totalPages);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setUploadedFilesData(parsed);
+            setFiles(parsed.map((f: any) => ({
+              clientUploadId: f.clientUploadId || `upload_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+              name: f.name,
+              size: f.size,
+              type: f.type,
+              status: "completed",
+              progress: 100,
+              pageCount: f.pageCount || 1
+            })));
+            // Re-calculate total pages
+            const totalPages = parsed.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
+            setBackendTotalPages(totalPages);
+          }
         } catch (err) {
           console.error("Failed to restore files from session:", err);
+          sessionStorage.removeItem("printFiles");
         }
       }
     }
@@ -643,11 +653,11 @@ export function UploadFile() {
         return;
       }
 
-      // Filter existing uploadedFilesData to exclude any cancelled files and ensure they match current UI files
+      // Filter existing uploadedFilesData to exclude any cancelled files and ensure they match currently completed UI files
       const currentActiveFiles = uploadedFilesData.filter((d) =>
         !cancelledUploadIdsRef.current.has(d.clientUploadId) &&
         filesRef.current.some(
-          (f) => f.clientUploadId === d.clientUploadId && f.status !== "failed"
+          (f) => f.clientUploadId === d.clientUploadId && f.status === "completed"
         )
       );
 
@@ -668,17 +678,20 @@ export function UploadFile() {
         backendFiles = response.data.files;
       }
 
-      // Post-finalize race check: Was any file cancelled while finalize was in flight?
-      const finalUploadedFiles: any[] = [];
-      for (const uf of validUploadedFiles) {
-        // Correlate backendFiles strictly by clientUploadId or positional index in filesToFinalize (zero filename fallback)
-        const finalizeIndex = filesToFinalize.findIndex((f) => f.clientUploadId === uf.clientUploadId);
-        const bf = backendFiles.find((b: any) => b.clientUploadId === uf.clientUploadId)
-          || (finalizeIndex >= 0 && finalizeIndex < backendFiles.length ? backendFiles[finalizeIndex] : undefined);
+      // Post-finalize race check: Correlate ALL files that were sent to /finalize-upload
+      const finalizedAllActive: any[] = [];
+      for (const item of filesToFinalize) {
+        if (!item.clientUploadId) continue;
 
-        if (cancelledUploadIdsRef.current.has(uf.clientUploadId)) {
-          console.log(`[FINALIZE RACE] File was cancelled while /finalize-upload was in flight: ${uf.name} (${uf.clientUploadId})`);
-          const cleanupUrl = bf?.url || uf.url;
+        // Correlate backendFiles strictly by clientUploadId or positional index in filesToFinalize (safe fallback to name)
+        const finalizeIndex = filesToFinalize.findIndex((f) => f.clientUploadId === item.clientUploadId);
+        const bf = backendFiles.find((b: any) => b.clientUploadId === item.clientUploadId)
+          || (finalizeIndex >= 0 && finalizeIndex < backendFiles.length ? backendFiles[finalizeIndex] : undefined)
+          || backendFiles.find((b: any) => b.name === item.name);
+
+        if (cancelledUploadIdsRef.current.has(item.clientUploadId)) {
+          console.log(`[FINALIZE RACE] File was cancelled while /finalize-upload was in flight: ${item.name} (${item.clientUploadId})`);
+          const cleanupUrl = bf?.url || item.url;
           if (cleanupUrl) {
             api.delete("/remove-file", { data: { fileUrl: cleanupUrl } }).catch(() => {});
           }
@@ -686,34 +699,28 @@ export function UploadFile() {
         }
 
         if (bf) {
-          finalUploadedFiles.push({
-            clientUploadId: uf.clientUploadId,
-            jobId: bf.jobId, // Explicitly capture jobId from backend
-            name: uf.name,
-            url: bf.url || uf.url,
-            type: bf.type || uf.type,
-            size: uf.size,
-            pageCount: typeof bf.pageCount === "number" ? bf.pageCount : uf.pageCount,
+          finalizedAllActive.push({
+            clientUploadId: item.clientUploadId,
+            jobId: bf.jobId || item.jobId, // Fresh jobId from backend for EVERY finalized file
+            name: item.name,
+            url: bf.url || item.url,
+            type: bf.type || item.type,
+            size: item.size,
+            pageCount: typeof bf.pageCount === "number" ? bf.pageCount : item.pageCount,
           });
         } else {
-          finalUploadedFiles.push(uf);
+          finalizedAllActive.push(item);
         }
       }
 
-      // Update uploadedFilesData with explicit jobIds (strictly correlated by clientUploadId)
-      const allActiveUploaded = [
-        ...uploadedFilesData.filter(
-          (p) => !finalUploadedFiles.some((f) => f.clientUploadId === p.clientUploadId)
-        ),
-        ...finalUploadedFiles,
-      ];
-      setUploadedFilesData(allActiveUploaded);
-      sessionStorage.setItem("printFiles", JSON.stringify(allActiveUploaded));
+      // Update uploadedFilesData with explicit fresh jobIds for all active files
+      setUploadedFilesData(finalizedAllActive);
+      sessionStorage.setItem("printFiles", JSON.stringify(finalizedAllActive));
 
       // Update UI files (strictly correlated by clientUploadId)
       setFiles((prev) =>
         prev.map((f) => {
-          const matchingFinal = finalUploadedFiles.find((uf) =>
+          const matchingFinal = finalizedAllActive.find((uf) =>
             uf.clientUploadId === f.clientUploadId
           );
           if (matchingFinal) {
@@ -724,7 +731,7 @@ export function UploadFile() {
       );
       toast.success("Files ready for printing!");
 
-      const totalPages = finalUploadedFiles.reduce((acc: number, curr: any) => acc + curr.pageCount, 0);
+      const totalPages = finalizedAllActive.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
       setBackendTotalPages(totalPages);
 
       sessionStorage.setItem("uploadAmount", (totalPages * 2).toString());
