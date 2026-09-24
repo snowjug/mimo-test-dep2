@@ -27,6 +27,7 @@ BW_PRINTER_NAME = os.environ.get("BW_PRINTER_NAME", "Brother_HL_L2440DW_series")
 COLOR_PRINTER_NAME = os.environ.get("COLOR_PRINTER_NAME", "Epson_L3250")
 # Kiosk Routing Identity
 KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
+IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
 TEMP_DIR = "/tmp/mimo_prints"
 
 if not os.path.exists(TEMP_DIR):
@@ -224,24 +225,53 @@ def slice_pdf_pages(input_pdf, page_range):
         print(f"❌ Page slicing failed: {e}")
         return input_pdf
 
-def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_color: bool = False, is_duplex: bool = False, doc_ref=None) -> bool:
+def check_reasons_for_error(reasons) -> str | None:
+    """Inspect CUPS job/printer state reasons for hard failure conditions."""
+    if not reasons:
+        return None
+    if isinstance(reasons, str):
+        reasons = [reasons]
+    for r in reasons:
+        r_lower = str(r).lower().strip()
+        # media-empty-warning alone is not a hard failure
+        if r_lower in ('media-empty', 'media-empty-error', 'media-needed', 'media-needed-error'):
+            return "Printer out of paper"
+        if r_lower in ('media-jam', 'media-jam-error'):
+            return "Paper jam detected"
+        if r_lower in ('door-open', 'door-open-error'):
+            return "Printer cover is open"
+        if r_lower in ('offline-report', 'offline-error'):
+            return "Printer is offline"
+        if r_lower in ('input-tray-missing', 'input-tray-missing-error'):
+            return "Input tray missing"
+    return None
+
+def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_color: bool = False, is_duplex: bool = False, doc_ref=None, printer_name: str = BW_PRINTER_NAME) -> bool:
     """
     Polls CUPS via pycups for the specific job ID until IPP_JOB_COMPLETED (state 9)
     AND the calibrated physical print duration has elapsed.
     Returns True ONLY when BOTH CUPS success AND physical print duration are satisfied.
-    Returns False if pycups is unavailable, job is stopped/canceled/aborted, or times out.
+    Returns False if pycups is unavailable, job is stopped/canceled/aborted, reports hard errors, or times out.
     """
     if cups is None:
         print(f"❌ pycups is not installed or available. Cannot monitor CUPS job {cups_job_id}.")
         return False
 
     # Calibrated mechanical cadence:
-    # Uses the same reliable completion cadence as B&W Laser: 3.5s warmup + 2.2s per simplex sheet / 8.5s per duplex physical sheet
-    warmup_sec = 4.0 if is_duplex else 3.5
-    per_sheet_sec = 8.5 if is_duplex else 2.2
+    # CV-001 Brother HL-L5210DN B&W Laser: 10.4s warmup + 1.3s per simplex sheet / 5.5s per duplex physical sheet
+    # SV-002 Brother HL-L2440DW B&W Laser: 3.5s warmup + 2.2s per simplex sheet / 8.5s per duplex physical sheet
+    # SV-002 Epson L3250 Color Inkjet: 4.5s warmup + 12.0s per simplex sheet / 24.0s per duplex physical sheet
     if is_color:
+        warmup_sec = 4.5
+        per_sheet_sec = 24.0 if is_duplex else 12.0
         timeout_sec = max(90, int(60 + warmup_sec + (total_sheets * (35 if is_duplex else 25))))
+    elif KIOSK_ID == "CV-001" or "5210" in BW_PRINTER_NAME:
+        warmup_sec = 3.8 if is_duplex else 10.4
+        per_sheet_sec = 5.5 if is_duplex else 1.3
+        timeout_sec = max(60, int(60 + warmup_sec + (total_sheets * (15 if is_duplex else 6))))
     else:
+        warmup_sec = 4.0 if is_duplex else 3.5
+        per_sheet_sec = 8.5 if is_duplex else 2.2
         timeout_sec = max(60, int(60 + warmup_sec + (total_sheets * (20 if is_duplex else 8))))
 
     required_duration = warmup_sec + (total_sheets * per_sheet_sec)
@@ -261,7 +291,7 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
     IPP_JOB_ABORTED = 8
     IPP_JOB_COMPLETED = 9
     
-    print(f"⏳ Monitoring CUPS Job ID {cups_job_id} ({total_sheets} sheets, min required {required_duration:.1f}s, max timeout {timeout_sec}s)...")
+    print(f"⏳ Monitoring CUPS Job ID {cups_job_id} on [{printer_name}] ({total_sheets} sheets, min required {required_duration:.1f}s, max timeout {timeout_sec}s)...")
     
     while time.time() - start_time < timeout_sec:
         elapsed = time.time() - start_time
@@ -269,12 +299,54 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
         # Only poll CUPS if we haven't already confirmed State 9
         if not cups_confirmed:
             try:
+                # 1. Check printer-level hardware state reasons (out of paper, jam, door open, etc.)
+                try:
+                    p_attrs = conn.getPrinterAttributes(printer_name)
+                    p_reasons = p_attrs.get('printer-state-reasons', [])
+                    p_err = check_reasons_for_error(p_reasons)
+                    if p_err:
+                        print(f"❌ Physical printer [{printer_name}] reported error: {p_reasons} -> {p_err}")
+                        if doc_ref:
+                            try:
+                                doc_ref.update({"status": "failed", "printerStatus": p_err})
+                            except Exception as up_err:
+                                print(f"⚠️ Failed to update Firestore error status: {up_err}")
+                        try:
+                            conn.cancelJob(cups_job_id)
+                        except Exception:
+                            pass
+                        return False
+                except Exception as p_query_err:
+                    pass
+
+                # 2. Check job attributes and job-level state reasons
                 attrs = conn.getJobAttributes(cups_job_id)
                 job_state = attrs.get('job-state')
+                job_reasons = attrs.get('job-state-reasons', [])
+                
+                job_err = check_reasons_for_error(job_reasons)
+                if job_err:
+                    print(f"❌ CUPS Job {cups_job_id} reported job error: {job_reasons} -> {job_err}")
+                    if doc_ref:
+                        try:
+                            doc_ref.update({"status": "failed", "printerStatus": job_err})
+                        except Exception as up_err:
+                            print(f"⚠️ Failed to update Firestore error status: {up_err}")
+                    try:
+                        conn.cancelJob(cups_job_id)
+                    except Exception:
+                        pass
+                    return False
                 
                 if job_state in (IPP_JOB_CANCELED, IPP_JOB_ABORTED, IPP_JOB_STOPPED):
                     reasons = attrs.get('job-state-reasons', ['unknown'])
+                    err_msg = check_reasons_for_error(reasons) or "CUPS job aborted or stopped"
                     print(f"❌ CUPS Job {cups_job_id} terminated with state {job_state}: {reasons}")
+                    if doc_ref:
+                        try:
+                            doc_ref.update({"status": "failed", "printerStatus": err_msg})
+                        except Exception as up_err:
+                            print(f"⚠️ Failed to update Firestore error status: {up_err}")
                     return False
                     
                 if job_state == IPP_JOB_COMPLETED:
@@ -306,13 +378,9 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
                     except Exception as up_err:
                         print(f"⚠️ Progress update error: {up_err}")
 
-        # FINAL DUAL GATE: When CUPS completes, wait physical buffer for the final sheet (4.0s for Color inkjet, 0.0s for B&W laser)
-        if cups_confirmed:
-            paper_exit_delay = 4.0 if is_color else 0.0
-            if paper_exit_delay > 0:
-                print(f"⏳ [SYNC] CUPS confirmed job {cups_job_id}. Waiting {paper_exit_delay}s for Color final sheet physical ejection...")
-                time.sleep(paper_exit_delay)
-            print(f"🎉 CUPS Job {cups_job_id} physical printing complete ({total_sheets} sheets).")
+        # FINAL DUAL GATE: Both CUPS completion confirmed AND physical duration elapsed
+        if cups_confirmed and elapsed >= required_duration:
+            print(f"🎉 CUPS Job {cups_job_id} physical printing complete ({total_sheets} sheets after {elapsed:.1f}s).")
             if doc_ref:
                 try:
                     doc_ref.update({"sheetsCompleted": total_sheets})
@@ -320,7 +388,7 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
                     print(f"⚠️ Progress update error: {up_err}")
             return True
             
-        time.sleep(0.5)
+        time.sleep(0.1)
         
     print(f"❌ Timeout ({timeout_sec}s) waiting for physical completion of CUPS job {cups_job_id} (cups_confirmed={cups_confirmed})")
     return False
@@ -396,7 +464,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             sheets_per_copy = math.ceil(sheets_per_copy / 2)
             
         total_sheets = max(1, int(sheets_per_copy * copies))
-        effective_is_color = is_color or (printer_name == COLOR_PRINTER_NAME and BW_PRINTER_NAME != COLOR_PRINTER_NAME) or ("epson" in printer_name.lower())
+        effective_is_color = False if IS_MONOCHROME_ONLY else (is_color or (printer_name == COLOR_PRINTER_NAME and BW_PRINTER_NAME != COLOR_PRINTER_NAME) or ("epson" in printer_name.lower()))
 
         if doc_ref:
             try:
@@ -442,7 +510,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             cups_job_id = int(match.group(1))
             is_duplex = (double_sided == "double")
             print(f"✅ CUPS job {cups_job_id} accepted by queue. Waiting for physical completion (duplex={is_duplex})...")
-            return wait_for_cups_job_completion(cups_job_id, total_sheets, effective_is_color, is_duplex=is_duplex, doc_ref=doc_ref)
+            return wait_for_cups_job_completion(cups_job_id, total_sheets, effective_is_color, is_duplex=is_duplex, doc_ref=doc_ref, printer_name=printer_name)
         
         print("⚠️ Could not extract CUPS job ID from lp output. Assuming accepted.")
         if doc_ref:
@@ -603,7 +671,7 @@ def process_job(doc_snapshot):
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
     color_mode = doc.get("colorMode", "monochrome")
-    is_color = color_mode.lower() == "color"
+    is_color = False if IS_MONOCHROME_ONLY else (color_mode.lower() == "color")
     print_options = doc.get("printOptions", {})
     # Read copies from printOptions (where frontend stores it), fallback to top-level
     copies = int(print_options.get("copies", doc.get("copies", 1)))
@@ -758,10 +826,19 @@ def process_job(doc_snapshot):
             print(f"🎉 Job {doc_id} marked as completed.")
 
         else:
-            doc_ref.update({
-                "status": "failed",
-                "printerStatus": "CUPS error on Pi"
-            })
+            try:
+                latest = doc_ref.get()
+                latest_data = latest.to_dict() if latest.exists else {}
+                if latest_data.get("status") != "failed":
+                    doc_ref.update({
+                        "status": "failed",
+                        "printerStatus": "CUPS error on Pi"
+                    })
+            except Exception:
+                doc_ref.update({
+                    "status": "failed",
+                    "printerStatus": "CUPS error on Pi"
+                })
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         doc_ref.update({"status": "failed", "printerStatus": f"Pi processing error: {str(e)[:50]}"})
