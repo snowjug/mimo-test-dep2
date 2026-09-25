@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Tv,
   Volume2,
@@ -9,10 +9,13 @@ import {
   CheckCircle2,
   Loader2,
   Cpu,
+  Plus,
+  Sparkles,
+  ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc } from 'firebase/firestore';
-import { storage, db } from '../../lib/firebase';
+import { storage } from '../../lib/firebase';
 import api from '../../api';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -43,6 +46,20 @@ export const ConfigurationPage: React.FC = () => {
   const [savingThresholds, setSavingThresholds] = useState(false);
   const [savedThresholds, setSavedThresholds] = useState(false);
 
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const res = await api.get('/admin/screensaver');
+        if (res.data) {
+          setScreensaver(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load screensaver settings:', err);
+      }
+    };
+    loadConfig();
+  }, []);
+
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -58,309 +75,273 @@ export const ConfigurationPage: React.FC = () => {
         });
       });
     } catch (err) {
-      console.error('Failed to upload screensaver media:', err);
-      alert('Failed to upload file from gallery.');
+      alert('Upload failed: ' + (err as Error).message);
     } finally {
       setIsUploadingMedia(false);
-      e.target.value = '';
     }
   };
 
-  const saveScreensaver = async () => {
+  const handleAddVideoUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVideoUrl.trim()) return;
+    setScreensaver((prev) => ({ ...prev, videos: [...prev.videos, newVideoUrl.trim()] }));
+    setNewVideoUrl('');
+  };
+
+  const handleRemoveVideo = (index: number) => {
+    setScreensaver((prev) => ({
+      ...prev,
+      videos: prev.videos.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSaveScreensaver = async () => {
     setSavingScreensaver(true);
+    setSavedScreensaver(false);
     try {
-      const adminToken = localStorage.getItem('adminToken') || '';
-      const headers = adminToken ? { Authorization: `Bearer ${adminToken}` } : {};
-
-      try {
-        await setDoc(
-          doc(db, 'mimo_settings', 'screensaver'),
-          {
-            videos: Array.isArray(screensaver.videos) ? screensaver.videos : [],
-            playSound: Boolean(screensaver.playSound),
-            idleTimeoutSeconds: Number(screensaver.idleTimeoutSeconds || 60),
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
-      } catch (fsErr) {
-        console.warn('Firestore write warning:', fsErr);
-      }
-
-      try {
-        await api.post('/admin/screensaver', screensaver, { headers });
-      } catch (apiErr) {
-        console.warn('Backend API /admin/screensaver response handled:', apiErr);
-      }
-
+      await api.post('/admin/screensaver', screensaver);
       setSavedScreensaver(true);
       setTimeout(() => setSavedScreensaver(false), 3000);
     } catch (err) {
-      console.warn('Screensaver save completed:', err);
-      setSavedScreensaver(true);
-      setTimeout(() => setSavedScreensaver(false), 3000);
+      alert('Failed to save screensaver settings');
     } finally {
       setSavingScreensaver(false);
     }
   };
 
-  const handleSaveThresholds = () => {
+  const handleSaveThresholds = async () => {
     setSavingThresholds(true);
+    setSavedThresholds(false);
     setTimeout(() => {
       setSavingThresholds(false);
       setSavedThresholds(true);
       setTimeout(() => setSavedThresholds(false), 3000);
-    }, 600);
+    }, 500);
   };
 
   return (
-    <div className="w-full space-y-6 pb-12 select-none font-sans max-w-4xl">
-      {/* Header */}
-      <div>
-        <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${
-          isDark ? 'text-white' : 'text-[#1e1b4b]'
-        }`}>
-          System & Kiosk Configuration
-        </h1>
-        <p className={`text-xs sm:text-sm font-medium mt-0.5 ${
-          isDark ? 'text-slate-400' : 'text-gray-500'
-        }`}>
-          Configure kiosk screensavers, idle timeouts, hardware alert thresholds, SLA defaults, and administrator credentials
-        </p>
-      </div>
-
-      {/* 1. Screensaver Configuration Card */}
-      <div className={`border rounded-2xl p-6 shadow-sm space-y-5 ${
-        isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-      }`}>
-        <div className={`flex items-center gap-2.5 pb-3 border-b ${
-          isDark ? 'border-slate-700' : 'border-gray-100'
-        }`}>
-          <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-[#a78bfa] flex items-center justify-center font-bold">
-            <Tv size={17} />
-          </div>
-          <div>
-            <h2 className={`text-base font-bold ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>Motion Graphics & Screen Saver</h2>
-            <p className="text-xs text-gray-400">Configure idle screensaver playlist and audio on kiosk tablets</p>
-          </div>
-        </div>
-
-        {/* Audio & Timeout Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className={`border rounded-xl p-4 flex items-center justify-between ${
-            isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50/80 border-gray-200'
-          }`}>
-            <div>
-              <div className={`font-extrabold text-xs uppercase tracking-wider ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>Audio Playback</div>
-              <div className="text-xs text-gray-400 mt-0.5">Play background sound with video</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setScreensaver({ ...screensaver, playSound: !screensaver.playSound })}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                screensaver.playSound
-                  ? 'bg-[#7c3aed] text-white shadow-xs'
-                  : isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              {screensaver.playSound ? <Volume2 size={15} /> : <VolumeX size={15} />}
-              {screensaver.playSound ? 'Sound ON' : 'Muted'}
-            </button>
-          </div>
-
-          <div className={`border rounded-xl p-4 ${
-            isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50/80 border-gray-200'
-          }`}>
-            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">
-              Idle Timeout (Seconds)
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="10"
-                max="600"
-                value={screensaver.idleTimeoutSeconds}
-                onChange={(e) => setScreensaver({ ...screensaver, idleTimeoutSeconds: parseInt(e.target.value) || 60 })}
-                className={`w-full px-3 py-2 border rounded-lg text-sm font-bold focus:outline-none ${
-                  isDark
-                    ? 'bg-slate-900 border-slate-700 text-white focus:border-[#8b5cf6]'
-                    : 'bg-white border-gray-200 text-[#1e1b4b] focus:border-[#7c3aed]'
-                }`}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Playlist URL List */}
+    <div className="space-y-6 animate-fadeIn font-sans select-none">
+      {/* ── Page Header ────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-            Active Video Playlist URLs
-          </label>
-          <div className="space-y-2 mb-4">
-            {screensaver.videos.map((url, i) => (
-              <div
-                key={i}
-                className={`flex items-center justify-between gap-3 p-3 border rounded-xl text-xs ${
-                  isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50 border-gray-200'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 truncate">
-                  <span className="font-bold text-gray-400">{i + 1}.</span>
-                  <span className={`truncate font-semibold ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>{url}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setScreensaver({ ...screensaver, videos: screensaver.videos.filter((_, idx) => idx !== i) })}
-                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer flex-shrink-0"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+          <div className="flex items-center gap-2.5">
+            <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              System & Kiosk Configuration
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+              <ShieldCheck size={12} />
+              Edge Node Policy
+            </span>
           </div>
-
-          {/* Add URL or Upload File */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              placeholder="Paste media URL (e.g. https://.../video.mp4)"
-              value={newVideoUrl}
-              onChange={(e) => setNewVideoUrl(e.target.value)}
-              className={`flex-1 px-3.5 py-2.5 text-xs border rounded-xl focus:outline-none ${
-                isDark
-                  ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-[#8b5cf6]'
-                  : 'bg-white border-gray-200 text-[#1e1b4b] placeholder-gray-400 focus:border-[#7c3aed]'
-              }`}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (newVideoUrl.trim()) {
-                  setScreensaver({ ...screensaver, videos: [...screensaver.videos, newVideoUrl.trim()] });
-                  setNewVideoUrl('');
-                }
-              }}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                isDark
-                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
-              }`}
-            >
-              + Add URL
-            </button>
-            <label className="px-4 py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-xl text-xs font-bold cursor-pointer inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors">
-              {isUploadingMedia ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-              Upload File
-              <input type="file" accept="video/*,image/*" className="hidden" disabled={isUploadingMedia} onChange={handleMediaUpload} />
-            </label>
-          </div>
-        </div>
-
-        <div className={`flex justify-end pt-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
-          <button
-            type="button"
-            onClick={saveScreensaver}
-            disabled={savingScreensaver}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold text-xs shadow-md shadow-purple-500/20 transition-all cursor-pointer"
-          >
-            {savingScreensaver ? <Loader2 size={14} className="animate-spin" /> : savedScreensaver ? <CheckCircle2 size={14} /> : <Save size={14} />}
-            {savedScreensaver ? 'Screensaver Saved!' : 'Save Screensaver Settings'}
-          </button>
+          <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">
+            Configure kiosk screensavers, idle timeouts, hardware alert thresholds, and autonomous policies.
+          </p>
         </div>
       </div>
 
-      {/* 2. Hardware Alert & Mesh Thresholds */}
-      <div className={`border rounded-2xl p-6 shadow-sm space-y-5 ${
-        isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-      }`}>
-        <div className={`flex items-center gap-2.5 pb-3 border-b ${
-          isDark ? 'border-slate-700' : 'border-gray-100'
-        }`}>
-          <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-[#a78bfa] flex items-center justify-center font-bold">
-            <Cpu size={17} />
-          </div>
+      {/* ── Config Grid ────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Screensaver & Motion Graphics */}
+        <div className="p-5 sm:p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs flex flex-col justify-between space-y-5">
           <div>
-            <h2 className={`text-base font-bold ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>Hardware Alerts & Telemetry Thresholds</h2>
-            <p className="text-xs text-gray-400">Configure trigger parameters for autonomous incident alerts</p>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-bold text-base text-[var(--text-1)]">Motion Graphics & Screen Saver</h2>
+                <p className="text-xs text-[var(--text-3)]">Configure idle screensaver playlist and audio on kiosk tablets</p>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                <Tv size={16} />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Audio & Idle Timeout */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    Audio Playback
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setScreensaver(prev => ({ ...prev, playSound: !prev.playSound }))}
+                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      screensaver.playSound
+                        ? 'bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400'
+                        : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-3)]'
+                    }`}
+                  >
+                    <span>{screensaver.playSound ? 'Sound Enabled' : 'Muted'}</span>
+                    {screensaver.playSound ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    Idle Timeout (Seconds)
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="600"
+                    value={screensaver.idleTimeoutSeconds}
+                    onChange={(e) => setScreensaver({ ...screensaver, idleTimeoutSeconds: parseInt(e.target.value) || 60 })}
+                    className="w-full px-3 py-2 text-xs sm:text-sm font-bold rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-1)] focus:outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+              </div>
+
+              {/* Playlist URLs */}
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-2">
+                  Active Video Playlist URLs
+                </label>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {screensaver.videos.map((vid, i) => (
+                    <div
+                      key={i}
+                      className="p-2.5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-between gap-2"
+                    >
+                      <span className="text-xs font-mono text-[var(--text-2)] truncate max-w-[280px]">
+                        {i + 1}. {vid}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveVideo(i)}
+                        className="p-1 text-[var(--text-3)] hover:text-rose-500 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Video & Upload */}
+              <form onSubmit={handleAddVideoUrl} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Paste media URL (e.g. https://.../video.mp4)"
+                  value={newVideoUrl}
+                  onChange={(e) => setNewVideoUrl(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-1)] focus:outline-none focus:border-[var(--primary)]"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text-2)] hover:bg-[var(--surface-2)] cursor-pointer"
+                >
+                  + Add URL
+                </button>
+                <label className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all cursor-pointer">
+                  {isUploadingMedia ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                  <span>Upload</span>
+                  <input type="file" accept="video/*" onChange={handleMediaUpload} className="hidden" />
+                </label>
+              </form>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-[var(--border)] flex items-center justify-between">
+            {savedScreensaver ? (
+              <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">
+                <CheckCircle2 size={14} /> Screensaver synced!
+              </span>
+            ) : <span />}
+
+            <button
+              type="button"
+              disabled={savingScreensaver}
+              onClick={handleSaveScreensaver}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-indigo-500/20 disabled:opacity-50"
+            >
+              {savingScreensaver ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              Save Screensaver Settings
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className={`border rounded-xl p-4 ${
-            isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50/80 border-gray-200'
-          }`}>
-            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">
-              Paper Tray Low Alert Limit (%)
-            </label>
-            <input
-              type="number"
-              value={thresholds.paperLowLimit}
-              onChange={(e) => setThresholds({ ...thresholds, paperLowLimit: parseInt(e.target.value) || 0 })}
-              className={`w-full px-3 py-2 border rounded-lg text-sm font-bold focus:outline-none ${
-                isDark ? 'bg-slate-900 border-slate-700 text-white focus:border-[#8b5cf6]' : 'bg-white border-gray-200 text-[#1e1b4b] focus:border-[#7c3aed]'
-              }`}
-            />
+        {/* Hardware Alerts & Telemetry Thresholds */}
+        <div className="p-5 sm:p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs flex flex-col justify-between space-y-5">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-bold text-base text-[var(--text-1)]">Hardware Alerts & Telemetry Thresholds</h2>
+                <p className="text-xs text-[var(--text-3)]">Configure trigger parameters for autonomous incident alerts</p>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                <Cpu size={16} />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    Paper Tray Low Alert Limit (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={thresholds.paperLowLimit}
+                    onChange={(e) => setThresholds({ ...thresholds, paperLowLimit: parseInt(e.target.value) || 15 })}
+                    className="w-full px-3 py-2 text-xs sm:text-sm font-bold rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-1)] focus:outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    Toner Cartridge Low Limit (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={thresholds.tonerLowLimit}
+                    onChange={(e) => setThresholds({ ...thresholds, tonerLowLimit: parseInt(e.target.value) || 20 })}
+                    className="w-full px-3 py-2 text-xs sm:text-sm font-bold rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-1)] focus:outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    Max Dispatch Retries Before Incident
+                  </label>
+                  <input
+                    type="number"
+                    value={thresholds.maxRetries}
+                    onChange={(e) => setThresholds({ ...thresholds, maxRetries: parseInt(e.target.value) || 3 })}
+                    className="w-full px-3 py-2 text-xs sm:text-sm font-bold rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-1)] focus:outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    Heartbeat Check Interval (Seconds)
+                  </label>
+                  <input
+                    type="number"
+                    value={thresholds.heartbeatInterval}
+                    onChange={(e) => setThresholds({ ...thresholds, heartbeatInterval: parseInt(e.target.value) || 15 })}
+                    className="w-full px-3 py-2 text-xs sm:text-sm font-bold rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-1)] focus:outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className={`border rounded-xl p-4 ${
-            isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50/80 border-gray-200'
-          }`}>
-            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">
-              Toner Cartridge Low Limit (%)
-            </label>
-            <input
-              type="number"
-              value={thresholds.tonerLowLimit}
-              onChange={(e) => setThresholds({ ...thresholds, tonerLowLimit: parseInt(e.target.value) || 0 })}
-              className={`w-full px-3 py-2 border rounded-lg text-sm font-bold focus:outline-none ${
-                isDark ? 'bg-slate-900 border-slate-700 text-white focus:border-[#8b5cf6]' : 'bg-white border-gray-200 text-[#1e1b4b] focus:border-[#7c3aed]'
-              }`}
-            />
-          </div>
+          <div className="pt-4 border-t border-[var(--border)] flex items-center justify-between">
+            {savedThresholds ? (
+              <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">
+                <CheckCircle2 size={14} /> Thresholds updated!
+              </span>
+            ) : <span />}
 
-          <div className={`border rounded-xl p-4 ${
-            isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50/80 border-gray-200'
-          }`}>
-            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">
-              Max Dispatch Retries Before Incident
-            </label>
-            <input
-              type="number"
-              value={thresholds.maxRetries}
-              onChange={(e) => setThresholds({ ...thresholds, maxRetries: parseInt(e.target.value) || 0 })}
-              className={`w-full px-3 py-2 border rounded-lg text-sm font-bold focus:outline-none ${
-                isDark ? 'bg-slate-900 border-slate-700 text-white focus:border-[#8b5cf6]' : 'bg-white border-gray-200 text-[#1e1b4b] focus:border-[#7c3aed]'
-              }`}
-            />
+            <button
+              type="button"
+              disabled={savingThresholds}
+              onClick={handleSaveThresholds}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-purple-600/20 disabled:opacity-50"
+            >
+              {savingThresholds ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              Save System Thresholds
+            </button>
           </div>
-
-          <div className={`border rounded-xl p-4 ${
-            isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50/80 border-gray-200'
-          }`}>
-            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">
-              Heartbeat Check Interval (Seconds)
-            </label>
-            <input
-              type="number"
-              value={thresholds.heartbeatInterval}
-              onChange={(e) => setThresholds({ ...thresholds, heartbeatInterval: parseInt(e.target.value) || 0 })}
-              className={`w-full px-3 py-2 border rounded-lg text-sm font-bold focus:outline-none ${
-                isDark ? 'bg-slate-900 border-slate-700 text-white focus:border-[#8b5cf6]' : 'bg-white border-gray-200 text-[#1e1b4b] focus:border-[#7c3aed]'
-              }`}
-            />
-          </div>
-        </div>
-
-        <div className={`flex justify-end pt-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
-          <button
-            type="button"
-            onClick={handleSaveThresholds}
-            disabled={savingThresholds}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold text-xs shadow-md shadow-purple-500/20 transition-all cursor-pointer"
-          >
-            {savingThresholds ? <Loader2 size={14} className="animate-spin" /> : savedThresholds ? <CheckCircle2 size={14} /> : <Save size={14} />}
-            {savedThresholds ? 'Thresholds Saved!' : 'Save System Thresholds'}
-          </button>
         </div>
       </div>
     </div>
