@@ -25,7 +25,7 @@ User Device (Browser)
 mimo-website (Vite + React)       ◄── Customer uploads docs, pays via Cashfree
       │
       ▼
-backend/api (Node.js + Express)   ◄── Creates Firestore print job, generates 4-digit code
+functions/ (Firebase Cloud Function `api`, Express) ◄── Creates Firestore print job, generates 4-digit code
       │
       ▼
 Firestore (Firebase)              ◄── Real-time database; stores print jobs, user accounts
@@ -46,37 +46,31 @@ Kiosk Touchscreen (mimo-frontend) ◄── User enters code, watches real-time 
 
 ```
 mimo-test-dep2/
-│
-├── backend/                            # Node.js + Express REST API
-│   ├── api/server.js                   # Main server — all API routes live here
-│   ├── .env                            # 🔒 Secrets (download from GDrive, don't commit)
-│   ├── .env.example                    # Template showing required env variable names
-│   ├── firebase.json                   # Firebase deployment config
-│   ├── firestore.rules                 # Firestore security rules
-│   └── serviceAccountKey.json          # 🔒 Firebase Admin SDK key (download from GDrive)
-│
-├── mimo-website/                       # Customer + Admin web app
-│   ├── src/                            # Vite + React source
-│   └── mimo-admin-dashboard/src/       # Admin dashboard (nested Vite + React app)
-│       └── App.tsx                     # Main admin UI — all tabs, analytics, settings
-│
+├── functions/                THE backend — Firebase Cloud Functions (`api` + Firestore/scheduler triggers)
+│   ├── index.js              Entry point: exports the deployed functions (names/URLs are a contract)
+│   ├── src/                  server.js (Express app) · config/ · middleware/ (auth, rateLimit) · routes/
+│   │                         controllers/ · services/ · triggers/ · validators/
+│   └── __tests__/            Unit tests (`npm test`)
+├── mimo-website/             Customer web app (Vite + React) + admin dashboard (mimo-admin-dashboard/) + Capacitor android/
 ├── mimo-frontend-web-app/
-│   └── mimo-frontend/                  # Kiosk touchscreen UI (Vite + React)
-│       └── src/components/screens/     # Each screen is a separate component
-│           ├── NumpadScreen.tsx        # User enters 4-digit print code
-│           ├── PrintingScreen.tsx      # Real-time print progress display
-│           └── adds/Adds.tsx           # Screensaver / idle motion graphics
-│
-├── pi-listener/
-│   └── firebase_listener.py            # Raspberry Pi Python daemon
-│                                       # Watches Firestore → downloads PDF → sends to CUPS
-│
-├── functions/                          # Firebase Cloud Functions
-│   ├── index.js                        # Serverless functions (WhatsApp, OTP, webhooks)
-│   └── .env                            # 🔒 Functions secrets (download from GDrive)
-│
-└── docs/                               # Additional documentation
+│   └── mimo-frontend/        Kiosk touchscreen UI (Vite + React)
+├── LENOVO TABLET APP/        Android kiosk shell (Kotlin WebView) + ADB lock/unlock scripts
+├── company-website/          Static company site (copy of mimo-website/public — see docs)
+├── converter/                Office→PDF service (LibreOffice, Cloud Run `mimo-office-converter`)
+├── pi_scripts/               Pi listener (MIMO 1.0 / CV-001 lineage) + helpers
+├── pi-listener/              Pi listener (MIMO 2.0 / SV-002 lineage)
+├── mimo-listener*.service  pi_setup.sh  fallback_wifi.sh …   Pi provisioning files
+├── scripts/                  One-off tooling, not deployed: pi-ops/ · firestore/ · e2e/ · fixtures/
+├── backend/                  ⚠️ LEGACY Express server — FROZEN, not the production API (see below)
+├── docs/                     Older notes (several are historical — see banners)
+├── firebase.json  .firebaserc  storage.rules
+└── .github/workflows/        deploy-functions.yml · deploy-converter.yml · backend-image.yml (legacy image)
 ```
+
+> **`backend/` is frozen legacy.** Production traffic goes to `functions/`. `backend/` is kept untouched only because an
+> external process may still consume its Docker image (`backend-image.yml`); it also holds the Firestore rules/indexes
+> (`backend/firestore.rules`, `backend/firebase.json`). Do not add features there. Pi listener file names are unchanged —
+> which listener runs on which Pi still needs confirming by hash.
 
 ---
 
@@ -123,54 +117,28 @@ cd Mimo_V2
 1. Open the **[GDrive Environment Variables link](https://drive.google.com/file/d/1VURWsFEovVIUPC2dxNqrPfkcpAye42IU/view?usp=sharing)**
 2. Download the zip / file shared
 3. Place files in correct locations:
-   - `backend/.env` ← backend API secrets
-   - `functions/.env` ← Firebase Cloud Functions secrets
-   - `backend/serviceAccountKey.json` or project root ← Firebase Admin SDK
+   - `functions/.env` ← Cloud Functions secrets (Firebase deploys read this file; keep the same variable names)
+   - `backend/.env` ← legacy Express server only
+   - `backend/serviceAccountKey.json` or project root ← Firebase Admin SDK (used by ad-hoc scripts in `scripts/`)
 
-### Step 3 — Install All Dependencies
+### Step 3 — Install Dependencies
 
-Open **3 separate terminal windows** and run:
-
-**Terminal 1 — Backend:**
 ```bash
-cd backend
-npm install
+(cd functions && npm install)                                # backend (Cloud Functions)
+(cd mimo-website && npm install)                             # customer app + admin build
+(cd mimo-frontend-web-app/mimo-frontend && npm install)      # kiosk UI
 ```
 
-**Terminal 2 — Customer Website & Admin Dashboard:**
+### Step 4 — Run
+
 ```bash
-cd mimo-website
-npm install
+(cd functions && npm test)                                   # unit tests
+(cd mimo-website && npm run dev)                             # http://localhost:5173
+(cd mimo-frontend-web-app/mimo-frontend && npm run dev)      # http://localhost:5174
 ```
 
-**Terminal 3 — Kiosk Frontend:**
-```bash
-cd mimo-frontend-web-app/mimo-frontend
-npm install
-```
-
-### Step 4 — Start Dev Servers
-
-**Terminal 1 — Backend API** (start this first!):
-```bash
-cd backend
-npm start
-# ✅ Runs at http://localhost:3000
-```
-
-**Terminal 2 — Customer Website:**
-```bash
-cd mimo-website
-npm run dev
-# ✅ Runs at http://localhost:5173
-```
-
-**Terminal 3 — Kiosk App:**
-```bash
-cd mimo-frontend-web-app/mimo-frontend
-npm run dev
-# ✅ Runs at http://localhost:5174
-```
+The backend is a Firebase Cloud Function, so there is no `npm start`. Frontends call the deployed API
+(`https://api-upqxuj7evq-uc.a.run.app`) unless `VITE_API_URL` is set in dev.
 
 ---
 
@@ -196,7 +164,7 @@ Two physical kiosk stations are running in production:
 | **SV-002** | MIMO 2.0 | `100.107.95.16` | Brother HL-L2440DW | Epson L3250 |
 | **CV-001** | MIMO 1.0 | `100.70.107.44` | Brother HL-L5210DN | — |
 
-Each kiosk has a **Raspberry Pi** running `pi-listener/firebase_listener.py` as a systemd service (`mimo-listener`). The Pi watches Firestore for new `"printing"` status jobs assigned to its `kioskId`.
+Each kiosk has a **Raspberry Pi** running a `firebase_listener.py` (from `pi_scripts/` or `pi-listener/`) as a systemd service (`mimo-listener`). The Pi watches Firestore for new `"printing"` status jobs assigned to its `kioskId`.
 
 ---
 
@@ -273,39 +241,26 @@ Then add `Authorization: Bearer <token>` to every subsequent request.
 
 ### Q: How do I add a new API endpoint?
 
-All backend routes are in [`backend/api/server.js`](backend/api/server.js). Add your route following the existing pattern:
-```js
-app.post('/your-new-route', async (req, res) => {
-  try {
-    // your logic
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-```
-Test locally first at `http://localhost:3000/your-new-route`.
+Add the handler to the matching file in `functions/src/controllers/`, then map it in `functions/src/routes/`
+(routers are mounted from `functions/src/server.js`). Shared logic goes in `services/`, auth in `middleware/auth.js`.
+Code-guessing endpoints use `middleware/rateLimit.js` (Firestore-backed, shared across instances).
 
 ---
 
 ### Q: How do I deploy backend changes to production?
 
-The backend runs on **Google Cloud Run**. Deployment is done via Firebase:
-```bash
-cd backend
-firebase deploy --only functions --project mimo-v2-11868
-```
-Or push to `main` if CI/CD is set up.
+Pushes to `main` that touch `functions/**` deploy the `api` function via `.github/workflows/deploy-functions.yml`
+(`firebase deploy --only functions:api`). The Firestore/scheduler trigger functions are **not** deployed by CI.
+CI has no environment step: `functions/.env` (or values already set on the function) supplies the env vars.
 
 ---
 
 ### Q: My changes work locally but not in production — why?
 
 Common causes:
-1. **Missing env variable on production** — check Cloud Run / Firebase environment config.
+1. **Missing env variable on production** — check the function's environment config (`functions/.env` at deploy time).
 2. **Firestore security rules blocking the request** — check `firestore.rules`.
-3. **CORS** — make sure `FRONTEND_URL` in `backend/.env` matches the deployed frontend URL.
+3. **CORS** — the function allows any origin (`cors({ origin: true })`); look at request headers/auth instead.
 4. **Old build cached** — hard refresh or clear Vercel deployment cache.
 
 ---
@@ -324,8 +279,8 @@ Common causes:
 ## 🔧 Useful Commands Quick Reference
 
 ```bash
-# Check if backend is running
-curl http://localhost:3000/health
+# Check the deployed API is up
+curl https://api-upqxuj7evq-uc.a.run.app/
 
 # Deploy Firestore rules only
 firebase deploy --only firestore:rules --config backend/firebase.json --project mimo-v2-11868

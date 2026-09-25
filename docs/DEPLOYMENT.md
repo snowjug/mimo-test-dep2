@@ -1,3 +1,5 @@
+> **Historical document.** Written for the pre-consolidation layout (separate Express `backend/`, Northflank/Vercel hosting). Paths and deployment steps below may no longer apply — see the root `README.md`.
+
 # Deployment Notes
 
 ## Service Layout
