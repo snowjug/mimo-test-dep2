@@ -106,3 +106,20 @@ describe("POST /admin/coupons/bulk", () => {
     } finally { db.batch = orig; db.collection = origCol; }
   });
 });
+
+describe("POST /mark-printed ownership", () => {
+  it("queries only the caller's own jobs (userId filter)", async () => {
+    const filters = [];
+    const origCol = db.collection;
+    const chain = { where: (f, op, v) => { filters.push([f, op, v]); return chain; }, get: async () => ({ empty: true, docs: [] }) };
+    db.collection = () => chain;
+    try {
+      const { postMarkPrinted } = require("../src/controllers/print.controller");
+      await withServer((app) => app.post("/m", (req, res, next) => { req.user = { userId: "owner1" }; next(); }, postMarkPrinted), async (base) => {
+        const res = await fetch(`${base}/m`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ printCode: "4321" }) });
+        assert.strictEqual(res.status, 404);
+        assert.deepStrictEqual(filters, [["printCode", "==", "4321"], ["userId", "==", "owner1"]]);
+      });
+    } finally { db.collection = origCol; }
+  });
+});

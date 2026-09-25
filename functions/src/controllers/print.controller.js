@@ -144,9 +144,13 @@ const postMarkPrinted = async (req, res) => {
       return res.status(400).json({ error: "Print code required" });
     }
 
+    // Only the job owner may mark their own jobs printed (print codes are 4 digits and guessable;
+    // without the userId filter any logged-in user could complete someone else's job, which also
+    // triggers deletion of that user's stored files).
     const snapshot = await db
       .collection("print_jobs")
       .where("printCode", "==", printCode)
+      .where("userId", "==", req.user.userId)
       .get();
 
     if (snapshot.empty) {
