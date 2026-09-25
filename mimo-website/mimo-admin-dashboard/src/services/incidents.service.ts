@@ -1,30 +1,15 @@
-import { IncidentsPageData } from '../types/incidents.types';
-import { mockIncidentsData } from '../mocks/incidents.mock';
 import api from '../api';
 
-export interface IIncidentsService {
-  getIncidents(): Promise<IncidentsPageData>;
-}
+export class IncidentsService {
+  public async getRefundRequests(): Promise<any[]> {
+    const res = await api.get('/admin/refund-requests');
+    return res.data?.requests || [];
+  }
 
-export class MockIncidentsService implements IIncidentsService {
-  async getIncidents(): Promise<IncidentsPageData> {
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    return mockIncidentsData;
+  public async getHardwareAlerts(): Promise<any> {
+    const res = await api.get('/admin/hardware');
+    return res.data || {};
   }
 }
 
-export class ApiIncidentsService implements IIncidentsService {
-  async getIncidents(): Promise<IncidentsPageData> {
-    try {
-      const response = await api.get('/admin/incidents');
-      return response.data;
-    } catch {
-      return mockIncidentsData;
-    }
-  }
-}
-
-const isMock = (import.meta as any).env?.VITE_DATA_SOURCE !== 'api';
-export const incidentsService: IIncidentsService = isMock
-  ? new MockIncidentsService()
-  : new ApiIncidentsService();
+export const incidentsService = new IncidentsService();

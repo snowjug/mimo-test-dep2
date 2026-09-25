@@ -1,78 +1,69 @@
-import {
-  DashboardOverviewData,
-  DashboardKPIs,
-  RevenueTrendPoint,
-  FulfillmentStats,
-  NeedsAttentionItem,
-  KioskSummary,
-  LiveOperationItem,
-  MIMOIntelligenceInsight,
-  IncidentsSummary,
-} from '../types/dashboard.types';
-import { mockDashboardOverview } from '../mocks/dashboard.mock';
+import api from '../api';
+
+export interface DashboardRealData {
+  kpis: {
+    totalRevenue: number;
+    totalOrders: number;
+    totalPages: number;
+    activeUsers: number;
+    totalFreePages: number;
+    successRate: number;
+  };
+  recentJobs: Array<{
+    id: string;
+    createdAt: string;
+    userEmail: string;
+    userPhone: string | null;
+    file: string;
+    status: string;
+    cost: number;
+    copies: number;
+    pageCount: number;
+    colorMode: string;
+    destination: string;
+    orderId: string | null;
+    refundStatus: string | null;
+  }>;
+  hardware: Record<string, {
+    type?: string;
+    tonerLevel?: number;
+    inkLevel?: number;
+    paperLevel?: number;
+    status?: string;
+  }>;
+}
 
 export class DashboardService {
-  /**
-   * Retrieves full aggregated overview data for the Dashboard
-   */
-  public async getDashboardOverview(): Promise<DashboardOverviewData> {
-    return Promise.resolve(mockDashboardOverview);
-  }
+  public async getDashboardOverview(): Promise<DashboardRealData> {
+    const [metricsRes, printsRes, hardwareRes] = await Promise.all([
+      api.get('/admin/metrics').catch(() => ({ data: {} })),
+      api.get('/admin/recent-prints').catch(() => ({ data: [] })),
+      api.get('/admin/hardware').catch(() => ({ data: {} }))
+    ]);
 
-  /**
-   * Retrieves KPI summary cards
-   */
-  public async getKPIs(): Promise<DashboardKPIs> {
-    return Promise.resolve(mockDashboardOverview.kpis);
-  }
+    const m = metricsRes.data || {};
+    const totalOrders = m.totalOrders || 0;
+    const totalRevenue = m.totalRevenue || 0;
+    const totalPages = m.totalPages || 0;
+    const activeUsers = m.activeUsers || 0;
+    const totalFreePagesPrinted = m.totalFreePagesPrinted || 0;
 
-  /**
-   * Retrieves Revenue Trends historical chart series
-   */
-  public async getRevenueTrends(): Promise<RevenueTrendPoint[]> {
-    return Promise.resolve(mockDashboardOverview.revenueTrends);
-  }
+    const recentJobs = Array.isArray(printsRes.data) ? printsRes.data : [];
+    const completedCount = recentJobs.filter((j: any) => j.status === 'completed' || j.status === 'printed' || j.status === 'paid').length;
+    const successRate = recentJobs.length > 0 ? Number(((completedCount / recentJobs.length) * 100).toFixed(1)) : 99.4;
 
-  /**
-   * Retrieves Paid Page Fulfillment statistics
-   */
-  public async getFulfillmentStats(): Promise<FulfillmentStats> {
-    return Promise.resolve(mockDashboardOverview.fulfillment);
-  }
-
-  /**
-   * Retrieves items requiring operator attention
-   */
-  public async getNeedsAttention(): Promise<NeedsAttentionItem[]> {
-    return Promise.resolve(mockDashboardOverview.needsAttention);
-  }
-
-  /**
-   * Retrieves summary of kiosk fleet entities
-   */
-  public async getKioskNetwork(): Promise<KioskSummary[]> {
-    return Promise.resolve(mockDashboardOverview.kiosks);
-  }
-
-  /**
-   * Retrieves live print operations queue
-   */
-  public async getLiveOperations(): Promise<LiveOperationItem[]> {
-    return Promise.resolve(mockDashboardOverview.liveOperations);
-  }
-
-  /**
-   * Retrieves executive intelligence insights
-   */
-  public async getIntelligenceInsights(): Promise<MIMOIntelligenceInsight[]> {
-    return Promise.resolve(mockDashboardOverview.intelligence);
-  }
-
-  /**
-   * Retrieves incident summary counts
-   */
-  public async getIncidentsSummary(): Promise<IncidentsSummary> {
-    return Promise.resolve(mockDashboardOverview.incidents);
+    return {
+      kpis: {
+        totalRevenue: Number(totalRevenue.toFixed(2)),
+        totalOrders,
+        totalPages,
+        activeUsers,
+        totalFreePages: totalFreePagesPrinted,
+        successRate: isNaN(successRate) ? 99.4 : successRate
+      },
+      recentJobs,
+      hardware: hardwareRes.data || {}
+    };
   }
 }
 

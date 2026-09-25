@@ -4,20 +4,21 @@ import {
   Loader2,
 } from 'lucide-react';
 import api from './api';
-import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { AppShell } from './components/layout/AppShell';
 import { OverviewPage } from './pages/Overview/OverviewPage';
 import { OperationsPage } from './pages/Operations/OperationsPage';
 import { KiosksPage } from './pages/Kiosks/KiosksPage';
 import { IncidentsPage } from './pages/Incidents/IncidentsPage';
 import { AnalyticsPage } from './pages/Analytics/AnalyticsPage';
+import { UsersPage } from './pages/Users/UsersPage';
 import { FinancePage } from './pages/Finance/FinancePage';
 import { ConfigurationPage } from './pages/Configuration/ConfigurationPage';
 
+import { AdminLoginPage } from './components/auth/AdminLoginPage';
+
 function DashboardApp() {
   const [token, setToken] = useState(localStorage.getItem('adminToken') || '');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -28,9 +29,10 @@ function DashboardApp() {
     if (path.includes('operation')) return 'operations';
     if (path.includes('kiosk')) return 'kiosks';
     if (path.includes('incident')) return 'incidents';
+    if (path.includes('user') || path.includes('customer')) return 'users';
     if (path.includes('analytic')) return 'analytics';
     if (path.includes('finance')) return 'finance';
-    if (path.includes('config')) return 'configuration';
+    if (path.includes('config') || path.includes('setting')) return 'configuration';
     return 'overview';
   };
 
@@ -50,16 +52,15 @@ function DashboardApp() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const login = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (email: string, pass: string) => {
     setError('');
     setLoading(true);
     try {
-      const r = await api.post('/admin/login', { email, password });
+      const r = await api.post('/admin/login', { email, password: pass });
       localStorage.setItem('adminToken', r.data.token);
       setToken(r.data.token);
     } catch {
-      setError('Invalid credentials.');
+      setError('Invalid credentials. Please check your username/password.');
     } finally {
       setLoading(false);
     }
@@ -71,7 +72,7 @@ function DashboardApp() {
   };
 
   const handleResetMetrics = async () => {
-    if (!confirm('Reset ALL metrics?')) return;
+    if (!confirm('Reset ALL telemetry and platform metrics?')) return;
     setIsResetting(true);
     try {
       await api.post('/admin/reset-metrics', {}, { headers: { Authorization: `Bearer ${token}` } });
@@ -86,63 +87,15 @@ function DashboardApp() {
   // ── UNPROTECTED AUTHENTICATION SCREEN ──────────────────────────────────────
   if (!token) {
     return (
-      <div className="min-h-screen bg-[#faf8ff] flex items-center justify-center p-4 font-sans">
-        <form onSubmit={login} className="bg-white border border-[#ede9fe] shadow-xl rounded-2xl p-8 w-full max-w-sm">
-          <div className="flex justify-center mb-5">
-            <div className="w-14 h-14 bg-[#7c3aed] rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/25">
-              <Building className="text-white w-7 h-7" />
-            </div>
-          </div>
-          <h1 className="text-2xl font-black text-[#1e1b4b] text-center tracking-tight mb-1">
-            Welcome Back
-          </h1>
-          <p className="text-gray-500 text-xs text-center mb-6">
-            Sign in to MIMO Command Center
-          </p>
-          {error && (
-            <p className="text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-xl text-xs text-center mb-4 font-semibold">
-              {error}
-            </p>
-          )}
-          <div className="space-y-3.5 mb-5">
-            <div>
-              <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                Username / Email
-              </label>
-              <input
-                type="text"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-[#1e1b4b] text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-[#1e1b4b] text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all"
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold py-3 rounded-xl shadow-lg shadow-purple-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In'}
-          </button>
-        </form>
-      </div>
+      <AdminLoginPage
+        onLogin={handleLogin}
+        loading={loading}
+        error={error}
+      />
     );
   }
 
-  // ── MAIN APPLICATION SHELL & ROUTER ────────────────────────────────────────
+  // ── MAIN APPLICATION SHELL (7 EXACT PAGES) ─────────────────────────────────
   return (
     <AppShell
       activeTab={activeTab}
@@ -157,13 +110,32 @@ function DashboardApp() {
       {activeTab === 'kiosks' && <KiosksPage />}
       {activeTab === 'incidents' && <IncidentsPage />}
       {activeTab === 'analytics' && <AnalyticsPage />}
+      {activeTab === 'users' && <UsersPage />}
       {activeTab === 'finance' && <FinancePage />}
       {activeTab === 'configuration' && <ConfigurationPage />}
     </AppShell>
   );
 }
 
-export default function AdminDashboard() {
+import { FinanceApp } from './pages/Finance/FinanceApp';
+
+export default function RootApp() {
+  const [isFinanceRoute, setIsFinanceRoute] = useState(() => {
+    return window.location.pathname.toLowerCase().startsWith('/finance');
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsFinanceRoute(window.location.pathname.toLowerCase().startsWith('/finance'));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  if (isFinanceRoute) {
+    return <FinanceApp />;
+  }
+
   return (
     <ThemeProvider>
       <DashboardApp />
