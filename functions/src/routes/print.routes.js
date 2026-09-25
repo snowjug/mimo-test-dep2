@@ -6,5 +6,7 @@ const router = express.Router();
 
 router.post("/get-documents-by-code", print.postGetDocumentsByCode);
 router.get("/generate-print-code", authMiddleware, print.getGeneratePrintCode);
+router.get("/print-summary", authMiddleware, print.getPrintSummary);
+router.post("/mark-printed", authMiddleware, print.postMarkPrinted);
 
 module.exports = router;

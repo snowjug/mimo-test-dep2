@@ -1,5 +1,6 @@
+const axios = require("axios");
 const jwt = require("jsonwebtoken");
-const { SECRET_KEY } = require("../config/env");
+const { CASHFREE_BASE_URL, SECRET_KEY, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 
 // ================= ADMIN AUTH =================
@@ -264,6 +265,174 @@ const getAdminRecentPrints = async (req, res) => {
   }
 };
 
+// ================= ADMIN: BULK COUPONS =================
+// (ported from the legacy Express server; handler body unchanged)
+// expiryDate is stored as a Firestore Timestamp (the legacy server stored an ISO string), because
+// /validate-coupon and /create-order call expiryDate.toDate().
+const postAdminCouponsBulk = async (req, res) => {
+  try {
+    const { prefix, count, discountPercentage, expiryDate } = req.body;
+    const batch = db.batch();
+    const generatedCodes = [];
+    
+    for(let i = 0; i < Number(count); i++) {
+      const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const code = `${prefix.toUpperCase()}-${randomStr}`;
+      generatedCodes.push(code);
+      const ref = db.collection("coupons").doc(code);
+      batch.set(ref, {
+        discountPercentage: Number(discountPercentage),
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        isActive: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        isBulk: true
+      });
+    }
+    await batch.commit();
+    res.json({ success: true, count: generatedCodes.length, codes: generatedCodes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ================= ADMIN REFUND =================
+// (ported from the legacy Express server; handler body unchanged)
+// ================= ADMIN REFUND =================
+// Admin manually triggers a real Cashfree refund for an order.
+const postAdminRefund = async (req, res) => {
+  try {
+    const { orderId, refundAmount, note } = req.body;
+    if (!orderId) return res.status(400).json({ error: "orderId is required" });
+
+    // 1. Fetch the order to get the amount and userId
+    let ordSnap = await db.collection("orders").where("orderId", "==", orderId).get();
+    if (ordSnap.empty) {
+      ordSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
+    }
+    if (ordSnap.empty) return res.status(404).json({ error: "Order not found" });
+
+    const orderData = ordSnap.docs[0].data();
+    const userId = orderData.userId;
+    const originalAmount = orderData.amount || orderData.totals?.totalAmount || 0;
+    const amountToRefund = refundAmount ? Number(refundAmount) : originalAmount;
+
+    if (amountToRefund <= 0 || amountToRefund > originalAmount) {
+      return res.status(400).json({ error: `Invalid refund amount. Must be between 0.01 and ${originalAmount}` });
+    }
+
+    // 2. Call Cashfree Refund API
+    const refundId = `refund_${Date.now()}`;
+    let cashfreeRefundResponse = null;
+    try {
+      const cfRefundRes = await axios.post(
+        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        {
+          refund_amount: amountToRefund,
+          refund_id: refundId,
+          refund_note: note || "Refund initiated by Mimo admin",
+        },
+        { headers: cashfreeHeaders, timeout: 15000 }
+      );
+      cashfreeRefundResponse = cfRefundRes.data;
+      console.log(`[ADMIN-REFUND] Cashfree refund created: ${refundId} for orderId=${orderId} amount=₹${amountToRefund}`);
+    } catch (cfErr) {
+      const cfError = cfErr.response?.data?.message || cfErr.message;
+      console.error(`[ADMIN-REFUND] Cashfree refund API failed: ${cfError}`);
+      return res.status(502).json({ error: `Cashfree refund failed: ${cfError}` });
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+
+    // 3. Record refund in Firestore `refunds` collection
+    const refundDocRef = db.collection("refunds").doc(refundId);
+    batch.set(refundDocRef, {
+      refundId,
+      orderId,
+      userId,
+      refundAmount: amountToRefund,
+      originalAmount,
+      status: cashfreeRefundResponse?.refund_status || "PENDING",
+      cashfreeRefundId: cashfreeRefundResponse?.cf_refund_id || null,
+      note: note || null,
+      initiatedAt: now,
+      cashfreeResponse: cashfreeRefundResponse,
+    });
+
+    // 4. Mark order as REFUNDED
+    ordSnap.forEach((doc) => {
+      batch.update(doc.ref, {
+        status: "REFUNDED",
+        orderStatus: "refunded",
+        refundId,
+        refundedAt: now,
+        refundAmount: amountToRefund,
+      });
+    });
+
+    // 5. Reset print_jobs to 'pending' if not yet printed (allows admin retry if needed)
+    const jobsSnap = await db.collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("orderId", "==", orderId)
+      .get();
+    jobsSnap.forEach((doc) => {
+      const data = doc.data();
+      if (!["printing", "completed"].includes(data.status)) {
+        batch.update(doc.ref, {
+          status: "refunded",
+          "paymentStatus.status": "refunded",
+          refundId,
+          refundedAt: now,
+        });
+      }
+    });
+
+    // 6. Mark pending refund_request as resolved (if one exists)
+    const refReqSnap = await db.collection("refund_requests")
+      .where("orderId", "==", orderId)
+      .where("status", "==", "pending")
+      .get();
+    refReqSnap.forEach((doc) => {
+      batch.update(doc.ref, {
+        status: "processed",
+        resolvedAt: now,
+        resolvedBy: "admin",
+        adminNote: note || "Refund processed",
+        refundId,
+      });
+    });
+
+    await batch.commit();
+
+    res.json({
+      message: `Refund of ₹${amountToRefund} initiated successfully for order ${orderId}`,
+      refundId,
+      cashfreeStatus: cashfreeRefundResponse?.refund_status,
+    });
+  } catch (err) {
+    console.error("[ADMIN-REFUND] Error:", err);
+    res.status(500).json({ error: "Refund processing failed" });
+  }
+};
+
+// ================= ADMIN REFUND REQUESTS LIST =================
+// (ported from the legacy Express server; handler body unchanged)
+// ================= ADMIN REFUND REQUESTS LIST =================
+// Admin views all pending user refund requests.
+const getAdminRefundRequests = async (req, res) => {
+  try {
+    const snap = await db.collection("refund_requests")
+      .orderBy("requestedAt", "desc")
+      .limit(50)
+      .get();
+    const requests = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json({ requests });
+  } catch (err) {
+    console.error("[ADMIN-REFUND-REQUESTS] Error:", err);
+    res.status(500).json({ error: "Failed to fetch refund requests" });
+  }
+};
+
 module.exports = {
   postAdminLogin,
   getAdminCoupons,
@@ -278,4 +447,7 @@ module.exports = {
   getAdminMetrics,
   postAdminResetMetrics,
   getAdminRecentPrints,
+  postAdminCouponsBulk,
+  postAdminRefund,
+  getAdminRefundRequests,
 };

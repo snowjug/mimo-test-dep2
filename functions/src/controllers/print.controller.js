@@ -101,7 +101,81 @@ const getGeneratePrintCode = async (req, res) => {
   }
 };
 
+// ================= PRINT SUMMARY =================
+// (ported from the legacy Express server; handler body unchanged)
+// ================= PRINT SUMMARY =================
+const getPrintSummary = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const snapshot = await db
+      .collection("print_jobs")
+      .where("userId", "==", userId)
+      .where("status", "==", "printing")
+      .get();
+
+    const totalPrints = snapshot.size;
+    let totalPages = 0;
+    let totalAmount = 0;
+
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      totalPages += data.pageCount || 0;
+      totalAmount += (data.pageCount || 0) * 2.3;
+    });
+
+    res.json({
+      totalPrints,
+      totalPages,
+      totalAmount: Number(totalAmount.toFixed(2)),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to fetch summary");
+  }
+};
+
+// ================= MARK PRINTED =================
+// (ported from the legacy Express server; handler body unchanged)
+const postMarkPrinted = async (req, res) => {
+  try {
+    const { printCode } = req.body;
+
+    if (!printCode) {
+      return res.status(400).json({ error: "Print code required" });
+    }
+
+    const snapshot = await db
+      .collection("print_jobs")
+      .where("printCode", "==", printCode)
+      .get();
+
+    if (snapshot.empty) {
+      return res.status(404).json({ error: "No jobs found" });
+    }
+
+    const batch = db.batch();
+
+    snapshot.docs.forEach((doc) => {
+      batch.update(doc.ref, {
+        isPrinted: true,
+        printerStatus: "completed",
+        status: "completed",
+      });
+    });
+
+    await batch.commit();
+
+    res.json({ message: "Print completed successfully" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update print status" });
+  }
+};
+
 module.exports = {
   postGetDocumentsByCode,
   getGeneratePrintCode,
+  getPrintSummary,
+  postMarkPrinted,
 };
