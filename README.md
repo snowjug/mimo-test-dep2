@@ -60,9 +60,9 @@ mimo-test-dep2/
 ├── pi_scripts/               Pi listener (MIMO 1.0 / CV-001 lineage) + helpers
 ├── pi-listener/              Pi listener (MIMO 2.0 / SV-002 lineage)
 ├── mimo-listener*.service  pi_setup.sh  fallback_wifi.sh …   Pi provisioning files
-├── scripts/                  One-off tooling, not deployed: pi-ops/ · firestore/ · e2e/ · fixtures/
+├── scripts/                  One-off tooling, not deployed: deployment/ · diagnostics/ · testing/ (+ testing/fixtures/)
 ├── backend/                  ⚠️ LEGACY Express server — FROZEN, not the production API (see below)
-├── docs/                     Older notes (several are historical — see banners)
+├── docs/                     architecture/ · deployment/ · setup/ — older notes (several are historical, see banners)
 ├── firebase.json  .firebaserc  storage.rules
 └── .github/workflows/        deploy-functions.yml · deploy-converter.yml · backend-image.yml (legacy image)
 ```
