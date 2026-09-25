@@ -12,5 +12,6 @@ router.get("/mimo/stats", authMiddleware, user.getMimoStats);
 router.get("/print-history", authMiddleware, user.getPrintHistory);
 router.get("/settings", authMiddleware, user.getSettings);
 router.post("/settings", authMiddleware, user.postSettings);
+router.post("/upload-profile-photo", authMiddleware, user.postUploadProfilePhoto);
 
 module.exports = router;
