@@ -11,6 +11,7 @@
  */
 
 const express = require("express");
+const { createLimiters } = require("../middleware/rateLimit");
 const {
   validateKioskPrintRequest,
   validateKioskPrintResponse,
@@ -31,9 +32,10 @@ function createKioskRouter(dependencies) {
   } = dependencies;
 
   const router = express.Router();
+  const { codeGuessLimiter, statusLimiter } = createLimiters(db);
 
   // ================= 1. KIOSK: POLL JOB STATUS =================
-  router.get("/job-status", async (req, res) => {
+  router.get("/job-status", statusLimiter, async (req, res) => {
     try {
       const { printCode } = req.query;
       if (!printCode) {
@@ -178,7 +180,7 @@ function createKioskRouter(dependencies) {
   });
 
   // ================= 2. KIOSK: TRIGGER PI PRINT =================
-  router.post("/print", async (req, res) => {
+  router.post("/print", codeGuessLimiter, async (req, res) => {
     try {
       const validation = validateKioskPrintRequest(req.body);
       if (!validation.valid) {
