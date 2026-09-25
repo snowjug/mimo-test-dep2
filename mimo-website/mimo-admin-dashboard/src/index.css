@@ -1,18 +1,232 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+@variant dark (&:where(.dark, .dark *));
+
+/* Tailwind v4 changed the default border colour from gray-200 to currentColor, so a bare `border`
+   rendered black. Restore the v3 default (layered, so explicit border-* utilities still win). */
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    border-color: var(--color-slate-200, currentColor);
+  }
+}
+
+/* ── DESIGN TOKENS & APPLICATION SHELL VARIABLES ──────────────────────── */
+:root {
+  --sidebar-width:           260px;
+  --sidebar-collapsed-width: 76px;
+  --topbar-height:           64px;
+
+  --primary:        #4f46e5;
+  --primary-hover:  #4338ca;
+  --primary-light:  #eef2ff;
+  --primary-border: #c7d2fe;
+  --primary-muted:  #818cf8;
+
+  --bg:         #f8fafc;
+  --surface:    #ffffff;
+  --surface-2:  #f1f5f9;
+  --border:     #e2e8f0;
+  --border-2:   #cbd5e1;
+
+  --text-1: #0f172a;
+  --text-2: #475569;
+  --text-3: #94a3b8;
+
+  --green:        #10b981;
+  --green-bg:     #f0fdf4;
+  --green-border: #bbf7d0;
+  --green-text:   #166534;
+
+  --amber:        #f59e0b;
+  --amber-bg:     #fffbeb;
+  --amber-border: #fde68a;
+  --amber-text:   #92400e;
+
+  --red:        #ef4444;
+  --red-bg:     #fef2f2;
+  --red-border: #fecaca;
+  --red-text:   #991b1b;
+
+  --blue:        #3b82f6;
+  --blue-bg:     #eff6ff;
+  --blue-border: #bfdbfe;
+  --blue-text:   #1e40af;
+
+  --radius:    10px;
+  --radius-lg: 16px;
+}
+
+.dark {
+  --bg:         #090d16;
+  --surface:    #0f172a;
+  --surface-2:  #1e293b;
+  --border:     #1e293b;
+  --border-2:   #334155;
+
+  --text-1: #f8fafc;
+  --text-2: #94a3b8;
+  --text-3: #64748b;
+
+  --primary-light:  #1e1b4b;
+  --primary-border: #3730a3;
+
+  --green-bg:    #052e16;
+  --green-border:#14532d;
+  --green-text:  #86efac;
+
+  --amber-bg:    #2d1900;
+  --amber-border:#78350f;
+  --amber-text:  #fcd34d;
+
+  --red-bg:    #2d0a0a;
+  --red-border:#7f1d1d;
+  --red-text:  #fca5a5;
+
+  --blue-bg:    #172554;
+  --blue-border:#1e3a8a;
+  --blue-text:  #93c5fd;
+}
+
+/* ── RESET ─────────────────────────────────────────────────────────────────── */
+/* Tailwind's preflight (in @layer base) already resets margins/padding. An UNLAYERED
+   `margin: 0; padding: 0` here beats every Tailwind spacing utility (px-*, py-*, mx-auto,
+   gap-*, mb-* …) and collapses the whole UI, so only box-sizing is set. */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: 14px; }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-::-webkit-scrollbar        { width: 5px; height: 5px; }
+/* ── SCROLLBAR ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(124,58,237,.3); border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,.6); }
+::-webkit-scrollbar-thumb  { background: var(--border-2); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ── FOCUS ─────────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── ANIMATIONS ────────────────────────────────────────────────────────────── */
+@keyframes spin   { to { transform: rotate(360deg); } }
+@keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.4} }
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes toastIn {
+  from { opacity:0; transform: translateX(100%) scale(.96); }
+  to   { opacity:1; transform: translateX(0)   scale(1);   }
+}
+@keyframes toastOut {
+  from { opacity:1; transform: translateX(0) scale(1); max-height: 120px; margin-bottom: 8px; }
+  to   { opacity:0; transform: translateX(100%) scale(.96); max-height: 0; margin-bottom: 0; }
+}
+
+.animate-fadeIn  { animation: fadeIn  .2s ease forwards; }
+.animate-slideIn { animation: slideIn .2s ease forwards; }
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface-2) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius);
+}
+
+/* Toast */
+.toast-enter { animation: toastIn  .3s ease forwards; }
+.toast-exit  { animation: toastOut .3s ease forwards; }
+
+/* ── MIMO FINANCE APPLICATION SHELL (CSS GRID ARCHITECTURE) ──────────────── */
+.finance-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr);
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #FAF9FD;
+}
+
+.finance-sidebar {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  width: 250px;
+  min-width: 250px;
+  max-width: 250px;
+  height: 100vh;
+  background-color: #FFFFFF;
+  border-right: 1px solid #EDE9FE;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  z-index: 30;
+}
+
+.finance-topbar {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  height: 64px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #EDE9FE;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 20;
+}
+
+.finance-main {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px 32px;
+  background-color: #FAF9FD;
+}
+
+@media (max-width: 767.98px) {
+  .finance-layout {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+  }
+  .finance-layout > .finance-sidebar {
+    display: none;
+  }
+  .finance-topbar {
+    width: 100%;
+    position: sticky;
+    top: 0;
+  }
+  .finance-main {
+    width: 100%;
+    padding: 16px;
+    overflow: visible;
+  }
+}

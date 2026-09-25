@@ -1,405 +1,487 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Printer,
   RefreshCw,
   Search,
+  Filter,
+  FileText,
+  Printer,
+  RotateCcw,
   CheckCircle2,
   Clock,
   AlertTriangle,
-  FileText,
-  RotateCcw,
+  IndianRupee,
+  Layers,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Loader2,
+  Download,
 } from 'lucide-react';
+import api from '../../api';
 import { useTheme } from '../../context/ThemeContext';
 
-interface PrintJob {
+interface PrintJobRecord {
   id: string;
-  fileName: string;
-  user: string;
-  kiosk: string;
-  kioskCode: string;
+  createdAt: string;
+  userEmail: string;
+  userPhone: string | null;
+  file: string;
+  status: string;
+  cost: number;
+  copies: number;
   pageCount: number;
-  type: 'B&W' | 'Color';
-  amount: number;
-  stage: 'Queued' | 'Merging' | 'Printing' | 'Completed' | 'Failed';
-  status: 'ACTIVE' | 'PRINTING' | 'DONE' | 'FAILED' | 'WARNING';
-  timestamp: string;
-  duration: string;
+  colorMode: string;
+  destination: string;
+  orderId: string | null;
+  refundStatus: string | null;
+  refundAmount?: number | null;
 }
-
-const INITIAL_JOBS: PrintJob[] = [
-  {
-    id: 'JB-9041',
-    fileName: 'Application_Form_Final.pdf',
-    user: 'rahul.s@campus.edu',
-    kiosk: 'MIMO 1 (Main Library)',
-    kioskCode: 'CV-001',
-    pageCount: 7,
-    type: 'B&W',
-    amount: 16.10,
-    stage: 'Printing',
-    status: 'PRINTING',
-    timestamp: 'Just now',
-    duration: '12s',
-  },
-  {
-    id: 'JB-9040',
-    fileName: 'Hall_Ticket_Exam_2026.pdf',
-    user: 'priya.k@campus.edu',
-    kiosk: 'MIMO 2 (Admin Block)',
-    kioskCode: 'SV-002',
-    pageCount: 2,
-    type: 'Color',
-    amount: 20.00,
-    stage: 'Merging',
-    status: 'ACTIVE',
-    timestamp: '1m ago',
-    duration: '4s',
-  },
-  {
-    id: 'JB-9039',
-    fileName: 'Project_Assignment_Draft.pdf',
-    user: 'arjun.v@campus.edu',
-    kiosk: 'MIMO 2 (Admin Block)',
-    kioskCode: 'SV-002',
-    pageCount: 14,
-    type: 'B&W',
-    amount: 32.20,
-    stage: 'Queued',
-    status: 'WARNING',
-    timestamp: '3m ago',
-    duration: '45s',
-  },
-  {
-    id: 'JB-9038',
-    fileName: 'Campus_ID_Card.pdf',
-    user: 'sneha.m@campus.edu',
-    kiosk: 'MIMO 1 (Main Library)',
-    kioskCode: 'CV-001',
-    pageCount: 1,
-    type: 'Color',
-    amount: 10.00,
-    stage: 'Completed',
-    status: 'DONE',
-    timestamp: '6m ago',
-    duration: '8s',
-  },
-  {
-    id: 'JB-9037',
-    fileName: 'Lecture_Notes_Module4.pdf',
-    user: 'vikram.r@campus.edu',
-    kiosk: 'MIMO 3 (Cafeteria)',
-    kioskCode: 'SV-003',
-    pageCount: 22,
-    type: 'B&W',
-    amount: 50.60,
-    stage: 'Completed',
-    status: 'DONE',
-    timestamp: '14m ago',
-    duration: '26s',
-  },
-  {
-    id: 'JB-9036',
-    fileName: 'Research_Paper_IEEE.pdf',
-    user: 'ananya.d@campus.edu',
-    kiosk: 'MIMO 4 (Hostel Block)',
-    kioskCode: 'SV-004',
-    pageCount: 8,
-    type: 'B&W',
-    amount: 18.40,
-    stage: 'Failed',
-    status: 'FAILED',
-    timestamp: '22m ago',
-    duration: '1m 10s',
-  },
-];
 
 export const OperationsPage: React.FC = () => {
   const { isDark } = useTheme();
-  const [jobs, setJobs] = useState<PrintJob[]>(INITIAL_JOBS);
-  const [filterTab, setFilterTab] = useState<'all' | 'processing' | 'completed' | 'failed'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [jobs, setJobs] = useState<PrintJobRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [destinationFilter, setDestinationFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 600);
+  // Refund Modal State
+  const [refundJob, setRefundJob] = useState<PrintJobRecord | null>(null);
+  const [refundNote, setRefundNote] = useState('Refund initiated by Admin');
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [refundMessage, setRefundMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const fetchJobs = async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
+    try {
+      const res = await api.get<PrintJobRecord[]>('/admin/recent-prints');
+      setJobs(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Failed to load recent prints:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const handleReprint = (jobId: string) => {
-    alert(`Initiating reprint dispatch for Job #${jobId}`);
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  const handleRefundSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!refundJob || !refundJob.orderId) {
+      alert('Cannot process refund: No Order ID attached to this job.');
+      return;
+    }
+    setIsRefunding(true);
+    setRefundMessage(null);
+    try {
+      const res = await api.post('/admin/refund', {
+        orderId: refundJob.orderId,
+        refundAmount: refundJob.cost,
+        note: refundNote,
+      });
+      setRefundMessage({ type: 'success', text: res.data.message || 'Refund processed successfully.' });
+      setTimeout(() => {
+        setRefundJob(null);
+        fetchJobs(true);
+      }, 1500);
+    } catch (err: any) {
+      setRefundMessage({
+        type: 'error',
+        text: err.response?.data?.error || 'Refund failed. Check gateway connection.',
+      });
+    } finally {
+      setIsRefunding(false);
+    }
   };
 
-  const filteredJobs = jobs.filter((job) => {
-    const matchesSearch =
-      job.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.kiosk.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.id.toLowerCase().includes(searchQuery.toLowerCase());
+  const destinations = useMemo(() => {
+    const set = new Set<string>();
+    jobs.forEach(j => { if (j.destination) set.add(j.destination); });
+    return Array.from(set);
+  }, [jobs]);
 
-    if (!matchesSearch) return false;
+  const filteredJobs = useMemo(() => {
+    let list = [...jobs];
 
-    if (filterTab === 'processing') return job.status === 'ACTIVE' || job.status === 'PRINTING' || job.status === 'WARNING';
-    if (filterTab === 'completed') return job.status === 'DONE';
-    if (filterTab === 'failed') return job.status === 'FAILED';
-    return true;
-  });
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        j =>
+          j.file.toLowerCase().includes(q) ||
+          j.userEmail.toLowerCase().includes(q) ||
+          (j.orderId && j.orderId.toLowerCase().includes(q))
+      );
+    }
 
-  const totalJobs = jobs.length;
-  const inQueueCount = jobs.filter((j) => j.status === 'ACTIVE' || j.status === 'PRINTING').length;
-  const completedCount = jobs.filter((j) => j.status === 'DONE').length;
-  const actionNeededCount = jobs.filter((j) => j.status === 'FAILED' || j.status === 'WARNING').length;
+    if (statusFilter !== 'ALL') {
+      list = list.filter(j => j.status?.toLowerCase() === statusFilter.toLowerCase());
+    }
+
+    if (destinationFilter !== 'ALL') {
+      list = list.filter(j => j.destination === destinationFilter);
+    }
+
+    return list;
+  }, [jobs, search, statusFilter, destinationFilter]);
+
+  const totalPages = Math.ceil(filteredJobs.length / PAGE_SIZE) || 1;
+  const paginatedJobs = filteredJobs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const stats = useMemo(() => {
+    const total = jobs.length;
+    const completed = jobs.filter(j => j.status === 'completed' || j.status === 'printed' || j.status === 'paid').length;
+    const printing = jobs.filter(j => j.status === 'printing').length;
+    const refunded = jobs.filter(j => j.status === 'refunded' || j.refundStatus).length;
+    return { total, completed, printing, refunded };
+  }, [jobs]);
 
   return (
-    <div className="w-full space-y-6 pb-12 select-none font-sans">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="space-y-6 animate-fadeIn font-sans select-none">
+      {/* ── Page Header ────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${
-            isDark ? 'text-white' : 'text-[#1e1b4b]'
-          }`}>
-            Print Operations & Queue
-          </h1>
-          <p className={`text-xs sm:text-sm font-medium mt-0.5 ${
-            isDark ? 'text-slate-400' : 'text-gray-500'
-          }`}>
-            Real-time tracking of dispatch pipeline, queue processing, and reprint logs
+          <div className="flex items-center gap-2.5">
+            <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              Print Operations
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live Queue & Dispatch
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">
+            Real-time tracking of documents, queue health, hardware output, and gateway refunds.
           </p>
         </div>
 
-        <button
-          onClick={handleRefresh}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer self-start sm:self-auto border ${
-            isDark
-              ? 'bg-slate-800 border-slate-700 text-[#a78bfa] hover:bg-slate-700'
-              : 'bg-white border-[#ede9fe] text-[#7c3aed] hover:bg-purple-50'
-          }`}
-        >
-          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-          Refresh Jobs
-        </button>
-      </div>
-
-      {/* Summary KPI Row (4 equal cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1 */}
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              TOTAL PRINT JOBS
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-purple-500/15 text-[#a78bfa] flex items-center justify-center">
-              <FileText size={15} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className={`text-3xl font-black ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>{totalJobs}</div>
-            <p className="text-xs text-gray-400 mt-0.5">All sessions today</p>
-          </div>
-        </div>
-
-        {/* Card 2 */}
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              IN DISPATCH QUEUE
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center">
-              <Clock size={15} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-blue-500">{inQueueCount}</div>
-            <p className="text-xs text-gray-400 mt-0.5">Active pipeline processing</p>
-          </div>
-        </div>
-
-        {/* Card 3 */}
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              SUCCESSFUL PRINTS
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-              <CheckCircle2 size={15} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-emerald-500">{completedCount}</div>
-            <p className="text-xs text-gray-400 mt-0.5">Dispatched without error</p>
-          </div>
-        </div>
-
-        {/* Card 4 */}
-        <div className={`border rounded-2xl p-5 shadow-sm ${
-          isDark ? 'bg-[#1e293b] border-amber-500/30' : 'bg-white border-amber-200/80'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              ACTION NEEDED
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center">
-              <AlertTriangle size={15} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-amber-500">{actionNeededCount}</div>
-            <p className="text-xs text-gray-400 mt-0.5">Warning or failed print</p>
-          </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fetchJobs(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[var(--surface)] border border-[var(--border)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+            Refresh Queue
+          </button>
         </div>
       </div>
 
-      {/* Main Table Card */}
-      <div className={`border rounded-2xl p-6 shadow-sm space-y-4 ${
-        isDark ? 'bg-[#1e293b] border-[#334155]' : 'bg-white border-[#ede9fe]'
-      }`}>
-        {/* Table Controls (Filter Tabs + Search) */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-          {/* Filter Tabs */}
-          <div className={`flex items-center gap-1.5 p-1 rounded-xl border self-start md:self-auto overflow-x-auto max-w-full ${
-            isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50 border-gray-200'
-          }`}>
-            {[
-              { id: 'all', label: 'All Jobs' },
-              { id: 'processing', label: 'Processing' },
-              { id: 'completed', label: 'Completed' },
-              { id: 'failed', label: 'Failed' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setFilterTab(tab.id as any)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  filterTab === tab.id
-                    ? isDark ? 'bg-purple-950/80 text-[#a78bfa]' : 'bg-white text-[#7c3aed] shadow-xs'
-                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {/* ── Quick KPI Stat Tiles ────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+          <span className="text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">Total Stream</span>
+          <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)] mt-1">{stats.total}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+          <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Completed</span>
+          <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{stats.completed}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+          <span className="text-[11px] font-bold text-blue-500 uppercase tracking-wider">Printing Active</span>
+          <p className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400 mt-1">{stats.printing}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+          <span className="text-[11px] font-bold text-purple-500 uppercase tracking-wider">Refunded</span>
+          <p className="text-2xl sm:text-3xl font-black text-purple-600 dark:text-purple-400 mt-1">{stats.refunded}</p>
+        </div>
+      </div>
 
-          {/* Search Input */}
-          <div className="relative w-full md:w-72">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+      {/* ── Filter Toolbar & Table ─────────────────────────────────── */}
+      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs overflow-hidden">
+        {/* Controls Toolbar */}
+        <div className="p-4 sm:p-5 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--surface)]">
+          {/* Search */}
+          <div className="relative flex-1 max-w-md">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
             <input
               type="text"
-              placeholder="Search file, user, kiosk..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl transition-all focus:outline-none ${
-                isDark
-                  ? 'bg-slate-800/80 border border-slate-700 text-white placeholder-slate-400 focus:border-[#8b5cf6]'
-                  : 'bg-gray-50 border border-gray-200 text-[#1e1b4b] placeholder-gray-400 focus:border-[#7c3aed] focus:bg-white'
-              }`}
+              placeholder="Search by file name, student email, or Order ID..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-1)] placeholder:text-[var(--text-3)] focus:outline-none focus:border-[var(--primary)] transition-all"
             />
+          </div>
+
+          {/* Filters */}
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 text-xs font-bold rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-1)] cursor-pointer focus:outline-none"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="completed">Completed</option>
+              <option value="printing">Printing</option>
+              <option value="paid">Paid</option>
+              <option value="refunded">Refunded</option>
+              <option value="failed">Failed</option>
+            </select>
+
+            {/* Destination Filter */}
+            {destinations.length > 0 && (
+              <select
+                value={destinationFilter}
+                onChange={(e) => {
+                  setDestinationFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="px-3 py-2 text-xs font-bold rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-1)] cursor-pointer focus:outline-none"
+              >
+                <option value="ALL">All Kiosks</option>
+                {destinations.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
-        {/* Desktop Operations Table */}
+        {/* Real Data Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className={`border-b text-[10px] uppercase font-extrabold tracking-wider ${
-                isDark ? 'border-slate-700 text-slate-400' : 'border-gray-100 text-gray-400'
-              }`}>
-                <th className="pb-3 pl-2">Job ID</th>
-                <th className="pb-3">Document</th>
-                <th className="pb-3">User</th>
-                <th className="pb-3">Kiosk Node</th>
-                <th className="pb-3">Pages / Type</th>
-                <th className="pb-3">Amount</th>
-                <th className="pb-3">Stage / Duration</th>
-                <th className="pb-3">Status</th>
-                <th className="pb-3 pr-2 text-right">Action</th>
+              <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">
+                <th className="py-3 px-4 sm:px-6">Document</th>
+                <th className="py-3 px-4">Student</th>
+                <th className="py-3 px-4">Terminal</th>
+                <th className="py-3 px-4">Pages / Copies</th>
+                <th className="py-3 px-4">Mode</th>
+                <th className="py-3 px-4">Amount</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 sm:px-6 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className={`divide-y font-medium ${
-              isDark ? 'divide-slate-700/60' : 'divide-gray-100'
-            }`}>
-              {filteredJobs.map((job) => (
-                <tr key={job.id} className="hover:bg-purple-500/10 transition-colors">
-                  <td className="py-3.5 pl-2 font-mono font-bold text-[#a78bfa]">{job.id}</td>
-                  <td className={`py-3.5 font-bold max-w-[180px] truncate ${
-                    isDark ? 'text-white' : 'text-[#1e1b4b]'
-                  }`}>
-                    {job.fileName}
-                  </td>
-                  <td className="py-3.5 text-gray-400 text-[11px] max-w-[140px] truncate">
-                    {job.user}
-                  </td>
-                  <td className={`py-3.5 whitespace-nowrap font-semibold ${
-                    isDark ? 'text-slate-200' : 'text-gray-700'
-                  }`}>
-                    {job.kiosk}
-                  </td>
-                  <td className="py-3.5 whitespace-nowrap">
-                    <span className={`font-bold ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`}>{job.pageCount} pgs</span>
-                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
-                      isDark ? 'bg-slate-800 text-slate-300' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {job.type}
-                    </span>
-                  </td>
-                  <td className={`py-3.5 font-bold whitespace-nowrap ${
-                    isDark ? 'text-white' : 'text-[#1e1b4b]'
-                  }`}>
-                    ₹{job.amount.toFixed(2)}
-                  </td>
-                  <td className="py-3.5 whitespace-nowrap">
-                    <div className={`font-semibold ${isDark ? 'text-slate-200' : 'text-[#1e1b4b]'}`}>{job.stage}</div>
-                    <div className="text-[10px] text-gray-400">{job.duration} ({job.timestamp})</div>
-                  </td>
-                  <td className="py-3.5 whitespace-nowrap">
-                    <span
-                      className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                        job.status === 'DONE'
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                          : job.status === 'PRINTING'
-                          ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30 animate-pulse'
-                          : job.status === 'ACTIVE'
-                          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
-                          : job.status === 'WARNING'
-                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                          : 'bg-red-500/15 text-red-400 border border-red-500/30'
-                      }`}
-                    >
-                      {job.status}
-                    </span>
-                  </td>
-                  <td className="py-3.5 pr-2 text-right whitespace-nowrap">
-                    <button
-                      onClick={() => handleReprint(job.id)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
-                        isDark
-                          ? 'border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
-                          : 'border-gray-200 text-gray-600 hover:bg-purple-50 hover:text-[#7c3aed]'
-                      }`}
-                    >
-                      <RotateCcw size={12} />
-                      Reprint
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredJobs.length === 0 && (
+            <tbody className="divide-y divide-[var(--border)] text-xs sm:text-sm">
+              {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-gray-400">
-                    No print operations matched your filter.
+                  <td colSpan={8} className="py-12 text-center text-[var(--text-3)]">
+                    <RefreshCw className="animate-spin inline mr-2" size={16} />
+                    Loading operations queue...
                   </td>
                 </tr>
+              ) : paginatedJobs.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-[var(--text-3)]">
+                    No print operations found
+                  </td>
+                </tr>
+              ) : (
+                paginatedJobs.map((job) => (
+                  <tr key={job.id} className="hover:bg-[var(--surface-2)]/50 transition-colors">
+                    {/* File / Doc */}
+                    <td className="py-3.5 px-4 sm:px-6">
+                      <div className="flex items-center gap-2.5">
+                        <FileText size={16} className="text-indigo-500 flex-shrink-0" />
+                        <div>
+                          <p className="font-bold text-[var(--text-1)] truncate max-w-[200px]">
+                            {job.file}
+                          </p>
+                          <p className="text-[10px] text-[var(--text-3)] font-mono">
+                            {job.orderId || job.id}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Student User */}
+                    <td className="py-3.5 px-4 text-[var(--text-2)] font-medium">
+                      <p className="truncate max-w-[160px]">{job.userEmail}</p>
+                      {job.userPhone && <p className="text-[10px] text-[var(--text-3)]">{job.userPhone}</p>}
+                    </td>
+
+                    {/* Destination Terminal */}
+                    <td className="py-3.5 px-4 font-mono text-[11px] text-[var(--text-2)] font-bold">
+                      {job.destination}
+                    </td>
+
+                    {/* Pages */}
+                    <td className="py-3.5 px-4 font-semibold text-[var(--text-1)]">
+                      {job.pageCount} pgs {job.copies > 1 ? `(${job.copies} copies)` : ''}
+                    </td>
+
+                    {/* Color Mode */}
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                        job.colorMode === 'color'
+                          ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}>
+                        {job.colorMode}
+                      </span>
+                    </td>
+
+                    {/* Amount */}
+                    <td className="py-3.5 px-4 font-bold text-emerald-600 dark:text-emerald-400">
+                      ₹{job.cost.toFixed(2)}
+                    </td>
+
+                    {/* Status Badge */}
+                    <td className="py-3.5 px-4">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase ${
+                        job.status === 'completed' || job.status === 'printed' || job.status === 'paid'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                          : job.status === 'printing'
+                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                          : job.status === 'refunded'
+                          ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
+                          : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                      }`}>
+                        {job.status}
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3.5 px-4 sm:px-6 text-right">
+                      {job.status !== 'refunded' && job.cost > 0 && job.orderId && (
+                        <button
+                          type="button"
+                          onClick={() => setRefundJob(job)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <RotateCcw size={12} />
+                          Refund
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--text-3)] bg-[var(--surface)]">
+          <span>
+            Showing {filteredJobs.length > 0 ? (page - 1) * PAGE_SIZE + 1 : 0} to{' '}
+            {Math.min(page * PAGE_SIZE, filteredJobs.length)} of {filteredJobs.length} records
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="p-1.5 rounded-lg border border-[var(--border)] disabled:opacity-30 hover:bg-[var(--surface-2)] cursor-pointer"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="font-bold text-[var(--text-1)]">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="p-1.5 rounded-lg border border-[var(--border)] disabled:opacity-30 hover:bg-[var(--surface-2)] cursor-pointer"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* ── Cashfree Refund Modal ────────────────────────────────────── */}
+      {refundJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <form
+            onSubmit={handleRefundSubmit}
+            className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+              <div className="flex items-center gap-2">
+                <RotateCcw size={18} className="text-rose-500" />
+                <h3 className="font-bold text-base text-[var(--text-1)]">Issue Cashfree Refund</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRefundJob(null)}
+                className="p-1 rounded text-[var(--text-3)] hover:text-[var(--text-1)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            {refundMessage && (
+              <div
+                className={`p-3 rounded-xl text-xs font-semibold ${
+                  refundMessage.type === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
+                }`}
+              >
+                {refundMessage.text}
+              </div>
+            )}
+
+            <div className="space-y-2 text-xs text-[var(--text-2)]">
+              <div className="flex justify-between py-1 border-b border-[var(--border)]">
+                <span className="text-[var(--text-3)]">Order ID</span>
+                <span className="font-mono font-bold text-[var(--text-1)]">{refundJob.orderId}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[var(--border)]">
+                <span className="text-[var(--text-3)]">Customer</span>
+                <span className="font-semibold">{refundJob.userEmail}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[var(--border)]">
+                <span className="text-[var(--text-3)]">Document</span>
+                <span className="truncate max-w-[200px]">{refundJob.file}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[var(--border)]">
+                <span className="text-[var(--text-3)]">Refund Amount</span>
+                <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">
+                  ₹{refundJob.cost.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                Refund Reason / Note
+              </label>
+              <input
+                type="text"
+                value={refundNote}
+                onChange={(e) => setRefundNote(e.target.value)}
+                required
+                className="w-full px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-xs text-[var(--text-1)] focus:outline-none focus:border-[var(--primary)]"
+              />
+            </div>
+
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-[var(--border)]">
+              <button
+                type="button"
+                onClick={() => setRefundJob(null)}
+                className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text-2)] hover:bg-[var(--surface-2)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isRefunding}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-rose-500/20 disabled:opacity-50"
+              >
+                {isRefunding ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                Confirm Refund
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
