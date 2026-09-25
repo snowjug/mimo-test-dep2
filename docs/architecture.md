@@ -1,3 +1,5 @@
+> **Historical document.** Written for the pre-consolidation layout (separate Express `backend/`, Northflank/Vercel hosting). Paths and deployment steps below may no longer apply — see the root `README.md`.
+
 # Mimo Print Ecosystem: System Architecture & Documentation
 
 Welcome to the comprehensive technical documentation for the Mimo Print Kiosk system. Mimo is a fully automated, highly scalable, zero-maintenance print brokering platform designed to bridge web uploads with physical hardware printers using a serverless event-driven architecture.
