@@ -19,3 +19,7 @@ build/
 serviceAccountKey.json
 SENSITIVE_ENV_VARIABLES.md
 **/private.md
+# Python / Vite generated
+__pycache__/
+*.pyc
+.vite/
