@@ -1,3 +1,5 @@
+const Busboy = require("busboy");
+const { v4: uuidv4 } = require("uuid");
 const { admin, db } = require("../config/firebase");
 
 // ================= PROFILE =================
@@ -148,6 +150,69 @@ const postSettings = async (req, res) => {
   }
 };
 
+// ================= PROFILE PHOTO UPLOAD =================
+// Ported from the legacy Express server (which used multer). The Cloud Functions runtime consumes the
+// request stream before Express sees it and exposes the bytes as req.rawBody, so multer cannot read
+// multipart bodies here; busboy parses req.rawBody instead. Request/response contract is unchanged:
+// multipart/form-data with a `photo` field -> { photoUrl }.
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
+function parsePhotoUpload(req) {
+  return new Promise((resolve, reject) => {
+    const contentType = req.headers["content-type"] || "";
+    if (!contentType.startsWith("multipart/form-data") || !req.rawBody) return resolve(null);
+    const bb = Busboy({ headers: req.headers, limits: { files: 1, fileSize: MAX_PHOTO_BYTES } });
+    let photo = null;
+    let tooLarge = false;
+    bb.on("file", (field, stream, info) => {
+      if (field !== "photo") return stream.resume();
+      const chunks = [];
+      stream.on("data", (d) => chunks.push(d));
+      stream.on("limit", () => { tooLarge = true; });
+      stream.on("end", () => {
+        photo = { buffer: Buffer.concat(chunks), filename: info.filename || "photo", mimeType: info.mimeType };
+      });
+    });
+    bb.on("error", reject);
+    bb.on("close", () => {
+      if (tooLarge) return reject(Object.assign(new Error("Photo too large"), { status: 413 }));
+      resolve(photo);
+    });
+    bb.end(req.rawBody);
+  });
+}
+
+const postUploadProfilePhoto = async (req, res) => {
+  try {
+    const file = await parsePhotoUpload(req);
+    if (!file) return res.status(400).send("No file uploaded");
+
+    const userId = req.user.userId;
+    const safeFileName = file.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const fileName = `profiles/${userId}_${Date.now()}_${safeFileName}`;
+    const bucket = admin.storage().bucket();
+
+    // Firebase download-token URL instead of a 100-year signed URL: no IAM signing permission needed.
+    const token = uuidv4();
+    await bucket.file(fileName).save(file.buffer, {
+      contentType: file.mimeType,
+      metadata: {
+        cacheControl: "public, max-age=86400",
+        metadata: { firebaseStorageDownloadTokens: token },
+      },
+    });
+    const photoUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+
+    await db.collection("users").doc(userId).update({ photoUrl });
+
+    res.json({ photoUrl });
+  } catch (err) {
+    console.error("❌ /upload-profile-photo error:", err);
+    if (err.status === 413) return res.status(413).json({ error: "Photo too large (max 10MB)" });
+    res.status(500).json({ error: "Failed to upload profile photo" });
+  }
+};
+
 module.exports = {
   getProfile,
   putProfile,
@@ -157,4 +222,5 @@ module.exports = {
   getPrintHistory,
   getSettings,
   postSettings,
+  postUploadProfilePhoto,
 };

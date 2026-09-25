@@ -766,10 +766,67 @@ const postPaymentSuccess = async (req, res) => {
   }
 };
 
+// ================= USER REFUND REQUEST =================
+// (ported from the legacy Express server; handler body unchanged)
+// ================= USER REFUND REQUEST =================
+// Lets an authenticated user flag a failed/unprinted paid order for admin review.
+const postRequestRefund = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { orderId, reason } = req.body;
+    if (!orderId) return res.status(400).json({ error: "orderId is required" });
+
+    // Verify the order belongs to this user
+    let ordSnap = await db.collection("orders").where("orderId", "==", orderId).where("userId", "==", userId).get();
+    if (ordSnap.empty) {
+      ordSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).where("userId", "==", userId).get();
+    }
+    if (ordSnap.empty) return res.status(404).json({ error: "Order not found or does not belong to you" });
+
+    const orderData = ordSnap.docs[0].data();
+    const orderStatus = orderData.status || orderData.orderStatus || "";
+
+    // Only allow refund requests for FAILED or PAID-but-unprinted orders
+    const isPrintedOrPrinting = orderStatus === "printing" || orderStatus === "completed" || orderStatus === "PRINTED";
+    if (isPrintedOrPrinting) {
+      return res.status(400).json({ error: "Cannot request refund for an order that has been printed." });
+    }
+
+    // Check for duplicate request
+    const existingReq = await db.collection("refund_requests")
+      .where("orderId", "==", orderId)
+      .where("userId", "==", userId)
+      .get();
+    if (!existingReq.empty) {
+      return res.status(409).json({ error: "A refund request already exists for this order.", status: existingReq.docs[0].data().status });
+    }
+
+    const refundReqRef = await db.collection("refund_requests").add({
+      userId,
+      orderId,
+      orderStatus,
+      amount: orderData.amount || orderData.totals?.totalAmount || 0,
+      reason: reason || "User requested refund",
+      status: "pending",        // pending → approved → processed | rejected
+      requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+      resolvedAt: null,
+      resolvedBy: null,
+      adminNote: null,
+    });
+
+    console.log(`[REQUEST-REFUND] Created refund_request ${refundReqRef.id} for orderId=${orderId} userId=${userId}`);
+    res.json({ message: "Refund request submitted. Our team will review it within 24–48 hours.", requestId: refundReqRef.id });
+  } catch (err) {
+    console.error("[REQUEST-REFUND] Error:", err);
+    res.status(500).json({ error: "Failed to submit refund request" });
+  }
+};
+
 module.exports = {
   postCreateOrder,
   getVerifyPayment,
   postCashfreeWebhook,
   postCheckStatus,
   postPaymentSuccess,
+  postRequestRefund,
 };
