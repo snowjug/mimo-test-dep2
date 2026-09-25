@@ -18,6 +18,7 @@ router.post("/admin/hardware", adminAuthMiddleware, admin.postAdminHardware);
 router.get("/admin/metrics", adminAuthMiddleware, admin.getAdminMetrics);
 router.post("/admin/reset-metrics", adminAuthMiddleware, admin.postAdminResetMetrics);
 router.get("/admin/recent-prints", adminAuthMiddleware, admin.getAdminRecentPrints);
+router.get("/admin/users", adminAuthMiddleware, admin.getAdminUsers);
 router.post("/admin/refund", adminAuthMiddleware, admin.postAdminRefund);
 router.get("/admin/refund-requests", adminAuthMiddleware, admin.getAdminRefundRequests);
 

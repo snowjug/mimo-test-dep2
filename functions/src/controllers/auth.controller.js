@@ -6,13 +6,14 @@ const { admin, db } = require("../config/firebase");
 // ================= REGISTER =================
 const postRegister = async (req, res) => {
   try {
-    const { username, password, email, mobileNumber } = req.body;
+    const { username, name, password, email, mobileNumber } = req.body;
     const existing = await db.collection("users").where("email", "==", email).get();
     if (!existing.empty) return res.status(400).json({ error: "User already exists" });
     const hashedPassword = await bcrypt.hash(password, 10);
     const now = admin.firestore.FieldValue.serverTimestamp();
+    const finalUsername = username || name || (email ? email.split("@")[0] : "User");
     const userRef = await db.collection("users").add({
-      username, email, mobileNumber: mobileNumber || "", password: hashedPassword,
+      username: finalUsername, email, mobileNumber: mobileNumber || "", password: hashedPassword,
       googleUser: false, createdAt: now, updatedAt: now, accountStatus: "active",
       totalSpent: 0, totalPagesPrinted: 0, isVerified: true,
       mimo_coins: { balance: 0, total_earned: 0, total_used: 0 },
