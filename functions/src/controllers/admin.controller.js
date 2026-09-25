@@ -433,6 +433,91 @@ const getAdminRefundRequests = async (req, res) => {
   }
 };
 
+// ================= ADMIN USERS & CUSTOMER INTELLIGENCE =================
+const getAdminUsers = async (req, res) => {
+  try {
+    const [usersSnap, ordersSnap, jobsSnap] = await Promise.all([
+      db.collection("users").get(),
+      db.collection("orders").get(),
+      db.collection("print_jobs").get()
+    ]);
+
+    // Aggregate user spending and job statistics
+    const userStats = {};
+    const payingUserIds = new Set();
+    let totalRevenue = 0;
+
+    ordersSnap.forEach((doc) => {
+      const ord = doc.data();
+      const uid = ord.userId || ord.userEmail || "anonymous";
+      const amt = ord.amount || ord.totals?.totalAmount || 0;
+      if (ord.status === "PAID" || ord.status === "SUCCESS") {
+        totalRevenue += amt;
+        if (ord.userId) payingUserIds.add(ord.userId);
+        if (!userStats[uid]) userStats[uid] = { totalSpend: 0, orderCount: 0, pagesPrinted: 0 };
+        userStats[uid].totalSpend += amt;
+        userStats[uid].orderCount += 1;
+      }
+    });
+
+    jobsSnap.forEach((doc) => {
+      const job = doc.data();
+      const uid = job.userId || job.userEmail || "anonymous";
+      const pages = (job.pageCount || 0) * (job.copies || 1);
+      if (!userStats[uid]) userStats[uid] = { totalSpend: 0, orderCount: 0, pagesPrinted: 0 };
+      userStats[uid].pagesPrinted += pages;
+    });
+
+    const userList = [];
+    usersSnap.forEach((doc) => {
+      const u = doc.data();
+      const uid = doc.id;
+      const stats = userStats[uid] || userStats[u.email] || { totalSpend: 0, orderCount: 0, pagesPrinted: 0 };
+
+      let joinedAt = "";
+      if (u.createdAt) {
+        joinedAt = u.createdAt.toDate ? u.createdAt.toDate().toISOString() : new Date(u.createdAt).toISOString();
+      }
+
+      userList.push({
+        id: uid,
+        username: u.username || u.name || "Mimo User",
+        email: u.email || "No Email",
+        mobileNumber: u.mobileNumber || u.phoneNumber || "—",
+        googleUser: Boolean(u.googleUser),
+        mimoCoins: u.mimo_coins?.balance || 0,
+        totalSpend: Number(stats.totalSpend.toFixed(2)),
+        orderCount: stats.orderCount,
+        pagesPrinted: stats.pagesPrinted,
+        isPayingCustomer: stats.orderCount > 0,
+        joinedAt: joinedAt || new Date().toISOString()
+      });
+    });
+
+    // Sort users by total spend or join date
+    userList.sort((a, b) => b.totalSpend - a.totalSpend);
+
+    const totalUsers = usersSnap.size;
+    const activeCustomers = payingUserIds.size;
+    const conversionRate = totalUsers > 0 ? Number(((activeCustomers / totalUsers) * 100).toFixed(1)) : 0;
+    const avgRevenuePerUser = totalUsers > 0 ? Number((totalRevenue / totalUsers).toFixed(2)) : 0;
+
+    res.json({
+      metrics: {
+        totalUsers,
+        activeCustomers,
+        conversionRate,
+        avgRevenuePerUser,
+        totalRevenue: Number(totalRevenue.toFixed(2))
+      },
+      users: userList
+    });
+  } catch (err) {
+    console.error("[ADMIN-USERS] Error:", err);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+};
+
 module.exports = {
   postAdminLogin,
   getAdminCoupons,
@@ -450,4 +535,6 @@ module.exports = {
   postAdminCouponsBulk,
   postAdminRefund,
   getAdminRefundRequests,
+  getAdminUsers,
 };
+
