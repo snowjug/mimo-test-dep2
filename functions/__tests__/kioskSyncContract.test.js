@@ -19,9 +19,9 @@ const {
   validateKioskJobStatusResponse,
   validateReportFailureRequest,
   validatePrintJobDocument
-} = require("../contracts/kioskContract");
+} = require("../src/validators/kioskContract");
 
-const { createKioskRouter } = require("../routes/kioskRoutes");
+const { createKioskRouter } = require("../src/routes/kiosk.routes");
 
 describe("MIMO 2.0 Sync Safety & Contract Tests", () => {
 

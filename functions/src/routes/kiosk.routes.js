@@ -18,7 +18,7 @@ const {
   validateReportFailureRequest,
   validateStateTransition,
   PRINT_JOB_STATUS
-} = require("../contracts/kioskContract");
+} = require("../validators/kioskContract");
 
 function createKioskRouter(dependencies) {
   const {
