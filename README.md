@@ -172,7 +172,7 @@ what only an administrator can do: [`docs/deployment/REMAINING_SETUP.md`](docs/d
 | Part | How |
 |---|---|
 | Backend `api` | Push touching `functions/**` → `deploy-functions.yml`: tests → env from the live function (+ optional `FUNCTIONS_ENV_FILE` secret) → **refuses to deploy with missing or insecure config** → deploy → smoke test. Rollback: re-run the workflow with an older `ref`. |
-| Six triggers | Manual opt-in (their live regions differ from the code — see `CI_CD.md`) |
+| Six triggers | Deployed **by hand** (not by CI) with a logged-in Firebase account; regions are declared in code and pinned by a test — procedure in [`docs/deployment/CI_CD.md`](docs/deployment/CI_CD.md) §6. All run on Node 22 since 2026-09-27 |
 | Customer site, admin, finance, kiosk UI | Vercel's GitHub integration on every push; `post-deploy-smoke.yml` checks the public sites |
 | Office converter | `deploy-converter.yml` on pushes touching `converter/**`, with a health check |
 | Legacy backend | Northflank + Vercel + `backend-image.yml` — frozen, retirement in [`docs/deployment/LEGACY_BACKEND_REMOVAL.md`](docs/deployment/LEGACY_BACKEND_REMOVAL.md) |

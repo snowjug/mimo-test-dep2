@@ -9,7 +9,7 @@ Northflank) were **not** accessed. Actions needed from a repository admin are in
 | Component | Source | Deployed to | Trigger | Auto on `main`? | Failure is visible as |
 |---|---|---|---|---|---|
 | Backend API (`api`) | `functions/` | Firebase Functions `us-central1`, project `mimo-v2-11868` | `deploy-functions.yml` on push to `main` touching `functions/**` (14 successful runs in history) | **Yes** | Red run in GitHub Actions |
-| Firestore/scheduler triggers (6) | `functions/src/triggers/` | Firebase Functions — **live regions differ: `colourPaperUsageNotification`, `printerHardwareNotification`, `sendFailureNotification`, `lowPaperNotification` are in `asia-south1`; `api`, `autoRefundJob`, `autoCleanupStorageJob`, `scheduledFileRetentionCleanup` in `us-central1`** | same workflow, **manual opt-in only** (`deploy_triggers`) | **No** — see §5 | — |
+| Firestore/scheduler triggers (6) | `functions/src/triggers/` | Firebase Functions, `us-central1` (3) and `asia-south1` (3 e-mail triggers), Node 22 | **By hand** with the Firebase CLI — procedure in §6 | **No** | — |
 | Customer site | `mimo-website/` | Vercel project `mimo_v2` → `printmimo.tech` | Vercel Git integration on every push | **Yes** (statuses seen on every commit) | Vercel status on the commit; `post-deploy-smoke.yml` on `main` |
 | Admin + Finance | `mimo-website/mimo-admin-dashboard/` | Built into the customer site (`/admin/`, `/finance`) | same as customer site | **Yes** | same |
 | Kiosk UI | `mimo-frontend-web-app/mimo-frontend/` | Vercel (project `mimo-frontend` and others; the tablets load `mimo-kiosk-app.vercel.app`; also `mimo-frontend-three.vercel.app`, `mimo-2-0.vercel.app`) — project↔domain mapping is set in Vercel and not verified | Vercel Git integration | **Yes** | same |
@@ -67,7 +67,7 @@ There is no bypass flag and no authentication code was changed.
 | Injection | Inputs and event data are passed through `env:`, never interpolated into shell. |
 | Third-party actions | Pinned to major tags (not commit SHAs). Acceptable; pin SHAs if the org requires it. |
 | Deploy scope | `--only functions:<name>` lists — a deploy can never delete other functions. |
-| Deployer permissions | `FIREBASE_SERVICE_ACCOUNT` demonstrably deploys `api` and edits Cloud Run IAM. Whether it can deploy triggers (Eventarc/Secret Manager) and read the service config is **unproven until the first run** — the workflow degrades safely (see REMAINING_SETUP). |
+| Deployer permissions | `FIREBASE_SERVICE_ACCOUNT` deploys `api` and edits Cloud Run IAM (proven by run history). Triggers were deployed by hand with a personal Firebase account on 2026-09-27; whether the CI account could deploy them is unproven. |
 | Public repository | The repo is public. Committed items that need cleanup in a security task: a WhatsApp token fallback in `functions/src/config/env.js`, a hard-coded fallback for the internal failure-report secret in `functions/src/routes/kiosk.routes.js`, Pi SSH passwords in `backend/*.py` and `scripts/`, and `storage.rules` allowing public read/write (`if true`). None are touched here. |
 | Production API auth | Live `POST /admin/login` rejects `admin/admin` today. The team's local `.env` contains it and the gate refuses it. |
 
@@ -76,11 +76,29 @@ Whether the live function currently has every required variable; that the deploy
 folder mapping and Vercel "ignored build step" settings; branch protection. The first run of each workflow answers these and fails
 with an explicit message if something is missing.
 
-## 6. Trigger regions (found on 2026-09-26 with `firebase functions:list`)
-The code in `functions/src/triggers/` sets no region, so a deploy would put every trigger in `us-central1`. Live, three notification triggers
-already run in `asia-south1`, and a fourth (`lowPaperNotification`) exists live but not in the repository. Deploying from this code would
-create duplicate triggers (duplicate alert e-mails) instead of updating the existing ones. Until each trigger's region is set in code to
-match what is live, deploy triggers only deliberately and check `firebase functions:list` afterwards.
+## 6. Triggers: regions, runtime and how to deploy them (updated 2026-09-27)
+`firebase functions:list` shows the live layout. The three e-mail triggers (`sendFailureNotification`, `printerHardwareNotification`, `colourPaperUsageNotification`) run in **`asia-south1`**;
+`autoRefundJob`, `autoCleanupStorageJob` and `scheduledFileRetentionCleanup` run in **`us-central1`**. A trigger deployed without the right `region` would be created as a **second copy** (duplicate alert e-mails or refunds),
+so the regions are now declared in `functions/src/triggers/printJob.triggers.js` and pinned, together with the event sources, by `functions/__tests__/triggerDeployment.test.js`.
+All seven functions defined in code run on **Node 22** (migrated 2026-09-27; Node 20 functions can no longer be deployed after 2026-10-30).
+
+**Deploy triggers by hand** (a Firebase account with deploy rights; CI does not do this). Use a clean copy of the committed code so local `.env` files are not uploaded:
+```bash
+mkdir /tmp/tdeploy && git archive origin/main functions | tar -x -C /tmp/tdeploy
+echo '{ "functions": { "source": "functions" } }' > /tmp/tdeploy/firebase.json
+(cd /tmp/tdeploy/functions && npm ci --omit=dev)
+cd /tmp/tdeploy
+firebase deploy --only functions:scheduledFileRetentionCleanup --force --project mimo-v2-11868                      # no environment needed
+firebase deploy --only functions:sendFailureNotification,functions:printerHardwareNotification,functions:colourPaperUsageNotification --force --project mimo-v2-11868   # secret GMAIL_APP_PASSWORD is bound in code, no .env
+# autoRefundJob + autoCleanupStorageJob need CASHFREE_APP_ID, CASHFREE_SECRET_KEY, CASHFREE_ENV and WA_ACCESS_TOKEN, WA_PHONE_NUMBER_ID, WA_VERIFY_TOKEN
+# in /tmp/tdeploy/functions/.env (copy the values from the live autorefundjob Cloud Run service; delete the file afterwards):
+firebase deploy --only functions:autoRefundJob,functions:autoCleanupStorageJob --force --project mimo-v2-11868
+firebase functions:list --project mimo-v2-11868      # confirm 8 entries, no duplicates, regions unchanged
+```
+Never put `GMAIL_APP_PASSWORD` in the `.env` of a function that binds it as a secret (Google rejects the overlap), and never deploy a bare `firebase deploy`.
+Rollback: `gcloud run services update-traffic <service> --region <region> --to-revisions <previous-revision>=100` (revisions before the Node 22 move: see the deploy log) or redeploy an older commit the same way.
+
+**Open item:** the live function `lowPaperNotification` (`asia-south1`, still Node 20, only the Gmail secret bound) has **no source in this repository** — the code that defined it was replaced by `printerHardwareNotification`. It keeps running old code and cannot be redeployed. Decide whether to delete it (`firebase functions:delete lowPaperNotification --region asia-south1`) after checking whether alerts still depend on it.
 
 ## 7. Findings from the read-only checks of 2026-09-26/27
 * **Cashfree webhooks to the API have been timing out (504 after 60 s) since at least 2026-08-27** — all 24 logged calls in 30 days, on
