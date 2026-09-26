@@ -76,6 +76,18 @@ function parseLiveEnv(json) {
   return out;
 }
 
+/** Names bound to Secret Manager on the live function (they have no plain value; a .env deploy would unbind them). */
+function parseLiveSecretRefs(json) {
+  let doc;
+  try {
+    doc = typeof json === "string" ? JSON.parse(json) : json;
+  } catch {
+    return [];
+  }
+  const env = doc?.spec?.template?.spec?.containers?.[0]?.env || [];
+  return env.filter((i) => i && typeof i.name === "string" && i.valueFrom).map((i) => i.name);
+}
+
 function mergeSources({ live = {}, secretEnv = {} }) {
   const merged = {};
   const dropped = [];
@@ -118,15 +130,19 @@ const toDotenv = (env) => Object.keys(env).sort().map((k) => `${k}=${quote(env[k
 
 function main() {
   const outPath = process.argv[2] || "functions/.env";
-  const live = process.env.LIVE_ENV_JSON_PATH && fs.existsSync(process.env.LIVE_ENV_JSON_PATH)
-    ? parseLiveEnv(fs.readFileSync(process.env.LIVE_ENV_JSON_PATH, "utf8"))
-    : {};
+  const liveJson = process.env.LIVE_ENV_JSON_PATH && fs.existsSync(process.env.LIVE_ENV_JSON_PATH)
+    ? fs.readFileSync(process.env.LIVE_ENV_JSON_PATH, "utf8")
+    : "";
+  const live = parseLiveEnv(liveJson);
+  const liveSecretRefs = parseLiveSecretRefs(liveJson);
   const secretEnv = parseDotenv(process.env.FUNCTIONS_ENV_FILE || "");
   const { merged, dropped } = mergeSources({ live, secretEnv });
   const { missing, warnings, insecure } = validate(merged);
 
   const say = (msg) => console.log(msg);
   say(`Live production variables read: ${Object.keys(live).filter(isAllowed).length}`);
+  // Names only (never values): lets the team see what production currently has without console access.
+  console.log(`::notice title=Live function variables (names only)::plain: ${Object.keys(live).sort().join(", ") || "none"}; Secret Manager references: ${liveSecretRefs.sort().join(", ") || "none"}`);
   say(`Variables from FUNCTIONS_ENV_FILE secret: ${Object.keys(secretEnv).filter(isAllowed).length}`);
   if (dropped.length) say(`Ignored (reserved or not part of the allow-list): ${dropped.join(", ")}`);
   warnings.forEach((w) => say(`::warning::${w}`));
@@ -134,6 +150,9 @@ function main() {
   if (missing.length) {
     console.error(`::error title=Required configuration missing::Missing: ${missing.join(", ")}`);
     console.error(
+      (liveSecretRefs.some((n) => missing.includes(n))
+        ? `Note: ${liveSecretRefs.filter((n) => missing.includes(n)).join(", ")} is a Secret Manager reference on the live function; a .env deploy would unbind it, so supply the value too.\n`
+        : "") +
       "The deployed function has no value for these and none was supplied. Deploying would replace the\n" +
       "function's environment without them. Fix: a repository admin adds an Actions secret named\n" +
       "FUNCTIONS_ENV_FILE containing the production functions/.env (see docs/deployment/CI_CD.md)."
@@ -162,4 +181,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseDotenv, parseLiveEnv, mergeSources, validate, toDotenv, REQUIRED, ALLOWED };
+module.exports = { parseDotenv, parseLiveEnv, parseLiveSecretRefs, mergeSources, validate, toDotenv, REQUIRED, ALLOWED };

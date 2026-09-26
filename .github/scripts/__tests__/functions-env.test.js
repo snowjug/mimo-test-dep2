@@ -4,7 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { parseDotenv, parseLiveEnv, mergeSources, validate, toDotenv } = require("../functions-env");
+const { parseDotenv, parseLiveEnv, parseLiveSecretRefs, mergeSources, validate, toDotenv } = require("../functions-env");
 
 const SCRIPT = path.join(__dirname, "..", "functions-env.js");
 const GOOD = {
@@ -105,4 +105,17 @@ test("CLI: default admin/admin and the public JWT fallback block the deploy (exi
   const b = run({ ...GOOD, JWT_SECRET: "fallback_secret_key_change_me_in_prod" });
   assert.strictEqual(b.status, 2);
   assert.ok(!b.written);
+});
+
+test("secret-manager references on the live function are detected and explained when required", () => {
+  const doc = { spec: { template: { spec: { containers: [{ env: [
+    { name: "ADMIN_EMAIL", value: "ops@example.com" },
+    { name: "GMAIL_APP_PASSWORD", valueFrom: { secretKeyRef: { name: "GMAIL_APP_PASSWORD", key: "latest" } } },
+  ] }] } } } };
+  assert.deepStrictEqual(parseLiveSecretRefs(doc), ["GMAIL_APP_PASSWORD"]);
+  const { GMAIL_APP_PASSWORD, ...rest } = GOOD;
+  const r = run(rest, doc);
+  assert.strictEqual(r.status, 1);
+  assert.ok(r.stderr.includes("Secret Manager reference"));
+  assert.ok(r.stdout.includes("Secret Manager references: GMAIL_APP_PASSWORD"));
 });
