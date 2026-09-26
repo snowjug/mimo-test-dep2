@@ -1,7 +1,17 @@
 name: Deploy Cloud Run Office Converter
 
+# Runs when the converter's own files change on main (or manually). Nothing else triggers it.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "converter/**"
   workflow_dispatch:
+
+concurrency:
+  group: deploy-converter
+  cancel-in-progress: false
 
 jobs:
   deploy-converter:
@@ -39,7 +49,7 @@ jobs:
             --min-instances=0 \
             --max-instances=5 \
             --no-allow-unauthenticated \
-            --set-env-vars="STORAGE_BUCKET=mimo-v2-11868.firebasestorage.app" \
+            --update-env-vars="STORAGE_BUCKET=mimo-v2-11868.firebasestorage.app" \
             --project=mimo-v2-11868 \
             --quiet
 
