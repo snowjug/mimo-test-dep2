@@ -12,9 +12,9 @@ Northflank) were **not** accessed. Actions needed from a repository admin are in
 | Firestore/scheduler triggers (6) | `functions/src/triggers/` | Firebase Functions — **live regions differ: `colourPaperUsageNotification`, `printerHardwareNotification`, `sendFailureNotification`, `lowPaperNotification` are in `asia-south1`; `api`, `autoRefundJob`, `autoCleanupStorageJob`, `scheduledFileRetentionCleanup` in `us-central1`** | same workflow, **manual opt-in only** (`deploy_triggers`) | **No** — see §5 | — |
 | Customer site | `mimo-website/` | Vercel project `mimo_v2` → `printmimo.tech` | Vercel Git integration on every push | **Yes** (statuses seen on every commit) | Vercel status on the commit; `post-deploy-smoke.yml` on `main` |
 | Admin + Finance | `mimo-website/mimo-admin-dashboard/` | Built into the customer site (`/admin/`, `/finance`) | same as customer site | **Yes** | same |
-| Kiosk UI ×2 | `mimo-frontend-web-app/mimo-frontend/` | Two Vercel projects (`mimo-frontend`, `mimo-kiosk-backend` — project↔domain mapping is set in Vercel, inferred not verified) → `mimo-frontend-three.vercel.app`, `mimo-2-0.vercel.app` | Vercel Git integration | **Yes** | same |
+| Kiosk UI | `mimo-frontend-web-app/mimo-frontend/` | Vercel (project `mimo-frontend` and others; the tablets load `mimo-kiosk-app.vercel.app`; also `mimo-frontend-three.vercel.app`, `mimo-2-0.vercel.app`) — project↔domain mapping is set in Vercel and not verified | Vercel Git integration | **Yes** | same |
 | Office→PDF converter | `converter/` | Cloud Run `mimo-office-converter` (private) | `deploy-converter.yml` on push to `main` touching `converter/**` (was manual only) | **Yes** (new — not yet run) | Red run; health check |
-| Legacy backend | `backend/` | Northflank `mimo-backend` (build status on every commit) + GHCR image | Northflank integration; `backend-image.yml` on `backend/**` (85 successful runs) | Yes — frozen, untouched | Northflank / Actions |
+| Legacy backend | `backend/` | **Two live copies:** Northflank `mimo-backend` and Vercel project `mimo-kiosk-backend` (`mimo-kiosk-backend.vercel.app`, uses `backend/vercel.json`), both rebuilt on every push, plus a GHCR image | Northflank integration; `backend-image.yml` on `backend/**` (85 successful runs) | Yes — frozen, untouched | Northflank / Actions |
 | Raspberry Pi listeners | `pi-listener/`, `pi_scripts/` | The two Pis (Tailscale + SSH) | Manual (`scripts/deployment/*.py`, SSH with password) | **No** | — (only a syntax check in CI) |
 | Android kiosk shell | `LENOVO TABLET APP/` | The tablets (Device Owner, ADB) | Manual | **No** | — |
 | Firestore rules/indexes | `backend/firestore.rules`, `backend/firestore.indexes.json` | Firebase | Manual `firebase deploy` | **No** | — |
@@ -81,3 +81,11 @@ The code in `functions/src/triggers/` sets no region, so a deploy would put ever
 already run in `asia-south1`, and a fourth (`lowPaperNotification`) exists live but not in the repository. Deploying from this code would
 create duplicate triggers (duplicate alert e-mails) instead of updating the existing ones. Until each trigger's region is set in code to
 match what is live, deploy triggers only deliberately and check `firebase functions:list` afterwards.
+
+## 7. Findings from the read-only checks of 2026-09-26/27
+* **Cashfree webhooks to the API have been timing out (504 after 60 s) since at least 2026-08-27** — all 24 logged calls in 30 days, on
+  revisions from before the restructuring, so this is older than the current code. Payments still complete through the client-side
+  `/verify-payment` path, which hides it. Probable cause: `express.raw()` on `/cashfree-webhook` waits for a request body the Functions runtime
+  already consumed (`req.rawBody` is available there). Not fixed here (payment code); see LEGACY_BACKEND_REMOVAL.md.
+* The Meta WhatsApp webhook posts to the Functions API (300+ calls with 200 in 14 days), and the Cashfree webhook also targets the
+  Functions API (that is where the 504s are logged) — neither points at the legacy hosts.
