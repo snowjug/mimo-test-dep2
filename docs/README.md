@@ -6,6 +6,7 @@ The main documents live at the repository root: [`README.md`](../README.md) (sta
 | Path | What | Status |
 |---|---|---|
 | [`onboarding.md`](onboarding.md) | Three-day path for new interns | Current |
+| [`contributing.md`](contributing.md) | Change tiers, protected code, the safety net and how to write tests | Current |
 | [`deployment/CI_CD.md`](deployment/CI_CD.md) | How a push becomes a deployment, secrets, security gate, rollback | Current |
 | [`deployment/REMAINING_SETUP.md`](deployment/REMAINING_SETUP.md) | The few actions only a repository administrator can do | Current |
 | [`deployment/LEGACY_BACKEND_REMOVAL.md`](deployment/LEGACY_BACKEND_REMOVAL.md) | Plan and status for retiring the old `backend/` | Current (in progress) |

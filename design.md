@@ -105,7 +105,7 @@ The allowed transitions are encoded in `functions/src/validators/kioskContract.j
 
 ```
 pending ─► paid ─► printing ─► completed        (terminal)
-   │        │         ├──────► failed ─► refunded   (terminal)
+   │        │         ├──────► failed ─► refunded   (terminal; `failed` alone already triggers the automatic order refund)
    │        │         └──────► refunded
    │        ├─► refunded / failed / cancelled
    └─► failed / cancelled
@@ -118,7 +118,7 @@ pending ─► paid ─► printing ─► completed        (terminal)
 | `printing` | `POST /kiosk/print` | Assigned to one kiosk; the Pi reacts |
 | `completed` | Pi listener, `/mark-printed`, kiosk status route | Done (terminal) |
 | `failed` | Pi listener, kiosk routes | Printer reported an error |
-| `refunded` | `autoRefundJob` trigger, `/admin/refund` | Money returned (terminal) |
+| `refunded` | `/admin/refund` (unprinted jobs), kiosk failure route | Money returned (terminal). The automatic `autoRefundJob` refunds the *order* (`refundStatus`) and leaves the job `failed` |
 | `cancelled` | declared in the contract | Terminal; little used today |
 | `abandoned`, `cleaned` | upload flow, retention job | Housekeeping states used by code but **not** in the contract enum |
 
@@ -142,7 +142,8 @@ Design rules: terminal states never regress; only one kiosk may take a job; colo
 6. **No secrets in git** — not in code, docs, tests, logs or screenshots. Use environment variables; ask for the shared credentials file.
 7. **Avoid composite indexes and unbounded reads.**
 8. **Update the docs in the same pull request**, and label anything you could not verify as *unverified*.
-9. **Prefer deleting dead code to commenting it out**, but not the legacy `backend/` until its retirement plan is finished ([`docs/deployment/LEGACY_BACKEND_REMOVAL.md`](docs/deployment/LEGACY_BACKEND_REMOVAL.md)).
+9. **Respect the change tiers.** Payments, refunds, job state, auth, triggers and deploy files are protected and owner-reviewed; the safety net and the workflow are in [`docs/contributing.md`](docs/contributing.md).
+10. **Prefer deleting dead code to commenting it out**, but not the legacy `backend/` until its retirement plan is finished ([`docs/deployment/LEGACY_BACKEND_REMOVAL.md`](docs/deployment/LEGACY_BACKEND_REMOVAL.md)).
 
 ## 11. Known deviations from these principles
 

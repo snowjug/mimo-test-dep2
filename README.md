@@ -154,8 +154,9 @@ Pi tools read `PI_*` variables from `scripts/pi-ops/pi-hosts.env` ([template](sc
 ## Testing
 
 ```bash
-(cd functions && npm test)                                        # backend unit tests (50)
-node --test .github/scripts/__tests__/functions-env.test.js       # deployment-gate tests
+(cd functions && npm test)                                        # backend tests (80)
+(cd functions && npm run test:coverage)                           # coverage gate for money/refund/dashboard code
+node --test .github/scripts/__tests__/*.test.js                   # deployment-gate and secret-scanner tests
 python3 scripts/pi-ops/tests/test_pi_ops.py                       # Pi tooling tests, offline
 (cd mimo-website && npm run build)                                # customer site + admin build
 (cd mimo-frontend-web-app/mimo-frontend && npm run build)         # kiosk UI type-check + build
@@ -210,7 +211,7 @@ what only an administrator can do: [`docs/deployment/REMAINING_SETUP.md`](docs/d
 | | |
 |---|---|
 | [`architecture.md`](architecture.md) · [`design.md`](design.md) | System architecture · conventions and reasoning |
-| [`docs/onboarding.md`](docs/onboarding.md) · [`docs/README.md`](docs/README.md) | Intern path · documentation index |
+| [`docs/onboarding.md`](docs/onboarding.md) · [`docs/contributing.md`](docs/contributing.md) · [`docs/README.md`](docs/README.md) | Intern path · change tiers and the safety net · documentation index |
 | [`functions/README.md`](functions/README.md) | Backend: API, env vars, tests |
 | [`mimo-website/README.md`](mimo-website/README.md) · [admin](mimo-website/mimo-admin-dashboard/README.md) · [kiosk](mimo-frontend-web-app/mimo-frontend/README.md) | Front ends |
 | [`scripts/README.md`](scripts/README.md) · [`pi_scripts/README.md`](pi_scripts/README.md) · [`pi-listener/README.md`](pi-listener/README.md) | Pi tooling and listeners |
