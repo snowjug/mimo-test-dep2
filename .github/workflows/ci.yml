@@ -72,8 +72,15 @@ jobs:
         working-directory: functions
       - run: npm test
         working-directory: functions
-      - name: Deployment-gate tests
-        run: node --test .github/scripts/__tests__/functions-env.test.js
+      - name: Coverage gate for money, refund and dashboard code (ratchet - thresholds only go up)
+        run: npm run test:coverage
+        working-directory: functions
+      - name: Advisory dependency audit (production dependencies, does not fail the build yet)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: functions
+      - name: Pipeline script tests (deployment gate, secret scanner)
+        run: node --test .github/scripts/__tests__/*.test.js
 
   website:
     name: Customer site + admin/finance build
@@ -152,3 +159,28 @@ jobs:
         run: |
           bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
           ./actionlint -color
+
+  secrets:
+    name: Secret scan (added lines only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Scan the lines this change adds
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            base="origin/$BASE_REF"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            base="$BEFORE"
+          else
+            base="origin/main" # new branch or manual run
+          fi
+          node .github/scripts/secret-scan.js "$base" HEAD
