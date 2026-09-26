@@ -163,13 +163,14 @@ Manual checks worth doing after a change: hit the route with no token (401), wit
 
 ## 8. Deploying
 
-CI (`.github/workflows/deploy-functions.yml`) runs on pushes to `main` that touch `functions/**` and executes
-`firebase deploy --only functions:api`. Notes:
+Push to `main` (touching `functions/**`) → `.github/workflows/deploy-functions.yml` runs the tests, builds `functions/.env`
+from the live function's variables (+ optional `FUNCTIONS_ENV_FILE` secret), **stops if required variables are missing or
+insecure** (default admin password, weak `JWT_SECRET`), deploys `functions:api` and smoke-tests it. Full description:
+[`docs/deployment/CI_CD.md`](../docs/deployment/CI_CD.md).
 
-* The **triggers are not deployed by CI**; deploy them manually when their code changes
-  (`firebase deploy --only functions`, needs a logged-in Firebase CLI).
-* CI has no environment step — the function's environment variables must already be configured. Verify after a deploy.
-* Rolling back = `git revert` the change and let CI redeploy.
+* The six **triggers** deploy only through a manual run with *include_triggers* (or `firebase deploy --only functions` locally).
+* Manual deploy from a laptop still works: put the real `.env` in `functions/` (without the `FIREBASE_*` lines, Firebase rejects them).
+* Rolling back = `git revert` and let CI redeploy.
 
 ## 9. Conventions
 

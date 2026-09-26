@@ -1,5 +1,9 @@
 name: Deploy Firebase Functions
 
+# Deploys the production API (`functions:api`) when backend code on main changes.
+# Environment variables are NOT in git. They come from (1) the live function's current configuration and
+# (2) the optional FUNCTIONS_ENV_FILE repository secret. The deploy stops before touching production when
+# required configuration is missing or insecure (default admin password, weak/public JWT secret).
 on:
   push:
     branches:
@@ -7,23 +11,62 @@ on:
     paths:
       - "functions/**"
       - ".github/workflows/deploy-functions.yml"
+      - ".github/scripts/functions-env.js"
   workflow_dispatch:
+    inputs:
+      include_triggers:
+        description: "Also deploy the 6 Firestore/scheduler triggers (they are not part of a normal push deploy)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: mimo-v2-11868
+  REGION: us-central1
+  API_URL: https://api-upqxuj7evq-uc.a.run.app
 
 jobs:
-  deploy:
+  test:
+    name: Backend tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: functions/package-lock.json
+      - name: Install dependencies
+        working-directory: functions
+        run: npm ci
+      - name: Unit tests
+        working-directory: functions
+        run: npm test
+      - name: Deployment-gate tests
+        run: node --test .github/scripts/__tests__/functions-env.test.js
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+  deploy:
+    name: Deploy to Firebase
+    needs: test
+    # Production deploys come from main only (manual runs from other branches are refused).
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
           cache-dependency-path: functions/package-lock.json
 
-      - name: Install Functions Dependencies
+      - name: Install dependencies
         working-directory: functions
         run: npm ci
 
@@ -38,17 +81,59 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy to Firebase Functions
+      - name: Read the live function's environment (read-only)
+        run: |
+          if gcloud run services describe api --region="$REGION" --project="$PROJECT_ID" --format=json > "$RUNNER_TEMP/live-service.json" 2>/dev/null; then
+            echo "Read the deployed function's configuration."
+          else
+            echo "::warning::Could not read the deployed function's configuration; relying on the FUNCTIONS_ENV_FILE secret only."
+            echo '{}' > "$RUNNER_TEMP/live-service.json"
+          fi
+
+      - name: Prepare functions/.env and run the security gate
+        env:
+          LIVE_ENV_JSON_PATH: ${{ runner.temp }}/live-service.json
+          FUNCTIONS_ENV_FILE: ${{ secrets.FUNCTIONS_ENV_FILE }}
+        run: node .github/scripts/functions-env.js functions/.env
+
+      - name: Deploy
         env:
           FIREBASE_FUNCTIONS_DISCOVERY_TIMEOUT: "60000"
+          INCLUDE_TRIGGERS: ${{ inputs.include_triggers }}
         run: |
-          firebase deploy --only functions:api --force --project mimo-v2-11868
+          TARGETS="functions:api"
+          if [ "$INCLUDE_TRIGGERS" = "true" ]; then
+            TARGETS="$TARGETS,functions:autoRefundJob,functions:autoCleanupStorageJob,functions:sendFailureNotification,functions:printerHardwareNotification,functions:colourPaperUsageNotification,functions:scheduledFileRetentionCleanup"
+          fi
+          echo "Deploying: $TARGETS"
+          firebase deploy --only "$TARGETS" --force --project "$PROJECT_ID"
 
-      - name: Ensure Public Invoker Access
+      - name: Ensure public invoker access
         run: |
           gcloud run services add-iam-policy-binding api \
-            --region=us-central1 \
+            --region="$REGION" \
             --member="allUsers" \
             --role="roles/run.invoker" \
-            --project=mimo-v2-11868 \
+            --project="$PROJECT_ID" \
             --quiet
+
+      - name: Smoke test the deployed API
+        run: |
+          check() { # name, expected status, curl args...
+            local name="$1" want="$2"; shift 2
+            for attempt in 1 2 3 4 5 6; do
+              got=$(curl -s -o /dev/null -w "%{http_code}" -m 20 "$@" || true)
+              [ "$got" = "$want" ] && { echo "OK   $name -> $got"; return 0; }
+              sleep 10
+            done
+            echo "::error title=Smoke test failed::$name returned $got, expected $want"
+            return 1
+          }
+          check "API is up (GET /)" 200 "$API_URL/"
+          check "New admin endpoints deployed (GET /admin/analytics without token)" 401 "$API_URL/admin/analytics"
+          check "Admin login rejects bad credentials" 401 -X POST -H "content-type: application/json" \
+            -d '{"email":"ci-smoke-test","password":"not-a-real-password"}' "$API_URL/admin/login"
+
+      - name: Remove generated .env
+        if: always()
+        run: rm -f functions/.env "$RUNNER_TEMP/live-service.json"

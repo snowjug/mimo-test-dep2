@@ -129,16 +129,20 @@ Which of `pi-listener/` or `pi_scripts/` runs on which Pi has not been confirmed
 
 ## Deployment
 
+Pushing to `main` deploys automatically; details, secrets and the safety gate are in
+[`docs/deployment/CI_CD.md`](docs/deployment/CI_CD.md).
+
 | Part | How |
 |---|---|
-| Backend `api` | Push to `main` touching `functions/**` → `.github/workflows/deploy-functions.yml` runs `firebase deploy --only functions:api`. Triggers are **not** deployed by CI: `firebase deploy --only functions` manually. |
+| Backend `api` | Push to `main` touching `functions/**` → `deploy-functions.yml`: tests → builds the env from the live function (+ optional `FUNCTIONS_ENV_FILE` secret) → **refuses to deploy with missing or insecure config** (default admin password, weak JWT secret) → deploys → smoke-tests. |
+| Triggers (6) | Actions → *Deploy Firebase Functions* → Run workflow → tick *include_triggers*. |
 | Customer site + admin + finance | Vercel builds `mimo-website` on push (`npm run build` also builds the admin app into `dist/admin`). |
-| Kiosk UI | Vercel builds `mimo-frontend-web-app/mimo-frontend`. |
-| Office converter | Manual GitHub Action `deploy-converter.yml` (Cloud Run). |
+| Kiosk UI | Vercel builds `mimo-frontend-web-app/mimo-frontend` on push. |
+| Office converter | `deploy-converter.yml` on pushes touching `converter/**` (or manually). |
 | Legacy image | `backend-image.yml` — frozen, leave alone. |
+| Checks | `ci.yml` runs tests/builds for the apps a branch or PR touches; it deploys nothing. |
 
-CI has no environment-variable step: the deployed function's configuration must already contain them. After any backend
-deploy, hit `https://api-upqxuj7evq-uc.a.run.app/` and one authenticated route to confirm.
+After a backend deploy the workflow itself verifies `GET /` and `GET /admin/analytics` (401 = new routes are live).
 
 ## Testing
 
