@@ -60,7 +60,7 @@ The complete table is in [`architecture.md` §14](architecture.md#14-feature-sta
 | Separate finance login | **Partial** |
 | Per-user admin accounts, bank settlement reconciliation, BigQuery export | **Planned** |
 
-**Known issues** (see [`architecture.md` §13](architecture.md#13-known-limitations)): `POST /payment-success` trusts the caller · CORS allows any origin · `firebase/storage.rules` allows public read/write ·
+**Known issues** (see [`architecture.md` §13](architecture.md#13-known-limitations)): CORS allows any origin · `firebase/storage.rules` allows public read/write ·
 some historical documents and folders are stale (`company-website/`, `docs/*` marked *Historical*) · the kiosk UI has the production API address hard-coded.
 
 ## Technology stack
@@ -154,7 +154,7 @@ Pi tools read `PI_*` variables from `scripts/pi-ops/pi-hosts.env` ([template](sc
 ## Testing
 
 ```bash
-(cd functions && npm test)                                        # backend tests (80)
+(cd functions && npm test)                                        # backend tests (232)
 (cd functions && npm run test:coverage)                           # coverage gate for money/refund/dashboard code
 node --test .github/scripts/__tests__/*.test.js                   # deployment-gate and secret-scanner tests
 python3 scripts/pi-ops/tests/test_pi_ops.py                       # Pi tooling tests, offline

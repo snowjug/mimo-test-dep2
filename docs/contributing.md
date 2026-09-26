@@ -54,8 +54,9 @@ Prefer table-driven tests for money maths, and one `test` per behaviour with a n
 
 ## 5. Everyday commands
 ```bash
-cd functions && npm test                 # all backend tests (80)
+cd functions && npm test                 # all backend tests (232)
 cd functions && npm run test:coverage    # coverage gate (same as CI)
+cd functions && npm run test:emulator     # order/refund flows against the real Firestore emulator (Java + Firebase CLI)
 node --test .github/scripts/__tests__/*.test.js
 node .github/scripts/secret-scan.js origin/main HEAD    # would CI find a secret in your change?
 ```
