@@ -10,6 +10,20 @@ import {
   X,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useLiveQuery } from '../../hooks/useLiveQuery';
+import { insights } from '../../services/insights.service';
+import { defaultRange } from '../../lib/dateRange';
+
+/** Email stored in the admin JWT (display only; the API verifies the token). */
+const emailFromToken = (): string | undefined => {
+  try {
+    const t = localStorage.getItem('adminToken') || '';
+    const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.email === 'string' ? payload.email : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 export interface AdminLayoutProps {
   activeTab: string;
@@ -17,7 +31,7 @@ export interface AdminLayoutProps {
   onLogout: () => void;
   onResetMetrics?: () => void;
   isResetting?: boolean;
-  incidentCount?: number;
+  incidentCount?: number; // ignored: the layout reads the live count itself
   children: React.ReactNode;
 }
 
@@ -35,7 +49,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onLogout,
   onResetMetrics,
   isResetting = false,
-  incidentCount = 2,
   children,
 }) => {
   const { isDark } = useTheme();
@@ -43,6 +56,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     return localStorage.getItem('sidebarCollapsed') === 'true';
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Live fleet + incidents for the sidebar badge, fleet card and notification bell (always "today").
+  const kiosksQ = useLiveQuery(() => insights.kiosks(defaultRange()), [], { intervalMs: 30000 });
+  const incidentsQ = useLiveQuery(() => insights.incidents(defaultRange()), [], { intervalMs: 30000 });
+  const fleet = kiosksQ.data ? { online: kiosksQ.data.summary.online, total: kiosksQ.data.summary.total } : null;
+  const incidentCount = incidentsQ.data?.counts.open ?? 0;
+  const alerts = incidentsQ.data?.incidents ?? [];
+  const userEmail = emailFromToken();
 
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', String(collapsed));
@@ -64,6 +85,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         onTabChange={onTabChange}
         onLogout={onLogout}
         incidentCount={incidentCount}
+        fleet={fleet}
+        userEmail={userEmail}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed(v => !v)}
       />
@@ -91,6 +114,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               }}
               onLogout={onLogout}
               incidentCount={incidentCount}
+              fleet={fleet}
+              userEmail={userEmail}
               isMobile={true}
             />
           </div>
@@ -107,6 +132,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           onResetMetrics={onResetMetrics}
           isResetting={isResetting}
           incidentCount={incidentCount}
+          alerts={alerts}
           onOpenMobileNav={() => setMobileOpen(true)}
         />
 

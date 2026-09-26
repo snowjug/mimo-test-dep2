@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Layers, Loader2, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import api from '../../api';
+import { useRange } from '../../context/RangeContext';
+import { useLiveQuery } from '../../hooks/useLiveQuery';
+import { insights } from '../../services/insights.service';
 import { FinanceLayout } from './layout/FinanceLayout';
 import { FinanceTab } from './layout/FinanceSidebar';
 import { FinanceOverviewPage } from './pages/FinanceOverviewPage';
@@ -10,140 +12,66 @@ import { FinanceRefundsPage } from './pages/FinanceRefundsPage';
 import { FinancePricingPage } from './pages/FinancePricingPage';
 import { FinanceWalletPage } from './pages/FinanceWalletPage';
 import { FinanceSettlementsPage } from './pages/FinanceSettlementsPage';
-
 import { FinanceLoginPage } from '../../components/auth/FinanceLoginPage';
+import type { AdminUsersResponse } from '../../types/user.types';
 
+const TAB_PATHS: [string, FinanceTab][] = [
+  ['/finance/transaction', 'transactions'],
+  ['/finance/analytic', 'analytics'],
+  ['/finance/refund', 'refunds'],
+  ['/finance/pricing', 'pricing'],
+  ['/finance/wallet', 'wallet'],
+  ['/finance/settlement', 'settlements'],
+];
+const tabFromPath = (): FinanceTab => {
+  const path = window.location.pathname.toLowerCase();
+  return TAB_PATHS.find(([p]) => path.includes(p))?.[1] ?? 'overview';
+};
+
+/**
+ * Finance portal shell: login, navigation and ONE set of live, date-filtered queries shared by all pages.
+ * Nothing here is invented: numbers come from /admin/analytics, /admin/transactions, /admin/refund-requests
+ * and /admin/users (wallet page only); empty periods show zeros and failures show an error banner.
+ */
 export const FinanceApp: React.FC = () => {
-  const [token, setToken] = useState<string>(() => {
-    return localStorage.getItem('financeToken') || '';
-  });
+  const [token, setToken] = useState<string>(() => localStorage.getItem('financeToken') || '');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
-
-  // Derive initial tab from URL
-  const getInitialTab = (): FinanceTab => {
-    const path = window.location.pathname.toLowerCase();
-    if (path.includes('/finance/transaction')) return 'transactions';
-    if (path.includes('/finance/analytic')) return 'analytics';
-    if (path.includes('/finance/refund')) return 'refunds';
-    if (path.includes('/finance/pricing')) return 'pricing';
-    if (path.includes('/finance/wallet')) return 'wallet';
-    if (path.includes('/finance/settlement')) return 'settlements';
-    return 'overview';
-  };
-
-  const [activeTab, setActiveTab] = useState<FinanceTab>(getInitialTab);
-  const [dateRange, setDateRange] = useState('30d');
+  const [activeTab, setActiveTab] = useState<FinanceTab>(tabFromPath);
   const [globalSearch, setGlobalSearch] = useState('');
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const { range, current, live } = useRange();
 
-  // Real backend financial states
-  const [metrics, setMetrics] = useState({
-    totalRevenue: 142500,
-    successfulPayments: 128430,
-    pendingPayments: 18450,
-    refundsIssued: 3240,
-    netRevenue: 125190,
-    walletBalance: 12500,
-    totalOrders: 8420,
-    totalPages: 14500,
-    activeUsers: 142,
-  });
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [refundRequests, setRefundRequests] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-
-  // Navigation tab change handler
   const handleTabChange = (tab: FinanceTab) => {
     setActiveTab(tab);
-    const newPath = tab === 'overview' ? '/finance' : `/finance/${tab}`;
-    window.history.pushState(null, '', newPath);
+    window.history.pushState(null, '', tab === 'overview' ? '/finance' : `/finance/${tab}`);
   };
 
-  // Synchronize browser back/forward buttons
   useEffect(() => {
-    const handlePopState = () => {
-      setActiveTab(getInitialTab());
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    const onPop = () => setActiveTab(tabFromPath());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  // Fetch real financial datasets from backend APIs
-  const fetchFinanceData = useCallback(async () => {
-    if (!token) return;
-    setIsLoadingData(true);
-    try {
-      const [metricsRes, printsRes, refundsRes, usersRes] = await Promise.allSettled([
-        api.get('/admin/metrics'),
-        api.get('/admin/recent-prints'),
-        api.get('/admin/refund-requests'),
-        api.get('/admin/users'),
-      ]);
+  // Queries only run once signed in; they re-run when the date range changes and poll while the range includes today.
+  const signedIn = !!token;
+  const analytics = useLiveQuery(() => (signedIn ? insights.analytics(current()) : Promise.resolve(null)), [range, signedIn], { live: live && signedIn });
+  const transactions = useLiveQuery(() => (signedIn ? insights.transactions(current(), { limit: 1000 }) : Promise.resolve(null)), [range, signedIn], { live: live && signedIn });
+  const refunds = useLiveQuery(
+    () => (signedIn ? api.get<{ requests: any[] }>('/admin/refund-requests').then((r) => r.data.requests) : Promise.resolve(null)),
+    [signedIn],
+    { live: signedIn, intervalMs: 30000 }
+  );
+  // Heavy (scans users, orders and jobs), so only while the Wallet page is open and refreshed manually.
+  const wantUsers = signedIn && activeTab === 'wallet';
+  const users = useLiveQuery(() => (wantUsers ? api.get<AdminUsersResponse>('/admin/users').then((r) => r.data) : Promise.resolve(null)), [wantUsers], { live: false });
 
-      let rev = 142500;
-      let orders = 8420;
-      let pages = 14500;
-      let uCount = 142;
+  const refreshAll = () => { analytics.refresh(); transactions.refresh(); refunds.refresh(); if (wantUsers) users.refresh(); };
+  const isRefreshing = analytics.fetching || transactions.fetching || refunds.fetching;
+  const pendingRefunds = (refunds.data || []).filter((r) => r.status === 'pending').length;
 
-      if (metricsRes.status === 'fulfilled' && metricsRes.value.data) {
-        const d = metricsRes.value.data;
-        rev = d.totalRevenue || rev;
-        orders = d.totalOrders || orders;
-        pages = d.totalPages || pages;
-        uCount = d.activeUsers || uCount;
-      }
-
-      let printsData: any[] = [];
-      if (printsRes.status === 'fulfilled' && Array.isArray(printsRes.value.data)) {
-        printsData = printsRes.value.data;
-        setTransactions(printsData);
-      }
-
-      let refData: any[] = [];
-      if (refundsRes.status === 'fulfilled' && refundsRes.value.data?.requests) {
-        refData = refundsRes.value.data.requests;
-        setRefundRequests(refData);
-      }
-
-      let usersData: any[] = [];
-      if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value.data?.users)) {
-        usersData = usersRes.value.data.users;
-        setUsers(usersData);
-      }
-
-      // Compute consolidated metrics
-      const refundsSum = refData.reduce((acc, r) => acc + (Number(r.refundAmount || r.amount) || 0), 3240);
-      const pendingSum = printsData.filter(p => p.status === 'pending').reduce((acc, p) => acc + (Number(p.cost) || 0), 18450);
-      const successSum = rev > refundsSum ? rev - refundsSum : rev;
-
-      setMetrics({
-        totalRevenue: rev,
-        successfulPayments: successSum,
-        pendingPayments: pendingSum,
-        refundsIssued: refundsSum,
-        netRevenue: rev - refundsSum,
-        walletBalance: 12500,
-        totalOrders: orders,
-        totalPages: pages,
-        activeUsers: uCount,
-      });
-    } catch (e) {
-      console.error('Error loading finance telemetry:', e);
-    } finally {
-      setIsLoadingData(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    fetchFinanceData();
-  }, [fetchFinanceData]);
-
-  // Dedicated Finance Login Handler
   const handleLogin = async (loginEmail: string, loginPassword: string) => {
     setAuthError('');
     setIsAuthLoading(true);
-
     try {
       // Credentials are verified by the backend only; there is no client-side fallback session.
       const r = await api.post('/admin/login', { email: loginEmail, password: loginPassword });
@@ -162,85 +90,56 @@ export const FinanceApp: React.FC = () => {
     setToken('');
   };
 
-  // ── UNPROTECTED FINANCE AUTHENTICATION SCREEN ─────────────────────────────
   if (!token) {
-    return (
-      <FinanceLoginPage
-        onLogin={handleLogin}
-        loading={isAuthLoading}
-        error={authError}
-      />
-    );
+    return <FinanceLoginPage onLogin={handleLogin} loading={isAuthLoading} error={authError} />;
   }
 
-  // ── MAIN FINANCE APPLICATION SHELL WITH 7 EXACT PAGES ──────────────────────
   return (
     <FinanceLayout
       activeTab={activeTab}
       onTabChange={handleTabChange}
       onLogout={handleLogout}
-      dateRange={dateRange}
-      onDateRangeChange={setDateRange}
-      onRefresh={fetchFinanceData}
-      isRefreshing={isLoadingData}
+      onRefresh={refreshAll}
+      isRefreshing={isRefreshing}
       searchQuery={globalSearch}
       onSearchChange={setGlobalSearch}
-      pendingRefundsCount={refundRequests.filter(r => r.status === 'pending').length}
+      pendingRefundsCount={pendingRefunds}
     >
       {activeTab === 'overview' && (
         <FinanceOverviewPage
-          metrics={metrics}
-          recentTransactions={transactions}
-          refundRequests={refundRequests}
-          loading={isLoadingData}
-          onRefresh={fetchFinanceData}
+          analytics={analytics.data}
+          transactions={transactions.data?.transactions ?? []}
+          refundRequests={refunds.data ?? []}
+          loading={analytics.loading}
+          error={analytics.error}
+          updatedAt={analytics.updatedAt}
+          onRefresh={refreshAll}
           onNavigateToTab={(tab) => handleTabChange(tab as FinanceTab)}
         />
       )}
-
       {activeTab === 'transactions' && (
         <FinanceTransactionsPage
-          transactions={transactions}
-          loading={isLoadingData}
-          onRefresh={fetchFinanceData}
+          transactions={transactions.data?.transactions ?? []}
+          total={transactions.data?.total ?? 0}
+          truncated={!!transactions.data?.truncated}
+          globalSearch={globalSearch}
+          loading={transactions.loading}
+          error={transactions.error}
+          onRefresh={transactions.refresh}
         />
       )}
-
       {activeTab === 'analytics' && (
-        <FinanceAnalyticsPage
-          metrics={metrics}
-          loading={isLoadingData}
-        />
+        <FinanceAnalyticsPage analytics={analytics.data} loading={analytics.loading} error={analytics.error} onRefresh={analytics.refresh} />
       )}
-
       {activeTab === 'refunds' && (
-        <FinanceRefundsPage
-          refundRequests={refundRequests}
-          loading={isLoadingData}
-          onRefresh={fetchFinanceData}
-        />
+        <FinanceRefundsPage refundRequests={refunds.data ?? []} loading={refunds.loading} error={refunds.error} onRefresh={refreshAll} />
       )}
-
-      {activeTab === 'pricing' && (
-        <FinancePricingPage
-          loading={isLoadingData}
-          onRefresh={fetchFinanceData}
-        />
-      )}
-
+      {activeTab === 'pricing' && <FinancePricingPage loading={false} onRefresh={refreshAll} />}
       {activeTab === 'wallet' && (
-        <FinanceWalletPage
-          users={users}
-          loading={isLoadingData}
-          onRefresh={fetchFinanceData}
-        />
+        <FinanceWalletPage users={users.data?.users ?? []} loading={users.loading} error={users.error} onRefresh={users.refresh} />
       )}
-
       {activeTab === 'settlements' && (
-        <FinanceSettlementsPage
-          metrics={metrics}
-          loading={isLoadingData}
-        />
+        <FinanceSettlementsPage analytics={analytics.data} transactions={transactions.data?.transactions ?? []} loading={analytics.loading} error={analytics.error} />
       )}
     </FinanceLayout>
   );

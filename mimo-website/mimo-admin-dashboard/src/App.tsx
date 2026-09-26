@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import api from './api';
 import { ThemeProvider } from './context/ThemeContext';
+import { RangeProvider } from './context/RangeContext';
 import { AppShell } from './components/layout/AppShell';
 import { OverviewPage } from './pages/Overview/OverviewPage';
 import { OperationsPage } from './pages/Operations/OperationsPage';
@@ -103,12 +104,11 @@ function DashboardApp() {
       onLogout={logout}
       onResetMetrics={handleResetMetrics}
       isResetting={isResetting}
-      incidentCount={2}
     >
       {activeTab === 'overview' && <OverviewPage />}
       {activeTab === 'operations' && <OperationsPage />}
       {activeTab === 'kiosks' && <KiosksPage />}
-      {activeTab === 'incidents' && <IncidentsPage />}
+      {activeTab === 'incidents' && <IncidentsPage onNavigate={handleTabChange} />}
       {activeTab === 'analytics' && <AnalyticsPage />}
       {activeTab === 'users' && <UsersPage />}
       {activeTab === 'finance' && <FinancePage />}
@@ -133,12 +133,18 @@ export default function RootApp() {
   }, []);
 
   if (isFinanceRoute) {
-    return <FinanceApp />;
+    return (
+      <RangeProvider>
+        <FinanceApp />
+      </RangeProvider>
+    );
   }
 
   return (
     <ThemeProvider>
-      <DashboardApp />
+      <RangeProvider>
+        <DashboardApp />
+      </RangeProvider>
     </ThemeProvider>
   );
 }

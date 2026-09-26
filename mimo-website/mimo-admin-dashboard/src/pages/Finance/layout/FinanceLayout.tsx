@@ -7,8 +7,6 @@ export interface FinanceLayoutProps {
   activeTab: FinanceTab;
   onTabChange: (tab: FinanceTab) => void;
   onLogout: () => void;
-  dateRange: string;
-  onDateRangeChange: (range: string) => void;
   onRefresh: () => void;
   isRefreshing?: boolean;
   searchQuery?: string;
@@ -21,8 +19,6 @@ export const FinanceLayout: React.FC<FinanceLayoutProps> = ({
   activeTab,
   onTabChange,
   onLogout,
-  dateRange,
-  onDateRangeChange,
   onRefresh,
   isRefreshing,
   searchQuery,
@@ -79,8 +75,7 @@ export const FinanceLayout: React.FC<FinanceLayoutProps> = ({
       {/* ── TOPBAR NAVIGATION (GRID COL 2, ROW 1) ──────────────────────── */}
       <FinanceTopbar
         activeTab={activeTab}
-        dateRange={dateRange}
-        onDateRangeChange={onDateRangeChange}
+        pendingRefundsCount={pendingRefundsCount}
         onRefresh={onRefresh}
         isRefreshing={isRefreshing}
         searchQuery={searchQuery}

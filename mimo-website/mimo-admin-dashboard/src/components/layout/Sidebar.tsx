@@ -30,12 +30,15 @@ export interface SidebarProps {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   isMobile?: boolean;
+  /** Live kiosk fleet summary from /admin/kiosks (null while loading). */
+  fleet?: { online: number; total: number } | null;
+  userEmail?: string;
 }
 
 const NAV_CORE: NavItemDef[] = [
   { id: 'overview',   label: 'Executive Overview',   icon: LayoutDashboard },
   { id: 'operations', label: 'Print Operations',     icon: Printer, badge: 'LIVE', badgeType: 'live' },
-  { id: 'kiosks',     label: 'Kiosk Network',        icon: Cpu,     badge: '2 Active', badgeType: 'info' },
+  { id: 'kiosks',     label: 'Kiosk Network',        icon: Cpu },
   { id: 'incidents',  label: 'Incident Management',  icon: AlertTriangle, badgeType: 'alert' },
 ];
 
@@ -60,6 +63,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   collapsed = false,
   onToggleCollapse,
   isMobile = false,
+  fleet = null,
+  userEmail,
 }) => {
   const isCollapsedView = collapsed && !isMobile;
 
@@ -68,6 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const active = activeTab === item.id;
     const isIncidents = item.id === 'incidents';
     const alertCount = isIncidents && incidentCount > 0 ? incidentCount : null;
+    const fleetBadge = item.id === 'kiosks' && fleet ? `${fleet.online}/${fleet.total} online` : null;
 
     return (
       <button
@@ -112,14 +118,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             )}
 
-            {/* Info Badge */}
-            {item.badgeType === 'info' && item.badge && (
+            {/* Info Badge (live fleet status for Kiosk Network) */}
+            {(fleetBadge || (item.badgeType === 'info' && item.badge)) && (
               <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                 active
                   ? 'bg-white/20 text-white'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
               }`}>
-                {item.badge}
+                {fleetBadge || item.badge}
               </span>
             )}
 
@@ -211,24 +217,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <Section label="Settings" items={NAV_SETTINGS} />
       </nav>
 
-      {/* ── SECTION 3: FLEET STATUS ───────────────────────────────── */}
+      {/* ── SECTION 3: FLEET STATUS (live from /admin/kiosks) ───────── */}
       {!isCollapsedView && (
         <div className="p-3 mx-3 mb-3 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 flex-shrink-0">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Activity size={13} className="text-emerald-500" />
+              <Activity size={13} className={fleet && fleet.online < fleet.total ? 'text-amber-500' : 'text-emerald-500'} />
               Fleet Status
             </span>
-            <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200/60 dark:border-emerald-500/20 px-1.5 py-0.5 rounded">
-              2/2 ONLINE
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+              !fleet
+                ? 'text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                : fleet.online === fleet.total
+                ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200/60 dark:border-emerald-500/20'
+                : 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200/60 dark:border-amber-500/20'
+            }`}>
+              {fleet ? `${fleet.online}/${fleet.total} ONLINE` : '…'}
             </span>
           </div>
           <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 mb-1.5 overflow-hidden">
-            <div className="bg-emerald-500 h-full rounded-full w-full" />
+            <div
+              className={`${fleet && fleet.online < fleet.total ? 'bg-amber-500' : 'bg-emerald-500'} h-full rounded-full transition-all`}
+              style={{ width: fleet && fleet.total ? `${(fleet.online / fleet.total) * 100}%` : '0%' }}
+            />
           </div>
           <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 font-mono">
-            <span>2 Active Nodes</span>
-            <span>0 Outages</span>
+            <span>{fleet ? `${fleet.online} online` : 'checking…'}</span>
+            <span>{fleet ? `${fleet.total - fleet.online} offline` : ''}</span>
           </div>
         </div>
       )}
@@ -246,8 +261,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {!isCollapsedView && (
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">Admin</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">admin@mimo.in</p>
+                <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">Administrator</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate" title={userEmail}>{userEmail || 'Signed in'}</p>
               </div>
             )}
           </div>

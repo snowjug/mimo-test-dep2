@@ -1,4 +1,7 @@
 import React from 'react';
+import { useLiveQuery } from '../../../hooks/useLiveQuery';
+import { insights } from '../../../services/insights.service';
+import { defaultRange } from '../../../lib/dateRange';
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -111,24 +114,8 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
           <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
         </a>
 
-        {/* System Status Pill */}
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-[#EDE9FE] shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-            </span>
-            <div className="flex flex-col">
-              <span className="text-[12px] font-bold text-slate-800 leading-none">
-                System Status
-              </span>
-              <span className="text-[11px] text-slate-400 font-medium mt-0.5 leading-none">
-                All Systems Operational
-              </span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-slate-300" />
-        </div>
+        {/* Live machine status (from the kiosks' heartbeats) */}
+        <FleetPill />
 
         {/* Profile Card */}
         <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-[#EDE9FE] shadow-2xs">
@@ -156,5 +143,29 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
         </div>
       </div>
     </aside>
+  );
+};
+
+/** "2/2 machines online" from /admin/kiosks (replaces the old fixed "All Systems Operational"). */
+const FleetPill: React.FC = () => {
+  const q = useLiveQuery(() => insights.kiosks(defaultRange()), [], { intervalMs: 30000 });
+  const sum = q.data?.summary;
+  const ok = !!sum && sum.offline === 0;
+  const dot = !sum ? 'bg-slate-300' : ok ? 'bg-emerald-500' : 'bg-amber-500';
+  return (
+    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-[#EDE9FE] shadow-2xs">
+      <div className="flex items-center gap-2.5">
+        <span className="relative flex h-2.5 w-2.5 shrink-0">
+          {ok && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
+          <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${dot}`} />
+        </span>
+        <div className="flex flex-col">
+          <span className="text-[12px] font-bold text-slate-800 leading-none">Machines</span>
+          <span className="text-[11px] text-slate-400 font-medium mt-0.5 leading-none">
+            {q.error ? 'Status unavailable' : sum ? `${sum.online} of ${sum.total} online` : 'Checking…'}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 };

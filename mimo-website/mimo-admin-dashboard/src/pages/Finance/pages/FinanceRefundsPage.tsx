@@ -17,16 +17,19 @@ import { FinanceMetricCard } from '../components/FinanceMetricCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
 import { FinanceDetailsDrawer } from '../components/FinanceDetailsDrawer';
+import { ErrorBanner } from '../../../components/insights/InsightBits';
 
 export interface FinanceRefundsPageProps {
   refundRequests: any[];
   loading: boolean;
+  error?: string | null;
   onRefresh: () => void;
 }
 
 export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
   refundRequests,
   loading,
+  error,
   onRefresh,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -95,6 +98,7 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
 
   return (
     <div className="space-y-6">
+      {error && <ErrorBanner message={error} onRetry={onRefresh} />}
       {/* ── TOP METRICS ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <FinanceMetricCard

@@ -35,6 +35,13 @@ import {
 } from 'recharts';
 import api from '../../api';
 import { useTheme } from '../../context/ThemeContext';
+import { useRange } from '../../context/RangeContext';
+import { insights } from '../../services/insights.service';
+import { DateRangePicker } from '../../components/ui/DateRangePicker';
+import { ErrorBanner } from '../../components/insights/InsightBits';
+import { bucketLabel, describeRange } from '../../lib/dateRange';
+import { errorMessage } from '../../hooks/useLiveQuery';
+import type { Analytics } from '../../types/insights.types';
 
 interface PricingSettings {
   pricePerPageBW: number;
@@ -65,6 +72,9 @@ interface RefundItem {
 
 export const FinancePage: React.FC = () => {
   const { isDark } = useTheme();
+  const { range, setRange, current, live } = useRange();
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [activeSegment, setActiveSegment] = useState<'overview' | 'transactions' | 'refunds' | 'pricing'>('overview');
 
   // Pricing State
@@ -101,39 +111,53 @@ export const FinancePage: React.FC = () => {
 
   const loadFinanceData = async () => {
     setLoading(true);
-    try {
-      const [settingsRes, couponsRes, printsRes, refundsRes, metricsRes] = await Promise.all([
-        api.get('/admin/settings').catch(() => ({ data: {} })),
-        api.get('/admin/coupons').catch(() => ({ data: [] })),
-        api.get('/admin/recent-prints').catch(() => ({ data: [] })),
-        api.get('/admin/refund-requests').catch(() => ({ data: [] })),
-        api.get('/admin/metrics').catch(() => ({ data: {} })),
-      ]);
+    const r = current();
+    // allSettled: one failing endpoint must not blank the whole page, and failures are shown, not swallowed.
+    const [settingsRes, couponsRes, jobsRes, refundsRes, analyticsRes] = await Promise.allSettled([
+      api.get('/admin/settings'),
+      api.get('/admin/coupons'),
+      insights.jobs(r, { limit: 1000 }),
+      api.get('/admin/refund-requests'),
+      insights.analytics(r),
+    ]);
+    const errors: string[] = [];
+    const fail = (label: string, res: PromiseRejectedResult) => errors.push(`${label}: ${errorMessage(res.reason)}`);
 
-      if (settingsRes.data) {
-        setPricing({
-          pricePerPageBW: settingsRes.data.pricePerPageBW ?? 2.80,
-          pricePerPageColor: settingsRes.data.pricePerPageColor ?? 10.00,
-          pricePerPageA4: settingsRes.data.pricePerPageA4 ?? 2.80,
-          pricePerPageBWDuplex: settingsRes.data.pricePerPageBWDuplex ?? 3.30,
-          pricePerPageGraph: settingsRes.data.pricePerPageGraph ?? 2.00,
-        });
-      }
+    if (settingsRes.status === 'fulfilled' && settingsRes.value.data) {
+      const d = settingsRes.value.data;
+      setPricing({
+        pricePerPageBW: d.pricePerPageBW ?? 2.80,
+        pricePerPageColor: d.pricePerPageColor ?? 10.00,
+        pricePerPageA4: d.pricePerPageA4 ?? 2.80,
+        pricePerPageBWDuplex: d.pricePerPageBWDuplex ?? 3.30,
+        pricePerPageGraph: d.pricePerPageGraph ?? 2.00,
+      });
+    } else if (settingsRes.status === 'rejected') fail('Pricing', settingsRes);
 
-      setCoupons(Array.isArray(couponsRes.data) ? couponsRes.data : []);
-      setTransactions(Array.isArray(printsRes.data) ? printsRes.data : []);
-      setRefundRequests(Array.isArray(refundsRes.data) ? refundsRes.data : []);
-      setMetrics(metricsRes.data || {});
-    } catch (err) {
-      console.error('Failed to load finance data:', err);
-    } finally {
-      setLoading(false);
-    }
+    if (couponsRes.status === 'fulfilled') setCoupons(Array.isArray(couponsRes.value.data) ? couponsRes.value.data : []);
+    else fail('Coupons', couponsRes);
+
+    if (jobsRes.status === 'fulfilled') setTransactions(jobsRes.value.jobs);
+    else fail('Ledger', jobsRes);
+
+    // The API answers { requests: [...] }.
+    if (refundsRes.status === 'fulfilled') setRefundRequests(refundsRes.value.data?.requests ?? []);
+    else fail('Refund requests', refundsRes);
+
+    if (analyticsRes.status === 'fulfilled') { setAnalytics(analyticsRes.value); setMetrics({ totalRevenue: analyticsRes.value.current.revenue }); }
+    else fail('Revenue summary', analyticsRes);
+
+    setLoadErrors(errors);
+    setLoading(false);
   };
 
   useEffect(() => {
     loadFinanceData();
-  }, []);
+    if (!live) return;
+    const id = window.setInterval(() => { if (document.visibilityState === 'visible') loadFinanceData(); }, 30000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range]);
 
   const handleSavePricing = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,29 +222,16 @@ export const FinancePage: React.FC = () => {
     }
   };
 
-  const totalGross = useMemo(() => {
-    return metrics?.totalRevenue || transactions.reduce((acc, t) => acc + (t.cost || 0), 0);
-  }, [metrics, transactions]);
+  const totalGross = analytics?.current.revenue ?? 0;
+  const totalRefunded = analytics?.current.refundedAmount ?? 0;
+  const netRevenue = analytics?.current.netRevenue ?? 0;
+  const paymentAttempts = (analytics?.current.orders ?? 0) + (analytics?.current.failedPayments ?? 0);
+  const paymentSuccessRate = paymentAttempts ? Math.round(((analytics?.current.orders ?? 0) / paymentAttempts) * 1000) / 10 : null;
 
-  const totalRefunded = useMemo(() => {
-    return refundRequests
-      .filter(r => r.status === 'processed' || r.status === 'approved')
-      .reduce((acc, r) => acc + (r.amount || 0), 0);
-  }, [refundRequests]);
-
-  const netRevenue = Math.max(0, totalGross - totalRefunded);
-
-  const revenueTimeSeries = useMemo(() => {
-    const map: Record<string, number> = {};
-    transactions.forEach(t => {
-      const d = t.createdAt ? new Date(t.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Today';
-      map[d] = (map[d] || 0) + (t.cost || 0);
-    });
-    return Object.entries(map).map(([date, amount]) => ({
-      date,
-      amount: Number(amount.toFixed(2)),
-    }));
-  }, [transactions]);
+  const revenueTimeSeries = useMemo(
+    () => (analytics?.series ?? []).map((p) => ({ date: bucketLabel(p.key), amount: p.revenue })),
+    [analytics]
+  );
 
   const filteredTransactions = useMemo(() => {
     if (!searchTxn.trim()) return transactions;
@@ -244,14 +255,16 @@ export const FinancePage: React.FC = () => {
             </h1>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Cashfree Settlement Mesh
+              Live payments · Cashfree
             </span>
           </div>
           <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">
-            Financial performance, payment ledger, refund disputes, and campus tariff pricing.
+            Revenue, payment ledger, refund disputes and tariff pricing · {describeRange(range)}
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center gap-3">
+        <DateRangePicker value={range} onChange={setRange} tone="admin" />
         <button
           type="button"
           onClick={loadFinanceData}
@@ -260,7 +273,10 @@ export const FinancePage: React.FC = () => {
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           Sync Finance
         </button>
+        </div>
       </div>
+
+      {loadErrors.map((m) => <ErrorBanner key={m} message={m} onRetry={loadFinanceData} />)}
 
       {/* ── Segment Navigation ─────────────────────────────────────── */}
       <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2 overflow-x-auto">
@@ -316,15 +332,15 @@ export const FinancePage: React.FC = () => {
               <p className="text-2xl sm:text-3xl font-black text-amber-500 mt-1">
                 ₹{totalRefunded.toFixed(2)}
               </p>
-              <p className="text-[11px] text-[var(--text-3)] mt-1">{refundRequests.length} total claims recorded</p>
+              <p className="text-[11px] text-[var(--text-3)] mt-1">{refundRequests.length} refund requests on record</p>
             </div>
 
             <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-              <span className="text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">Settlement Rate</span>
+              <span className="text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">Payment Success Rate</span>
               <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)] mt-1">
-                100%
+                {paymentSuccessRate === null ? '—' : `${paymentSuccessRate}%`}
               </p>
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Instant Cashfree Webhook</p>
+              <p className="text-[11px] text-[var(--text-3)] font-semibold mt-1">{analytics ? `${analytics.current.orders} paid · ${analytics.current.failedPayments} failed` : 'Loading…'}</p>
             </div>
           </div>
 
@@ -333,9 +349,9 @@ export const FinancePage: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="font-bold text-base text-[var(--text-1)]">Revenue Intelligence</h2>
-                <p className="text-xs text-[var(--text-3)]">Daily gross collections across all active kiosk hardware</p>
+                <p className="text-xs text-[var(--text-3)]">Gross collections for the selected dates</p>
               </div>
-              <span className="text-xs font-bold text-indigo-500 font-mono">Real-Time Sync</span>
+              <span className="text-xs font-bold text-indigo-500 font-mono">{live ? 'Live' : 'Historical'}</span>
             </div>
 
             <div className="h-72 w-full">
@@ -495,7 +511,7 @@ export const FinancePage: React.FC = () => {
                         {r.orderId}
                       </td>
                       <td className="py-3.5 px-4 text-[var(--text-2)] font-medium">
-                        {r.userEmail}
+                        {r.userEmail || (r as any).userId || '—'}
                       </td>
                       <td className="py-3.5 px-4 font-black text-rose-600 dark:text-rose-400">
                         ₹{(r.amount || 0).toFixed(2)}
@@ -513,13 +529,13 @@ export const FinancePage: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 sm:px-6 text-right">
-                        <button
+                        {r.status === 'pending' && (<button
                           type="button"
                           onClick={() => setRefundModal({ open: true, item: r })}
                           className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
                         >
                           Process Refund
-                        </button>
+                        </button>)}
                       </td>
                     </tr>
                   ))
