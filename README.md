@@ -129,20 +129,17 @@ Which of `pi-listener/` or `pi_scripts/` runs on which Pi has not been confirmed
 
 ## Deployment
 
-Pushing to `main` deploys automatically; details, secrets and the safety gate are in
-[`docs/deployment/CI_CD.md`](docs/deployment/CI_CD.md).
+Pushing to `main` deploys automatically. Details: [`docs/deployment/CI_CD.md`](docs/deployment/CI_CD.md); the few things a repository
+admin must do once: [`docs/deployment/REMAINING_SETUP.md`](docs/deployment/REMAINING_SETUP.md).
 
 | Part | How |
 |---|---|
-| Backend `api` | Push to `main` touching `functions/**` → `deploy-functions.yml`: tests → builds the env from the live function (+ optional `FUNCTIONS_ENV_FILE` secret) → **refuses to deploy with missing or insecure config** (default admin password, weak JWT secret) → deploys → smoke-tests. |
-| Triggers (6) | Actions → *Deploy Firebase Functions* → Run workflow → tick *include_triggers*. |
-| Customer site + admin + finance | Vercel builds `mimo-website` on push (`npm run build` also builds the admin app into `dist/admin`). |
-| Kiosk UI | Vercel builds `mimo-frontend-web-app/mimo-frontend` on push. |
-| Office converter | `deploy-converter.yml` on pushes touching `converter/**` (or manually). |
-| Legacy image | `backend-image.yml` — frozen, leave alone. |
-| Checks | `ci.yml` runs tests/builds for the apps a branch or PR touches; it deploys nothing. |
-
-After a backend deploy the workflow itself verifies `GET /` and `GET /admin/analytics` (401 = new routes are live).
+| Backend `api` + 6 triggers | Push touching `functions/**` → `deploy-functions.yml`: tests → env from the live function (+ optional `FUNCTIONS_ENV_FILE` secret) → **refuses to deploy with missing/insecure config** → deploy → smoke test → triggers. Rollback: re-run the workflow with an older `ref`. |
+| Customer site + admin + finance, kiosk UI | Vercel's GitHub integration on every push; `post-deploy-smoke.yml` then checks the public sites. |
+| Office converter | `deploy-converter.yml` on pushes touching `converter/**`, with a health check. |
+| Legacy backend | Northflank + `backend-image.yml` — frozen, leave alone. |
+| Raspberry Pis, Android tablets, Firebase rules | **Manual** (physical devices / rules) — see REMAINING_SETUP. |
+| Checks | `ci.yml` tests/builds only the apps a branch or PR touches; it deploys nothing. |
 
 ## Testing
 

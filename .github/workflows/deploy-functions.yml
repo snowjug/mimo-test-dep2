@@ -1,6 +1,6 @@
 name: Deploy Firebase Functions
 
-# Deploys the production API (`functions:api`) when backend code on main changes.
+# Deploys the production API (`functions:api`) and then the 6 Firestore/scheduler triggers when backend code on main changes.
 # Environment variables are NOT in git. They come from (1) the live function's current configuration and
 # (2) the optional FUNCTIONS_ENV_FILE repository secret. The deploy stops before touching production when
 # required configuration is missing or insecure (default admin password, weak/public JWT secret).
@@ -14,10 +14,14 @@ on:
       - ".github/scripts/functions-env.js"
   workflow_dispatch:
     inputs:
-      include_triggers:
-        description: "Also deploy the 6 Firestore/scheduler triggers (they are not part of a normal push deploy)"
+      ref:
+        description: "Rollback: an older commit or tag of main to redeploy (empty = latest main). Must already be part of main."
+        type: string
+        default: ""
+      deploy_triggers:
+        description: "Also deploy the 6 Firestore/scheduler triggers"
         type: boolean
-        default: false
+        default: true
 
 concurrency:
   group: deploy-functions
@@ -59,6 +63,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Refuse refs that are not part of main
+        env:
+          TARGET_REF: ${{ inputs.ref }}
+        run: |
+          if [ -n "$TARGET_REF" ]; then
+            git fetch --quiet origin main
+            git merge-base --is-ancestor HEAD origin/main || { echo "::error title=Rollback refused::$TARGET_REF is not part of main"; exit 1; }
+            echo "Rolling back to $(git rev-parse --short HEAD)"
+          fi
 
       - uses: actions/setup-node@v4
         with:
@@ -96,17 +113,10 @@ jobs:
           FUNCTIONS_ENV_FILE: ${{ secrets.FUNCTIONS_ENV_FILE }}
         run: node .github/scripts/functions-env.js functions/.env
 
-      - name: Deploy
+      - name: Deploy API
         env:
           FIREBASE_FUNCTIONS_DISCOVERY_TIMEOUT: "60000"
-          INCLUDE_TRIGGERS: ${{ inputs.include_triggers }}
-        run: |
-          TARGETS="functions:api"
-          if [ "$INCLUDE_TRIGGERS" = "true" ]; then
-            TARGETS="$TARGETS,functions:autoRefundJob,functions:autoCleanupStorageJob,functions:sendFailureNotification,functions:printerHardwareNotification,functions:colourPaperUsageNotification,functions:scheduledFileRetentionCleanup"
-          fi
-          echo "Deploying: $TARGETS"
-          firebase deploy --only "$TARGETS" --force --project "$PROJECT_ID"
+        run: firebase deploy --only "functions:api" --force --project "$PROJECT_ID"
 
       - name: Ensure public invoker access
         run: |
@@ -133,6 +143,17 @@ jobs:
           check "New admin endpoints deployed (GET /admin/analytics without token)" 401 "$API_URL/admin/analytics"
           check "Admin login rejects bad credentials" 401 -X POST -H "content-type: application/json" \
             -d '{"email":"ci-smoke-test","password":"not-a-real-password"}' "$API_URL/admin/login"
+
+      # Runs only after the API is deployed and verified, so a trigger problem can never take the API down.
+      # A failure here turns the run red but leaves the healthy API in place.
+      - name: Deploy Firestore/scheduler triggers
+        if: github.event_name == 'push' || inputs.deploy_triggers
+        env:
+          FIREBASE_FUNCTIONS_DISCOVERY_TIMEOUT: "60000"
+        run: |
+          TRIGGERS="autoRefundJob autoCleanupStorageJob sendFailureNotification printerHardwareNotification colourPaperUsageNotification scheduledFileRetentionCleanup"
+          TARGETS=$(for t in $TRIGGERS; do printf "functions:%s," "$t"; done)
+          firebase deploy --only "${TARGETS%,}" --force --project "$PROJECT_ID"
 
       - name: Remove generated .env
         if: always()

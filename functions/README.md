@@ -165,10 +165,10 @@ Manual checks worth doing after a change: hit the route with no token (401), wit
 
 Push to `main` (touching `functions/**`) → `.github/workflows/deploy-functions.yml` runs the tests, builds `functions/.env`
 from the live function's variables (+ optional `FUNCTIONS_ENV_FILE` secret), **stops if required variables are missing or
-insecure** (default admin password, weak `JWT_SECRET`), deploys `functions:api` and smoke-tests it. Full description:
+insecure** (default admin password, weak `JWT_SECRET`), deploys `functions:api` and smoke-tests it. Rollback: run the workflow with an older `ref`. Full description:
 [`docs/deployment/CI_CD.md`](../docs/deployment/CI_CD.md).
 
-* The six **triggers** deploy only through a manual run with *include_triggers* (or `firebase deploy --only functions` locally).
+* The six **triggers** deploy right after the API in the same run (a trigger failure turns the run red but leaves the API up).
 * Manual deploy from a laptop still works: put the real `.env` in `functions/` (without the `FIREBASE_*` lines, Firebase rejects them).
 * Rolling back = `git revert` and let CI redeploy.
 
