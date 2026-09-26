@@ -107,15 +107,20 @@ test("CLI: default admin/admin and the public JWT fallback block the deploy (exi
   assert.ok(!b.written);
 });
 
-test("secret-manager references on the live function are detected and explained when required", () => {
-  const doc = { spec: { template: { spec: { containers: [{ env: [
-    { name: "ADMIN_EMAIL", value: "ops@example.com" },
-    { name: "GMAIL_APP_PASSWORD", valueFrom: { secretKeyRef: { name: "GMAIL_APP_PASSWORD", key: "latest" } } },
-  ] }] } } } };
+test("a Secret Manager reference on the live function satisfies the requirement and is kept out of .env", () => {
+  const doc = liveDoc({ ADMIN_EMAIL: "ops@example.com" });
+  doc.spec.template.spec.containers[0].env.push({ name: "GMAIL_APP_PASSWORD", valueFrom: { secretKeyRef: { name: "GMAIL_APP_PASSWORD", key: "latest" } } });
   assert.deepStrictEqual(parseLiveSecretRefs(doc), ["GMAIL_APP_PASSWORD"]);
   const { GMAIL_APP_PASSWORD, ...rest } = GOOD;
   const r = run(rest, doc);
-  assert.strictEqual(r.status, 1);
-  assert.ok(r.stderr.includes("Secret Manager reference"));
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.ok(!("GMAIL_APP_PASSWORD" in parseDotenv(fs.readFileSync(r.out, "utf8"))));
   assert.ok(r.stdout.includes("Secret Manager references: GMAIL_APP_PASSWORD"));
+});
+
+test("without a live secret reference GMAIL_APP_PASSWORD is still required", () => {
+  const { GMAIL_APP_PASSWORD, ...rest } = GOOD;
+  const r = run(rest);
+  assert.strictEqual(r.status, 1);
+  assert.ok(r.stderr.includes("GMAIL_APP_PASSWORD"));
 });
