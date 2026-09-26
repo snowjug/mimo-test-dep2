@@ -85,6 +85,6 @@ match what is live, deploy triggers only deliberately and check `firebase functi
 ## 7. Findings from the read-only checks of 2026-09-26/27
 * **Cashfree webhooks to the API have been timing out (504 after 60 s) since at least 2026-08-27** — all 24 logged calls in 30 days, on
   revisions from before the restructuring, so this is older than the current code. Payments still complete through the client-side
-  `/verify-payment` path, which hides it. The webhook handler is being hardened (a fix is prepared but not deployed); further details are withheld from this public repository until it is live.
+  `/verify-payment` path, which hid two problems: (1) under Cloud Functions the body arrives pre-parsed, so the signature check was skipped and unsigned payment events were accepted; (2) events other than `PAYMENT_SUCCESS_WEBHOOK` got no response, hence the 504s. **Fixed** (commit `fix(webhook)`): the signature is always verified from `req.rawBody`, every event is answered, success events are idempotent, with regression tests. After deploy, watch for `[WEBHOOK] rejected` in the API logs (it would mean Cashfree signs differently than the documented scheme).
 * The Meta WhatsApp webhook posts to the Functions API (300+ calls with 200 in 14 days), and the Cashfree webhook also targets the
   Functions API (that is where the 504s are logged) — neither points at the legacy hosts.
