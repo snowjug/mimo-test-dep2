@@ -1,15 +1,15 @@
 # MIMO — Architecture
 
 > How MIMO is built, why it is built that way, and where to look when something breaks.
-> Setup and commands live in the [root README](../../README.md) and in the README of each folder; deployment is in
-> [`docs/deployment/CI_CD.md`](../deployment/CI_CD.md).
+> Setup and commands live in the [root README](README.md) and in the README of each folder; the reasoning behind conventions is in [`design.md`](design.md); deployment is in
+> [`docs/deployment/CI_CD.md`](docs/deployment/CI_CD.md). New here? Start with [`docs/onboarding.md`](docs/onboarding.md).
 
 **Contents** — [1 Overview](#1-overview) · [2 System context](#2-system-context) · [3 Components](#3-components) ·
 [4 Key flows](#4-key-flows) · [5 Data model](#5-firestore-data-model) · [6 Backend](#6-backend-design) ·
 [7 Security](#7-security-model) · [8 Admin & finance analytics](#8-admin--finance-analytics) ·
 [9 Raspberry Pi](#9-raspberry-pi-and-kiosk-hardware) · [10 Deployment](#10-deployment-topology) ·
 [11 Failure modes](#11-failure-modes-and-what-you-see) · [12 Design decisions](#12-design-decisions) ·
-[13 Limitations](#13-known-limitations)
+[13 Limitations](#13-known-limitations) · [14 Feature status](#14-feature-status-and-unverified-behaviour)
 
 ---
 
@@ -91,7 +91,7 @@ flowchart LR
 | **Converter** | `converter/` | Node + LibreOffice, Cloud Run | Office → PDF; private, protected by IAM and a shared secret |
 | **Legacy backend** | `backend/` | Express | **Frozen**, not in the production path |
 
-Repository layout, run commands and per-folder details: [root README](../../README.md).
+Repository layout, run commands and per-folder details: [root README](README.md).
 
 ## 4. Key flows
 
@@ -115,7 +115,7 @@ sequenceDiagram
   else payment needed
     API->>CF: create payment session
     S->>CF: pay
-    CF->>API: POST /cashfree-webhook (signature checked)
+    CF->>API: POST /cashfree-webhook (server-to-server; verification being hardened, see 4.5 and 13)
     API->>FS: payment_transactions, job "paid", printCode
   end
   API-->>S: print code (on screen; also WhatsApp / e-mail where used)
@@ -159,6 +159,19 @@ pending ──payment──► paid ──kiosk print──► printing ──�
 (`idle → awaiting_coupon → …`). It reuses the same pricing/order code, sends a payment link (`/wa-pay/:orderId`) and, after
 payment (`/wa-pay-success/:orderId`), the print code. `whatsapp_msg_ids` de-duplicates Meta's retries.
 
+### 4.5 Payment and Cashfree webhook flow
+
+Status: **implemented** (order creation, hosted checkout, `/verify-payment`, free/coupon orders); **partially implemented** (webhook — see below).
+
+1. `POST /create-order` (customer JWT): merges the user's pending jobs into one job, prices it (`pricePerPage` from settings × pages), then applies the coupon percentage and coins (1 coin = ₹0.50).
+   * payable amount **below ₹1** → free order: the job becomes `paid`, a random 4-digit print code is generated immediately, an `orders` record is written and a receipt e-mail is sent (no gateway involved);
+   * otherwise a Cashfree order is created (`return_url` = `https://printmimo.tech/payment-verify?order_id=…`), a `payment_transactions` record with status `INITIATED` is stored, and `{ orderId, paymentSessionId, amount }` is returned to the browser.
+2. The student pays on Cashfree's hosted checkout and is redirected to `/payment-verify`.
+3. The website calls `GET /verify-payment/:orderId`. The API asks Cashfree for the order status **server-to-server**; if it is `PAID` it marks the order `PAID` and calls its own `/payment-success`, which assigns the **4-digit print code** to the jobs and returns it. If the Cashfree call fails it falls back to the status stored in Firestore.
+4. In parallel Cashfree posts a webhook to `POST /cashfree-webhook`. On `PAYMENT_SUCCESS_WEBHOOK` the handler marks orders/jobs paid, calls `/payment-success` if no code exists yet and updates `users.totalSpent` and the `system/metrics` document.
+   **Known issues:** the webhook path is only partially implemented. Its verification and response handling are being hardened (a fix is prepared, not deployed), and only the webhook — not `/verify-payment` — updates `totalSpent` and `system/metrics`, so those counters can lag. Do not rely on them; the dashboards compute their numbers from `orders` / `payment_transactions` (§8).
+5. Failed prints are refunded by `autoRefundJob` (Cashfree refund API) and recorded in `refunds`; customers can also file `POST /request-refund`, which an admin resolves with `POST /admin/refund`.
+
 ## 5. Firestore data model
 
 | Collection | Purpose | Key fields |
@@ -195,7 +208,7 @@ functions/
 ```
 
 **Route groups** (authoritative list: `functions/src/routes/`): Auth · Profile · Upload · Payment · Print-code & kiosk · Public · WhatsApp · Admin. Full table in
-[`functions/README.md`](../../functions/README.md#3-api-overview).
+[`functions/README.md`](functions/README.md#3-api-overview).
 
 **Triggers** (all in `functions/src/triggers/`):
 
@@ -222,7 +235,7 @@ IP in Firestore, shared by all instances — 5/min + 20/h for code entry, 20/min
 | Role separation | Customer tokens are rejected on `/admin/*`; the admin app never sends the customer token |
 | Kiosk endpoints | Unauthenticated by design (a student types a code) → rate-limited and validated against a contract |
 | Pi → API | `/kiosk/report-failure` requires `INTERNAL_WEBHOOK_SECRET`; the Pi itself uses a Firebase service-account key |
-| Payments | Cashfree webhook verified by `x-webhook-signature` |
+| Payments | The payment result is confirmed server-to-server with Cashfree in `/verify-payment`. The Cashfree webhook is **partially implemented**: its hardening is in progress (see §4.5 and §13) |
 | Converter | Private Cloud Run service (IAM) + `INTERNAL_CONVERTER_SECRET` |
 | Secrets | Only in env variables and git-ignored files. CI builds `functions/.env` at deploy time and refuses insecure values (default admin password, weak/public `JWT_SECRET`) |
 | Ownership | `/mark-printed` only touches the caller's own jobs |
@@ -247,6 +260,19 @@ charts, KPIs, deltas ◄── { current, previous, series, byKiosk, byPaymentMe
 * **Live:** the UI polls every 30 s while the range includes today (only while the tab is visible).
 * **No composite indexes:** single-field range/equality queries plus in-memory filtering; capped at 5 000 documents per collection (`truncated: true`). This is deliberate — creating indexes needs console access.
 
+### 8.1 Admin and Finance workflows
+
+Status: **implemented**. Two portals, one bundle (`mimo-website/mimo-admin-dashboard`), one login (`POST /admin/login`, 24 h JWT).
+
+| Portal | URL | Typical tasks | Endpoints used |
+|---|---|---|---|
+| Admin | `/admin/` | Watch machines (online, paper, toner), incidents (offline machines, failed prints, refund requests), print jobs, customers, screensaver/config | `/admin/analytics`, `/kiosks`, `/incidents`, `/jobs`, `/users`, `/hardware`, `/screensaver` |
+| Finance | `/finance` | Revenue and net revenue, transactions, refunds (approve/reject), pricing and coupons, wallet (customer coins), period reports | `/admin/analytics`, `/transactions`, `/refund-requests`, `/refund`, `/settings`, `/coupons`, `/users` |
+
+Both use a shared date-range picker (default: today) and poll every 30 s while the range includes today. A separate finance-only login exists in the code
+(`FINANCE_EMAIL` / `FINANCE_PASSWORD`) but is **partially implemented**: its token cannot yet call the `/admin/*` endpoints, so finance staff currently use the admin login.
+"Settlements" and "Wallet" screens are derived from order and user data; there is no bank-settlement integration (**planned**, not implemented).
+
 ## 9. Raspberry Pi and kiosk hardware
 
 | | MIMO 1.0 (`CV-001`) | MIMO 2.0 (`SV-002`) |
@@ -257,11 +283,11 @@ charts, KPIs, deltas ◄── { current, previous, series, byKiosk, byPaymentMe
 The listener (Python, one process per Pi):
 1. subscribes to `print_jobs` where `status == "printing"` for its `KIOSK_ID`;
 2. downloads the file(s), converts locally if needed (HEIC, Office), applies options (colour/B&W, duplex, copies, N-up, page ranges) and prints via CUPS;
-3. writes `sheetsCompleted`, then `completed` or `failed` (+ reason); on failure it also calls `POST /kiosk/report-failure`;
+3. writes `sheetsCompleted`, then `completed` or `failed` (+ reason); the `pi_scripts` variant also calls `POST /kiosk/report-failure` on failure;
 4. every ~30 s writes `system_status/<KIOSK_ID>` (`lastSeen`, `printerStatus` from `lpstat`) and pings the API root.
 
 The Pi holds a Firebase **service-account key** (full Firestore access) — treat the SD card as a secret. Systemd units and setup helpers: `scripts/pi-setup/`.
-Which of `pi-listener/` / `pi_scripts/` runs on which Pi has not been confirmed by file hash.
+**Two listener variants exist** and both were edited in September 2026: `pi_scripts/firebase_listener.py` (≈1 650 lines; colour-sheet accounting, `report-failure` call) and `pi-listener/firebase_listener.py` (≈980 lines; the MIMO 2.0 work: physical paper/printer error detection and a 120 s print deadline, per its commit message). Which file runs on which Pi is **unverified** — the deployment scripts in `scripts/pi-ops/` push `pi_scripts/…` to both machines. Compare the file on the device with both variants before deploying.
 
 ## 10. Deployment topology
 
@@ -276,7 +302,7 @@ Which of `pi-listener/` / `pi_scripts/` runs on which Pi has not been confirmed 
 | Pis, tablets, Firebase rules | Devices / Firebase | **Manual** |
 
 Vercel, Firebase and Google Cloud settings are not stored in this repository, which is why folder names, `firebase.json`,
-`.firebaserc` and exported function names must not change. Details, secrets and rollback: [`CI_CD.md`](../deployment/CI_CD.md).
+`.firebaserc` and exported function names must not change. Details, secrets and rollback: [`CI_CD.md`](docs/deployment/CI_CD.md).
 
 ## 11. Failure modes and what you see
 
@@ -285,7 +311,7 @@ Vercel, Firebase and Google Cloud settings are not stored in this repository, wh
 | Pi offline / listener stopped | Machine shows *offline* on the dashboard; jobs stay `printing` | `journalctl -u mimo-listener`; once the Pi (or the kiosk's `report-failure` call) marks the job `failed`, it is refunded |
 | Printer jam / out of paper | Job `failed`, refund banner on kiosk, alert e-mail | CUPS state, `hardware/printers` |
 | Wrong code entered repeatedly | `429` "Too many attempts" at the kiosk | Rate limiter; wait for `Retry-After` |
-| Payment succeeded but no code | Order in `payment_transactions` without a `paid` job | Cashfree webhook logs / signature |
+| Payment succeeded but no code | Order in `payment_transactions` without a `paid` job | `/verify-payment` logs (`[VERIFY-PAYMENT]`), Cashfree dashboard |
 | API unreachable | Dashboards show an error banner with *Retry*; kiosk retries every 2 s | Function logs, Cloud Run status |
 | Converter down | Office uploads fail; PDFs/images still work | Converter health, IAM invoker |
 | Firestore unavailable | Rate limiter fails open; most operations error | Firebase status |
@@ -304,10 +330,34 @@ Vercel, Firebase and Google Cloud settings are not stored in this repository, wh
 
 ## 13. Known limitations
 
-* `POST /payment-success` trusts the caller instead of confirming with Cashfree (the webhook path is safe).
+* `POST /payment-success` trusts the caller instead of confirming with Cashfree.
+* **Cashfree webhook handling is partially implemented and is being hardened** (a fix is prepared but not deployed; details are withheld from this public repository until it is live). `/verify-payment` is the authoritative payment check today.
 * CORS allows any origin; `storage.rules` currently allows public read/write; Firestore rules are managed outside `functions/`.
 * Admin uses one shared login (`ADMIN_EMAIL` / `ADMIN_PASSWORD`) — no per-user accounts or audit trail.
 * Rate limiting is per IP: everyone at one kiosk shares a budget, so a run of wrong codes can briefly lock that kiosk.
 * Analytics read up to 5 000 documents per collection per request; pre-aggregate daily totals at much larger scale.
 * Pi listeners, tablets and Firebase rules are deployed by hand; two listener copies exist and the live one per machine is unconfirmed.
 * `company-website/` and the in-app legacy admin page (`mimo-website/src/app/pages/mimo-admin-dashboard/`) are stale copies.
+
+## 14. Feature status and unverified behaviour
+
+Legend: **Implemented** = present in code and exercised in production or tests · **Partial** = present but incomplete or being fixed · **Planned** = not in the code · **Unverified** = present in the code, not confirmed by this documentation audit.
+
+| Area | Feature | Status |
+|---|---|---|
+| Customer | Sign-up/login (e-mail, Google), profile, coins | Implemented |
+| Customer | Upload (PDF, images, Office), text-to-PDF, print options, coupons | Implemented |
+| Customer | Cashfree checkout, print code, print history, refund requests | Implemented |
+| Customer | WhatsApp ordering | Implemented; end-to-end flow **unverified** by this audit |
+| Customer | Android app (Capacitor wrapper of the website) | Implemented; build and store release **unverified** |
+| Kiosk | Code entry, live progress, refund banner, screensaver, maintenance screen | Implemented |
+| Kiosk | Android lock-task shell | Implemented; device setup is manual |
+| Backend | Rate limiting, auto refunds, storage retention, alert e-mails | Implemented |
+| Backend | Cashfree webhook | **Partial** — hardening in progress |
+| Backend | Separate finance login | **Partial** |
+| Backend | Per-user admin accounts, audit trail | **Planned** |
+| Dashboards | Live analytics, date ranges, machines, incidents, transactions, refunds, pricing/coupons | Implemented |
+| Dashboards | Bank settlement reconciliation | **Planned** (screen shows order-derived figures) |
+| Data | BigQuery export proposed in `docs/architecture/FIREBASE_SCHEMA_DESIGN.md` | **Planned** |
+| Hardware | Pi listeners, heartbeat, CUPS printing | Implemented; live file per machine **unverified** |
+| Ops | Push-to-deploy for `api`, converter, web apps | Implemented; triggers, Pis, tablets and Firebase rules are manual |

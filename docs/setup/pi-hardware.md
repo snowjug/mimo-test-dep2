@@ -12,8 +12,8 @@ shared credentials file; `scripts/pi-ops/pi-hosts.example.env` lists the variabl
 | Colour printer (CUPS) | none (points at the same Brother queue) | `Epson_L3250` |
 | Listener path on the Pi | `/home/printpi/firebase_listener.py` | `/home/pi/mimo/firebase_listener.py` |
 
-**Which listener runs:** `scripts/pi-ops/deploy_all_fixes.py` states that *"the master copy is in `pi_scripts/firebase_listener.py`"* and deploys it to
-both Pis, so `pi_scripts/` is the live listener and `pi-listener/` is most likely a stale copy. This comes from the deployment tooling, not from
-hashing the files on the devices.
+**Which listener runs — unverified.** The repository has two listener variants and both were edited in September 2026: [`pi_scripts/firebase_listener.py`](../../pi_scripts/README.md) (larger; includes the `report-failure` call and colour-sheet accounting) and
+[`pi-listener/firebase_listener.py`](../../pi-listener/README.md) (smaller; the MIMO 2.0 paper/printer-error detection and 120 s print deadline). The scripts in `scripts/pi-ops/` push the `pi_scripts` variant to both machines and call it the "master copy", which does **not** prove what is installed today.
+Compare the file on each Pi with both variants before deploying.
 
 Reachability: both Pis are reached over Tailscale; SV-002 also has a LAN address that `deploy_all_fixes.py` uses to hop from CV-001.

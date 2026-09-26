@@ -20,7 +20,7 @@ python scripts/pi-ops/pi_ops.py CV-001 restart          # asks for confirmation 
 Commands: `status logs service restart stop start printers processes files listener tools pull`. This replaces ~20 one-off scripts from `backend/api/*.js`.
 
 ## Deploying the listener
-`pi_scripts/firebase_listener.py` is the master copy for **both** Pis.
+These scripts push `pi_scripts/firebase_listener.py` to **both** Pis. ⚠ The repository has a second variant, `pi-listener/` (the recent MIMO 2.0 work), and which one each machine should run is **unverified** — diff the file on the device first (`pi_ops.py <kiosk> listener`).
 
 | Script | What it does |
 |---|---|

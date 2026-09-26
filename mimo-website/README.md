@@ -76,3 +76,19 @@ dashboard, not in this repo. A push builds the whole folder, including the admin
 * `company-website/` at the repo root is an older, **diverged** copy of the static pages (it is not what Vercel deploys).
   Edit `public/` here; treat `company-website/` as a stale archive.
 * Mobile app: `npx cap sync android` after `npm run build`, then open `android/` in Android Studio.
+
+## Status, dependencies and troubleshooting
+
+**Implemented:** account (e-mail and Google sign-in), upload with page counting, print options, coupons and coins, Cashfree payment, print code, profile/history, static marketing pages. **Unverified:** the Capacitor Android build and store release, WhatsApp ordering (server side), the legacy Supabase client (`supabase.ts`, appears unused).
+**Known issues:** a legacy in-app admin page (`src/app/pages/mimo-admin-dashboard`) is routed at `/admin` in local dev but production serves the standalone admin bundle instead; Figma-export leftovers (`ATTRIBUTIONS.md`, `guidelines/Guidelines.md` is an empty template).
+
+**Dependencies:** React 18, Vite 6, Tailwind 4, Radix UI, React Router 7, Axios, Firebase web SDK (public config in `src/lib/firebase.ts`), Capacitor 8. **Environment:** `VITE_API_URL` (dev only). No secrets belong here.
+**Tests:** none. `npm run build` (also builds the admin app) is the check used in CI.
+
+| Symptom | Cause |
+|---|---|
+| Network errors in dev | The local backend is not running on `http://localhost:3000` (default dev API) |
+| Logged out after each request | The API rejected the token (`401/403` triggers a sign-out in `src/app/api.ts`) |
+| `/admin/` or `/finance` 404 on a static host | They need the `vercel.json` rewrites |
+
+Related: [`architecture.md` §3–4](../architecture.md) · [`design.md` §3](../design.md#3-frontend-design) · [`docs/onboarding.md`](../docs/onboarding.md).

@@ -1,3 +1,6 @@
+> **Superseded / historical.** This describes the earlier mock-data / data-source layer of the admin dashboard (files such as `src/types/*.types.ts` and a `VITE_DATA_SOURCE` switch) that **no longer exists**:
+> the dashboards now read live data from `/admin/analytics` and related endpoints. Current documentation: [`../README.md`](../README.md) and [`architecture.md`](../../../architecture.md) §8. Kept for reference only.
+
 # MIMO Admin Dashboard Backend Integration Guide
 
 ## 1. Overview
