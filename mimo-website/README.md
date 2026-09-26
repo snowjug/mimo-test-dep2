@@ -54,7 +54,7 @@ npm run dev            # http://localhost:5173
 
 Environment (`.env`, not committed; names in `.env.example`): `VITE_API_URL` (dev only — production always uses the
 Functions API), `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (legacy, currently unused by the main flow).
-To develop against a local backend run `npm run dev` in `../functions` (port 5001) and set `VITE_API_URL=http://localhost:5001`.
+To develop against a local backend run `npm run dev` in `../functions` (port 3000, which is also the dev default of this app).
 
 ## Build & deploy
 
