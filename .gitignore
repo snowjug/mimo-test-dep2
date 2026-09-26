@@ -19,6 +19,9 @@ build/
 serviceAccountKey.json
 SENSITIVE_ENV_VARIABLES.md
 **/private.md
+# Pi tools: real hosts/credentials
+scripts/pi-ops/pi-hosts.env
+
 # Python / Vite generated
 __pycache__/
 *.pyc
