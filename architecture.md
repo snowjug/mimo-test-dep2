@@ -295,7 +295,7 @@ The Pi holds a Firebase **service-account key** (full Firestore access) — trea
 | Part | Where | Deployed by |
 |---|---|---|
 | API | Firebase Functions, `us-central1` | GitHub Action on push to `main` touching `functions/**` (with a config/security gate and smoke test) |
-| 6 triggers | Firebase Functions — live regions differ (`asia-south1` for 4 of them) | Manual opt-in via the same workflow; the code sets no region, so a blind deploy would create duplicates (see `CI_CD.md` §6) |
+| 6 triggers | Firebase Functions (`us-central1` for 3, `asia-south1` for the 3 e-mail triggers; declared in code, pinned by `triggerDeployment.test.js`) | **By hand** with the Firebase CLI (procedure in `CI_CD.md` §6); not part of the push pipeline |
 | Customer site + admin + finance | Vercel `mimo_v2` → `printmimo.tech` | Vercel Git integration; `vercel.json` rewrites `/admin*`, `/finance*` to the admin bundle |
 | Kiosk UI (×2) | Vercel (two projects) | Vercel Git integration |
 | Converter | Cloud Run `mimo-office-converter` | GitHub Action on push touching `converter/**` |

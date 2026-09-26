@@ -168,7 +168,7 @@ from the live function's variables (+ optional `FUNCTIONS_ENV_FILE` secret), **s
 insecure** (default admin password, weak `JWT_SECRET`), deploys `functions:api` and smoke-tests it. Rollback: run the workflow with an older `ref`. Full description:
 [`docs/deployment/CI_CD.md`](../docs/deployment/CI_CD.md).
 
-* The six **triggers** are **not** deployed on push (manual opt-in): four run in `asia-south1` live while the code has no region, so a deploy would create duplicates. See `CI_CD.md` §6.
+* The six **triggers** are **not** deployed on push: deploy them by hand (procedure in `../docs/deployment/CI_CD.md` §6). Their regions are declared in code and pinned by `__tests__/triggerDeployment.test.js`; all run on Node 22.
 * Manual deploy from a laptop still works: put the real `.env` in `functions/` (without the `FIREBASE_*` lines, Firebase rejects them).
 * Rolling back = `git revert` and let CI redeploy.
 
@@ -182,6 +182,6 @@ insecure** (default admin password, weak `JWT_SECRET`), deploys `functions:api` 
 ## 10. Status, known issues and links
 
 * **Implemented:** everything in §3–§7, including the Cashfree webhook (raw-body signature check, every event answered, idempotent success handling; scheme unverified against live traffic). **Partial:** the separate finance login (`FINANCE_EMAIL` / `FINANCE_PASSWORD`; its token is rejected by `/admin/*`).
-* **Known issues:** `POST /payment-success` trusts the caller; CORS allows any origin; the six triggers are not deployed by CI and three of them run in a different region than the code declares (see `../docs/deployment/CI_CD.md`).
+* **Known issues:** `POST /payment-success` trusts the caller; CORS allows any origin; the six triggers are deployed by hand (not by CI); a leftover live function `lowPaperNotification` has no source in this repository (see `../docs/deployment/CI_CD.md` §6).
 * Source layout: [`src/README.md`](src/README.md) · tests: [`__tests__/README.md`](__tests__/README.md) · design rules: [`../design.md`](../design.md) · system view: [`../architecture.md`](../architecture.md) · onboarding: [`../docs/onboarding.md`](../docs/onboarding.md).
 * Common errors: `401` (missing/expired JWT) · `403` on `/admin/*` with a customer token · `429` (print-code rate limit) · admin login always failing (`ADMIN_EMAIL`/`ADMIN_PASSWORD` unset — login is disabled) · local calls succeed but change **production** data (you are using real credentials).
