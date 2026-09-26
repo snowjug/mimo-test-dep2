@@ -1,6 +1,8 @@
 name: Deploy Firebase Functions
 
-# Deploys the production API (`functions:api`) and then the 6 Firestore/scheduler triggers when backend code on main changes.
+# Deploys the production API (`functions:api`) when backend code on main changes. The 6 Firestore/scheduler triggers are
+# deliberately NOT deployed on push: 3 of them are live in asia-south1 while this code has no region (a deploy would create
+# duplicate us-central1 copies). They are opt-in via the manual input below.
 # Environment variables are NOT in git. They come from (1) the live function's current configuration and
 # (2) the optional FUNCTIONS_ENV_FILE repository secret. The deploy stops before touching production when
 # required configuration is missing or insecure (default admin password, weak/public JWT secret).
@@ -19,9 +21,9 @@ on:
         type: string
         default: ""
       deploy_triggers:
-        description: "Also deploy the 6 Firestore/scheduler triggers"
+        description: "Also deploy the 6 Firestore/scheduler triggers (read docs/deployment/CI_CD.md section 5 first: region mismatch)"
         type: boolean
-        default: true
+        default: false
 
 concurrency:
   group: deploy-functions
@@ -147,7 +149,7 @@ jobs:
       # Runs only after the API is deployed and verified, so a trigger problem can never take the API down.
       # A failure here turns the run red but leaves the healthy API in place.
       - name: Deploy Firestore/scheduler triggers
-        if: github.event_name == 'push' || inputs.deploy_triggers
+        if: inputs.deploy_triggers
         env:
           FIREBASE_FUNCTIONS_DISCOVERY_TIMEOUT: "60000"
         run: |

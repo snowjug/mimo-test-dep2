@@ -139,7 +139,7 @@ repository admin must do once: [`docs/deployment/REMAINING_SETUP.md`](docs/deplo
 
 | Part | How |
 |---|---|
-| Backend `api` + 6 triggers | Push touching `functions/**` → `deploy-functions.yml`: tests → env from the live function (+ optional `FUNCTIONS_ENV_FILE` secret) → **refuses to deploy with missing or insecure config** → deploy → smoke test → triggers. Rollback: re-run the workflow with an older `ref`. |
+| Backend `api` | Push touching `functions/**` → `deploy-functions.yml`: tests → env from the live function (+ optional `FUNCTIONS_ENV_FILE` secret) → **refuses to deploy with missing or insecure config** → deploy → smoke test. Rollback: re-run the workflow with an older `ref`. The 6 triggers are manual opt-in (their live regions differ from the code — see `CI_CD.md` §6). |
 | Customer site, admin, finance, kiosk UI | Vercel's GitHub integration on every push; `post-deploy-smoke.yml` then checks the public sites. |
 | Office converter | `deploy-converter.yml` on pushes touching `converter/**`, with a health check. |
 | Legacy backend | Northflank + `backend-image.yml` — frozen, leave alone. |

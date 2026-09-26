@@ -168,7 +168,7 @@ from the live function's variables (+ optional `FUNCTIONS_ENV_FILE` secret), **s
 insecure** (default admin password, weak `JWT_SECRET`), deploys `functions:api` and smoke-tests it. Rollback: run the workflow with an older `ref`. Full description:
 [`docs/deployment/CI_CD.md`](../docs/deployment/CI_CD.md).
 
-* The six **triggers** deploy right after the API in the same run (a trigger failure turns the run red but leaves the API up).
+* The six **triggers** are **not** deployed on push (manual opt-in): four run in `asia-south1` live while the code has no region, so a deploy would create duplicates. See `CI_CD.md` §6.
 * Manual deploy from a laptop still works: put the real `.env` in `functions/` (without the `FIREBASE_*` lines, Firebase rejects them).
 * Rolling back = `git revert` and let CI redeploy.
 
