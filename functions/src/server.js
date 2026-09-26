@@ -8,7 +8,8 @@ const { isColorJob } = require("./services/printJob.service");
 const app = express();
 app.set("trust proxy", 1);
 app.use(cors({ origin: true }));
-app.use(express.json());
+// Keep the exact request bytes (needed to verify webhook signatures). Cloud Functions already provides req.rawBody.
+app.use(express.json({ verify: (req, res, buf) => { if (!req.rawBody) req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 app.get("/", (req, res) => res.send("Mimo Firebase Serverless is LIVE 🚀"));
 
