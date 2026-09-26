@@ -94,3 +94,24 @@ Type-check (there is no tsconfig checked in): use a temporary config with `stric
 2. Add the type in `types/insights.types.ts` and the call in `services/insights.service.ts`.
 3. In the page use `useRange()` (shared date range) + `useLiveQuery(() => insights.xxx(current()), [range], { live })`,
    render `ErrorBanner` for `error`, skeletons for `loading`, and put the range picker in the page header.
+
+## Status, dependencies and troubleshooting
+
+| | |
+|---|---|
+| **Implemented** | Live, date-filtered pages for both portals (see the table above), error/empty states, refund and pricing/coupon actions |
+| **Partial** | A separate finance login exists in the backend (`FINANCE_EMAIL` / `FINANCE_PASSWORD`) but its token cannot call `/admin/*` yet — use the admin login for both portals |
+| **Derived data** | *Settlements* and *Wallet* are computed from order and user data; there is no bank-settlement integration (planned) |
+| **Historical** | `docs/admin-data-contract.md` and `docs/backend-integration.md` describe a removed mock-data layer (bannered) |
+
+**Environment:** only `VITE_API_URL` (development only; production builds use the Functions API address compiled in). No secrets.
+**Tests:** none in this folder. The checks are `npm run build` (Vite) and the backend tests for the endpoints it uses (`functions/__tests__/analytics.test.js`). The repository has no `tsconfig` for this app; type-checking was done with a temporary strict config *(unverified as a CI step)*.
+
+| Symptom | Cause |
+|---|---|
+| Red banner "The API does not have this endpoint yet" | The API you talk to is older than the dashboards — restart your local backend / check the production deploy |
+| Login says invalid credentials | The API's `ADMIN_EMAIL` / `ADMIN_PASSWORD` differ from what you typed |
+| Blank page at `/admin/` in production | Base path: the bundle must be built with base `/admin/` (normal `vite build`) |
+| Charts empty | The selected range has no data — pick another range |
+
+Related: [`architecture.md` §8](../../architecture.md#8-admin--finance-analytics) · [`design.md` §3](../../design.md#3-frontend-design) · [`functions/README.md`](../../functions/README.md#4-live-admin-analytics-api).
