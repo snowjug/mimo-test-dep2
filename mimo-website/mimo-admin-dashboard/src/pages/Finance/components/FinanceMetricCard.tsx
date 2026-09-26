@@ -95,7 +95,7 @@ export const FinanceMetricCard: React.FC<FinanceMetricCardProps> = ({
         </div>
       </div>
 
-      {(change || comparisonText) && (
+      {(change || (comparisonText && change !== undefined)) && (
         <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-1.5 text-[11px] min-w-0">
           {change && (
             <span
@@ -117,7 +117,7 @@ export const FinanceMetricCard: React.FC<FinanceMetricCardProps> = ({
               {change}
             </span>
           )}
-          {comparisonText && (
+          {change && comparisonText && (
             <span className="text-slate-400 truncate">
               {comparisonText}
             </span>
