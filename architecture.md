@@ -82,7 +82,7 @@ flowchart LR
 
 | Component | Folder | Stack | Responsibility |
 |---|---|---|---|
-| **Backend** | `functions/` | Node 20, Express 5, Firebase Functions v2 | Auth, upload finalising, pricing, payments, print codes, kiosk contract, refunds, admin analytics, WhatsApp bot, e-mail |
+| **Backend** | `functions/` | Node 22, Express 5, Firebase Functions v2 | Auth, upload finalising, pricing, payments, print codes, kiosk contract, refunds, admin analytics, WhatsApp bot, e-mail |
 | **Customer site** | `mimo-website/` | React 18, Vite, Tailwind 4, Capacitor | Login, upload, options, payment, print code; static marketing/legal pages; Android wrapper |
 | **Admin + Finance** | `mimo-website/mimo-admin-dashboard/` | React 18, Vite, Recharts | Live, date-filtered operations and money dashboards; one bundle, two portals |
 | **Kiosk UI** | `mimo-frontend-web-app/mimo-frontend/` | React 19, Vite | Code entry, live print progress, result, screensaver |

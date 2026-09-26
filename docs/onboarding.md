@@ -9,7 +9,7 @@ and never paste keys into chat, issues or pull requests.
 | Tool | Version | Needed for |
 |---|---|---|
 | Git | any recent | everything |
-| Node.js + npm | **20** (the backend declares `engines.node = 20`; newer versions work locally) | all JavaScript apps |
+| Node.js + npm | **22** (the backend declares `engines.node = 22`; Node 20 still runs the front ends) | all JavaScript apps |
 | Firebase CLI | `npm install -g firebase-tools` | Firestore emulator (optional but recommended) |
 | Java | a recent JDK (the emulator prints the version it needs) | the Firestore emulator only |
 | Python | 3.9+ | Pi tooling and its tests (optional) |
