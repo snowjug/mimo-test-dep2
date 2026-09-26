@@ -1,0 +1,42 @@
+# Code owners are asked to review every pull request that touches these paths.
+# The rule only BLOCKS merging when a repository admin enables
+#   Settings -> Branches -> main -> "Require review from Code Owners".
+# Tiers are explained in docs/contributing.md.
+
+# Default: the maintainers review everything
+*                                            @snowjug @Dibya81
+
+# Tier 2 - money, refunds, job state, authentication and deployment: an owner must approve
+/functions/src/controllers/payment.controller.js   @snowjug @Dibya81
+/functions/src/controllers/admin.controller.js     @snowjug @Dibya81
+/functions/src/controllers/auth.controller.js      @snowjug @Dibya81
+/functions/src/controllers/whatsapp.controller.js  @snowjug @Dibya81
+/functions/src/services/whatsapp.service.js        @snowjug @Dibya81
+/functions/src/triggers/                           @snowjug @Dibya81
+/functions/src/middleware/                         @snowjug @Dibya81
+/functions/src/validators/                         @snowjug @Dibya81
+/functions/src/routes/                             @snowjug @Dibya81
+/functions/src/config/                             @snowjug @Dibya81
+/functions/index.js                                @snowjug @Dibya81
+/functions/package.json                            @snowjug @Dibya81
+/functions/src/modules/payments/                   @snowjug @Dibya81
+/functions/src/modules/refunds/                    @snowjug @Dibya81
+/functions/src/modules/print-jobs/                 @snowjug @Dibya81
+
+# The tests that freeze money behaviour and the public API surface
+/functions/__tests__/*.characterization.test.js    @snowjug @Dibya81
+/functions/__tests__/apiSurface.test.js            @snowjug @Dibya81
+/functions/__tests__/fixtures/                     @snowjug @Dibya81
+
+# Deployment, security rules and infrastructure
+/.github/                                          @snowjug @Dibya81
+/firebase/                                         @snowjug @Dibya81
+/firebase.json                                     @snowjug @Dibya81
+/.firebaserc                                       @snowjug @Dibya81
+/converter/                                        @snowjug @Dibya81
+
+# Devices in production
+/pi_scripts/                                       @snowjug @Dibya81
+/pi-listener/                                      @snowjug @Dibya81
+/scripts/pi-ops/                                   @snowjug @Dibya81
+/scripts/pi-setup/                                 @snowjug @Dibya81

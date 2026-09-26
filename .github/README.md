@@ -7,7 +7,12 @@
 | `workflows/deploy-converter.yml` | Push to `main` touching `converter/**` (or manual): Cloud Build → Cloud Run → health check |
 | `workflows/post-deploy-smoke.yml` | Runs when Vercel reports a successful production deployment and checks the public sites |
 | `workflows/backend-image.yml` | Legacy: builds the frozen `backend/` Docker image (to be removed with `backend/`) |
-| `scripts/functions-env.js` (+ `__tests__/`) | Builds `functions/.env` for a deploy and blocks missing/insecure configuration; masks secret values in logs |
+| `scripts/functions-env.js` | Builds `functions/.env` for a deploy and blocks missing/insecure configuration; masks secret values in logs |
+| `scripts/secret-scan.js` | Fails a pull request/push that **adds** a secret-looking line (CI job *Secret scan*); `secret-scan:allow` marks a false positive |
+| `scripts/__tests__/` | Tests for both scripts: `node --test .github/scripts/__tests__/*.test.js` |
+| `CODEOWNERS` | Who must review protected paths (enforced only if an admin enables *Require review from Code Owners*) |
+| `pull_request_template.md` | Checklist shown on every pull request |
+| `dependabot.yml` | Weekly/monthly grouped dependency update PRs, capped |
 
 **Secrets used:** `FIREBASE_SERVICE_ACCOUNT` (deploy credential), optional `FUNCTIONS_ENV_FILE` (dotenv text), `GITHUB_TOKEN`. Only a repository admin can add or change secrets.
 **Test the gate locally:** `node --test .github/scripts/__tests__/functions-env.test.js`. **Lint workflows:** `actionlint` (CI does this when `.github/` changes).
