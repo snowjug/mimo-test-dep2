@@ -45,12 +45,14 @@ jobs:
             files=$(git ls-files) # new branch / manual run: check everything
           fi
           has() { echo "$files" | grep -qE "$1" && echo true || echo false; }
-          echo "functions=$(has '^functions/')" >> "$GITHUB_OUTPUT"
-          echo "website=$(has '^mimo-website/')" >> "$GITHUB_OUTPUT"
-          echo "kiosk=$(has '^mimo-frontend-web-app/')" >> "$GITHUB_OUTPUT"
-          echo "ci=$(has '^\.github/')" >> "$GITHUB_OUTPUT"
-          echo "converter=$(has '^converter/')" >> "$GITHUB_OUTPUT"
-          echo "pi=$(has '^(pi-listener|pi_scripts)/')" >> "$GITHUB_OUTPUT"
+          {
+            echo "functions=$(has '^functions/')"
+            echo "website=$(has '^mimo-website/')"
+            echo "kiosk=$(has '^mimo-frontend-web-app/')"
+            echo "ci=$(has '^\.github/')"
+            echo "converter=$(has '^converter/')"
+            echo "pi=$(has '^(pi-listener|pi_scripts)/')"
+          } >> "$GITHUB_OUTPUT"
           [ "$EVENT" = "workflow_dispatch" ] && for k in functions website kiosk ci converter pi; do echo "$k=true" >> "$GITHUB_OUTPUT"; done
           echo "Changed files: $(echo "$files" | grep -c .)"
 

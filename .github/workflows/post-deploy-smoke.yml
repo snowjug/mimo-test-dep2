@@ -26,14 +26,14 @@ jobs:
           fail=0
           check() { # description, url, expected status, expected text in body (optional)
             local desc="$1" url="$2" want="$3" text="${4:-}" got="" body="$RUNNER_TEMP/body.html"
-            for attempt in 1 2 3 4 5 6; do
+            for _ in 1 2 3 4 5 6; do
               got=$(curl -sL -o "$body" -w "%{http_code}" -m 25 "$url" || true)
               if [ "$got" = "$want" ] && { [ -z "$text" ] || grep -q "$text" "$body"; }; then
                 echo "OK   $desc ($got)"; return 0
               fi
               sleep 15   # the production domain can lag a few seconds behind the deployment
             done
-            echo "::error title=Smoke test failed::$desc -> $got (expected $want${text:+ containing '$text'}) at $url"
+            echo "::error title=Smoke test failed::$desc -> $got (expected $want, text: ${text:-any}) at $url"
             fail=1
           }
           echo "Vercel environment: $DEPLOY_ENV"
