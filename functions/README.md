@@ -6,7 +6,7 @@ finance portal and the Raspberry Pis need from a server lives here.
 
 | | |
 |---|---|
-| Runtime | Node.js 20 · Firebase Functions v2 · Express 5 |
+| Runtime | Node.js 22 · Firebase Functions v2 · Express 5 |
 | Public URL | `https://api-upqxuj7evq-uc.a.run.app` (function `api`, region `us-central1`) |
 | Project | Firebase project `mimo-v2-11868` |
 | Data | Firestore + Cloud Storage (Firebase Admin SDK) |

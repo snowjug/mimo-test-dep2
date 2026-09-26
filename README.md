@@ -67,7 +67,7 @@ some historical documents and folders are stale (`company-website/`, `docs/*` ma
 
 | Layer | Technology |
 |---|---|
-| Backend | Node.js 20, Express 5, Firebase Cloud Functions v2 (`functions/`) |
+| Backend | Node.js 22, Express 5, Firebase Cloud Functions v2 (`functions/`) |
 | Data | Firestore, Cloud Storage, Secret Manager (Firebase project `mimo-v2-11868`) |
 | Payments / messaging | Cashfree, WhatsApp Cloud API, Gmail SMTP |
 | Customer site | React 18, Vite 6, Tailwind CSS 4, Radix UI, React Router 7, Capacitor (Android wrapper) |
@@ -81,7 +81,7 @@ some historical documents and folders are stale (`company-website/`, `docs/*` ma
 
 ```
 .
-├── functions/                  THE backend — Firebase Cloud Functions (Node 20, Express 5)      → functions/README.md
+├── functions/                  THE backend — Firebase Cloud Functions (Node 22, Express 5)      → functions/README.md
 ├── mimo-website/               Customer web app · static marketing site · Android wrapper       → mimo-website/README.md
 │   └── mimo-admin-dashboard/   Admin (/admin) + Finance (/finance) portals, live data           → its README.md
 ├── mimo-frontend-web-app/
@@ -114,7 +114,7 @@ some historical documents and folders are stale (`company-website/`, `docs/*` ma
 
 ## Prerequisites
 
-Git · Node.js 20 and npm · (optional) Firebase CLI `npm install -g firebase-tools` and a JDK for the Firestore emulator · (optional) Python 3.9+ for the Pi tools.
+Git · Node.js 22 (20 also works for the front ends) and npm · (optional) Firebase CLI `npm install -g firebase-tools` and a JDK for the Firestore emulator · (optional) Python 3.9+ for the Pi tools.
 
 ```bash
 git clone https://github.com/snowjug/mimo-test-dep2.git
@@ -182,7 +182,7 @@ what only an administrator can do: [`docs/deployment/REMAINING_SETUP.md`](docs/d
 
 [`docs/onboarding.md`](docs/onboarding.md) is the full path. In short:
 
-* **Day 1** — read this README and `architecture.md`; set up Node 20; run your app locally (backend against the emulator); run `cd functions && npm test`.
+* **Day 1** — read this README and `architecture.md`; set up Node 22; run your app locally (backend against the emulator); run `cd functions && npm test`.
 * **Day 2** — trace a request from the UI through routes → controllers → Firestore; run the other test suites; find the logs.
 * **Day 3** — pick a small task, work on `intern/<your-name>-<topic>`, test, push the branch and open a pull request (do not merge it yourself).
 
