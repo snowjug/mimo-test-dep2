@@ -50,7 +50,7 @@ git checkout -b intern/<your-name>-day1      # never work on main
    `functions/.env` is git-ignored; never commit it.
 4. **Run your app** (see the folder README). Defaults: customer site `http://localhost:5173`, admin `http://localhost:5174`.
    ⚠ The **kiosk UI has the production API address hard-coded** — running it locally talks to *production*. Do not enter real print codes; see the workaround in its README (point the API constants at your local backend, and never commit that change).
-5. **Run the tests:** `cd functions && npm test` → expect *50 pass*.
+5. **Run the tests:** `cd functions && npm test` → expect *80 pass*. `npm run test:coverage` also runs the coverage gate.
 
 Checkpoint: you can start one app locally and the backend tests pass.
 
@@ -67,7 +67,7 @@ Checkpoint: you can start one app locally and the backend tests pass.
    `functions/src/controllers/adminInsights.controller.js` → `services/analytics.service.js` → test `functions/__tests__/analytics.test.js`.
 3. **Run the other checks:**
    ```bash
-   node --test .github/scripts/__tests__/functions-env.test.js      # deploy-gate tests
+   node --test .github/scripts/__tests__/*.test.js                   # deploy-gate and secret-scanner tests
    python3 scripts/pi-ops/tests/test_pi_ops.py                       # Pi tooling tests (no Pi needed)
    cd mimo-frontend-web-app/mimo-frontend && npm install && npm run build   # type-check + build
    ```
@@ -92,7 +92,7 @@ Checkpoint: you can point to the file for each step of a request and you have se
    git add <files> && git commit -m "fix(scope): what and why"
    git push -u origin intern/<your-name>-<topic>
    ```
-3. **Open a pull request** against `main` on GitHub. Describe what changed, how you tested it and anything unverified. `ci.yml` runs the checks for the folders you touched.
+3. **Open a pull request** against `main` on GitHub and fill in the template. Describe what changed, how you tested it and anything unverified. `ci.yml` runs the checks for the folders you touched. Read [`docs/contributing.md`](contributing.md) first: payment, refund, auth, trigger and deploy files are **protected** — do not edit them without a maintainer.
    Do **not** merge it yourself: a merge that touches `functions/**` deploys the production API.
 4. Address review comments with new commits on the same branch.
 

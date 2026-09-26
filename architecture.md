@@ -146,11 +146,11 @@ sequenceDiagram
 
 ```
 pending ──payment──► paid ──kiosk print──► printing ──► completed
-   │                                          └──────► failed ──► refunded (automatic)
+   │                                          └──────► failed   (the ORDER is refunded automatically; the job stays `failed`)
    └─ superseded by a newer cart / never paid ─► abandoned   (upload flow + hourly cleanup)
 ```
 
-* A failed print (the Pi reports `failed`) triggers **`autoRefundJob`** → Cashfree refund → status `refunded`; the kiosk shows the refund banner.
+* A failed print (the Pi reports `failed`) triggers **`autoRefundJob`** → Cashfree refund of the whole order amount → the **order** gets `refundStatus = SUCCESS` (or `FAILED` with `refundError`). The **job stays `failed`**; job status `refunded` is written only by the manual admin refund (and the kiosk failure route). The kiosk shows the refund banner for both. Pinned by `functions/__tests__/refund.characterization.test.js`.
 * Completed jobs get their files deleted (**`autoCleanupStorageJob`**); anything older than 24 h is swept hourly.
 * Colour jobs are accepted only at `SV-002`; valid machines are `CV-001` and `SV-002`.
 
@@ -170,7 +170,7 @@ Status: **implemented** (order creation, hosted checkout, `/verify-payment`, fre
 3. The website calls `GET /verify-payment/:orderId`. The API asks Cashfree for the order status **server-to-server**; if it is `PAID` it marks the order `PAID` and calls its own `/payment-success`, which assigns the **4-digit print code** to the jobs and returns it. If the Cashfree call fails it falls back to the status stored in Firestore.
 4. In parallel Cashfree posts a webhook to `POST /cashfree-webhook`. On `PAYMENT_SUCCESS_WEBHOOK` the handler marks orders/jobs paid, calls `/payment-success` if no code exists yet and updates `users.totalSpent` and the `system/metrics` document.
    **Known issues:** the webhook path is only partially implemented. Its verification and response handling are being hardened (a fix is prepared, not deployed), and only the webhook — not `/verify-payment` — updates `totalSpent` and `system/metrics`, so those counters can lag. Do not rely on them; the dashboards compute their numbers from `orders` / `payment_transactions` (§8).
-5. Failed prints are refunded by `autoRefundJob` (Cashfree refund API) and recorded in `refunds`; customers can also file `POST /request-refund`, which an admin resolves with `POST /admin/refund`.
+5. Failed prints are refunded by `autoRefundJob` (Cashfree refund API; recorded on the order — the trigger does not write the `refunds` collection); customers can also file `POST /request-refund`, which an admin resolves with `POST /admin/refund`.
 
 ## 5. Firestore data model
 
