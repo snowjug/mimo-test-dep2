@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isSelfDoc() {
+      return signedIn() && resource.data.id == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isSelfDoc();
+      allow create: if signedIn() && request.resource.data.id == request.auth.uid;
+      allow update, delete: if isOwner(userId) || isSelfDoc();
+    }
+
+    match /orders/{orderId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /print_jobs/{jobId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /payment_transactions/{transactionId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /mimo_coin_transactions/{transactionId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /mimo_settings/{docId} {
+      allow read, write: if true;
+    }
+
+    // Default deny for everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

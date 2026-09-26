@@ -28,7 +28,7 @@ Until this is done the new admin/finance dashboards show error banners on produc
 ## 2. Devices and rules — manual by nature (not a GitHub problem)
 | What | Why it cannot be automated | Action when it changes |
 |---|---|---|
-| Raspberry Pi listeners | The Pis sit behind Tailscale; GitHub has no network path or SSH credential to them | On the Pi: replace `firebase_listener.py` from `main`, `sudo systemctl restart mimo-listener`. Confirm first which folder (`pi-listener/` or `pi_scripts/`) each Pi runs. `scripts/deployment/deploy_listener.py` points to another GitHub repo (`madhans7/…`) — do not use it as is. |
+| Raspberry Pi listeners | The Pis sit behind Tailscale; GitHub has no network path or SSH credential to them | From a machine on the Tailscale network: `python scripts/pi-ops/deploy_both.py` (setup in `scripts/pi-ops/README.md`); the master listener is `pi_scripts/firebase_listener.py`. `scripts/deployment/deploy_listener.py` points to another GitHub repo (`madhans7/…`) — do not use it. |
 | Android kiosk app | Installed over ADB on physical tablets | Build in Android Studio and install by ADB (`LENOVO TABLET APP/KIOSK_GUIDE.md`) |
 | Firestore rules/indexes (`backend/`) and `firebase/storage.rules` | Not deployed by any workflow; changing production rules automatically is a risk decision | `firebase deploy --only firestore:rules` / `storage` by someone logged into Firebase |
 

@@ -51,7 +51,7 @@ jobs:
             echo "kiosk=$(has '^mimo-frontend-web-app/')"
             echo "ci=$(has '^\.github/')"
             echo "converter=$(has '^converter/')"
-            echo "pi=$(has '^(pi-listener|pi_scripts)/')"
+            echo "pi=$(has '^(pi-listener|pi_scripts|scripts/pi-ops)/')"
           } >> "$GITHUB_OUTPUT"
           [ "$EVENT" = "workflow_dispatch" ] && for k in functions website kiosk ci converter pi; do echo "$k=true" >> "$GITHUB_OUTPUT"; done
           echo "Changed files: $(echo "$files" | grep -c .)"
@@ -137,7 +137,9 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile every Pi script (syntax only; the Pis are updated manually, see docs/deployment/REMAINING_SETUP.md)
-        run: python -m compileall -q pi-listener pi_scripts
+        run: python -m compileall -q pi-listener pi_scripts scripts/pi-ops
+      - name: Pi tooling tests (offline; also fail if a credential literal reappears)
+        run: python scripts/pi-ops/tests/test_pi_ops.py
 
   workflows:
     name: Lint GitHub workflows

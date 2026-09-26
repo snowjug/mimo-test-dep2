@@ -56,9 +56,9 @@ the printout.** Two kiosks run in production.
 ├── LENOVO TABLET APP/          Android kiosk shell (Kotlin WebView) + ADB lock/unlock helpers
 ├── pi-listener/, pi_scripts/   Raspberry Pi print listeners (Python)
 ├── converter/                  Office → PDF service (LibreOffice on Cloud Run)
-├── scripts/                    Tooling, not deployed: pi-setup/ · deployment/ · diagnostics/ · testing/
+├── scripts/                    Tooling, not deployed: pi-ops/ (SSH tools for the Pis) · pi-setup/ · deployment/ · diagnostics/ · testing/
 ├── docs/                       architecture/ · deployment/ · setup/ · historical notes
-├── firebase/                   storage.rules
+├── firebase/                   Firestore + Storage rules and Firestore indexes (see firebase/README.md)
 ├── company-website/            Older static site copy — stale, the live one is mimo-website/public
 ├── backend/                    LEGACY Express server — frozen, not used by production
 ├── .github/                    CI/CD workflows and their scripts
@@ -130,7 +130,7 @@ sudo systemctl restart mimo-listener     # restart
 lpstat -p -d                             # printer state
 ```
 
-Which of `pi-listener/` or `pi_scripts/` runs on which Pi is not confirmed by file hash — check before editing either.
+`pi_scripts/firebase_listener.py` is the master listener for both Pis (per the deploy tooling; `pi-listener/` looks stale — not verified on the devices). Everyday Pi operations and deploys: [`scripts/pi-ops/README.md`](scripts/pi-ops/README.md); hardware reference: [`docs/setup/pi-hardware.md`](docs/setup/pi-hardware.md).
 
 ## Deployment
 
