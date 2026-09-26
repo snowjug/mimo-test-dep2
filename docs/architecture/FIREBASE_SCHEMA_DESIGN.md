@@ -1,3 +1,6 @@
+> **Design proposal — partially matches reality.** The collections `users`, `print_jobs`, `orders` and `payment_transactions` exist and are used; the BigQuery export and the audit-trail extensions described here are **not implemented** (planned, unverified).
+> The authoritative description of the live data model is [`architecture.md` §5](../../architecture.md#5-firestore-data-model).
+
 # Firebase Firestore Schema Design for MIMO Kiosk System
 
 ## Overview
@@ -200,7 +203,7 @@ Core collection tracking each print request from upload to completion.
     "expiresAt": 1234567890000
   },
   "metadata": {
-    "ipAddress": "192.168.1.100",
+    "ipAddress": "<pi-lan-address>",
     "userAgent": "Mozilla/5.0...",
     "sessionId": "session_uuid",
     "tags": ["urgent", "color"]
@@ -280,7 +283,7 @@ Audit trail for all payment attempts, including failed transactions.
     "bankReferenceId": "bank_ref_123456"
   },
   "audit": {
-    "ipAddress": "192.168.1.100",
+    "ipAddress": "<pi-lan-address>",
     "userAgent": "Mozilla/5.0...",
     "retryCount": 0,
     "webhookReceived": true,

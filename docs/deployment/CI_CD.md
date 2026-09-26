@@ -68,7 +68,7 @@ There is no bypass flag and no authentication code was changed.
 | Third-party actions | Pinned to major tags (not commit SHAs). Acceptable; pin SHAs if the org requires it. |
 | Deploy scope | `--only functions:<name>` lists — a deploy can never delete other functions. |
 | Deployer permissions | `FIREBASE_SERVICE_ACCOUNT` demonstrably deploys `api` and edits Cloud Run IAM. Whether it can deploy triggers (Eventarc/Secret Manager) and read the service config is **unproven until the first run** — the workflow degrades safely (see REMAINING_SETUP). |
-| Public repository | The repo is public. Committed items that need cleanup in a security task: a WhatsApp token fallback in `functions/src/config/env.js`, `mimo_secret_123` in `functions/src/routes/kiosk.routes.js`, Pi SSH passwords in `backend/*.py` and `scripts/`, and `storage.rules` allowing public read/write (`if true`). None are touched here. |
+| Public repository | The repo is public. Committed items that need cleanup in a security task: a WhatsApp token fallback in `functions/src/config/env.js`, a hard-coded fallback for the internal failure-report secret in `functions/src/routes/kiosk.routes.js`, Pi SSH passwords in `backend/*.py` and `scripts/`, and `storage.rules` allowing public read/write (`if true`). None are touched here. |
 | Production API auth | Live `POST /admin/login` rejects `admin/admin` today. The team's local `.env` contains it and the gate refuses it. |
 
 ## 5. What cannot be verified from here
@@ -85,7 +85,6 @@ match what is live, deploy triggers only deliberately and check `firebase functi
 ## 7. Findings from the read-only checks of 2026-09-26/27
 * **Cashfree webhooks to the API have been timing out (504 after 60 s) since at least 2026-08-27** — all 24 logged calls in 30 days, on
   revisions from before the restructuring, so this is older than the current code. Payments still complete through the client-side
-  `/verify-payment` path, which hides it. Probable cause: `express.raw()` on `/cashfree-webhook` waits for a request body the Functions runtime
-  already consumed (`req.rawBody` is available there). Not fixed here (payment code); see LEGACY_BACKEND_REMOVAL.md.
+  `/verify-payment` path, which hides it. The webhook handler is being hardened (a fix is prepared but not deployed); further details are withheld from this public repository until it is live.
 * The Meta WhatsApp webhook posts to the Functions API (300+ calls with 200 in 14 days), and the Cashfree webhook also targets the
   Functions API (that is where the 504s are logged) — neither points at the legacy hosts.

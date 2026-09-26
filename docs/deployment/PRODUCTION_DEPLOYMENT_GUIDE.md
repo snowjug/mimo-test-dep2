@@ -285,7 +285,7 @@ a29d563 - feat(docs): add comprehensive README with live links
 ---
 
 **Questions?** Refer to:
-- [../TEST REPORTS/TEST_REPORT.md](../TEST%20REPORTS/TEST_REPORT.md) - Test results
-- [CRITICAL_ISSUES_ANALYSIS.md](CRITICAL_ISSUES_ANALYSIS.md) - Issues found & fixes
+- ../TEST REPORTS/TEST_REPORT.md (file no longer in the repository) - Test results
+- [CRITICAL_ISSUES_ANALYSIS.md](../CRITICAL_ISSUES_ANALYSIS.md) - Issues found & fixes
 - [NORTHFLANK_FREE_TIER_OPTIMIZATION.md](NORTHFLANK_FREE_TIER_OPTIMIZATION.md) - Architecture details
 

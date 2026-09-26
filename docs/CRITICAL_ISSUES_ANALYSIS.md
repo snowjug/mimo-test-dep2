@@ -12,7 +12,7 @@
 
 ### 1️⃣ 🔴 **Race Condition: Job Conversion Processing**
 
-**Location**: [server.js](server.js#L658)  
+**Location**: [server.js](../backend/api/server.js#L658)  
 **Severity**: CRITICAL  
 **Impact**: Data loss, duplicate conversions, stuck jobs
 
@@ -82,7 +82,7 @@ curl -X POST http://localhost:3000/create-order \
 
 ### 2️⃣ 🔴 **PDF Cache Memory Leak**
 
-**Location**: [server.js](server.js#L48-L90)  
+**Location**: [server.js](../backend/api/server.js#L48-L90)  
 **Severity**: CRITICAL  
 **Impact**: Memory gradually fills, pod OOM after 1-2 hours
 
@@ -152,7 +152,7 @@ cacheJobPdf = (pin, buffer) => {
 
 ### 3️⃣ 🔴 **Missing Indexes on Firestore Queries**
 
-**Location**: [server.js](server.js) - Multiple query locations  
+**Location**: [server.js](../backend/api/server.js) - Multiple query locations  
 **Severity**: CRITICAL  
 **Impact**: Slow queries that get worse with more data
 
@@ -217,7 +217,7 @@ db.collection("printJobs")
 
 ### 4️⃣ 🟡 **Missing Error Handling: Cashfree API Failures**
 
-**Location**: [server.js](server.js#L700)  
+**Location**: [server.js](../backend/api/server.js#L700)  
 **Severity**: HIGH  
 **Impact**: Order creation hangs, customer loses payment
 
@@ -274,7 +274,7 @@ if (!existingOrder.empty) {
 
 ### 5️⃣ 🟡 **No Rate Limiting on /kiosk/print**
 
-**Location**: [server.js](server.js#L1043)  
+**Location**: [server.js](../backend/api/server.js#L1043)  
 **Severity**: HIGH  
 **Impact**: Brute-force attack, Raspberry Pi spam
 
@@ -330,7 +330,7 @@ app.post("/kiosk/print", kioskLimiter, async (req, res) => {
 
 ### 6️⃣ 🟡 **Unauthenticated Endpoints**
 
-**Location**: [server.js](server.js)  
+**Location**: [server.js](../backend/api/server.js)  
 **Issues**:
 - ❌ `/kiosk/print` - No auth (line 1043)
 - ❌ `/mark-printed` - No auth (line 1006)
@@ -397,7 +397,7 @@ const jobDoc = await db.runTransaction(async (transaction) => {
 
 ### 8️⃣ 🟢 **Hardcoded Customer Email/Phone**
 
-**Location**: [server.js](server.js#L710)  
+**Location**: [server.js](../backend/api/server.js#L710)  
 **Issue**: All orders create with same email/phone
 ```javascript
 customer_details: {
