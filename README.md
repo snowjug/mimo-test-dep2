@@ -1,306 +1,188 @@
-# 🖨️ MIMO V2 — Intelligent Cloud Print Platform
+# MIMO — Self-Service Cloud Printing
 
-> **MIMO** is a production-grade automated self-service printing platform. Students upload their documents from any device, pay online, walk to a kiosk, enter a 4-digit code, and collect their prints — no USB drives, no queues.
+MIMO lets students print without USB drives or queues: **upload a document on the website → pay → get a 4-digit code →
+type it on a kiosk → collect the printout.** Two kiosks run in production.
 
----
+| Machine | ID | Printers |
+|---|---|---|
+| **MIMO 1.0** | `CV-001` | Black & white (Brother HL-L5210DN) |
+| **MIMO 2.0** | `SV-002` | Black & white (Brother HL-L2440DW) + colour (Epson L3250) |
 
-## 🔐 Environment Variables & Credentials
-
-> [!IMPORTANT]
-> All real API keys, Firebase credentials, and service account secrets are stored on Google Drive.
-> **Download them before starting any local development.**
->
-> 📁 **[Download Environment Variables (Google Drive)](https://drive.google.com/file/d/1VURWsFEovVIUPC2dxNqrPfkcpAye42IU/view?usp=sharing)**
->
-> ⚠️ **NEVER commit `.env` files, `serviceAccountKey.json`, or any raw secrets to GitHub.**
+> New here? Read [How it works](#how-it-works), then [Repository map](#repository-map), then set up the part you will
+> work on. The deep dive is in [`docs/architecture/architecture.md`](docs/architecture/architecture.md).
 
 ---
 
-## 🏗️ System Architecture — How MIMO Works End to End
+## How it works
 
 ```
-User Device (Browser)
-      │
-      ▼
-mimo-website (Vite + React)       ◄── Customer uploads docs, pays via Cashfree
-      │
-      ▼
-functions/ (Firebase Cloud Function `api`, Express) ◄── Creates Firestore print job, generates 4-digit code
-      │
-      ▼
-Firestore (Firebase)              ◄── Real-time database; stores print jobs, user accounts
-      │
-      ▼
-Raspberry Pi (pi-listener)        ◄── Python script watches Firestore; triggers CUPS printer
-      │
-      ▼
-CUPS Printer (Physical)           ◄── Brother / Epson prints the document
-      │
-      ▼
-Kiosk Touchscreen (mimo-frontend) ◄── User enters code, watches real-time print progress
+ Student's phone/laptop                         Kiosk touchscreen (Android tablet)
+ mimo-website (React)                           mimo-frontend (React, full-screen)
+        │  upload · pay · get code                     │  enter code · watch progress
+        ▼                                              ▼
+ ┌──────────────────────────────────────────────────────────────────────────┐
+ │  functions/  — Firebase Cloud Function `api` (Express)  + Firestore triggers │
+ │  auth · pricing · Cashfree payments · print codes · refunds · analytics     │
+ └───────────────┬───────────────────────────────┬──────────────────────────┘
+                 │                               │
+         Firestore + Cloud Storage        Cashfree (payments) · WhatsApp · e-mail
+                 │  status becomes "printing"
+                 ▼
+ Raspberry Pi per kiosk (pi-listener / pi_scripts)  ── CUPS ──►  physical printer
+        watches Firestore, downloads the PDF, prints, reports progress + heartbeat
 ```
 
----
+1. The student uploads files straight to Cloud Storage; the API verifies them (Office files → PDF via `converter/`).
+2. They pay through Cashfree (or a free/coupon order). The API issues a **4-digit print code**.
+3. At the kiosk they enter the code. The API checks it (rate-limited) and marks the job `printing` **for that kiosk**.
+4. The kiosk's Raspberry Pi sees the change in Firestore, prints via CUPS, and writes progress → `completed` / `failed`.
+5. A failed print is **refunded automatically** (Firestore trigger → Cashfree).
+6. Staff watch everything live in the **admin dashboard** and **finance portal**.
 
-## 📁 Project Folder Structure
+## Repository map
 
 ```
-mimo-test-dep2/
-├── functions/                THE backend — Firebase Cloud Functions (`api` + Firestore/scheduler triggers)
-│   ├── index.js              Entry point: exports the deployed functions (names/URLs are a contract)
-│   ├── src/                  server.js (Express app) · config/ · middleware/ (auth, rateLimit) · routes/
-│   │                         controllers/ · services/ · triggers/ · validators/
-│   └── __tests__/            Unit tests (`npm test`)
-├── mimo-website/             Customer web app (Vite + React) + admin dashboard (mimo-admin-dashboard/) + Capacitor android/
+.
+├── functions/                    ★ THE backend: Firebase Cloud Functions (Node 20, Express 5)      → functions/README.md
+├── mimo-website/                 Customer web app + static marketing pages + Android (Capacitor)   → mimo-website/README.md
+│   └── mimo-admin-dashboard/     Admin dashboard (/admin) + Finance portal (/finance), live data   → its README.md
 ├── mimo-frontend-web-app/
-│   └── mimo-frontend/        Kiosk touchscreen UI (Vite + React)
-├── LENOVO TABLET APP/        Android kiosk shell (Kotlin WebView) + ADB lock/unlock scripts
-├── company-website/          Static company site (copy of mimo-website/public — see docs)
-├── converter/                Office→PDF service (LibreOffice, Cloud Run `mimo-office-converter`)
-├── pi_scripts/               Pi listener (MIMO 1.0 / CV-001 lineage) + helpers
-├── pi-listener/              Pi listener (MIMO 2.0 / SV-002 lineage)
-├── mimo-listener*.service  pi_setup.sh  fallback_wifi.sh …   Pi provisioning files
-├── scripts/                  One-off tooling, not deployed: deployment/ · diagnostics/ · testing/ (+ testing/fixtures/)
-├── backend/                  ⚠️ LEGACY Express server — FROZEN, not the production API (see below)
-├── docs/                     architecture/ · deployment/ · setup/ — older notes (several are historical, see banners)
-├── firebase.json  .firebaserc  storage.rules
-└── .github/workflows/        deploy-functions.yml · deploy-converter.yml · backend-image.yml (legacy image)
+│   └── mimo-frontend/            Kiosk touchscreen UI                                              → its README.md
+├── LENOVO TABLET APP/            Android kiosk shell (Kotlin WebView) + ADB lock/unlock scripts
+├── pi-listener/ · pi_scripts/    Raspberry Pi print listeners (Python) — see "Raspberry Pis" below
+├── mimo-listener*.service · pi_setup.sh · fallback_wifi.sh …   Pi provisioning (systemd units, setup)
+├── converter/                    Office → PDF service (LibreOffice on Cloud Run: `mimo-office-converter`)
+├── scripts/                      One-off tooling (not deployed): deployment/ · diagnostics/ · testing/
+├── docs/                         architecture/ · deployment/ · setup/ · historical notes
+├── company-website/              Older static site copy (stale; the live one is mimo-website/public)
+├── backend/                      ⚠ LEGACY Express server — FROZEN, not used by production
+└── firebase.json · .firebaserc · storage.rules · .github/workflows/
 ```
 
-> **`backend/` is frozen legacy.** Production traffic goes to `functions/`. `backend/` is kept untouched only because an
-> external process may still consume its Docker image (`backend-image.yml`); it also holds the Firestore rules/indexes
-> (`backend/firestore.rules`, `backend/firebase.json`). Do not add features there. Pi listener file names are unchanged —
-> which listener runs on which Pi still needs confirming by hash.
+**Ground rules**
 
----
+* `functions/` is the only backend. Do not add features to `backend/`; it is kept because an external process may still
+  use its Docker image (`backend-image.yml`) and it holds the Firestore rules/indexes files.
+* Exported function names and URLs in `functions/index.js`, the `firebase.json`/`.firebaserc` project wiring and the
+  frontend folder names are **deployment contracts** (Vercel/Firebase settings live in dashboards, not in this repo).
+  Never rename or move them.
 
-## 🌿 Git Branch Guide
+## Apps and URLs
 
-| Branch | Owner | Purpose |
-|---|---|---|
-| `main` | Team | **Production** — all stable, tested code lives here |
-| `atharv-changes` | Atharv | Feature development branch |
-| `revautsav-android` | Revautsav | Android kiosk app (separate history, Android Studio project) |
-
-> [!TIP]
-> As an intern, **always create your own branch** before making changes:
-> ```bash
-> git checkout -b intern/yourname-feature-name
-> ```
-> Never push directly to `main`.
-
----
-
-## 🛠️ Tools You Need to Install First
-
-| Tool | Why You Need It | Download |
-|---|---|---|
-| **Node.js v18+** | Runs the backend server and all React frontends | [nodejs.org](https://nodejs.org/) |
-| **npm** | Installs JavaScript packages (comes with Node.js) | Package |
-| **Git** | Version control, cloning this repo | [git-scm.com](https://git-scm.com/) |
-| **Python 3.9+** | Run the Raspberry Pi listener scripts locally | [python.org](https://www.python.org/) |
-| **Firebase CLI** | Deploy Firestore rules, Firebase Functions | `npm install -g firebase-tools` |
-| **VS Code** | Recommended code editor | [code.visualstudio.com](https://code.visualstudio.com/) |
-| **Android Studio** | Only if working on `revautsav-android` branch | [developer.android.com](https://developer.android.com/studio) |
-
----
-
-## 🚀 Step-by-Step Local Setup for New Interns
-
-### Step 1 — Clone the Repo
-```bash
-git clone https://github.com/visionprintt/Mimo_V2.git
-cd Mimo_V2
-```
-
-### Step 2 — Get Credentials
-1. Open the **[GDrive Environment Variables link](https://drive.google.com/file/d/1VURWsFEovVIUPC2dxNqrPfkcpAye42IU/view?usp=sharing)**
-2. Download the zip / file shared
-3. Place files in correct locations:
-   - `functions/.env` ← Cloud Functions secrets (Firebase deploys read this file; keep the same variable names)
-   - `backend/.env` ← legacy Express server only
-   - `backend/serviceAccountKey.json` or project root ← Firebase Admin SDK (used by ad-hoc scripts in `scripts/`)
-
-### Step 3 — Install Dependencies
-
-```bash
-(cd functions && npm install)                                # backend (Cloud Functions)
-(cd mimo-website && npm install)                             # customer app + admin build
-(cd mimo-frontend-web-app/mimo-frontend && npm install)      # kiosk UI
-```
-
-### Step 4 — Run
-
-```bash
-(cd functions && npm test)                                   # unit tests
-(cd mimo-website && npm run dev)                             # http://localhost:5173
-(cd mimo-frontend-web-app/mimo-frontend && npm run dev)      # http://localhost:5174
-```
-
-The backend is a Firebase Cloud Function, so there is no `npm start`. Frontends call the deployed API
-(`https://api-upqxuj7evq-uc.a.run.app`) unless `VITE_API_URL` is set in dev.
-
----
-
-## 🌐 Live Production URLs
-
-| Service | URL |
+| What | URL |
 |---|---|
-| Customer Web App | [https://printmimo.tech](https://printmimo.tech) |
-| Landing Page | [https://printmimo.tech/landing](https://printmimo.tech/landing) |
-| Admin Dashboard | [https://printmimo.tech/admin](https://printmimo.tech/admin) |
-| Kiosk SV-002 | [https://mimo-2-0.vercel.app/?kioskId=SV-002](https://mimo-2-0.vercel.app/?kioskId=SV-002) |
-| Kiosk CV-001 | [https://mimo-frontend-three.vercel.app/?kioskId=CV-001](https://mimo-frontend-three.vercel.app/?kioskId=CV-001) |
-| Backend Cloud API | [https://api-upqxuj7evq-uc.a.run.app](https://api-upqxuj7evq-uc.a.run.app) |
+| Customer web app | https://printmimo.tech |
+| Landing page | https://printmimo.tech/landing |
+| Admin dashboard | https://printmimo.tech/admin/ |
+| Finance portal | https://printmimo.tech/finance |
+| API | https://api-upqxuj7evq-uc.a.run.app |
+| Kiosk MIMO 1.0 | https://mimo-frontend-three.vercel.app/?kioskId=CV-001 |
+| Kiosk MIMO 2.0 | https://mimo-2-0.vercel.app/?kioskId=SV-002 |
 
----
+Firebase project: `mimo-v2-11868`.
 
-## 🖥️ Physical Kiosk Hardware (Production)
+## Getting started
 
-Two physical kiosk stations are running in production:
-
-| Kiosk ID | Name | Tailscale IP | B&W Printer | Color Printer |
-|---|---|---|---|---|
-| **SV-002** | MIMO 2.0 | `100.107.95.16` | Brother HL-L2440DW | Epson L3250 |
-| **CV-001** | MIMO 1.0 | `100.70.107.44` | Brother HL-L5210DN | — |
-
-Each kiosk has a **Raspberry Pi** running a `firebase_listener.py` (from `pi_scripts/` or `pi-listener/`) as a systemd service (`mimo-listener`). The Pi watches Firestore for new `"printing"` status jobs assigned to its `kioskId`.
-
----
-
-## ❓ Intern FAQs
-
-### Q: What happens when a user pays and enters the print code at the kiosk?
-
-1. User pays via Cashfree on `mimo-website` → backend creates a Firestore doc in `/printJobs/{jobId}` with status `"paid"` and a `printCode`.
-2. User walks to kiosk, enters the 4-digit `printCode` on `NumpadScreen.tsx`.
-3. Kiosk calls `/kiosk/start-print` → backend verifies code → updates Firestore status to `"printing"`.
-4. The **Raspberry Pi's `firebase_listener.py`** detects the Firestore status change.
-5. Pi downloads the PDF via signed URL → calls `lpr` to send it to the CUPS printer.
-6. Kiosk polls Firestore every 2s and shows a live progress bar on `PrintingScreen.tsx`.
-7. Pi sets status to `"completed"` → kiosk shows 100% and success screen.
-
----
-
-### Q: What is Cashfree? Why do we use it?
-
-**Cashfree** is an Indian payment gateway (like Stripe for India). We use it because:
-- Supports UPI, Cards, NetBanking
-- Has a proper refund API (important — if printing fails, we auto-refund!)
-- Required env vars: `CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY`
-
----
-
-### Q: What is Firestore? How does real-time sync work?
-
-**Firestore** is Google's NoSQL cloud database. It supports **real-time listeners** — when data changes, all connected clients are instantly notified without polling.
-
-We use it to:
-- Store print jobs (`/printJobs`)
-- Store user accounts (`/users`)
-- Store kiosk settings, pricing, and coupon codes
-
-The Pi listener uses `firebase-admin` Python SDK to watch for status changes.
-
----
-
-### Q: What is Tailscale? Why do the Raspberry Pis use it?
-
-**Tailscale** creates a secure private VPN network between our backend server and the Raspberry Pis. Without it, the Pis would need public IPs (expensive & insecure). With Tailscale:
-- The Pi has a private IP like `100.107.95.16`
-- The backend can SSH or send HTTP requests directly to the Pi
-- No firewall rules needed
-
----
-
-### Q: What is CUPS? Why does it matter?
-
-**CUPS** (Common Unix Printing System) is the Linux printing daemon running on the Raspberry Pi. It manages printer queues and handles `lpr` print commands.
-
-Common CUPS commands used in our system:
-```bash
-lpstat -p                          # Check printer status
-sudo cupsenable <printer_name>     # Enable a disabled printer
-sudo cupsaccept <printer_name>     # Allow printer to accept jobs
-sudo cancel -a <printer_name>      # Cancel all stuck jobs in queue
-lpr -P <printer_name> file.pdf     # Send PDF to printer
-```
-
----
-
-### Q: I got a `401 Unauthorized` error calling the API. Why?
-
-All admin and kiosk API endpoints require a **JWT Bearer token** in the `Authorization` header. Get a token by calling:
-```
-POST /admin/login
-{ "email": "admin@email.com", "password": "..." }
-```
-Then add `Authorization: Bearer <token>` to every subsequent request.
-
----
-
-### Q: How do I add a new API endpoint?
-
-Add the handler to the matching file in `functions/src/controllers/`, then map it in `functions/src/routes/`
-(routers are mounted from `functions/src/server.js`). Shared logic goes in `services/`, auth in `middleware/auth.js`.
-Code-guessing endpoints use `middleware/rateLimit.js` (Firestore-backed, shared across instances).
-
----
-
-### Q: How do I deploy backend changes to production?
-
-Pushes to `main` that touch `functions/**` deploy the `api` function via `.github/workflows/deploy-functions.yml`
-(`firebase deploy --only functions:api`). The Firestore/scheduler trigger functions are **not** deployed by CI.
-CI has no environment step: `functions/.env` (or values already set on the function) supplies the env vars.
-
----
-
-### Q: My changes work locally but not in production — why?
-
-Common causes:
-1. **Missing env variable on production** — check the function's environment config (`functions/.env` at deploy time).
-2. **Firestore security rules blocking the request** — check `firestore.rules`.
-3. **CORS** — the function allows any origin (`cors({ origin: true })`); look at request headers/auth instead.
-4. **Old build cached** — hard refresh or clear Vercel deployment cache.
-
----
-
-## 🔒 Security Rules for All Interns
-
-1. ❌ **Never commit `.env` files** — they are in `.gitignore` for a reason.
-2. ❌ **Never commit `serviceAccountKey.json`** — this gives full Firebase admin access.
-3. ✅ **Always create a feature branch** before coding: `git checkout -b intern/name-feature`
-4. ✅ **Open a Pull Request** (PR) against `main`, don't push directly.
-5. ✅ **Use `.env.example`** to document any new environment variable you add.
-6. ✅ **Test locally before pushing** — run `npm run build` to catch errors.
-
----
-
-## 🔧 Useful Commands Quick Reference
+Prerequisites: Node.js 20, npm, Git. Python 3.9+ only for Pi scripts, Firebase CLI only for manual deploys.
 
 ```bash
-# Check the deployed API is up
-curl https://api-upqxuj7evq-uc.a.run.app/
-
-# Deploy Firestore rules only
-firebase deploy --only firestore:rules --config backend/firebase.json --project mimo-v2-11868
-
-# View Pi listener logs (on Raspberry Pi)
-sudo journalctl -u mimo-listener -f
-
-# Restart Pi listener service
-sudo systemctl restart mimo-listener
-
-# Check CUPS printer queue
-lpstat -p -d
-
-# Build kiosk frontend for production
-cd mimo-frontend-web-app/mimo-frontend
-npm run build
+git clone https://github.com/snowjug/mimo-test-dep2.git
+cd mimo-test-dep2
 ```
+
+**Secrets first.** Real credentials are never in git. Get the shared credentials file (link at the bottom of this README) and
+put `functions/.env` in place. Variable names are documented in [`functions/README.md`](functions/README.md#5-environment-variables).
+
+| I want to work on… | Run |
+|---|---|
+| Backend | `cd functions && npm install && npm run dev` → http://localhost:5001 · `npm test` |
+| Customer site | `cd mimo-website && npm install && npm run dev` → http://localhost:5173 |
+| Admin / Finance | `cd mimo-website/mimo-admin-dashboard && npm install && npm run dev` → http://localhost:5174 (uses the API on :5001) |
+| Kiosk UI | `cd mimo-frontend-web-app/mimo-frontend && npm install && npm run dev` → http://localhost:5173/?kioskId=SV-002 |
+
+Frontends call the production API unless you point them at a local one with `VITE_API_URL=http://localhost:5001`
+(the admin dashboard does this by default in dev). **A local backend with real credentials talks to the real
+Firestore** — prefer the Firestore emulator when experimenting.
+
+## Admin dashboard & finance portal at a glance
+
+* Sign in with the admin credentials configured on the API (`ADMIN_EMAIL` / `ADMIN_PASSWORD`).
+* Every page is **live** and driven by a **date range** (default: today; presets, custom dates, comparison with the
+  previous period). No sample data: an empty range shows zeros.
+* Shows exactly the two real machines and their heartbeat/paper/toner state.
+* Details: [`mimo-website/mimo-admin-dashboard/README.md`](mimo-website/mimo-admin-dashboard/README.md).
+
+## Raspberry Pis
+
+Each kiosk has a Pi running a Python listener as the systemd service `mimo-listener`
+(`mimo-listener.service`, `KIOSK_ID` set per machine). It watches `print_jobs` for `status == "printing"` for its kiosk,
+prints through CUPS, updates progress, and writes a heartbeat to `system_status/<kioskId>` every ~30 s (this is what makes a
+machine show *online* on the dashboard).
+
+```bash
+sudo journalctl -u mimo-listener -f      # logs
+sudo systemctl restart mimo-listener     # restart
+lpstat -p -d                             # printer state
+```
+
+Which of `pi-listener/` or `pi_scripts/` runs on which Pi has not been confirmed by file hash — check before editing either.
+
+## Deployment
+
+| Part | How |
+|---|---|
+| Backend `api` | Push to `main` touching `functions/**` → `.github/workflows/deploy-functions.yml` runs `firebase deploy --only functions:api`. Triggers are **not** deployed by CI: `firebase deploy --only functions` manually. |
+| Customer site + admin + finance | Vercel builds `mimo-website` on push (`npm run build` also builds the admin app into `dist/admin`). |
+| Kiosk UI | Vercel builds `mimo-frontend-web-app/mimo-frontend`. |
+| Office converter | Manual GitHub Action `deploy-converter.yml` (Cloud Run). |
+| Legacy image | `backend-image.yml` — frozen, leave alone. |
+
+CI has no environment-variable step: the deployed function's configuration must already contain them. After any backend
+deploy, hit `https://api-upqxuj7evq-uc.a.run.app/` and one authenticated route to confirm.
+
+## Testing
+
+```bash
+(cd functions && npm test)                                           # unit tests (kiosk contract, rate limiter, analytics, routes)
+(cd mimo-website && npm run build)                                   # builds customer app + admin
+(cd mimo-frontend-web-app/mimo-frontend && npm run build)            # type-checks and builds the kiosk UI
+```
+
+## Security notes
+
+* Never commit `.env`, `serviceAccountKey.json`, or any key (they are git-ignored). Do not paste secrets into issues or chat.
+* `JWT_SECRET` **must** be set in production; the code fallback is public.
+* The print code is only 4 digits, so lookups are rate-limited (Firestore-backed) — keep `middleware/rateLimit.js` on those routes.
+* Work on a feature branch and open a pull request; `main` deploys the API automatically.
+* Known follow-ups (not yet changed): `POST /payment-success` trusts the caller instead of verifying with Cashfree; the API
+  allows any CORS origin; review credential hygiene (rotation) with the team. See `docs/CRITICAL_ISSUES_ANALYSIS.md`.
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| Dashboard shows an error banner / nothing loads | API unreachable or your session expired — use *Retry*; check `curl https://api-upqxuj7evq-uc.a.run.app/` |
+| Machine shows *offline* | The Pi has not written a heartbeat for 5 min: power, Wi-Fi, or `mimo-listener` stopped |
+| `401` from the API | Missing/expired JWT — log in again (`POST /admin/login` for admin routes) |
+| `429` at the kiosk | Too many wrong print codes from that IP; wait a minute |
+| Works locally, not in production | Missing environment variable on the deployed function, or stale Vercel build |
+| Admin assets 404 on production | The admin build must use base `/admin/` (already the case for `vite build`) |
+
+## More documentation
+
+| | |
+|---|---|
+| [`docs/architecture/architecture.md`](docs/architecture/architecture.md) | Full system architecture, data model, analytics design |
+| [`functions/README.md`](functions/README.md) | Backend: structure, API, env vars, testing, deploy |
+| [`mimo-website/README.md`](mimo-website/README.md) | Customer website |
+| [`mimo-website/mimo-admin-dashboard/README.md`](mimo-website/mimo-admin-dashboard/README.md) | Admin + finance portal |
+| [`mimo-frontend-web-app/mimo-frontend/README.md`](mimo-frontend-web-app/mimo-frontend/README.md) | Kiosk UI |
+| [`docs/deployment/`](docs/deployment) · [`docs/troubleshooting_log.md`](docs/troubleshooting_log.md) | Historical notes (pre-consolidation) |
 
 ---
 
-## 📞 Who to Contact
+## Credentials (private)
 
-If you're stuck or have questions about the codebase, check with your team lead. This README covers 90% of what you need to get started — the remaining 10% is in the code comments!
+Environment variables and service credentials are shared privately on Google Drive. Never commit them.
+
+📁 **[Environment variables & credentials (Google Drive)](https://drive.google.com/file/d/1VURWsFEovVIUPC2dxNqrPfkcpAye42IU/view?usp=sharing)**
