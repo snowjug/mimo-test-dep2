@@ -17,6 +17,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import type { Incident } from '../../types/insights.types';
+import { timeAgo } from '../../lib/format';
 
 export interface HeaderProps {
   activeTab: string;
@@ -25,6 +27,8 @@ export interface HeaderProps {
   onResetMetrics?: () => void;
   isResetting?: boolean;
   incidentCount?: number;
+  /** Live open incidents from /admin/incidents (drives the bell). */
+  alerts?: Incident[];
   onOpenMobileNav: () => void;
 }
 
@@ -38,43 +42,14 @@ interface NotificationItem {
   actionTab?: string;
 }
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'n1',
-    title: 'Paper Tray Low (SV-002)',
-    desc: 'Admin Block kiosk capacity dropped below 15% (70 sheets).',
-    time: '14m ago',
-    type: 'warning',
-    read: false,
-    actionTab: 'kiosks',
-  },
-  {
-    id: 'n2',
-    title: 'Auto-Dispatch Guard Active',
-    desc: '2 queued jobs resumed automatically on CV-001.',
-    time: '38m ago',
-    type: 'info',
-    read: false,
-    actionTab: 'operations',
-  },
-  {
-    id: 'n3',
-    title: 'Daily Revenue Target Reached',
-    desc: 'Total platform prints crossed ₹3,600 for today.',
-    time: '2h ago',
-    type: 'success',
-    read: true,
-    actionTab: 'finance',
-  },
-];
-
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onTabChange,
   onLogout,
   onResetMetrics,
   isResetting = false,
-  incidentCount = 2,
+  incidentCount = 0,
+  alerts = [],
   onOpenMobileNav,
 }) => {
   const { isDark, toggleTheme } = useTheme();
@@ -82,7 +57,16 @@ export const Header: React.FC<HeaderProps> = ({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const notifications: NotificationItem[] = alerts.slice(0, 8).map((a) => ({
+    id: a.id,
+    title: a.title,
+    desc: a.detail,
+    time: timeAgo(a.at),
+    type: a.severity === 'high' ? 'warning' : 'info',
+    read: readIds.has(a.id),
+    actionTab: a.tab,
+  }));
 
   const notifRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -103,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setReadIds(new Set(alerts.map(a => a.id)));
   };
 
   const currentTabInfo = {
@@ -246,6 +230,9 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                {notifications.length === 0 && (
+                  <p className="py-6 text-center text-xs font-semibold text-slate-400">All clear — no open incidents.</p>
+                )}
                 {notifications.map(n => (
                   <div
                     key={n.id}
@@ -268,7 +255,7 @@ export const Header: React.FC<HeaderProps> = ({
                         {n.type === 'success' && <CheckCircle2 size={13} className="text-emerald-500 dark:text-emerald-400 flex-shrink-0" />}
                         <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{n.title}</span>
                       </div>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap font-mono">{n.time}</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap font-mono">{n.time === '—' ? '' : n.time}</span>
                     </div>
                     <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">{n.desc}</p>
                   </div>

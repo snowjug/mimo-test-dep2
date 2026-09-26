@@ -1,17 +1,17 @@
 import React from 'react';
 import {
   Search,
-  Calendar,
   RotateCw,
   Bell,
   Menu,
 } from 'lucide-react';
 import { FinanceTab } from './FinanceSidebar';
+import { DateRangePicker } from '../../../components/ui/DateRangePicker';
+import { useRange } from '../../../context/RangeContext';
 
 export interface FinanceTopbarProps {
   activeTab: FinanceTab;
-  dateRange: string;
-  onDateRangeChange: (range: string) => void;
+  pendingRefundsCount?: number;
   onRefresh: () => void;
   isRefreshing?: boolean;
   searchQuery?: string;
@@ -31,8 +31,7 @@ const TAB_TITLES: Record<FinanceTab, { title: string; breadcrumb: string }> = {
 
 export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
   activeTab,
-  dateRange,
-  onDateRangeChange,
+  pendingRefundsCount = 0,
   onRefresh,
   isRefreshing = false,
   searchQuery = '',
@@ -40,6 +39,7 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
   onOpenMobileMenu,
 }) => {
   const current = TAB_TITLES[activeTab] || { title: 'Finance', breadcrumb: 'Overview' };
+  const { range, setRange } = useRange();
 
   return (
     <header className="finance-topbar">
@@ -86,20 +86,9 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
 
       {/* ── RIGHT: CONTROLS & PROFILE PILL ─────────────────────────────── */}
       <div className="flex items-center gap-3 shrink-0">
-        {/* Date Range Selector Dropdown */}
-        <div className="hidden sm:flex items-center gap-2 bg-[#FAF9FD] border border-[#EDE9FE] text-slate-700 text-xs font-bold px-3 py-2 rounded-xl shadow-2xs">
-          <Calendar className="w-3.5 h-3.5 text-[#6D35E8]" />
-          <select
-            value={dateRange}
-            onChange={(e) => onDateRangeChange(e.target.value)}
-            className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer pr-1"
-          >
-            <option value="today">Today</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-            <option value="1y">Year to Date</option>
-          </select>
+        {/* Date range: applies to every finance page (default: today) */}
+        <div className="hidden sm:block">
+          <DateRangePicker value={range} onChange={setRange} tone="finance" />
         </div>
 
         {/* Refresh Button */}
@@ -113,17 +102,19 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
           <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#6D35E8]' : ''}`} />
         </button>
 
-        {/* Notification Bell */}
+        {/* Pending refund requests */}
         <div className="relative">
           <button
             type="button"
-            title="Financial alerts"
+            title={pendingRefundsCount ? `${pendingRefundsCount} refund request(s) waiting for review` : 'No refund requests waiting'}
             className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-[#EDE9FE] bg-white transition-all cursor-pointer shadow-2xs relative"
           >
             <Bell className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
-              3
-            </span>
+            {pendingRefundsCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                {pendingRefundsCount}
+              </span>
+            )}
           </button>
         </div>
 

@@ -19,6 +19,13 @@ import {
 } from 'lucide-react';
 import api from '../../api';
 import { useTheme } from '../../context/ThemeContext';
+import { useRange } from '../../context/RangeContext';
+import { useLiveQuery } from '../../hooks/useLiveQuery';
+import { insights } from '../../services/insights.service';
+import { DateRangePicker } from '../../components/ui/DateRangePicker';
+import { LiveIndicator } from '../../components/ui/LiveIndicator';
+import { ErrorBanner } from '../../components/insights/InsightBits';
+import { describeRange } from '../../lib/dateRange';
 
 interface PrintJobRecord {
   id: string;
@@ -39,9 +46,13 @@ interface PrintJobRecord {
 
 export const OperationsPage: React.FC = () => {
   const { isDark } = useTheme();
-  const [jobs, setJobs] = useState<PrintJobRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { range, setRange, current, live } = useRange();
+  // Every job created in the selected range (default: today), polled while the range includes today.
+  const jobsQ = useLiveQuery(() => insights.jobs(current(), { limit: 1000 }), [range], { live });
+  const jobs: PrintJobRecord[] = (jobsQ.data?.jobs ?? []) as PrintJobRecord[];
+  const loading = jobsQ.loading;
+  const refreshing = jobsQ.fetching;
+  const fetchJobs = (_silent?: boolean) => jobsQ.refresh();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [destinationFilter, setDestinationFilter] = useState('ALL');
@@ -54,23 +65,7 @@ export const OperationsPage: React.FC = () => {
   const [isRefunding, setIsRefunding] = useState(false);
   const [refundMessage, setRefundMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const fetchJobs = async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
-    try {
-      const res = await api.get<PrintJobRecord[]>('/admin/recent-prints');
-      setJobs(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error('Failed to load recent prints:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchJobs();
-  }, []);
+  useEffect(() => { setPage(1); }, [range]);
 
   const handleRefundSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,11 +152,13 @@ export const OperationsPage: React.FC = () => {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">
-            Real-time tracking of documents, queue health, hardware output, and gateway refunds.
+            Every print job for {describeRange(range).toLowerCase()}: documents, queue health, hardware output and refunds.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <LiveIndicator updatedAt={jobsQ.updatedAt} live={live} fetching={jobsQ.fetching} />
+          <DateRangePicker value={range} onChange={setRange} tone="admin" />
           <button
             type="button"
             onClick={() => fetchJobs(true)}
@@ -173,6 +170,9 @@ export const OperationsPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {jobsQ.error && <ErrorBanner message={jobsQ.error} onRetry={jobsQ.refresh} />}
+      {jobsQ.data?.truncated && <p className="text-[11px] text-amber-600">Showing the newest {jobs.length} of {jobsQ.data.total} jobs — narrow the dates to see the rest.</p>}
 
       {/* ── Quick KPI Stat Tiles ────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

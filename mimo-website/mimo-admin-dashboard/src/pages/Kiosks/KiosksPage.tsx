@@ -1,254 +1,132 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Cpu,
-  RefreshCw,
-  Printer,
-  Sparkles,
-  Loader2,
-  CheckCircle2,
-  AlertTriangle,
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Printer, Wifi, WifiOff, Loader2, PackagePlus, Droplets } from 'lucide-react';
 import api from '../../api';
-import { useTheme } from '../../context/ThemeContext';
+import { useRange } from '../../context/RangeContext';
+import { useLiveQuery, errorMessage } from '../../hooks/useLiveQuery';
+import { insights } from '../../services/insights.service';
+import { DateRangePicker } from '../../components/ui/DateRangePicker';
+import { LiveIndicator } from '../../components/ui/LiveIndicator';
+import { ErrorBanner } from '../../components/insights/InsightBits';
+import { LevelBar } from '../../components/ui/shared';
+import { describeRange } from '../../lib/dateRange';
+import { inr, timeAgo } from '../../lib/format';
+import type { KioskLive, PrinterInfo } from '../../types/insights.types';
 
-interface KioskHardwareInfo {
-  type?: string;
-  tonerLevel?: number;
-  inkLevel?: number;
-  paperLevel?: number;
-  status?: string;
-  location?: string;
-  printerModel?: string;
-}
-
-const DEFAULT_KIOSKS: Record<string, KioskHardwareInfo> = {
-  'CV-001': {
-    type: 'bw',
-    tonerLevel: 88,
-    paperLevel: 420,
-    status: 'Online',
-    location: 'Central Library (Ground Floor)',
-    printerModel: 'HP LaserJet Enterprise M608',
-  },
-  'SV-002': {
-    type: 'color',
-    inkLevel: 75,
-    paperLevel: 380,
-    status: 'Online',
-    location: 'Academic & Admin Block',
-    printerModel: 'Canon Color imageRUNNER C3226',
-  },
-};
-
+/** Live machine status. Online = the Raspberry Pi sent a heartbeat in the last 5 minutes. */
 export const KiosksPage: React.FC = () => {
-  const { isDark } = useTheme();
-  const [hardware, setHardware] = useState<Record<string, KioskHardwareInfo>>(DEFAULT_KIOSKS);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [updatingCode, setUpdatingCode] = useState<string | null>(null);
+  const { range, setRange, current } = useRange();
+  // Machine health is always live, whatever range is selected for the activity numbers.
+  const q = useLiveQuery(() => insights.kiosks(current()), [range], { live: true, intervalMs: 20000 });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
 
-  const fetchHardware = async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  const restock = async (printer: PrinterInfo, what: 'paper' | 'supply') => {
+    const id = `${printer.key}:${what}`;
+    setBusy(id);
+    setActionError('');
     try {
-      const res = await api.get('/admin/hardware');
-      if (res.data && Object.keys(res.data).length > 0) {
-        setHardware(res.data);
-      } else {
-        setHardware(DEFAULT_KIOSKS);
-      }
+      const patch = what === 'paper' ? { paperLevel: printer.paperCapacity } : printer.type === 'color' ? { inkLevel: 100 } : { tonerLevel: 100 };
+      await api.post('/admin/hardware', { updates: { [printer.key]: patch } });
+      q.refresh();
     } catch (err) {
-      console.error('Failed to load hardware status:', err);
+      setActionError(errorMessage(err));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setBusy(null);
     }
   };
-
-  useEffect(() => {
-    fetchHardware();
-  }, []);
-
-  const handleUpdate = async (kioskCode: string, patch: Partial<KioskHardwareInfo>) => {
-    setUpdatingCode(kioskCode);
-    try {
-      const updatedItem = { ...(hardware[kioskCode] || DEFAULT_KIOSKS[kioskCode] || {}), ...patch };
-      await api.post('/admin/hardware', {
-        updates: {
-          [kioskCode]: updatedItem,
-        },
-      });
-      setHardware(prev => ({
-        ...prev,
-        [kioskCode]: updatedItem,
-      }));
-    } catch (err) {
-      alert('Failed to update kiosk hardware state.');
-    } finally {
-      setUpdatingCode(null);
-    }
-  };
-
-  const kioskList = Object.entries(hardware).filter(([code]) => code === 'CV-001' || code === 'SV-002' || code.includes('CV') || code.includes('SV'));
-  const activeList = kioskList.length > 0 ? kioskList : Object.entries(DEFAULT_KIOSKS);
 
   return (
     <div className="space-y-6 animate-fadeIn font-sans select-none">
-      {/* ── Page Header ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              Kiosk Network
-            </h1>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              2 Active Machines
-            </span>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-1)]">Kiosk Network</h1>
+            {q.data && (
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${q.data.summary.offline === 0 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
+                {q.data.summary.online}/{q.data.summary.total} online
+              </span>
+            )}
           </div>
-          <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">
-            Real-time telemetry, paper capacity, toner ink reserves, and maintenance controls for all campus terminals.
-          </p>
+          <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">Machine health, paper &amp; toner, and print activity for {describeRange(range).toLowerCase()}.</p>
         </div>
-
-        <button
-          type="button"
-          onClick={() => fetchHardware(true)}
-          disabled={refreshing}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[var(--surface)] border border-[var(--border)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
-        >
-          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-          Sync Hardware
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <LiveIndicator updatedAt={q.updatedAt} live fetching={q.fetching} onRefresh={q.refresh} />
+          <DateRangePicker value={range} onChange={setRange} tone="admin" />
+        </div>
       </div>
 
-      {/* ── Kiosk Node Grid (2 Machines) ────────────────────────────── */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] h-64 skeleton" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {activeList.map(([code, info]) => {
-            const isOnline = (info.status || 'Online') === 'Online';
-            const toner = info.tonerLevel ?? info.inkLevel ?? 85;
-            const paper = info.paperLevel ?? 420;
-            const isBusy = updatingCode === code;
-            const isColor = info.type === 'color' || code.includes('COLOR') || code === 'SV-002';
+      {q.error && <ErrorBanner message={q.error} onRetry={q.refresh} />}
+      {actionError && <ErrorBanner message={actionError} />}
 
-            return (
-              <div
-                key={code}
-                className="p-5 sm:p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs flex flex-col justify-between space-y-4 hover:border-indigo-500/40 transition-all"
-              >
-                {/* Node Header */}
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold text-sm">
-                        <Printer size={18} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-black text-base text-[var(--text-1)]">{code}</h3>
-                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
-                            isColor
-                              ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                          }`}>
-                            {isColor ? 'Color Duplex' : 'Monochrome'}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-[var(--text-3)] font-medium">
-                          {info.location || (code === 'CV-001' ? 'Central Library (Ground Floor)' : 'Academic & Admin Block')}
-                        </p>
-                      </div>
-                    </div>
+      {q.loading && <div className="grid grid-cols-1 xl:grid-cols-2 gap-6"><div className="skeleton h-72" /><div className="skeleton h-72" /></div>}
 
-                    {/* Online / Offline Status Toggle */}
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => handleUpdate(code, { status: isOnline ? 'Maintenance' : 'Online' })}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                        isOnline
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                          : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-                      }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                      {info.status || 'Online'}
-                    </button>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {q.data?.kiosks.map((k: KioskLive) => (
+          <section key={k.kioskId} className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-11 h-11 rounded-xl bg-[var(--primary-light)] text-[var(--primary)] flex items-center justify-center flex-shrink-0"><Printer size={20} /></div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg font-black text-[var(--text-1)]">{k.name}</h2>
+                    <span className="font-mono text-xs text-[var(--text-3)]">{k.kioskId}</span>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${k.type === 'color' ? 'bg-fuchsia-500/10 text-fuchsia-600' : 'bg-slate-500/10 text-slate-500'}`}>{k.type === 'color' ? 'Colour' : 'B&W'}</span>
                   </div>
-                </div>
-
-                {/* Telemetry Progress Bars */}
-                <div className="space-y-3 p-3.5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
-                  {/* Toner / Ink */}
-                  <div>
-                    <div className="flex justify-between text-xs font-bold mb-1">
-                      <span className="text-[var(--text-2)]">{isColor ? 'Color Ink Reserve' : 'Black Toner'}</span>
-                      <span className={toner < 20 ? 'text-amber-500' : 'text-indigo-500'}>{toner}%</span>
-                    </div>
-                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          toner < 20 ? 'bg-amber-500' : 'bg-gradient-to-r from-indigo-500 to-violet-500'
-                        }`}
-                        style={{ width: `${toner}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Paper Tray */}
-                  <div>
-                    <div className="flex justify-between text-xs font-bold mb-1">
-                      <span className="text-[var(--text-2)]">Paper Tray 1 (A4)</span>
-                      <span className={paper < 80 ? 'text-rose-500' : 'text-emerald-500'}>{paper} / 500 sheets</span>
-                    </div>
-                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          paper < 80 ? 'bg-rose-500' : 'bg-gradient-to-r from-emerald-500 to-teal-500'
-                        }`}
-                        style={{ width: `${Math.min(100, (paper / 500) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Maintenance Action Buttons */}
-                <div className="pt-2 flex items-center justify-between gap-2 border-t border-[var(--border)]">
-                  <span className="text-[11px] text-[var(--text-3)] font-mono">
-                    Node: {code}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => handleUpdate(code, { tonerLevel: 100, inkLevel: 100 })}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold border border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-all cursor-pointer"
-                    >
-                      {isBusy ? <Loader2 size={12} className="animate-spin" /> : 'Refill Toner (100%)'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => handleUpdate(code, { paperLevel: 500 })}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 transition-all cursor-pointer"
-                    >
-                      Load Paper (500)
-                    </button>
-                  </div>
+                  <p className="text-xs text-[var(--text-3)]">{k.description}</p>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${k.online ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>
+                {k.online ? <Wifi size={13} /> : <WifiOff size={13} />}{k.online ? 'Online' : 'Offline'}
+              </span>
+            </div>
+
+            <div className="mt-3 text-xs text-[var(--text-2)]">
+              <p><span className="text-[var(--text-3)]">Last heartbeat:</span> {k.lastSeen ? `${timeAgo(k.lastSeen)} (${new Date(k.lastSeen).toLocaleTimeString()})` : 'never'}</p>
+              {k.printerStatus && <p className="mt-0.5 break-words"><span className="text-[var(--text-3)]">Printer status:</span> {k.printerStatus}</p>}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[['Jobs', String(k.stats.jobs)], ['Printed', String(k.stats.completed)], ['Failed', String(k.stats.failed)], ['Revenue', inr(k.stats.revenue)]].map(([label, value]) => (
+                <div key={label} className="p-3 rounded-xl bg-[var(--surface-2)]/60 border border-[var(--border)]">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-3)]">{label}</p>
+                  <p className={`text-lg font-black tabular-nums ${label === 'Failed' && k.stats.failed > 0 ? 'text-rose-600' : 'text-[var(--text-1)]'}`}>{value}</p>
+                </div>
+              ))}
+            </div>
+            {(k.queue.paid + k.queue.printing) > 0 && (
+              <p className="mt-3 text-xs font-bold text-amber-600 dark:text-amber-400">Queue: {k.queue.printing} printing · {k.queue.paid} waiting to be collected</p>
+            )}
+
+            <div className="mt-4 space-y-4">
+              {k.printers.length === 0 && <p className="text-xs text-[var(--text-3)]">No paper/toner levels have been reported for this machine yet.</p>}
+              {k.printers.map((p) => {
+                const supply = p.tonerLevel ?? p.inkLevel;
+                return (
+                  <div key={p.key} className="p-3 rounded-xl border border-[var(--border)]">
+                    <p className="text-[11px] font-bold text-[var(--text-2)] mb-2">{p.type === 'color' ? 'Colour printer' : 'B&W printer'} <span className="font-mono text-[var(--text-3)]">({p.key})</span></p>
+                    {p.paperPct !== null && <LevelBar value={p.paperPct} label={`Paper tray · ${p.paperLevel}/${p.paperCapacity} sheets`} />}
+                    {supply !== null && <div className="mt-3"><LevelBar value={supply} label={p.type === 'color' ? 'Ink reserve' : 'Toner'} /></div>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {p.paperPct !== null && (
+                        <button type="button" disabled={busy !== null} onClick={() => restock(p, 'paper')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[var(--border)] text-[var(--text-2)] hover:bg-[var(--surface-2)] cursor-pointer disabled:opacity-50">
+                          {busy === `${p.key}:paper` ? <Loader2 size={12} className="animate-spin" /> : <PackagePlus size={12} />} Paper refilled ({p.paperCapacity})
+                        </button>
+                      )}
+                      {supply !== null && (
+                        <button type="button" disabled={busy !== null} onClick={() => restock(p, 'supply')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[var(--border)] text-[var(--text-2)] hover:bg-[var(--surface-2)] cursor-pointer disabled:opacity-50">
+                          {busy === `${p.key}:supply` ? <Loader2 size={12} className="animate-spin" /> : <Droplets size={12} />} {p.type === 'color' ? 'Ink' : 'Toner'} refilled
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 };
