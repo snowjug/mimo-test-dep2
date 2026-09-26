@@ -461,36 +461,56 @@ const getVerifyPayment = async (req, res) => {
 };
 
 // ================= CASHFREE WEBHOOK =================
-const postCashfreeWebhook = async (req, res) => {
-  try {
-    let event;
-    if (Buffer.isBuffer(req.body)) {
-      const rawBody = req.body.toString("utf8");
-      const receivedSignature = req.headers["x-webhook-signature"];
-      const timestamp = req.headers["x-webhook-timestamp"];
+// Cashfree signs every webhook: x-webhook-signature = base64(HMAC-SHA256(x-webhook-timestamp + rawBody, secret)).
+// Under Cloud Functions the body is already parsed before Express runs, so the exact bytes come from req.rawBody
+// (server.js also fills it for plain Express). The signature is ALWAYS verified; nothing is processed without it.
+const isValidCashfreeSignature = (rawBody, signature, timestamp, secret) => {
+  if (!signature || !timestamp || !secret) return false;
+  const expected = crypto.createHmac("sha256", secret).update(String(timestamp) + rawBody.toString("utf8")).digest("base64");
+  const a = Buffer.from(String(signature));
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
 
-      if (receivedSignature && timestamp) {
-        const signedPayload = timestamp + rawBody;
-        const expectedSignature = crypto
-          .createHmac("sha256", process.env.CASHFREE_SECRET_KEY)
-          .update(signedPayload)
-          .digest("base64");
-        if (receivedSignature !== expectedSignature) {
-          console.warn("Webhook signature mismatch");
-          return res.status(403).send("Invalid signature");
-        }
-      }
-      event = JSON.parse(rawBody);
-    } else {
-      // Body already parsed by express.json()
-      event = req.body;
+const postCashfreeWebhook = async (req, res) => {
+  let eventRef = null;
+  try {
+    const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.isBuffer(req.body) ? req.body : null;
+    if (!rawBody) {
+      console.warn("[WEBHOOK] rejected: request body not available");
+      return res.status(400).send("Unreadable body");
     }
+    if (!process.env.CASHFREE_SECRET_KEY) {
+      console.error("[WEBHOOK] CASHFREE_SECRET_KEY is not configured; cannot verify webhooks");
+      return res.status(500).send("Webhook not configured");
+    }
+    const signature = req.headers["x-webhook-signature"];
+    const timestamp = req.headers["x-webhook-timestamp"];
+    if (!isValidCashfreeSignature(rawBody, signature, timestamp, process.env.CASHFREE_SECRET_KEY)) {
+      console.warn(`[WEBHOOK] rejected: ${signature && timestamp ? "signature mismatch" : "missing signature headers"}`);
+      return res.status(403).send("Invalid signature");
+    }
+    const event = JSON.parse(rawBody.toString("utf8"));
 
     if (event.type === "PAYMENT_SUCCESS_WEBHOOK") {
       const orderId = event.data.order.order_id;
       const userId = event.data.customer_details.customer_id;
       const paidAmount = event.data.order.order_amount;
       const now = admin.firestore.FieldValue.serverTimestamp();
+
+      // Idempotency: Cashfree retries and may deliver twice; revenue counters must only move once per order.
+      // The marker is removed again if processing fails, so a retry can complete the work.
+      eventRef = db.collection("webhook_events").doc(`cashfree_${orderId}_PAYMENT_SUCCESS`);
+      try {
+        await eventRef.create({ orderId, type: event.type, receivedAt: now });
+      } catch (createErr) {
+        eventRef = null;
+        if (createErr && (createErr.code === 6 || /already exists/i.test(createErr.message || ""))) {
+          console.log(`[WEBHOOK] duplicate PAYMENT_SUCCESS for ${orderId}, ignored`);
+          return res.status(200).send("Duplicate webhook ignored");
+        }
+        throw createErr;
+      }
 
       // Update Orders (V1 + V2 Schema)
       let orders = await db.collection("orders").where("orderId", "==", orderId).get();
@@ -588,10 +608,16 @@ const postCashfreeWebhook = async (req, res) => {
       }, { merge: true });
 
       res.status(200).send("Webhook received");
+    } else {
+      // Every other event type (failed, user dropped, refund, test…) must still be acknowledged, otherwise Cashfree
+      // waits for the 60 s timeout (HTTP 504) and keeps retrying.
+      console.log(`[WEBHOOK] event ${event.type || "unknown"} acknowledged, no action`);
+      res.status(200).send("Webhook ignored");
     }
   } catch (err) {
     console.error(err);
-    res.sendStatus(500);
+    if (eventRef) await eventRef.delete().catch(() => {});
+    if (!res.headersSent) res.sendStatus(500);
   }
 };
 
