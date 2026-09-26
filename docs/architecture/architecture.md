@@ -150,7 +150,7 @@ and can only be deployed with console/CLI access.
 
 ## 6. Background triggers
 
-Defined in `functions/src/triggers/`, exported from `functions/index.js`. **A push deploys only `api`; triggers deploy through a manual workflow run** (see `docs/deployment/CI_CD.md`).
+Defined in `functions/src/triggers/`, exported from `functions/index.js`. **A push to `main` deploys `api` first, then these triggers** (see `docs/deployment/CI_CD.md`).
 
 | Function | Fires on | Does |
 |---|---|---|
@@ -214,7 +214,7 @@ The Pi holds a Firebase **service-account key** (full Firestore access, bypasses
 | Part | Where | Trigger |
 |---|---|---|
 | API | Firebase Functions (`us-central1`, project `mimo-v2-11868`) | Push to `main` touching `functions/**` (`deploy-functions.yml` → `functions:api`, with a config/security gate) |
-| Triggers | Firebase Functions | Manual run of the same workflow with *include_triggers* |
+| Triggers | Firebase Functions | Same workflow, right after `api` |
 | Customer + admin + finance | Vercel (`printmimo.tech`) | Push; `vercel.json` rewrites `/admin*`, `/finance*` to the admin bundle |
 | Kiosk UI | Vercel (two deployments, one per machine URL) | Push |
 | Converter | Cloud Run `mimo-office-converter` | Push to `main` touching `converter/**` (`deploy-converter.yml`) |
@@ -236,7 +236,7 @@ and exported function names must not change.
 
 * `POST /payment-success` trusts the caller instead of confirming the payment with Cashfree (payment webhook path is safe).
 * CORS allows any origin; Firestore rules are not managed from `functions/`.
-* Triggers deploy only on a manual workflow run; a forgotten run leaves old trigger code running.
+* Trigger deploys are unproven until the first run (they need Secret Manager/Eventarc permissions for the CI service account).
 * Analytics read up to 5 000 docs per collection per request — fine today, revisit (pre-aggregated daily docs) at much larger scale.
 * Two Pi listener copies (`pi-listener/`, `pi_scripts/`) exist; which is live per machine must be confirmed on the devices.
 * `company-website/` and `src/app/pages/mimo-admin-dashboard/` (in-app legacy admin) are stale copies.

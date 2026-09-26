@@ -1,0 +1,54 @@
+name: Post-deploy smoke (Vercel)
+
+# Vercel deploys the web apps through its own GitHub integration and reports each deployment back to GitHub.
+# This workflow listens for those reports and checks that the PUBLIC production sites really serve the new build.
+# (deployment_status workflows run from the default branch, so this takes effect once it is on main.)
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke test ${{ github.event.deployment.environment }}
+    # Production deployments only, and only when Vercel says the deployment succeeded.
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      startsWith(github.event.deployment.environment, 'Production') &&
+      contains(fromJSON('["Production – mimo_v2","Production – mimo-frontend","Production – mimo-kiosk-backend"]'), github.event.deployment.environment)
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_ENV: ${{ github.event.deployment.environment }}
+    steps:
+      - name: Check public production URLs
+        run: |
+          fail=0
+          check() { # description, url, expected status, expected text in body (optional)
+            local desc="$1" url="$2" want="$3" text="${4:-}" got="" body="$RUNNER_TEMP/body.html"
+            for attempt in 1 2 3 4 5 6; do
+              got=$(curl -sL -o "$body" -w "%{http_code}" -m 25 "$url" || true)
+              if [ "$got" = "$want" ] && { [ -z "$text" ] || grep -q "$text" "$body"; }; then
+                echo "OK   $desc ($got)"; return 0
+              fi
+              sleep 15   # the production domain can lag a few seconds behind the deployment
+            done
+            echo "::error title=Smoke test failed::$desc -> $got (expected $want${text:+ containing '$text'}) at $url"
+            fail=1
+          }
+          echo "Vercel environment: $DEPLOY_ENV"
+          case "$DEPLOY_ENV" in
+            "Production – mimo_v2")
+              check "Customer site"            "https://printmimo.tech/"            200 "MIMO"
+              check "Landing page"             "https://printmimo.tech/landing"     200 "MIMO"
+              check "Admin dashboard"          "https://printmimo.tech/admin/"      200 "/admin/assets/"
+              check "Finance portal (rewrite)" "https://printmimo.tech/finance"     200 "/admin/assets/"
+              ;;
+            *)
+              # The two kiosk deployments live in the other Vercel projects; the project-to-domain mapping is set in
+              # Vercel, so both kiosk domains are checked whichever project just deployed.
+              check "Kiosk MIMO 1.0 (CV-001)"  "https://mimo-frontend-three.vercel.app/?kioskId=CV-001" 200 "Self-Service Printing Kiosk"
+              check "Kiosk MIMO 2.0 (SV-002)"  "https://mimo-2-0.vercel.app/?kioskId=SV-002"            200 "Self-Service Printing Kiosk"
+              ;;
+          esac
+          exit $fail
