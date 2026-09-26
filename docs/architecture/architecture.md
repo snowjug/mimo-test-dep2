@@ -199,7 +199,7 @@ is shared by all function instances: 5/min + 20/h for code entry, 20/min + 100/h
 
 ## 9. Raspberry Pi listener
 
-One Python service per kiosk (`mimo-listener.service`, env `KIOSK_ID`, printer names). It:
+One Python service per kiosk (`scripts/pi-setup/mimo-listener.service`, env `KIOSK_ID`, printer names). It:
 
 1. subscribes (`on_snapshot`) to `print_jobs` where `status == "printing"` for its kiosk;
 2. downloads the file(s) with the Firebase Admin key, converts locally if needed (HEIC, Office), applies the options
