@@ -7,17 +7,29 @@ const { CASHFREE_BASE_URL, SECRET_KEY, cashfreeHeaders } = require("../config/en
 const { SUPPORTED_OFFICE_EXTENSIONS } = require("../services/converter.service");
 const { admin, db } = require("../config/firebase");
 const { sendWhatsAppMessage } = require("../services/whatsapp.service");
+const { getTransporter } = require("../services/email.service");
+const { loadPricing } = require("../services/pricing.service");
+const { generateUniquePrintCode } = require("../services/printCode.service");
+
+// Upper bound for copies of one order (the customer site allows 1-99).
+const MAX_COPIES = 100;
 
 // ================= CREATE ORDER =================
 const postCreateOrder = async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { jobIds, selectedFiles, printOptions, couponCode, coinsToUse } = req.body;
-    const coinsDiscount = coinsToUse ? Number(coinsToUse) * 0.5 : 0; // 1 coin = ₹0.50
-    let { orderId } = req.body;
-    if (!orderId) {
-      orderId = `order_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
+    // 1 coin = ₹0.50. The request is validated before anything is written (see the coin checks below).
+    let coinsRequested = 0;
+    if (coinsToUse !== undefined && coinsToUse !== null && coinsToUse !== "") {
+      coinsRequested = Number(coinsToUse);
+      if (!Number.isFinite(coinsRequested) || coinsRequested < 0) {
+        return res.status(400).json({ error: "coinsToUse must be a non-negative number." });
+      }
     }
+    // The order id is always generated here. A client-supplied id is ignored: reusing an existing order id could attach
+    // a new job to somebody else's (already paid) order.
+    const orderId = `order_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
 
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
       return res.status(400).json({ error: "Explicit non-empty jobIds array is required for checkout." });
@@ -60,7 +72,7 @@ const postCreateOrder = async (req, res) => {
         const couponData = couponDoc.data();
         const now = new Date();
         if (couponData.isActive && (!couponData.expiryDate || couponData.expiryDate.toDate() > now)) {
-          discountPercentage = couponData.discountPercentage;
+          discountPercentage = Math.min(100, Math.max(0, Number(couponData.discountPercentage) || 0));
         }
       }
     }
@@ -70,13 +82,20 @@ const postCreateOrder = async (req, res) => {
     const sheetType = printOptions?.sheetType || "a4";
     const colorMode = printOptions?.colorMode || "bw";
 
-    let pricePerPage = 2.80; // Default A4 BW simplex
+    // Prices come from mimo_settings/pricing (edited in the admin dashboard); defaults apply when unset or invalid.
+    const { rates } = await loadPricing(db);
+    let pricePerPage = rates.pricePerPageBW; // A4 B&W simplex
     if (colorMode === "color") {
-      pricePerPage = 10.00;
+      pricePerPage = rates.pricePerPageColor;
     } else if (isBlankSheet && sheetType === "graph") {
-      pricePerPage = 2.00;
+      pricePerPage = rates.pricePerPageGraph;
+    } else if (isBlankSheet) {
+      pricePerPage = rates.pricePerPageA4;
     }
     const copies = Number(printOptions?.copies || 1);
+    if (!Number.isInteger(copies) || copies < 1 || copies > MAX_COPIES) {
+      return res.status(400).json({ error: `copies must be a whole number between 1 and ${MAX_COPIES}.` });
+    }
 
     const batchUpdate = db.batch();
 
@@ -215,7 +234,7 @@ const postCreateOrder = async (req, res) => {
     if (printOptions?.doubleSided === "double") {
       actualPages = Math.ceil(actualPages / 2);
       if (colorMode === "bw") {
-        pricePerPage = 3.30;
+        pricePerPage = rates.pricePerPageBWDuplex;
       }
     }
 
@@ -251,18 +270,83 @@ const postCreateOrder = async (req, res) => {
       retentionStartAt: earliestRetentionStartAt || admin.firestore.FieldValue.serverTimestamp()
     });
 
+    // Coins: never more than the customer owns (minus coins reserved by their other unpaid orders), and they can
+    // cover at most half of the price (1 coin = ₹0.50), the same rule the customer site applies.
+    let coinsApplied = 0;
+    if (coinsRequested > 0) {
+      const userSnap = await db.collection("users").doc(userId).get();
+      const balance = Number(userSnap.exists ? userSnap.data().mimo_coins?.balance : 0) || 0;
+      const checkedOutIds = new Set(targetJobs.map((d) => d.id));
+      const otherPending = await db.collection("print_jobs").where("userId", "==", userId).where("status", "==", "pending").get();
+      let reserved = 0;
+      otherPending.forEach((d) => { if (!checkedOutIds.has(d.id)) reserved += Number(d.data().coinsToDeduct) || 0; });
+      if (coinsRequested > balance - reserved + 1e-9) {
+        return res.status(400).json({ error: "Not enough Mimo coins." });
+      }
+      coinsApplied = Math.min(coinsRequested, totalAmount);
+    }
+    const coinsDiscount = coinsApplied * 0.5;
+
     const finalAmountToPay = Math.max(0, totalAmount - coinsDiscount);
-
-    await batchUpdate.commit();
-
     let amount = Number(finalAmountToPay.toFixed(2));
     if (discountPercentage > 0) {
       amount = Number((amount - (amount * (discountPercentage / 100))).toFixed(2));
     }
+    if (!Number.isFinite(amount) || amount < 0) {
+      return res.status(400).json({ error: "Invalid order amount." });
+    }
+
+    const isFreeOrder = amount <= 0 || amount < 1.00;
+
+    // Paid orders: create the Cashfree order BEFORE anything is written. If the gateway refuses, the customer's pending
+    // jobs are untouched and there is nothing to roll back.
+    let response = null;
+    if (!isFreeOrder) {
+      let customerPhone = req.body?.customerPhone || "9999999999";
+      let customerName = req.body?.customerName || "Mimo User";
+      let customerEmail = req.body?.customerEmail || "user@printmimo.tech";
+      try {
+        const uDoc = await db.collection("users").doc(userId).get();
+        if (uDoc.exists) {
+          const uData = uDoc.data();
+          if (uData.mobileNumber || uData.phone) {
+            const digits = (uData.mobileNumber || uData.phone).toString().replace(/[^\d]/g, "");
+            if (digits.length >= 10) customerPhone = digits.slice(-10);
+          }
+          if (uData.name || uData.displayName || uData.fullName || uData.username) {
+            customerName = uData.name || uData.displayName || uData.fullName || uData.username;
+          }
+          if (uData.email) customerEmail = uData.email;
+        }
+      } catch (uErr) {
+        console.warn("Could not fetch user details for cashfree order:", uErr);
+      }
+
+      response = await axios.post(
+        `${CASHFREE_BASE_URL}/orders`,
+        {
+          order_id: orderId,
+          order_amount: amount,
+          order_currency: "INR",
+          customer_details: {
+            customer_id: userId,
+            customer_phone: customerPhone,
+            customer_name: customerName,
+            customer_email: customerEmail,
+          },
+          order_meta: {
+            return_url: `https://printmimo.tech/payment-verify?order_id={order_id}`
+          },
+        },
+        { headers: cashfreeHeaders, timeout: 10000 }
+      );
+    }
+
+    await batchUpdate.commit();
 
     // ─── FREE ORDER BYPASS ──────────────────────────────────────────────────────
-    if (amount <= 0 || amount < 1.00) {
-      const printCode = Math.floor(1000 + Math.random() * 9000).toString();
+    if (isFreeOrder) {
+      const printCode = await generateUniquePrintCode(db);
       const now = admin.firestore.FieldValue.serverTimestamp();
 
       await newJobRef.update({
@@ -275,10 +359,10 @@ const postCreateOrder = async (req, res) => {
       });
 
       // Deduct coins from user balance if coins were used
-      if (coinsToUse && coinsToUse > 0) {
+      if (coinsApplied > 0) {
         await db.collection("users").doc(userId).update({
-          "mimo_coins.balance": admin.firestore.FieldValue.increment(-coinsToUse),
-          "mimo_coins.total_used": admin.firestore.FieldValue.increment(coinsToUse),
+          "mimo_coins.balance": admin.firestore.FieldValue.increment(-coinsApplied),
+          "mimo_coins.total_used": admin.firestore.FieldValue.increment(coinsApplied),
         });
       }
 
@@ -286,7 +370,7 @@ const postCreateOrder = async (req, res) => {
         orderId, userId, amount: 0, totalPages: totalRawPages, totalDocs: mergedFiles.length,
         status: "PAID", orderStatus: "completed", printJobs: [newJobRef.id],
         createdAt: now, couponCode: couponCode || null, discountPercentage,
-        coinsUsed: coinsToUse || 0
+        coinsUsed: coinsApplied
       });
 
       // Trigger Email Receipt via Nodemailer for free orders
@@ -321,6 +405,7 @@ const postCreateOrder = async (req, res) => {
               </div>
             `
           };
+          const transporter = getTransporter();
           await transporter.sendMail(mailOptions);
           console.log(`[EMAIL] Free order receipt sent to ${userEmail}`);
         }
@@ -345,44 +430,11 @@ const postCreateOrder = async (req, res) => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    let customerPhone = req.body?.customerPhone || "9999999999";
-    let customerName = req.body?.customerName || "Mimo User";
-    let customerEmail = req.body?.customerEmail || "user@printmimo.tech";
-    try {
-      const uDoc = await db.collection("users").doc(userId).get();
-      if (uDoc.exists) {
-        const uData = uDoc.data();
-        if (uData.mobileNumber || uData.phone) {
-          const digits = (uData.mobileNumber || uData.phone).toString().replace(/[^\d]/g, "");
-          if (digits.length >= 10) customerPhone = digits.slice(-10);
-        }
-        if (uData.name || uData.displayName || uData.fullName || uData.username) {
-          customerName = uData.name || uData.displayName || uData.fullName || uData.username;
-        }
-        if (uData.email) customerEmail = uData.email;
-      }
-    } catch (uErr) {
-      console.warn("Could not fetch user details for cashfree order:", uErr);
+    // Paid path: the coins are deducted when the payment is confirmed (postPaymentSuccess); until then they are reserved on the job.
+    if (coinsApplied > 0) {
+      await newJobRef.update({ coinsToDeduct: coinsApplied });
     }
 
-    const response = await axios.post(
-      `${CASHFREE_BASE_URL}/orders`,
-      {
-        order_id: orderId,
-        order_amount: amount,
-        order_currency: "INR",
-        customer_details: {
-          customer_id: userId,
-          customer_phone: customerPhone,
-          customer_name: customerName,
-          customer_email: customerEmail,
-        },
-        order_meta: {
-          return_url: `https://printmimo.tech/payment-verify?order_id={order_id}`
-        },
-      },
-      { headers: cashfreeHeaders, timeout: 10000 }
-    );
 
     const paymentTxnRef = db.collection("payment_transactions").doc();
     await paymentTxnRef.set({
@@ -707,10 +759,27 @@ const postPaymentSuccess = async (req, res) => {
       return res.status(400).json({ error: "No pending jobs without code" });
     }
 
-    const printCode = Math.floor(1000 + Math.random() * 9000).toString();
+    // A code is only issued for PAID orders. /verify-payment and the Cashfree webhook confirm the payment and mark the
+    // order PAID before they call this handler; a customer calling it directly for an unpaid order is refused.
+    const orderIdsToCheck = new Set(jobsToUpdate.map((d) => d.data().orderId || null));
+    for (const jobOrderId of orderIdsToCheck) {
+      let paid = false;
+      if (jobOrderId) {
+        for (const collectionName of ["orders", "payment_transactions"]) {
+          const found = await db.collection(collectionName).where("orderId", "==", jobOrderId).where("userId", "==", userId).get();
+          if (found.docs.some((d) => d.data().status === "PAID")) { paid = true; break; }
+        }
+      }
+      if (!paid) {
+        return res.status(403).json({ error: "Payment has not been confirmed for this order." });
+      }
+    }
+
+    const printCode = await generateUniquePrintCode(db);
     let directKioskId = null;
 
     const batch = db.batch();
+    let coinsToCharge = 0;
     jobsToUpdate.forEach((doc) => {
       const data = doc.data();
       const jobKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
@@ -718,7 +787,7 @@ const postPaymentSuccess = async (req, res) => {
       if (jobKioskId) {
         directKioskId = jobKioskId;
       }
-      batch.update(doc.ref, {
+      const jobUpdate = {
         status: "paid",
         kioskId: targetKiosk,
         paymentTime: admin.firestore.FieldValue.serverTimestamp(),
@@ -726,8 +795,21 @@ const postPaymentSuccess = async (req, res) => {
         codeCreatedAt: now,
         retentionStartAt: now,
         isPrinted: false,
-      });
+      };
+      // Coins reserved at checkout are charged now, once (jobs that already have a code are never processed again).
+      const owed = Number(data.coinsToDeduct) || 0;
+      if (owed > 0 && !data.coinsDeducted) {
+        coinsToCharge += owed;
+        jobUpdate.coinsDeducted = true;
+      }
+      batch.update(doc.ref, jobUpdate);
     });
+    if (coinsToCharge > 0) {
+      batch.update(db.collection("users").doc(userId), {
+        "mimo_coins.balance": admin.firestore.FieldValue.increment(-coinsToCharge),
+        "mimo_coins.total_used": admin.firestore.FieldValue.increment(coinsToCharge),
+      });
+    }
     await batch.commit();
 
     // Trigger Email Receipt via Nodemailer
@@ -765,6 +847,7 @@ const postPaymentSuccess = async (req, res) => {
             </div>
           `
         };
+        const transporter = getTransporter();
         await transporter.sendMail(mailOptions);
         console.log(`[EMAIL] Receipt sent to ${userEmail}`);
       }
@@ -815,6 +898,16 @@ const postRequestRefund = async (req, res) => {
     // Only allow refund requests for FAILED or PAID-but-unprinted orders
     const isPrintedOrPrinting = orderStatus === "printing" || orderStatus === "completed" || orderStatus === "PRINTED";
     if (isPrintedOrPrinting) {
+      return res.status(400).json({ error: "Cannot request refund for an order that has been printed." });
+    }
+
+    // The order status above is PAID/REFUNDED, never "printing" or "completed": whether the order was printed lives on its print jobs.
+    const orderJobs = await db.collection("print_jobs").where("orderId", "==", orderId).where("userId", "==", userId).get();
+    const alreadyPrinted = orderJobs.docs.some((d) => {
+      const job = d.data();
+      return ["printing", "completed", "printed"].includes(job.status) || job.isPrinted === true;
+    });
+    if (alreadyPrinted) {
       return res.status(400).json({ error: "Cannot request refund for an order that has been printed." });
     }
 

@@ -2,6 +2,7 @@
 // as a second copy in us-central1 (duplicate alert e-mails). This test pins the region and the event source of every
 // exported trigger so that cannot happen by accident. Names, regions and event paths are deployment contracts.
 const test = require("node:test");
+require("./helpers/quiet");
 const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 

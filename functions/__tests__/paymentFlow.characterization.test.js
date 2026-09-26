@@ -2,6 +2,7 @@
 // refactors cannot change money behaviour by accident. A test marked KNOWN RISK documents behaviour that is
 // questionable; change it deliberately (and say why in the pull request) when the behaviour is fixed.
 const test = require("node:test");
+require("./helpers/quiet");
 const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 const { installAxiosStub } = require("./helpers/stubAxios");
@@ -92,10 +93,12 @@ test.describe("GET /verify-payment/:orderId", () => {
 // ───────────────────────── POST /payment-success ─────────────────────────
 test.describe("POST /payment-success (assigns the 4-digit print code)", () => {
   const job = (over = {}) => ({ userId: "u1", orderId: "order_1", status: "pending", printOptions: {}, ...over });
+  const order = (over = {}) => ({ orderId: "order_1", userId: "u1", amount: 25, status: "PAID", ...over });
+  const paid = { orders: { o1: order() } }; // the order behind the jobs, marked PAID by /verify-payment or the webhook
   test.beforeEach(() => { http.reset(); });
 
   test("gives every code-less pending job of the order the SAME 4-digit code and marks it paid for the default kiosk", async () => {
-    fake.reset({ print_jobs: { j1: job(), j2: job() }, users: { u1: { email: "a@example.com" } } });
+    fake.reset({ print_jobs: { j1: job(), j2: job() }, users: { u1: { email: "a@example.com" } }, ...paid });
     const res = response();
     await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
 
@@ -112,7 +115,7 @@ test.describe("POST /payment-success (assigns the 4-digit print code)", () => {
   });
 
   test("a kiosk chosen in the print options is kept and returned as directKioskId", async () => {
-    fake.reset({ print_jobs: { j1: job({ printOptions: { directKioskId: "SV-002" } }) } });
+    fake.reset({ print_jobs: { j1: job({ printOptions: { directKioskId: "SV-002" } }) }, ...paid });
     const res = response();
     await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
     assert.strictEqual(res.body.directKioskId, "SV-002");
@@ -138,7 +141,7 @@ test.describe("POST /payment-success (assigns the 4-digit print code)", () => {
   test("only the caller's own jobs and only the given order are touched", async () => {
     fake.reset({ print_jobs: {
       mine: job(), otherOrder: job({ orderId: "order_2" }), otherUser: job({ userId: "u2" }),
-    } });
+    }, ...paid });
     const res = response();
     await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
     const jobs = fake.data("print_jobs");
@@ -147,20 +150,45 @@ test.describe("POST /payment-success (assigns the 4-digit print code)", () => {
     assert.strictEqual(jobs.otherUser.status, "pending");
   });
 
-  test("KNOWN RISK: it never checks that the order was actually paid — a still-`pending` job gets a code just because the caller asked", async () => {
-    // Payment is verified by the CALLERS (/verify-payment, the webhook). Anyone with a customer token who calls
-    // this endpoint directly for an unpaid order receives a print code. Flip this test when the endpoint verifies payment.
-    fake.reset({ print_jobs: { j1: job({ status: "pending" }) }, orders: { o1: { orderId: "order_1", userId: "u1", amount: 25, status: "INITIATED" } } });
+  test("a code is refused unless the order behind the jobs is PAID: the job stays pending and nothing is written", async () => {
+    const refused = async (orders, jobs = { j1: job() }, body = { orderId: "order_1" }) => {
+      fake.reset({ print_jobs: jobs, ...(orders ? { orders } : {}) });
+      const res = response();
+      await postPaymentSuccess({ user: { userId: "u1" }, body }, res);
+      assert.strictEqual(res.code, 403);
+      assert.deepStrictEqual(res.body, { error: "Payment has not been confirmed for this order." });
+      assert.strictEqual(fake.log.writes.length, 0);
+      assert.strictEqual(Object.values(fake.data("print_jobs"))[0].status, "pending");
+    };
+    await refused(undefined);                                                          // no order record at all
+    await refused({ o1: order({ status: "INITIATED" }) });                              // created, not paid
+    await refused({ o1: order({ status: "REFUNDED" }) });                               // refunded
+    await refused({ o1: order({ userId: "u2" }) });                                     // someone else's paid order
+    await refused({ o1: order({ orderId: "order_9" }) });                               // a different order
+    await refused({ o1: order() }, { j1: job({ orderId: undefined }) }, {});          // job without an order id
+  });
+
+  test("a PAID order in payment_transactions (the gateway path) is accepted, and so is one in orders (free orders)", async () => {
+    for (const collection of ["payment_transactions", "orders"]) {
+      fake.reset({ print_jobs: { j1: job() }, [collection]: { o1: order() } });
+      const res = response();
+      await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
+      assert.strictEqual(res.code, 200, collection);
+      assert.match(res.body.printCode, /^[1-9]\d{3}$/);
+    }
+  });
+
+  test("all orders behind a multi-order call must be paid, otherwise nothing is issued", async () => {
+    fake.reset({ print_jobs: { a: job(), b: job({ orderId: "order_2" }) }, orders: { o1: order(), o2: order({ orderId: "order_2", status: "INITIATED" }) } });
     const res = response();
-    await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
-    assert.strictEqual(res.code, 200);
-    assert.strictEqual(fake.data("print_jobs").j1.status, "paid");
-    assert.strictEqual(fake.data("orders").o1.status, "INITIATED", "the order itself is still unpaid");
+    await postPaymentSuccess({ user: { userId: "u1" }, body: {} }, res);
+    assert.strictEqual(res.code, 403);
+    assert.strictEqual(fake.log.writes.length, 0);
   });
 
   test("KNOWN RISK: print codes are random 4-digit numbers with no uniqueness check across users", async () => {
     // 9 000 possible codes; two customers can receive the same code. The kiosk disambiguates by status/kiosk only.
-    fake.reset({ print_jobs: { j1: job() } });
+    fake.reset({ print_jobs: { j1: job() }, ...paid });
     const res = response();
     await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
     const codeQueries = fake.log.writes.filter((w) => w.type === "update");

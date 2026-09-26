@@ -1,11 +1,11 @@
 const axios = require("axios");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
-const { v4: uuidv4 } = require("uuid");
 const { CASHFREE_BASE_URL, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const { discoverStoragePaths, isProtectedTemplate, isStoragePathReferencedByOtherActiveJob } = require("../services/storage.service");
 const { getTransporter } = require("../services/email.service");
 const { sendWhatsAppButtons } = require("../services/whatsapp.service");
+const { claimRefund, refundIdFor } = require("../services/refund.service");
 
 // ================= AUTO REFUND LISTENER =================
 exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
@@ -31,13 +31,15 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
       return;
     }
     const orderDoc = orderSnapshot.docs[0];
-    const orderData = orderDoc.data();
 
-    // Prevent double refunds
-    if (orderData.refundStatus === "SUCCESS") {
-      console.log(`[REFUND] Order ${orderId} is already refunded.`);
+    // Prevent double refunds: claim the refund atomically. Refused when ANY path (this trigger, an admin refund or the
+    // kiosk failure report) already refunded the order, or another run is processing it right now.
+    const claim = await claimRefund(db, orderDoc.ref);
+    if (!claim.claimed) {
+      console.log(`[REFUND] Order ${orderId} not refunded here: ${claim.reason}.`);
       return;
     }
+    const orderData = claim.data;
 
     // Skip refund if the amount is zero (100% discount or free order)
     const refundAmount = orderData.amount || orderData.totals?.totalAmount || orderData.totalCost || orderData.order_amount || orderData.price || 0;
@@ -46,14 +48,15 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
       await orderDoc.ref.update({
         refundStatus: "SUCCESS",
         refundNote: "Zero amount order, no gateway refund required",
-        refundedAt: admin.firestore.FieldValue.serverTimestamp()
+        refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+        refundClaimedAt: admin.firestore.FieldValue.delete()
       });
       return;
     }
 
     try {
       // 2. Call Cashfree Refunds API
-      const refundId = `refund_${uuidv4().replace(/-/g, "").substring(0, 10)}`;
+      const refundId = refundIdFor("refund_auto", orderId);
       const response = await axios.post(
         `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
         {
@@ -70,7 +73,8 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
       await orderDoc.ref.update({
         refundStatus: "SUCCESS",
         refundId: refundId,
-        refundedAt: admin.firestore.FieldValue.serverTimestamp()
+        refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+        refundClaimedAt: admin.firestore.FieldValue.delete()
       });
 
       console.log(`[REFUND] Order ${orderId} successfully marked as refunded in DB.`);
@@ -78,7 +82,8 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
       console.error(`[REFUND ERROR] Failed to refund order ${orderId}:`, err.response?.data || err.message);
       await orderDoc.ref.update({
         refundStatus: "FAILED",
-        refundError: err.response?.data?.message || err.message
+        refundError: err.response?.data?.message || err.message,
+        refundClaimedAt: admin.firestore.FieldValue.delete()
       });
     }
   }

@@ -2,6 +2,7 @@
 // dashboards, Pis, Cashfree and Meta. This test fails when a route is added, removed or renamed by accident.
 // Intentional change?  Run  UPDATE_SNAPSHOT=1 npm test  and commit the changed fixture with an explanation in the PR.
 const test = require("node:test");
+require("./helpers/quiet");
 const assert = require("node:assert");
 const fs = require("fs");
 const path = require("path");

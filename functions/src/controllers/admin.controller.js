@@ -2,6 +2,7 @@ const axios = require("axios");
 const jwt = require("jsonwebtoken");
 const { CASHFREE_BASE_URL, SECRET_KEY, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
+const { claimRefund, releaseRefund, refundIdFor, REFUND_BLOCKED_MESSAGES } = require("../services/refund.service");
 
 // ================= ADMIN AUTH =================
 const postAdminLogin = (req, res) => {
@@ -329,8 +330,14 @@ const postAdminRefund = async (req, res) => {
       return res.status(400).json({ error: `Invalid refund amount. Must be between 0.01 and ${originalAmount}` });
     }
 
-    // 2. Call Cashfree Refund API
-    const refundId = `refund_${Date.now()}`;
+    // 2. Claim the refund (refused when this order was already refunded by any path or is being refunded right now),
+    //    then call the Cashfree Refund API with an id derived from the order.
+    const orderRef = ordSnap.docs[0].ref;
+    const claim = await claimRefund(db, orderRef);
+    if (!claim.claimed) {
+      return res.status(409).json({ error: REFUND_BLOCKED_MESSAGES[claim.reason] || "Refund not allowed." });
+    }
+    const refundId = refundIdFor("refund_adm", orderId);
     let cashfreeRefundResponse = null;
     try {
       const cfRefundRes = await axios.post(
@@ -347,6 +354,7 @@ const postAdminRefund = async (req, res) => {
     } catch (cfErr) {
       const cfError = cfErr.response?.data?.message || cfErr.message;
       console.error(`[ADMIN-REFUND] Cashfree refund API failed: ${cfError}`);
+      await releaseRefund(orderRef, claim.previousRefundStatus, admin.firestore.FieldValue);
       return res.status(502).json({ error: `Cashfree refund failed: ${cfError}` });
     }
 
@@ -373,6 +381,8 @@ const postAdminRefund = async (req, res) => {
       batch.update(doc.ref, {
         status: "REFUNDED",
         orderStatus: "refunded",
+        refundStatus: "SUCCESS",
+        refundClaimedAt: admin.firestore.FieldValue.delete(),
         refundId,
         refundedAt: now,
         refundAmount: amountToRefund,

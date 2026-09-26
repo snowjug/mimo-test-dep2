@@ -182,6 +182,6 @@ insecure** (default admin password, weak `JWT_SECRET`), deploys `functions:api` 
 ## 10. Status, known issues and links
 
 * **Implemented:** everything in §3–§7, including the Cashfree webhook (raw-body signature check, every event answered, idempotent success handling; scheme unverified against live traffic). **Partial:** the separate finance login (`FINANCE_EMAIL` / `FINANCE_PASSWORD`; its token is rejected by `/admin/*`).
-* **Known issues:** `POST /payment-success` trusts the caller; CORS allows any origin; the six triggers are deployed by hand (not by CI); a leftover live function `lowPaperNotification` has no source in this repository (see `../docs/deployment/CI_CD.md` §6).
+* **Known issues:** CORS allows any origin; the six triggers are deployed by hand (not by CI); a leftover live function `lowPaperNotification` has no source in this repository (see `../docs/deployment/CI_CD.md` §6).
 * Source layout: [`src/README.md`](src/README.md) · tests: [`__tests__/README.md`](__tests__/README.md) · design rules: [`../design.md`](../design.md) · system view: [`../architecture.md`](../architecture.md) · onboarding: [`../docs/onboarding.md`](../docs/onboarding.md).
 * Common errors: `401` (missing/expired JWT) · `403` on `/admin/*` with a customer token · `429` (print-code rate limit) · admin login always failing (`ADMIN_EMAIL`/`ADMIN_PASSWORD` unset — login is disabled) · local calls succeed but change **production** data (you are using real credentials).

@@ -2,6 +2,8 @@ const { AsyncLocalStorage } = require("async_hooks");
 const axios = require("axios");
 const { CASHFREE_BASE_URL, WA_ACCESS_TOKEN, WA_PHONE_NUMBER_ID, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
+const { loadPricing } = require("./pricing.service");
+const { generateUniquePrintCode } = require("./printCode.service");
 
 const waContext = new AsyncLocalStorage();
 
@@ -177,10 +179,10 @@ async function sendWhatsAppOrderCard(to, { orderId, fileName, colorMode, copies,
 }
 
 async function _askForCoupon(from, session, sessionRef, copies) {
-  const pricingDoc = await db.collection("settings").doc("pricing").get();
-  const pricing = pricingDoc.exists ? pricingDoc.data() : {};
+  // Same pricing document as the web checkout (mimo_settings/pricing); the optional WhatsApp-specific fields still override it.
+  const { rates, raw: pricing } = await loadPricing(db);
 
-  const pricePerPage = session.colorMode === "color" ? (pricing.pricePerPageWAColor || pricing.pricePerPageColor || 10.00) : (pricing.pricePerPageWABW || pricing.pricePerPageBW || 2.80);
+  const pricePerPage = session.colorMode === "color" ? (Number(pricing.pricePerPageWAColor) > 0 ? Number(pricing.pricePerPageWAColor) : rates.pricePerPageColor) : (Number(pricing.pricePerPageWABW) > 0 ? Number(pricing.pricePerPageWABW) : rates.pricePerPageBW);
 
   const pageCount = session.pageCount || 1;
   let totalAmount = Number((copies * pageCount * pricePerPage).toFixed(2));
@@ -216,7 +218,8 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
   if (couponCode) {
     try {
       const couponDoc = await db.collection("coupons").doc(couponCode).get();
-      if (couponDoc.exists) {
+      // A disabled coupon is treated like an unknown one (same rule as the web checkout).
+      if (couponDoc.exists && couponDoc.data().isActive) {
         const data = couponDoc.data();
         let isExpired = false;
 
@@ -244,7 +247,7 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
   if (totalAmount <= 0) {
     // FREE ORDER
     const orderId = `WA-FREE-${require("uuid").v4().slice(0, 8).toUpperCase()}`;
-    const printCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const printCode = await generateUniquePrintCode(db);
     const now = admin.firestore.FieldValue.serverTimestamp();
     const targetKioskId = session.kioskId || session.destination || "SV-002";
     await db.collection("print_jobs").doc(session.jobId).update({

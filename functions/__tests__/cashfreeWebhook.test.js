@@ -2,6 +2,7 @@
 // Regression tests for the production 504s (handler never answered non-success events) and for the skipped
 // signature check (under Cloud Functions the body arrives pre-parsed, so req.body is not a Buffer).
 const test = require("node:test");
+require("./helpers/quiet");
 const assert = require("node:assert");
 const crypto = require("crypto");
 const http = require("http");
