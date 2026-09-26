@@ -34,6 +34,10 @@ const REQUIRED = [
 // Have code fallbacks; missing is worth a warning, not a stop.
 const RECOMMENDED = ["GOOGLE_CLIENT_ID", "WA_PHONE_NUMBER_ID", "WA_ACCESS_TOKEN", "WA_VERIFY_TOKEN"];
 
+// Bound with `secrets: [...]` in functions/index.js. When the live function already has the Secret Manager
+// reference, the value must NOT also be written to .env (Google rejects the overlap) and is not required here.
+const SECRET_MANAGED = ["GMAIL_APP_PASSWORD"];
+
 const PUBLIC_JWT_FALLBACK = "fallback_secret_key_change_me_in_prod";
 const WEAK_PASSWORDS = new Set(["admin", "password", "123456", "12345678", "admin123", "administrator", "root", "changeme", "printpi", "mimo", "mimo123"]);
 const MIN_PASSWORD_LENGTH = 12;
@@ -129,6 +133,7 @@ const quote = (v) => `"${String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"').r
 const toDotenv = (env) => Object.keys(env).sort().map((k) => `${k}=${quote(env[k])}`).join("\n") + "\n";
 
 function main() {
+  const say = (msg) => console.log(msg);
   const outPath = process.argv[2] || "functions/.env";
   const liveJson = process.env.LIVE_ENV_JSON_PATH && fs.existsSync(process.env.LIVE_ENV_JSON_PATH)
     ? fs.readFileSync(process.env.LIVE_ENV_JSON_PATH, "utf8")
@@ -137,9 +142,13 @@ function main() {
   const liveSecretRefs = parseLiveSecretRefs(liveJson);
   const secretEnv = parseDotenv(process.env.FUNCTIONS_ENV_FILE || "");
   const { merged, dropped } = mergeSources({ live, secretEnv });
-  const { missing, warnings, insecure } = validate(merged);
+  const boundSecrets = SECRET_MANAGED.filter((n) => liveSecretRefs.includes(n));
+  boundSecrets.forEach((n) => delete merged[n]);
+  const validation = validate(merged);
+  const missing = validation.missing.filter((n) => !boundSecrets.includes(n));
+  const { warnings, insecure } = validation;
+  if (boundSecrets.length) say(`Provided by Secret Manager (bound in code, not written to .env): ${boundSecrets.join(", ")}`);
 
-  const say = (msg) => console.log(msg);
   say(`Live production variables read: ${Object.keys(live).filter(isAllowed).length}`);
   // Names only (never values): lets the team see what production currently has without console access.
   console.log(`::notice title=Live function variables (names only)::plain: ${Object.keys(live).sort().join(", ") || "none"}; Secret Manager references: ${liveSecretRefs.sort().join(", ") || "none"}`);
