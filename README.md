@@ -56,7 +56,7 @@ The complete table is in [`architecture.md` §14](architecture.md#14-feature-sta
 | Pi print listener with heartbeat, paper/toner alerts by e-mail | Implemented (live listener per machine **unverified**) |
 | Admin dashboard and finance portal with live data and date ranges | Implemented |
 | WhatsApp ordering | Implemented, **unverified** end to end |
-| Cashfree webhook | **Partial** — hardening in progress |
+| Cashfree webhook | Implemented (signature verified, every event answered, duplicates ignored); the signing scheme is **unverified** against live Cashfree traffic |
 | Separate finance login | **Partial** |
 | Per-user admin accounts, bank settlement reconciliation, BigQuery export | **Planned** |
 
