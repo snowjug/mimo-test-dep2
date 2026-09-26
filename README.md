@@ -95,12 +95,12 @@ put `functions/.env` in place. Variable names are documented in [`functions/READ
 
 | I want to work on… | Run |
 |---|---|
-| Backend | `cd functions && npm install && npm run dev` → http://localhost:5001 · `npm test` |
+| Backend | `cd functions && npm install && npm run dev` → http://localhost:3000 · `npm test` |
 | Customer site | `cd mimo-website && npm install && npm run dev` → http://localhost:5173 |
-| Admin / Finance | `cd mimo-website/mimo-admin-dashboard && npm install && npm run dev` → http://localhost:5174 (uses the API on :5001) |
+| Admin / Finance | `cd mimo-website/mimo-admin-dashboard && npm install && npm run dev` → http://localhost:5174 (uses the API on :3000) |
 | Kiosk UI | `cd mimo-frontend-web-app/mimo-frontend && npm install && npm run dev` → http://localhost:5173/?kioskId=SV-002 |
 
-Frontends call the production API unless you point them at a local one with `VITE_API_URL=http://localhost:5001`
+Frontends call the production API unless you point them at a local one with `VITE_API_URL=http://localhost:3000`
 (the admin dashboard does this by default in dev). **A local backend with real credentials talks to the real
 Firestore** — prefer the Firestore emulator when experimenting.
 

@@ -32,7 +32,7 @@ Stack: React 18 · Vite 6 · Tailwind CSS 4 · Recharts · lucide-react · Axios
 ```
 src/
 ├── main.tsx · App.tsx               Entry; App picks the Finance portal for /finance*, else the Admin dashboard
-├── api.ts                           Axios client (prod = Functions API; dev = VITE_API_URL || http://localhost:5001)
+├── api.ts                           Axios client (prod = Functions API; dev = VITE_API_URL || http://localhost:3000)
 ├── lib/
 │   ├── dateRange.ts                 Range model, presets, IST-safe API params, chart-bucket labels, % change
 │   └── format.ts                    ₹ / number / time formatters
@@ -75,7 +75,7 @@ npm install
 npm run dev          # http://localhost:5174  (dev server runs at "/", so /finance works too)
 ```
 
-The API defaults to `http://localhost:5001`, i.e. `npm run dev` in `../../functions`. Point elsewhere with
+The API defaults to `http://localhost:3000`, i.e. `npm run dev` in `../../functions`. Point elsewhere with
 `VITE_API_URL=http://127.0.0.1:8092 npm run dev`. **In a production build the API URL is fixed** to the Functions API so a
 stale build-time variable can never redirect the dashboard.
 

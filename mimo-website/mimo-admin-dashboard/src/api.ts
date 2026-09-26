@@ -5,9 +5,9 @@ const PROD_API_URL = 'https://api-upqxuj7evq-uc.a.run.app';
 // Production always talks to the Firebase Functions API (same rule as mimo-website/src/app/api.ts).
 // The admin build is produced by the customer site's Vercel build, so a build-time VITE_API_URL set
 // for that project must not be able to redirect the admin dashboard to a stale backend.
-// Local dev defaults to functions/dev.js (port 5001).
+// Local dev defaults to functions/dev.js (port 3000).
 const API_URL = import.meta.env.DEV
-  ? (import.meta.env.VITE_API_URL || 'http://localhost:5001')
+  ? (import.meta.env.VITE_API_URL || 'http://localhost:3000')
   : PROD_API_URL;
 
 const api = axios.create({
