@@ -16,7 +16,7 @@ jobs:
     if: >-
       github.event.deployment_status.state == 'success' &&
       startsWith(github.event.deployment.environment, 'Production') &&
-      contains(fromJSON('["Production – mimo_v2","Production – mimo-frontend","Production – mimo-kiosk-backend"]'), github.event.deployment.environment)
+      contains(fromJSON('["Production – mimo_v2","Production – mimo-frontend"]'), github.event.deployment.environment)
     runs-on: ubuntu-latest
     env:
       DEPLOY_ENV: ${{ github.event.deployment.environment }}
@@ -45,8 +45,8 @@ jobs:
               check "Finance portal (rewrite)" "https://printmimo.tech/finance"     200 "/admin/assets/"
               ;;
             *)
-              # The two kiosk deployments live in the other Vercel projects; the project-to-domain mapping is set in
-              # Vercel, so both kiosk domains are checked whichever project just deployed.
+              # Kiosk UI deployments: both kiosk domains are checked whichever project just deployed.
+              # (The Vercel project `mimo-kiosk-backend` is the legacy Express backend, not a kiosk UI — deliberately not listed.)
               check "Kiosk MIMO 1.0 (CV-001)"  "https://mimo-frontend-three.vercel.app/?kioskId=CV-001" 200 "Self-Service Printing Kiosk"
               check "Kiosk MIMO 2.0 (SV-002)"  "https://mimo-2-0.vercel.app/?kioskId=SV-002"            200 "Self-Service Printing Kiosk"
               ;;
