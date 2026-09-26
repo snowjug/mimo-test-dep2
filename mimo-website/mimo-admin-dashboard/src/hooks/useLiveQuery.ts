@@ -22,6 +22,7 @@ export interface LiveQuery<T> {
 export const errorMessage = (err: unknown): string => {
   const e = err as { response?: { status?: number; data?: { error?: string } }; message?: string };
   if (e?.response?.data?.error) return e.response.data.error;
+  if (e?.response?.status === 404) return 'The API does not have this endpoint yet — the backend running at this address is out of date (restart the local server, or deploy the latest functions/).';
   if (e?.response?.status) return `Server responded ${e.response.status}`;
   if (e?.message === 'Network Error') return 'Cannot reach the MIMO API. Check your connection and try again.';
   return e?.message || 'Something went wrong';

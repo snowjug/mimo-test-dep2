@@ -22,7 +22,7 @@ finance portal and the Raspberry Pis need from a server lives here.
 ```
 functions/
 ├── index.js                     Entry point: exports `api` + all triggers (keep it this thin)
-├── dev.js                       Local dev server (`npm run dev`, port 5001) — not deployed logic
+├── dev.js                       Local dev server (`npm run dev`, port 3000) — not deployed logic
 ├── package.json / package-lock.json
 ├── __tests__/                   Unit tests (node:test) — run with `npm test`
 └── src/
@@ -59,7 +59,7 @@ Firestore. Add code to the file that matches its job instead of growing `index.j
 cd functions
 npm install
 # create functions/.env with the variables from §5 (the values are shared privately, see the root README)
-npm run dev                    # http://localhost:5001  (loads .env, serves the same Express app)
+npm run dev                    # http://localhost:3000  (loads .env, serves the same Express app)
 npm test                       # unit tests
 ```
 
