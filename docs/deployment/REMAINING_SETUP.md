@@ -2,17 +2,28 @@
 
 Everything else in `docs/deployment/CI_CD.md` runs from a push to `main` with the credentials the repository already has.
 
-## 1. Only if the first backend run stops at the security gate
-**Who:** repository admin (`snowjug`) — collaborators cannot manage Actions secrets. **When:** once (redo only when rotating credentials).
+## 1. Backend deploy — needed now (first run, 2026-09-26, stopped at the security gate)
+**Who:** repository admin (`snowjug`) — collaborators cannot manage Actions secrets. **When:** once.
 
-The run log says exactly which variables are missing or insecure. Then:
+What the run found on the live function (names only, from the run summary):
+* Present and preserved automatically: `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CASHFREE_APP_ID`, `CASHFREE_ENV`, `CASHFREE_SECRET_KEY`, `WA_ACCESS_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_VERIFY_TOKEN`.
+* **Missing: `JWT_SECRET`** — production is signing logins with the public fallback string from the source code.
+* **`GMAIL_APP_PASSWORD` is attached as a Secret Manager reference**, which a `.env` deploy would unbind, so the value must be supplied too.
+* Not set (only a warning, a code default is used): `GOOGLE_CLIENT_ID`.
+
+Steps:
 1. GitHub → Settings → Secrets and variables → Actions → **New repository secret**.
-2. Name: `FUNCTIONS_ENV_FILE`. Value: the production `functions/.env` from the shared credentials file, with a **strong `ADMIN_PASSWORD` (12+ chars)**
-   and a **random `JWT_SECRET` (32+ chars)**; leave out the `FIREBASE_*` lines.
+2. Name `FUNCTIONS_ENV_FILE`, value — only what is missing, everything else is kept from the live function:
+   ```
+   JWT_SECRET="<output of: openssl rand -hex 32>"
+   GMAIL_APP_PASSWORD="<from the shared credentials file>"
+   ```
+   (optionally `GOOGLE_CLIENT_ID`). Adding `JWT_SECRET` signs every customer and admin out once.
 3. Actions → *Deploy Firebase Functions* → **Run workflow** (from `main`).
 
-Not needed if the live function already has strong values (the run then passes on its own). Production currently rejects `admin/admin`,
-which suggests it does, but that cannot be confirmed without console access.
+If the gate then reports `ADMIN_PASSWORD` as a default/short value, the live admin password is weak: put a strong `ADMIN_PASSWORD` in the same secret and re-run.
+
+Until this is done the new admin/finance dashboards show error banners on production (their `/admin/*` endpoints are not deployed yet); customers, kiosks and Pis are unaffected.
 
 ## 2. Devices and rules — manual by nature (not a GitHub problem)
 | What | Why it cannot be automated | Action when it changes |
