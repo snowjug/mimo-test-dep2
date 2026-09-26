@@ -3,6 +3,7 @@ const { CASHFREE_BASE_URL, WA_ACCESS_TOKEN, WA_VERIFY_TOKEN, cashfreeHeaders } =
 const { _askForCoupon, _finalizePayment, sendWhatsAppButtons, sendWhatsAppMessage, sendWhatsAppOrderCard, waContext } = require("../services/whatsapp.service");
 const { admin, db } = require("../config/firebase");
 const { getPDFDocument } = require("../services/pdf.service");
+const { generateUniquePrintCode } = require("../services/printCode.service");
 
 // ================= WHATSAPP HOSTED CHECKOUT PAGE =================
 // This serves a self-contained payment page for users coming from WhatsApp links.
@@ -108,7 +109,7 @@ const getWaPaySuccess = async (req, res) => {
       // Payment just completed, trigger fulfillment
       const cfStatus = await axios.get(`${CASHFREE_BASE_URL}/links/${orderId}`, { headers: cashfreeHeaders });
       if (cfStatus.data.link_status === "PAID") {
-        printCode = Math.floor(1000 + Math.random() * 9000).toString();
+        printCode = await generateUniquePrintCode(db);
         const now = admin.firestore.FieldValue.serverTimestamp();
         const batch = db.batch();
         waJobs.forEach(d => batch.update(d.ref, {

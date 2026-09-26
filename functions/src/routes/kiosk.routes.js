@@ -12,6 +12,7 @@
 
 const express = require("express");
 const { createLimiters } = require("../middleware/rateLimit");
+const { claimRefund, refundIdFor } = require("../services/refund.service");
 const {
   validateKioskPrintRequest,
   validateKioskPrintResponse,
@@ -332,7 +333,15 @@ function createKioskRouter(dependencies) {
         return res.json({ refunded: false, reason: "Free order — no refund needed" });
       }
 
-      const refundId = `autorefund_${jobId}_${Date.now()}`;
+      // Claim the refund atomically so the failure trigger, an admin refund or a repeated report cannot refund the same order twice.
+      if (ordSnap) {
+        const claim = await claimRefund(db, ordSnap.docs[0].ref);
+        if (!claim.claimed) {
+          return res.json({ skipped: true, reason: claim.reason === "in_progress" ? "Refund already in progress" : "Already refunded" });
+        }
+      }
+
+      const refundId = refundIdFor("autorefund", jobId);
       let cashfreeRefundResponse = null;
       let cashfreeError = null;
 
@@ -374,6 +383,8 @@ function createKioskRouter(dependencies) {
           batch.update(doc.ref, {
             status: cashfreeRefundResponse ? "REFUNDED" : "FAILED",
             orderStatus: cashfreeRefundResponse ? "refunded" : "failed",
+            refundStatus: cashfreeRefundResponse ? "SUCCESS" : "FAILED",
+            refundClaimedAt: admin.firestore.FieldValue.delete(),
             refundId: refundId,
             refundedAt: now,
             refundAmount: orderAmount,

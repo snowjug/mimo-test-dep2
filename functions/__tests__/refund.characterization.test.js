@@ -1,6 +1,7 @@
 // CHARACTERIZATION TESTS for refunds: the automatic refund trigger and the admin refund endpoint.
 // They pin down today's behaviour; KNOWN RISK tests document weaknesses and must be flipped on purpose when fixed.
 const test = require("node:test");
+require("./helpers/quiet");
 const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 const { installAxiosStub } = require("./helpers/stubAxios");
@@ -44,12 +45,13 @@ test.describe("autoRefundJob: print_jobs/{jobId} becomes `failed`", () => {
     assert.ok(call, "Cashfree refund requested");
     assert.match(call.url, /\/orders\/order_1\/refunds$/);
     assert.strictEqual(call.body.refund_amount, 25);
-    assert.match(call.body.refund_id, /^refund_[0-9a-f]{10}$/, "random id — Cashfree cannot de-duplicate a retry");
+    assert.strictEqual(call.body.refund_id, "refund_auto_order_1", "derived from the order, so Cashfree can recognise a repeated request");
     assert.match(call.body.refund_note, /job1/);
     const order = fake.data("orders").o1;
     assert.strictEqual(order.refundStatus, "SUCCESS");
     assert.strictEqual(order.refundId, call.body.refund_id);
     assert.ok(order.refundedAt instanceof Date);
+    assert.strictEqual(order.refundClaimedAt, undefined, "the temporary claim is cleared");
   });
 
   test("the print JOB itself stays `failed` — only the order records the refund (the job is not moved to `refunded`)", async () => {
@@ -106,15 +108,45 @@ test.describe("autoRefundJob: print_jobs/{jobId} becomes `failed`", () => {
     assert.strictEqual(order.refundId, undefined);
   });
 
-  test("KNOWN RISK: two concurrent deliveries of the same failure both call Cashfree (read-then-write guard, random refund ids)", async () => {
-    // Cloud Functions triggers are delivered at least once. The 'already refunded' check reads the order BEFORE the
-    // gateway call and the flag is written AFTER it, so two overlapping runs both pass the check.
+  test("two concurrent deliveries of the same failure reach Cashfree exactly ONCE", async () => {
     http.reset();
     http.on("post", REFUND_URL, async () => { await delay(); return { data: { refund_status: "PENDING" } }; });
-    await Promise.all([autoRefundJob.run(failing()), autoRefundJob.run(failing())]);
-    assert.strictEqual(refundCalls().length, 2, "today: 2 refund requests for one failed job. Target after the refund service is idempotent: 1");
-    const ids = refundCalls().map((c) => c.body.refund_id);
-    assert.notStrictEqual(ids[0], ids[1], "different refund ids, so Cashfree would treat them as separate refunds");
+    await Promise.all([autoRefundJob.run(failing()), autoRefundJob.run(failing()), autoRefundJob.run(failing())]);
+    assert.strictEqual(refundCalls().length, 1);
+    assert.strictEqual(fake.data("orders").o1.refundStatus, "SUCCESS");
+  });
+
+  test("a redelivery after the refund completed does nothing", async () => {
+    await autoRefundJob.run(failing());
+    await autoRefundJob.run(failing());
+    assert.strictEqual(refundCalls().length, 1);
+  });
+
+  test("an order already refunded by an admin or by the kiosk failure report (status REFUNDED) is not refunded again", async () => {
+    fake.reset(orders({ status: "REFUNDED", refundAmount: 25 }));
+    await autoRefundJob.run(failing());
+    assert.strictEqual(refundCalls().length, 0);
+  });
+
+  test("a refund that FAILED at the gateway can be retried by a later failure event", async () => {
+    http.reset();
+    http.on("post", REFUND_URL, () => { throw new Error("gateway down"); });
+    await autoRefundJob.run(failing());
+    assert.strictEqual(fake.data("orders").o1.refundStatus, "FAILED");
+    http.reset();
+    http.on("post", REFUND_URL, () => ({ data: { refund_status: "PENDING" } }));
+    await autoRefundJob.run(failing());
+    assert.strictEqual(refundCalls().length, 1);
+    assert.strictEqual(fake.data("orders").o1.refundStatus, "SUCCESS");
+  });
+
+  test("a fresh in-progress claim blocks another run; a stale one (crashed run) is taken over", async () => {
+    fake.reset(orders({ refundStatus: "PROCESSING", refundClaimedAt: Date.now() }));
+    await autoRefundJob.run(failing());
+    assert.strictEqual(refundCalls().length, 0);
+    fake.reset(orders({ refundStatus: "PROCESSING", refundClaimedAt: Date.now() - 11 * 60 * 1000 }));
+    await autoRefundJob.run(failing());
+    assert.strictEqual(refundCalls().length, 1);
   });
 });
 
@@ -146,7 +178,7 @@ test.describe("POST /admin/refund (manual refund by an admin)", () => {
   test("full refund: Cashfree called, refund recorded, order REFUNDED, unprinted jobs refunded, pending request processed", async () => {
     const res = await call({ orderId: "order_1", note: "customer asked" });
     assert.strictEqual(res.code, 200);
-    assert.match(res.body.refundId, /^refund_\d+$/);
+    assert.strictEqual(res.body.refundId, "refund_adm_order_1");
     assert.strictEqual(res.body.cashfreeStatus, "SUCCESS");
     assert.strictEqual(refundCalls()[0].body.refund_amount, 25);
 
@@ -155,6 +187,8 @@ test.describe("POST /admin/refund (manual refund by an admin)", () => {
     assert.strictEqual(refund.orderId, "order_1");
     const order = fake.data("orders").o1;
     assert.strictEqual(order.status, "REFUNDED");
+    assert.strictEqual(order.refundStatus, "SUCCESS");
+    assert.strictEqual(order.refundClaimedAt, undefined);
     assert.strictEqual(order.refundAmount, 25);
     const jobs = fake.data("print_jobs");
     assert.strictEqual(jobs.waiting.status, "refunded", "not yet printed -> refunded");
@@ -169,27 +203,44 @@ test.describe("POST /admin/refund (manual refund by an admin)", () => {
     assert.strictEqual(fake.data("orders").o1.refundAmount, 10);
   });
 
-  test("a Cashfree failure returns 502 and records nothing", async () => {
+  test("a Cashfree failure returns 502, records no refund and releases the claim so the refund can be retried", async () => {
     http.reset();
     http.on("post", REFUND_URL, () => { throw Object.assign(new Error("x"), { response: { data: { message: "declined" } } }); });
     const res = await call({ orderId: "order_1" });
     assert.strictEqual(res.code, 502);
     assert.match(res.body.error, /declined/);
-    assert.strictEqual(fake.log.writes.length, 0);
+    assert.deepStrictEqual(fake.data("refunds"), {});
+    const order = fake.data("orders").o1;
+    assert.strictEqual(order.status, "PAID");
+    assert.strictEqual(order.refundStatus, undefined);
+    assert.strictEqual(order.refundClaimedAt, undefined);
+    http.reset();
+    http.on("post", REFUND_URL, () => ({ data: { refund_status: "SUCCESS", cf_refund_id: 1 } }));
+    assert.strictEqual((await call({ orderId: "order_1" })).code, 200, "the retry goes through");
   });
 
-  test("KNOWN RISK: no guard against refunding an order that is already refunded (by the trigger or a previous admin refund)", async () => {
-    fake.reset(orders({ status: "REFUNDED", refundStatus: "SUCCESS", refundAmount: 25 }));
-    const res = await call({ orderId: "order_1" });
-    assert.strictEqual(res.code, 200, "today the endpoint asks Cashfree again; only the gateway can reject it");
+  test("an order that is already refunded (by the trigger, the kiosk report or an earlier admin refund) is refused with 409", async () => {
+    for (const over of [{ status: "REFUNDED", refundAmount: 25 }, { refundStatus: "SUCCESS" }]) {
+      http.reset();
+      http.on("post", REFUND_URL, () => ({ data: { refund_status: "SUCCESS" } }));
+      fake.reset(orders(over));
+      const res = await call({ orderId: "order_1" });
+      assert.strictEqual(res.code, 409);
+      assert.match(res.body.error, /already been refunded/);
+      assert.strictEqual(refundCalls().length, 0);
+    }
+  });
+
+  test("clicking refund twice at once refunds once: the second request is refused while the first is in flight", async () => {
+    http.reset();
+    http.on("post", REFUND_URL, async () => { await delay(); return { data: { refund_status: "SUCCESS" } }; });
+    const [a, b] = await Promise.all([call({ orderId: "order_1" }), call({ orderId: "order_1" })]);
+    assert.deepStrictEqual([a.code, b.code].sort(), [200, 409]);
     assert.strictEqual(refundCalls().length, 1);
   });
 
-  test("KNOWN RISK: the refund id is time-based, so a repeated request is a NEW refund, not a retry of the same one", async () => {
-    const first = await call({ orderId: "order_1", refundAmount: 5 });
-    await new Promise((r) => setTimeout(r, 3));
-    const second = await call({ orderId: "order_1", refundAmount: 5 });
-    assert.notStrictEqual(first.body.refundId, second.body.refundId);
-    assert.strictEqual(refundCalls().length, 2);
+  test("the refund id is derived from the order, so a repeat is the same refund, not a new one", async () => {
+    await call({ orderId: "order_1", refundAmount: 5 });
+    assert.strictEqual(refundCalls()[0].body.refund_id, "refund_adm_order_1");
   });
 });

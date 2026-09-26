@@ -8,9 +8,13 @@
     "test": "node --test __tests__/*.test.js",
     "test:sync": "node --test __tests__/kioskSyncContract.test.js",
     "predeploy:check": "npm test",
-    "test:coverage:protected": "c8 --check-coverage --per-file --lines 20 --branches 60 --include src/controllers/payment.controller.js --include src/controllers/admin.controller.js --include src/triggers/printJob.triggers.js node --test __tests__/*.test.js",
+    "test:coverage:protected": "c8 --check-coverage --per-file --lines 20 --branches 60 --include src/controllers/admin.controller.js --include src/triggers/printJob.triggers.js node --test __tests__/*.test.js",
     "test:coverage:core": "c8 --check-coverage --per-file --lines 90 --branches 70 --include src/middleware/rateLimit.js --include src/services/analytics.service.js node --test __tests__/*.test.js",
-    "test:coverage": "npm run test:coverage:protected && npm run test:coverage:core"
+    "test:coverage": "npm run test:coverage:money && npm run test:coverage:payment-services && npm run test:coverage:supporting && npm run test:coverage:protected && npm run test:coverage:core",
+    "test:coverage:money": "c8 --check-coverage --per-file --lines 88 --branches 84 --include src/controllers/payment.controller.js node --test __tests__/*.test.js",
+    "test:coverage:supporting": "c8 --check-coverage --per-file --lines 60 --branches 55 --include src/services/whatsapp.service.js --include src/controllers/public.controller.js node --test __tests__/*.test.js",
+    "test:coverage:payment-services": "c8 --check-coverage --per-file --lines 90 --branches 70 --include src/services/refund.service.js --include src/services/printCode.service.js --include src/services/pricing.service.js node --test __tests__/*.test.js",
+    "test:emulator": "firebase emulators:exec --config __tests__/emulator/firebase.emulator.json --only firestore --project demo-mimo-emulator \"node --test __tests__/emulator/orders.emulator.js\""
   },
   "keywords": [],
   "author": "",
