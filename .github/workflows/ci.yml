@@ -1,12 +1,10 @@
 name: CI
 
 # Checks every app that a push or pull request touches. It never deploys anything.
-# (Vercel builds/deploys the three web apps through its own GitHub integration; deploy-functions.yml
-#  deploys the API; deploy-converter.yml deploys the converter.)
+# Vercel builds/deploys the web apps through its own GitHub integration (checked afterwards by
+# post-deploy-smoke.yml); deploy-functions.yml deploys the API; deploy-converter.yml the converter.
 on:
   push:
-    branches-ignore:
-      - main # main is verified by the deploy workflows and by the PR that merged into it
   pull_request:
   workflow_dispatch:
 
@@ -26,6 +24,8 @@ jobs:
       website: ${{ steps.f.outputs.website }}
       kiosk: ${{ steps.f.outputs.kiosk }}
       ci: ${{ steps.f.outputs.ci }}
+      converter: ${{ steps.f.outputs.converter }}
+      pi: ${{ steps.f.outputs.pi }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,7 +49,9 @@ jobs:
           echo "website=$(has '^mimo-website/')" >> "$GITHUB_OUTPUT"
           echo "kiosk=$(has '^mimo-frontend-web-app/')" >> "$GITHUB_OUTPUT"
           echo "ci=$(has '^\.github/')" >> "$GITHUB_OUTPUT"
-          [ "$EVENT" = "workflow_dispatch" ] && for k in functions website kiosk ci; do echo "$k=true" >> "$GITHUB_OUTPUT"; done
+          echo "converter=$(has '^converter/')" >> "$GITHUB_OUTPUT"
+          echo "pi=$(has '^(pi-listener|pi_scripts)/')" >> "$GITHUB_OUTPUT"
+          [ "$EVENT" = "workflow_dispatch" ] && for k in functions website kiosk ci converter pi; do echo "$k=true" >> "$GITHUB_OUTPUT"; done
           echo "Changed files: $(echo "$files" | grep -c .)"
 
   functions:
@@ -109,3 +111,40 @@ jobs:
         working-directory: mimo-frontend-web-app/mimo-frontend
       - run: npm run build
         working-directory: mimo-frontend-web-app/mimo-frontend
+
+  converter:
+    name: Converter syntax check
+    needs: changes
+    if: needs.changes.outputs.converter == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --check converter/index.js
+
+  pi:
+    name: Pi listener syntax check
+    needs: changes
+    if: needs.changes.outputs.pi == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile every Pi script (syntax only; the Pis are updated manually, see docs/deployment/REMAINING_SETUP.md)
+        run: python -m compileall -q pi-listener pi_scripts
+
+  workflows:
+    name: Lint GitHub workflows
+    needs: changes
+    if: needs.changes.outputs.ci == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
