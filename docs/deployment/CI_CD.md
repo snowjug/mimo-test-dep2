@@ -9,7 +9,7 @@ Northflank) were **not** accessed. Actions needed from a repository admin are in
 | Component | Source | Deployed to | Trigger | Auto on `main`? | Failure is visible as |
 |---|---|---|---|---|---|
 | Backend API (`api`) | `functions/` | Firebase Functions `us-central1`, project `mimo-v2-11868` | `deploy-functions.yml` on push to `main` touching `functions/**` (14 successful runs in history) | **Yes** | Red run in GitHub Actions |
-| Firestore/scheduler triggers (6) | `functions/src/triggers/` | Firebase Functions | same workflow, second step, after the API is deployed and smoke-tested | **Yes** (new — not yet run) | Red run; API stays healthy |
+| Firestore/scheduler triggers (6) | `functions/src/triggers/` | Firebase Functions — **live regions differ: `colourPaperUsageNotification`, `printerHardwareNotification`, `sendFailureNotification`, `lowPaperNotification` are in `asia-south1`; `api`, `autoRefundJob`, `autoCleanupStorageJob`, `scheduledFileRetentionCleanup` in `us-central1`** | same workflow, **manual opt-in only** (`deploy_triggers`) | **No** — see §5 | — |
 | Customer site | `mimo-website/` | Vercel project `mimo_v2` → `printmimo.tech` | Vercel Git integration on every push | **Yes** (statuses seen on every commit) | Vercel status on the commit; `post-deploy-smoke.yml` on `main` |
 | Admin + Finance | `mimo-website/mimo-admin-dashboard/` | Built into the customer site (`/admin/`, `/finance`) | same as customer site | **Yes** | same |
 | Kiosk UI ×2 | `mimo-frontend-web-app/mimo-frontend/` | Two Vercel projects (`mimo-frontend`, `mimo-kiosk-backend` — project↔domain mapping is set in Vercel, inferred not verified) → `mimo-frontend-three.vercel.app`, `mimo-2-0.vercel.app` | Vercel Git integration | **Yes** | same |
@@ -28,7 +28,7 @@ push / PR (any branch) ──► ci.yml  changed folders only:  functions tests 
 
 push to main
   functions/**  ──► deploy-functions.yml   tests → live env + optional FUNCTIONS_ENV_FILE → SECURITY GATE
-                                           → deploy api → public invoker → smoke test → deploy 6 triggers
+                                           → deploy api → public invoker → smoke test   (triggers: manual opt-in)
   converter/**  ──► deploy-converter.yml   build → deploy → invoker → health check (must be up AND private)
   backend/**    ──► backend-image.yml      (unchanged)
   any push      ──► Vercel builds the web apps ──► post-deploy-smoke.yml checks the public sites once Vercel reports success
@@ -75,3 +75,9 @@ There is no bypass flag and no authentication code was changed.
 Whether the live function currently has every required variable; that the deployer account can deploy triggers; the Vercel project ↔
 folder mapping and Vercel "ignored build step" settings; branch protection. The first run of each workflow answers these and fails
 with an explicit message if something is missing.
+
+## 6. Trigger regions (found on 2026-09-26 with `firebase functions:list`)
+The code in `functions/src/triggers/` sets no region, so a deploy would put every trigger in `us-central1`. Live, three notification triggers
+already run in `asia-south1`, and a fourth (`lowPaperNotification`) exists live but not in the repository. Deploying from this code would
+create duplicate triggers (duplicate alert e-mails) instead of updating the existing ones. Until each trigger's region is set in code to
+match what is live, deploy triggers only deliberately and check `firebase functions:list` afterwards.
