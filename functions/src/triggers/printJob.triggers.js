@@ -183,6 +183,7 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
 exports.sendFailureNotification = onDocumentUpdated(
   {
     document: "print_jobs/{jobId}",
+    region: "asia-south1", // the deployed function lives here; without it a deploy would create a duplicate in us-central1
     secrets: ["GMAIL_APP_PASSWORD"],
   },
   async (event) => {
@@ -236,6 +237,7 @@ exports.sendFailureNotification = onDocumentUpdated(
 exports.printerHardwareNotification = onDocumentUpdated(
   {
     document: "hardware/printers",
+    region: "asia-south1", // the deployed function lives here; without it a deploy would create a duplicate in us-central1
     secrets: ["GMAIL_APP_PASSWORD"],
   },
   async (event) => {
@@ -457,6 +459,7 @@ exports.printerHardwareNotification = onDocumentUpdated(
 exports.colourPaperUsageNotification = onDocumentUpdated(
   {
     document: "print_jobs/{jobId}",
+    region: "asia-south1", // the deployed function lives here; without it a deploy would create a duplicate in us-central1
     secrets: ["GMAIL_APP_PASSWORD"],
   },
   async (event) => {
