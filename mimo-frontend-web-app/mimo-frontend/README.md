@@ -16,7 +16,7 @@ browser in kiosk mode.
 ```
 CodeEntryScreen  → POST /get-documents-by-code {printCode, kioskId}   (validates the code, colour/B&W rules per machine)
                  → POST /kiosk/print           {printCode, kioskId}   (job becomes "printing" for THIS kiosk)
-PrintingScreen   → GET  /kiosk/job-status?printCode=…  every ~4 s     (progress, done, or failed)
+PrintingScreen   → GET  /kiosk/job-status?printCode=…  every ~0.3–0.4 s (progress, done, or failed)
                    ▲ the Raspberry Pi listener sees status "printing" in Firestore, prints via CUPS,
                      and writes progress / "completed" / "failed" back
 ```

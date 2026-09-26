@@ -98,7 +98,7 @@ sequenceDiagram
   FS-->>PI: snapshot: printing job for my kiosk
   PI->>PI: download PDF, print via CUPS
   PI->>FS: progress … status "completed" (or "failed")
-  K->>API: GET /kiosk/job-status every 4 s
+  K->>API: GET /kiosk/job-status (polled every ~0.3-0.4 s while printing)
   Note over FS,API: on "failed": autoRefundJob → Cashfree refund → "refunded"
 ```
 
