@@ -50,13 +50,12 @@ type it on a kiosk → collect the printout.** Two kiosks run in production.
 │   └── mimo-frontend/            Kiosk touchscreen UI                                              → its README.md
 ├── LENOVO TABLET APP/            Android kiosk shell (Kotlin WebView) + ADB lock/unlock scripts
 ├── pi-listener/ · pi_scripts/    Raspberry Pi print listeners (Python) — see "Raspberry Pis" below
-├── mimo-listener*.service · pi_setup.sh · fallback_wifi.sh …   Pi provisioning (systemd units, setup)
 ├── converter/                    Office → PDF service (LibreOffice on Cloud Run: `mimo-office-converter`)
-├── scripts/                      One-off tooling (not deployed): deployment/ · diagnostics/ · testing/
+├── scripts/                      Tooling (not deployed): pi-setup/ (systemd units, Pi setup) · deployment/ · diagnostics/ · testing/
 ├── docs/                         architecture/ · deployment/ · setup/ · historical notes
 ├── company-website/              Older static site copy (stale; the live one is mimo-website/public)
 ├── backend/                      ⚠ LEGACY Express server — FROZEN, not used by production
-└── firebase.json · .firebaserc · storage.rules · .github/workflows/
+└── firebase.json · .firebaserc · firebase/ (storage.rules) · .github/workflows/     (the only files at the root: README, .gitignore + these Firebase files)
 ```
 
 **Ground rules**
@@ -115,7 +114,7 @@ Firestore** — prefer the Firestore emulator when experimenting.
 ## Raspberry Pis
 
 Each kiosk has a Pi running a Python listener as the systemd service `mimo-listener`
-(`mimo-listener.service`, `KIOSK_ID` set per machine). It watches `print_jobs` for `status == "printing"` for its kiosk,
+(`scripts/pi-setup/mimo-listener.service`, `KIOSK_ID` set per machine). It watches `print_jobs` for `status == "printing"` for its kiosk,
 prints through CUPS, updates progress, and writes a heartbeat to `system_status/<kioskId>` every ~30 s (this is what makes a
 machine show *online* on the dashboard).
 

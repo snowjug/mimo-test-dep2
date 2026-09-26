@@ -19,7 +19,7 @@ which suggests it does, but that cannot be confirmed without console access.
 |---|---|---|
 | Raspberry Pi listeners | The Pis sit behind Tailscale; GitHub has no network path or SSH credential to them | On the Pi: replace `firebase_listener.py` from `main`, `sudo systemctl restart mimo-listener`. Confirm first which folder (`pi-listener/` or `pi_scripts/`) each Pi runs. `scripts/deployment/deploy_listener.py` points to another GitHub repo (`madhans7/…`) — do not use it as is. |
 | Android kiosk app | Installed over ADB on physical tablets | Build in Android Studio and install by ADB (`LENOVO TABLET APP/KIOSK_GUIDE.md`) |
-| Firestore rules/indexes (`backend/`) and `storage.rules` | Not deployed by any workflow; changing production rules automatically is a risk decision | `firebase deploy --only firestore:rules` / `storage` by someone logged into Firebase |
+| Firestore rules/indexes (`backend/`) and `firebase/storage.rules` | Not deployed by any workflow; changing production rules automatically is a risk decision | `firebase deploy --only firestore:rules` / `storage` by someone logged into Firebase |
 
 ## 3. Optional
 * **Branch protection** on `main` requiring the *CI* checks — repository admin, one time. Without it CI is advisory and Vercel deploys regardless of test results.

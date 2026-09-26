@@ -18,7 +18,7 @@ Northflank) were **not** accessed. Actions needed from a repository admin are in
 | Raspberry Pi listeners | `pi-listener/`, `pi_scripts/` | The two Pis (Tailscale + SSH) | Manual (`scripts/deployment/*.py`, SSH with password) | **No** | — (only a syntax check in CI) |
 | Android kiosk shell | `LENOVO TABLET APP/` | The tablets (Device Owner, ADB) | Manual | **No** | — |
 | Firestore rules/indexes | `backend/firestore.rules`, `backend/firestore.indexes.json` | Firebase | Manual `firebase deploy` | **No** | — |
-| Storage rules | `storage.rules` | Firebase | Manual `firebase deploy` | **No** | — |
+| Storage rules | `firebase/storage.rules` | Firebase | Manual `firebase deploy` | **No** | — |
 
 ## 2. Pipeline
 
