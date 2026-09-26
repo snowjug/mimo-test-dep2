@@ -50,7 +50,7 @@ git checkout -b intern/<your-name>-day1      # never work on main
    `functions/.env` is git-ignored; never commit it.
 4. **Run your app** (see the folder README). Defaults: customer site `http://localhost:5173`, admin `http://localhost:5174`.
    ⚠ The **kiosk UI has the production API address hard-coded** — running it locally talks to *production*. Do not enter real print codes; see the workaround in its README (point the API constants at your local backend, and never commit that change).
-5. **Run the tests:** `cd functions && npm test` → expect *80 pass*. `npm run test:coverage` also runs the coverage gate.
+5. **Run the tests:** `cd functions && npm test` → expect *232 pass*. `npm run test:coverage` also runs the coverage gate.
 
 Checkpoint: you can start one app locally and the backend tests pass.
 

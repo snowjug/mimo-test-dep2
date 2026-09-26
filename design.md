@@ -147,7 +147,7 @@ Design rules: terminal states never regress; only one kiosk may take a job; colo
 
 ## 11. Known deviations from these principles
 
-* The API allows any CORS origin; `POST /payment-success` trusts the caller.
+* The API allows any CORS origin.
 * `firebase/storage.rules` allows public read/write.
 * The Pi listeners are deployed by hand and exist in two variants; the live one per machine is unverified.
 * Customer-site pages contain a legacy in-app admin page (`src/app/pages/mimo-admin-dashboard`) that production no longer serves; `company-website/` is a stale copy.
