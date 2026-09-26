@@ -8,19 +8,28 @@ const postAdminLogin = (req, res) => {
   const { email, password } = req.body;
 
   // Defensively strip quotes and whitespace from both env vars and user input
-  const envEmail = (process.env.ADMIN_EMAIL || "").replace(/^"|"$/g, '').trim();
-  const envPassword = (process.env.ADMIN_PASSWORD || "").replace(/^"|"$/g, '').trim();
+  const envAdminEmail    = (process.env.ADMIN_EMAIL    || "").replace(/^"|"$/g, '').trim();
+  const envAdminPassword = (process.env.ADMIN_PASSWORD || "").replace(/^"|"$/g, '').trim();
+  const envFinanceEmail    = (process.env.FINANCE_EMAIL    || "").replace(/^"|"$/g, '').trim();
+  const envFinancePassword = (process.env.FINANCE_PASSWORD || "").replace(/^"|"$/g, '').trim();
 
-  const reqEmail = (email || "").trim();
+  const reqEmail    = (email    || "").trim();
   const reqPassword = (password || "").trim();
 
-  if (envEmail && envPassword && reqEmail === envEmail && reqPassword === envPassword) {
-    const token = jwt.sign({ isAdmin: true, email: reqEmail }, SECRET_KEY, { expiresIn: "24h" });
-    return res.json({ token, message: "Admin Login Successful" });
+  // Admin credentials
+  if (envAdminEmail && envAdminPassword && reqEmail === envAdminEmail && reqPassword === envAdminPassword) {
+    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqEmail }, SECRET_KEY, { expiresIn: "24h" });
+    return res.json({ token, role: "admin", message: "Admin Login Successful" });
   }
 
-  console.log(`[AUTH FAILED] Attempted: '${reqEmail}' / '${reqPassword}' against Env: '${envEmail}' / '${envPassword}'`);
-  return res.status(401).json({ error: "Invalid admin credentials" });
+  // Finance credentials
+  if (envFinanceEmail && envFinancePassword && reqEmail === envFinanceEmail && reqPassword === envFinancePassword) {
+    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqEmail }, SECRET_KEY, { expiresIn: "24h" });
+    return res.json({ token, role: "finance", message: "Finance Login Successful" });
+  }
+
+  console.log(`[AUTH FAILED] Attempted: '${reqEmail}' / '${reqPassword}' against Admin: '${envAdminEmail}' / Finance: '${envFinanceEmail}'`);
+  return res.status(401).json({ error: "Invalid credentials" });
 };
 
 // ================= ADMIN COUPONS =================
