@@ -115,7 +115,7 @@ sequenceDiagram
   else payment needed
     API->>CF: create payment session
     S->>CF: pay
-    CF->>API: POST /cashfree-webhook (server-to-server; verification being hardened, see 4.5 and 13)
+    CF->>API: POST /cashfree-webhook (signature verified, see 4.5)
     API->>FS: payment_transactions, job "paid", printCode
   end
   API-->>S: print code (on screen; also WhatsApp / e-mail where used)
@@ -161,7 +161,7 @@ payment (`/wa-pay-success/:orderId`), the print code. `whatsapp_msg_ids` de-dupl
 
 ### 4.5 Payment and Cashfree webhook flow
 
-Status: **implemented** (order creation, hosted checkout, `/verify-payment`, free/coupon orders); **partially implemented** (webhook — see below).
+Status: **implemented** (order creation, hosted checkout, `/verify-payment`, free/coupon orders); **implemented** (webhook — see step 4; its signing scheme is unverified against live Cashfree traffic).
 
 1. `POST /create-order` (customer JWT): merges the user's pending jobs into one job, prices it (`pricePerPage` from settings × pages), then applies the coupon percentage and coins (1 coin = ₹0.50).
    * payable amount **below ₹1** → free order: the job becomes `paid`, a random 4-digit print code is generated immediately, an `orders` record is written and a receipt e-mail is sent (no gateway involved);
@@ -169,7 +169,8 @@ Status: **implemented** (order creation, hosted checkout, `/verify-payment`, fre
 2. The student pays on Cashfree's hosted checkout and is redirected to `/payment-verify`.
 3. The website calls `GET /verify-payment/:orderId`. The API asks Cashfree for the order status **server-to-server**; if it is `PAID` it marks the order `PAID` and calls its own `/payment-success`, which assigns the **4-digit print code** to the jobs and returns it. If the Cashfree call fails it falls back to the status stored in Firestore.
 4. In parallel Cashfree posts a webhook to `POST /cashfree-webhook`. On `PAYMENT_SUCCESS_WEBHOOK` the handler marks orders/jobs paid, calls `/payment-success` if no code exists yet and updates `users.totalSpent` and the `system/metrics` document.
-   **Known issues:** the webhook path is only partially implemented. Its verification and response handling are being hardened (a fix is prepared, not deployed), and only the webhook — not `/verify-payment` — updates `totalSpent` and `system/metrics`, so those counters can lag. Do not rely on them; the dashboards compute their numbers from `orders` / `payment_transactions` (§8).
+   The webhook handler **verifies Cashfree's signature** (`x-webhook-signature` = base64 HMAC-SHA256 of `x-webhook-timestamp + raw body`, using the API's Cashfree secret) against the raw request bytes and answers `403` otherwise; it answers `200` to every event type (only `PAYMENT_SUCCESS_WEBHOOK` does work) and ignores a second delivery of the same success (marker document `webhook_events/cashfree_<orderId>_PAYMENT_SUCCESS`, removed again if processing fails). Pinned by `functions/__tests__/cashfreeWebhook.test.js`.
+   **Unverified:** the signature scheme follows Cashfree's documented format but had not yet been confirmed against a live delivery when this was written — watch the API logs for `[WEBHOOK] rejected`; a rejected genuine success webhook is still covered by `/verify-payment`. Only the webhook (not `/verify-payment`) updates `users.totalSpent` and `system/metrics`, and it did not run successfully before this fix, so those counters were not maintained until now (no back-fill); dashboards compute their numbers from `orders` / `payment_transactions` (§8).
 5. Failed prints are refunded by `autoRefundJob` (Cashfree refund API; recorded on the order — the trigger does not write the `refunds` collection); customers can also file `POST /request-refund`, which an admin resolves with `POST /admin/refund`.
 
 ## 5. Firestore data model
@@ -235,7 +236,7 @@ IP in Firestore, shared by all instances — 5/min + 20/h for code entry, 20/min
 | Role separation | Customer tokens are rejected on `/admin/*`; the admin app never sends the customer token |
 | Kiosk endpoints | Unauthenticated by design (a student types a code) → rate-limited and validated against a contract |
 | Pi → API | `/kiosk/report-failure` requires `INTERNAL_WEBHOOK_SECRET`; the Pi itself uses a Firebase service-account key |
-| Payments | The payment result is confirmed server-to-server with Cashfree in `/verify-payment`. The Cashfree webhook is **partially implemented**: its hardening is in progress (see §4.5 and §13) |
+| Payments | The payment result is confirmed server-to-server with Cashfree in `/verify-payment`. The Cashfree webhook verifies its HMAC signature on the raw body (`403` otherwise) and is idempotent (§4.5); the scheme is unverified against live traffic |
 | Converter | Private Cloud Run service (IAM) + `INTERNAL_CONVERTER_SECRET` |
 | Secrets | Only in env variables and git-ignored files. CI builds `functions/.env` at deploy time and refuses insecure values (default admin password, weak/public `JWT_SECRET`) |
 | Ownership | `/mark-printed` only touches the caller's own jobs |
@@ -331,7 +332,7 @@ Vercel, Firebase and Google Cloud settings are not stored in this repository, wh
 ## 13. Known limitations
 
 * `POST /payment-success` trusts the caller instead of confirming with Cashfree.
-* **Cashfree webhook handling is partially implemented and is being hardened** (a fix is prepared but not deployed; details are withheld from this public repository until it is live). `/verify-payment` is the authoritative payment check today.
+* The Cashfree webhook's signing scheme is **unverified** against a live delivery (see §4.5); `/verify-payment` remains the authoritative payment check.
 * CORS allows any origin; `storage.rules` currently allows public read/write; Firestore rules are managed outside `functions/`.
 * Admin uses one shared login (`ADMIN_EMAIL` / `ADMIN_PASSWORD`) — no per-user accounts or audit trail.
 * Rate limiting is per IP: everyone at one kiosk shares a budget, so a run of wrong codes can briefly lock that kiosk.
@@ -353,7 +354,7 @@ Legend: **Implemented** = present in code and exercised in production or tests �
 | Kiosk | Code entry, live progress, refund banner, screensaver, maintenance screen | Implemented |
 | Kiosk | Android lock-task shell | Implemented; device setup is manual |
 | Backend | Rate limiting, auto refunds, storage retention, alert e-mails | Implemented |
-| Backend | Cashfree webhook | **Partial** — hardening in progress |
+| Backend | Cashfree webhook | Implemented; signing scheme **unverified** against live traffic |
 | Backend | Separate finance login | **Partial** |
 | Backend | Per-user admin accounts, audit trail | **Planned** |
 | Dashboards | Live analytics, date ranges, machines, incidents, transactions, refunds, pricing/coupons | Implemented |

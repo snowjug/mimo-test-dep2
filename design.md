@@ -94,7 +94,7 @@ Rules of thumb: a route file never contains logic; a controller never builds ana
 | Finance-only login | `FINANCE_EMAIL` / `FINANCE_PASSWORD` → role `finance`, `isAdmin: false` | **Partial** — the token is rejected by `/admin/*` today |
 | Kiosk | none; `kioskId` in the body | Rate limited (failed lookups per IP), colour rule enforced per machine |
 | Pi | Firebase service-account key (bypasses rules) | Treat the device as a secret holder; `/kiosk/report-failure` also needs `INTERNAL_WEBHOOK_SECRET` |
-| Cashfree, Meta | Webhook signature / verify token | Cashfree webhook hardening is in progress (**Partial**) |
+| Cashfree, Meta | Webhook signature / verify token | The Cashfree signature is always verified against the raw body (`403` otherwise); scheme unverified against live traffic |
 | Converter | Cloud Run IAM + `INTERNAL_CONVERTER_SECRET` | Not public |
 
 The API refuses to run admin logic without a real secret in production: the deploy pipeline blocks a default admin password or a weak/public `JWT_SECRET`.
@@ -147,7 +147,7 @@ Design rules: terminal states never regress; only one kiosk may take a job; colo
 
 ## 11. Known deviations from these principles
 
-* The API allows any CORS origin; `POST /payment-success` trusts the caller; Cashfree webhook hardening is in progress.
+* The API allows any CORS origin; `POST /payment-success` trusts the caller.
 * `firebase/storage.rules` allows public read/write.
 * The Pi listeners are deployed by hand and exist in two variants; the live one per machine is unverified.
 * Customer-site pages contain a legacy in-app admin page (`src/app/pages/mimo-admin-dashboard`) that production no longer serves; `company-website/` is a stale copy.
