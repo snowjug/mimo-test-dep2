@@ -292,65 +292,83 @@
     .kcopy--close h2 { font-size: clamp(2.4rem, 1.2rem + 3cqw, 4.6rem); }
     .kcopy--close .btn { margin-top: 28px; }
 
-    /* ── Phone composition: the split runs top/bottom and the camera pushes in further. ── */
+    /* ── Phone composition (art-directed separately, not a shrunk desktop) ──────────────────
+       One navy scene instead of a cramped top/bottom split: the story headline at the top, the real
+       kiosk standing large on the right, and a real-proportion phone held in front of it at the
+       bottom-left (overlapping the kiosk for depth). At the peak the phone drops away, the kiosk
+       centres and the camera pushes into its screen; at the close it settles above the CTA. */
     @media (max-width: 860px) {
       .stage {
-        --split: calc(0.56 - 0.20 * var(--a) - 0.36 * var(--c));
-        --kh: min(40cqh, 120cqw);
-        --S: 2.9;
-        --kx: calc((1 - var(--a)) * (1 - var(--c)) * 22cqw);
+        --kh: calc(min(63cqh, 160cqw) - var(--c) * 21cqh);
+        --S: 2.7;
+        --kx: calc((1 - var(--a)) * (1 - var(--c)) * 19cqw);
+        --ky: calc(13cqh - var(--c) * 19cqh);
         background:
-          radial-gradient(80% 45% at 50% calc(50% + var(--split) * 50%), var(--kiosk-ground-2), transparent 70%),
+          radial-gradient(90% 55% at 62% 62%, var(--kiosk-ground-2), transparent 72%),
           var(--kiosk-ground);
       }
-      .ghost { font-size: 42cqw; transform: translate(0, calc((var(--split) + 1) / 2 * 100cqh - 50cqh - 50%)); }
-      .kiosk-wrap { transform: translate(var(--kx), calc((var(--split) + 1) / 2 * 100cqh - 50cqh)); }
+      .ghost { font-size: 44cqw; transform: translate(calc(var(--kx) * 0.3), calc(var(--ky) - 50% - var(--p) * 6cqh)); }
+      .kiosk-wrap { transform: translate(var(--kx), var(--ky)); }
       .kiosk { transform:
         translate(calc(var(--z) * (0.5 - var(--fx)) * var(--kh) * 0.3697), calc(var(--z) * (0.5 - var(--fy)) * var(--kh)))
         scale(calc(1 + var(--z) * (var(--S) - 1))); }
+
+      /* The phone layer is no longer a clipped half: it is a transparent overlay on the navy scene.
+         It sits above the kiosk-side copy, so only its links take pointer events. */
       .phone-side {
-        clip-path: inset(0 0 calc((1 - var(--split)) * 100%) 0);
-        -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(var(--split) * 100cqh - 28px), transparent calc(var(--split) * 100cqh));
-        mask-image: linear-gradient(to bottom, #000 0, #000 calc(var(--split) * 100cqh - 28px), transparent calc(var(--split) * 100cqh));
+        background: transparent; color: var(--kiosk-ink); pointer-events: none;
+        clip-path: none; -webkit-mask-image: none; mask-image: none;
+      }
+      .phone-side a, .phone-side button { pointer-events: auto; }
+      /* While the camera is pushed in, the kiosk rises under the bar and headline: a navy scrim
+         (only where the text sits, only during the zoom) keeps them legible. */
+      .phone-side::before {
+        content: ""; position: absolute; inset: 0 0 auto 0; height: 200px; pointer-events: none;
+        background: linear-gradient(to bottom, var(--kiosk-ground) 62%, transparent);
+        opacity: var(--z);
       }
       .phone-side__inner {
-        width: 100%; height: 56cqh; padding: max(14px, env(safe-area-inset-top)) 16px 16px;
-        grid-template-rows: auto auto 1fr; gap: 10px;
+        width: 100%; height: auto; padding: max(14px, env(safe-area-inset-top)) 16px 16px;
+        grid-template-rows: auto auto; align-content: start; gap: 14px;
         transform: none;
       }
-      .bar .wordmark { font-size: 24px; }
-      .bar a:not(.bar-cta) { font-size: 13px; }
-      .bar a.bar-cta { font-size: 13px; padding: 0 12px; }
+      .bar .wordmark { font-size: 24px; color: #ffffff; }
+      .bar a:not(.bar-cta) { font-size: 13px; color: var(--kiosk-ink); }
+      .bar a.bar-cta { font-size: 13px; padding: 0 12px; background: #ffffff; color: #0a2342; opacity: calc(1 - var(--c)); }
       .phone-body { display: contents; }
-      .chapters { min-height: 0; height: 108px; }
+
+      .chapters { min-height: 0; height: 132px; }
       .chapter { top: 0; translate: none; }
-      .chapter h1, .chapter h2 { font-size: clamp(1.5rem, 1.1rem + 2.2cqw, 2rem); }
-      /* Buttons stay off mid-story (the bar's CTA is the reachable action instead); a short one-line
-         description survives so the phone side keeps some narrative, not just a bare headline. */
+      .chapter h1, .chapter h2 { color: var(--kiosk-ink); font-size: clamp(1.6rem, 1.15rem + 2.4cqw, 2.2rem); }
+      .chapter--hero h1 { font-size: clamp(2rem, 1.4rem + 3cqw, 2.6rem); }
+      /* Buttons stay off mid-story (the bar CTA is always reachable); the description stays, clamped. */
       .chapter p {
-        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden;
-        font-size: 13px; line-height: 1.35; margin-top: 6px; max-width: none;
+        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+        color: var(--kiosk-ink-soft); font-size: 14px; line-height: 1.4; margin-top: 8px; max-width: 30ch;
       }
       .chapter .btn { display: none; }
-      .phone { width: 100%; aspect-ratio: auto; height: 100%; border-radius: 24px; box-shadow: 0 1px 2px rgba(17, 19, 24, 0.08); }
-      .phone__tag { top: 10px; }
-      .scr { inset: 34px 14px 14px; gap: 8px; }
-      .bigcode { font-size: 44px; margin: 8px 0 2px; }
-      .divider { top: 0; left: 0; right: 0; bottom: auto; width: auto; height: 1px; transform: translateY(calc(var(--split) * 100cqh)); }
-      .divider__fill { width: 100%; height: 1px; transform-origin: left; transform: scaleX(var(--p)); }
-      .divider__lbl { bottom: auto; }
-      .divider__lbl--l { right: 16px; bottom: 10px; }
-      .divider__lbl--r { right: 16px; left: auto; top: 10px; }
-      .kcopy--hero { left: 16px; top: calc(56cqh + 44px); translate: none; max-width: 52cqw; }
-      .kcopy--hero h2 { font-size: 1.6rem; }
-      .kcopy--hero p { font-size: 15px; }
+
+      /* The phone keeps its desktop-sized internals (already verified) and is scaled as one object. */
+      .phone {
+        position: absolute; left: 16px; bottom: max(22px, env(safe-area-inset-bottom));
+        width: 260px; color: var(--sc-ink);
+        transform-origin: bottom left;
+        transform: translateY(calc(var(--a) * 130%)) scale(var(--ps, 0.64));
+        opacity: calc(1 - var(--a));
+        box-shadow: 0 0 0 8px #15171c, 0 24px 50px -12px rgba(0, 0, 0, 0.55);
+      }
+      .divider, .kcopy--hero { display: none; }
+
       .kcopy--peak { left: 16px; right: 16px; bottom: max(20px, env(safe-area-inset-bottom)); text-align: left; padding: 14px 16px; }
       .kcopy--peak h2 { font-size: 1.7rem; }
       .kcopy--peak p { margin-left: 0; font-size: 15px; }
-      .kcopy--close { left: 16px; right: 16px; top: max(28px, env(safe-area-inset-top)); translate: none; max-width: none; }
+      .kcopy--close { left: 16px; right: 16px; top: auto; bottom: max(24px, env(safe-area-inset-bottom)); translate: none; max-width: none; }
       .kcopy--close h2 { font-size: 2.2rem; }
-      .kcopy--close { top: auto; bottom: max(24px, env(safe-area-inset-bottom)); }
       .kcopy--close .btn { width: 100%; margin-top: 18px; }
+    }
+    /* Larger phones and small tablets hold a bigger phone. */
+    @media (min-width: 560px) and (max-width: 860px) {
+      .stage { --ps: 0.82; }
     }
 
     /* ── Static composition: no JS, or reduced motion. No pin, nothing hidden, depth kept. ── */
@@ -364,7 +382,7 @@
     .story.is-static .scr:not(.scr--code) { display: none; }
     .story.is-static .kcopy--hero p::after { content: " Your code 4821 is on the screen, and the page is out."; }
     @media (max-width: 860px) {
-      .story.is-static .stage { --split: 0.56; --kx: 22cqw; }
+      .story.is-static .stage { --kx: 19cqw; --ky: 13cqh; --kh: min(63cqh, 160cqw); }
     }
 
     /* ─────────────────────────────── AFTER THE STORY ─────────────────────────────── */
@@ -402,8 +420,8 @@
 
     .partners { border-top: 1px solid var(--line); padding: clamp(40px, 6vw, 72px) 0; display: flex; align-items: center; gap: clamp(20px, 5vw, 56px); flex-wrap: wrap; }
     .partners p { margin: 0; color: var(--sc-ink-soft); font-size: 15px; flex-basis: 100%; }
-    .partners img { height: 44px; width: auto; object-fit: contain; border-radius: 8px; filter: grayscale(1); opacity: 0.8; transition: filter 200ms, opacity 200ms; }
-    .partners img:hover { filter: none; opacity: 1; }
+    /* Partner marks in their own colours. */
+    .partners img { height: 56px; width: auto; object-fit: contain; border-radius: 10px; }
 
     .foot { border-top: 1px solid var(--line); padding: 40px 0 max(32px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; font-size: 15px; }
     .foot .wordmark { font-size: 22px; color: var(--sc-accent); }
@@ -580,10 +598,10 @@
 
         <section class="partners" aria-label="Supported by">
           <p>Supported by</p>
-          <img src="/Brands/IMG_3075.PNG" alt="Raajply" loading="lazy" decoding="async">
-          <img src="/Brands/logo1.png" alt="REVA NEST" loading="lazy" decoding="async">
-          <img src="/Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX" loading="lazy" decoding="async">
-          <img src="/Brands/Vasavi.jpg" alt="Vasavi" loading="lazy" decoding="async">
+          <img src="/Brands/IMG_3075.PNG" alt="SUDOBOX" loading="lazy" decoding="async">
+          <img src="/Brands/logo1.png" alt="Vasavi Condiments" loading="lazy" decoding="async">
+          <img src="/Brands/IMG_3715.JPG.jpeg" alt="Raajply" loading="lazy" decoding="async">
+          <img src="/Brands/Vasavi.jpg" alt="REVA NEST" loading="lazy" decoding="async">
         </section>
 
         <footer class="foot">
