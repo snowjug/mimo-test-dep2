@@ -220,7 +220,13 @@
 }
 
 @layer components {
-  /* The customer app is designed for phones. Larger screens get the same phone-width column. */
+  /*
+   * The customer app is designed for phones first; every phone rule below stays exactly as it
+   * was. At desktop widths (1024px+) the column widens into a real task-app layout instead of a
+   * phone card floating in empty space: MimoHeader/AppBar break out to full viewport width with a
+   * background band, and their content (plus ActionBar) re-centres at this same width so the whole
+   * page still reads as one aligned column, just a roomier one. See mimo/ui.tsx and mimo-header.tsx.
+   */
   .app-column {
     width: 100%;
     max-width: 440px;
@@ -233,6 +239,10 @@
   @media (min-width: 480px) {
     .app-column { box-shadow: 0 0 0 1px var(--hairline); }
     body { background: var(--surface-2); }
+  }
+
+  @media (min-width: 1024px) {
+    .app-column { max-width: 768px; box-shadow: none; }
   }
 
   .pad-safe-bottom { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
