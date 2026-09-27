@@ -11,7 +11,7 @@ import { describeRange } from '../../lib/dateRange';
 import { inr, int, pct } from '../../lib/format';
 import type { Analytics } from '../../types/insights.types';
 
-const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6'];
+const COLORS = ['#093765', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#8FB3DC'];
 
 const Card: React.FC<{ title: string; subtitle?: string; className?: string; children: React.ReactNode }> = ({ title, subtitle, className = '', children }) => (
   <section className={`p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs ${className}`}>
@@ -76,7 +76,7 @@ export const AnalyticsPage: React.FC = () => {
           { label: 'Avg order value', value: a ? inr(a.current.avgOrderValue) : '', cur: a?.current.avgOrderValue, prev: a?.previous?.summary.avgOrderValue },
         ].map((k) => (
           <div key={k.label} className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-            <span className="text-xs font-bold text-[var(--text-2)] uppercase tracking-wider">{k.label}</span>
+            <span className="text-xs font-bold text-[var(--text-2)]">{k.label}</span>
             {q.loading ? <div className="skeleton h-8 w-24 mt-3" /> : <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)] mt-2 tabular-nums">{k.value}</p>}
             <div className="mt-1.5 min-h-[16px]">{!q.loading && k.cur !== null && k.cur !== undefined && <Delta current={k.cur} previous={k.prev} />}</div>
           </div>
@@ -143,7 +143,7 @@ export const AnalyticsPage: React.FC = () => {
                   <XAxis dataKey="hour" tickFormatter={(h: number) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'a' : 'p'}`} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval={1} />
                   <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip labelFormatter={(h: number) => `${h}:00 – ${h}:59`} contentStyle={{ borderRadius: 12, fontSize: 12 }} />
-                  <Bar dataKey="jobs" name="Jobs" fill="#6366f1" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="jobs" name="Jobs" fill="#093765" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -171,7 +171,7 @@ export const AnalyticsPage: React.FC = () => {
             <div className="flex flex-wrap gap-3">
               {a.byStatus.sort((x, y) => y.count - x.count).map((s) => (
                 <div key={s.status} className="px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/50 min-w-[110px]">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-3)] capitalize">{s.status}</p>
+                  <p className="text-[10px] font-bold text-[var(--text-3)] capitalize">{s.status}</p>
                   <p className="text-xl font-black text-[var(--text-1)] tabular-nums">{int(s.count)}</p>
                 </div>
               ))}

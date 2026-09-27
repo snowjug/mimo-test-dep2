@@ -51,12 +51,12 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
   return (
     <aside className="finance-sidebar">
       {/* ── TOP: BRAND LOGO & TITLE (HEIGHT 64PX) ────────────────────────── */}
-      <div className="h-[64px] min-h-[64px] px-5 flex items-center gap-3 border-b border-[#EDE9FE] bg-white">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#6D35E8] to-[#9065FD] flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0">
+      <div className="h-[64px] min-h-[64px] px-5 flex items-center gap-3 border-b border-[#E4E7EB] bg-white">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#093765] to-[#9065FD] flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0">
           <Layers className="w-5 h-5" />
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="text-[15px] font-black text-[#19162D] tracking-tight leading-tight truncate">
+          <span className="text-[15px] font-black text-[#111318] tracking-tight leading-tight truncate">
             MIMO Finance
           </span>
           <span className="text-[11px] font-semibold text-slate-400 truncate">
@@ -77,14 +77,14 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
               onClick={() => onTabChange(item.id as FinanceTab)}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[14px] font-bold transition-all duration-150 cursor-pointer text-left ${
                 isActive
-                  ? 'bg-[#EDE8FF] text-[#6D35E8] shadow-xs'
+                  ? 'bg-[#E7EEF7] text-[#093765] shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
               <div className="flex items-center gap-3.5 min-w-0">
                 <Icon
                   className={`w-5 h-5 shrink-0 transition-colors ${
-                    isActive ? 'text-[#6D35E8]' : 'text-slate-400 group-hover:text-slate-600'
+                    isActive ? 'text-[#093765]' : 'text-slate-400 group-hover:text-slate-600'
                   }`}
                 />
                 <span className="truncate whitespace-nowrap">{item.label}</span>
@@ -101,11 +101,11 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
       </nav>
 
       {/* ── BOTTOM: STATUS & PROFILE SECTION ────────────────────────────── */}
-      <div className="p-3 space-y-2 border-t border-[#EDE9FE] bg-[#FAF9FD] shrink-0">
+      <div className="p-3 space-y-2 border-t border-[#E4E7EB] bg-[#F3F4F6] shrink-0">
         {/* Switch to Admin Ops */}
         <a
           href="/admin/"
-          className="flex items-center justify-between px-3 py-2 rounded-xl text-[12px] font-bold text-slate-500 hover:text-[#6D35E8] hover:bg-[#EDE8FF] transition-colors"
+          className="flex items-center justify-between px-3 py-2 rounded-xl text-[12px] font-bold text-slate-500 hover:text-[#093765] hover:bg-[#E7EEF7] transition-colors"
         >
           <span className="flex items-center gap-2">
             <ArrowUpRight className="w-4 h-4 text-slate-400" />
@@ -118,9 +118,9 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
         <FleetPill />
 
         {/* Profile Card */}
-        <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-[#EDE9FE] shadow-2xs">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-[#E4E7EB] shadow-2xs">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-[#6D35E8] flex items-center justify-center text-white font-black text-xs shrink-0 shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-[#093765] flex items-center justify-center text-white font-black text-xs shrink-0 shadow-xs">
               AD
             </div>
             <div className="flex flex-col min-w-0">
@@ -153,7 +153,7 @@ const FleetPill: React.FC = () => {
   const ok = !!sum && sum.offline === 0;
   const dot = !sum ? 'bg-slate-300' : ok ? 'bg-emerald-500' : 'bg-amber-500';
   return (
-    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-[#EDE9FE] shadow-2xs">
+    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-[#E4E7EB] shadow-2xs">
       <div className="flex items-center gap-2.5">
         <span className="relative flex h-2.5 w-2.5 shrink-0">
           {ok && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}

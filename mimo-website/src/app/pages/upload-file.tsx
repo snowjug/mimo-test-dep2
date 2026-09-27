@@ -1,16 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
-import { MimoCoinsDisplay } from "../components/mimo-coins-display";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Upload, FileText, X, Printer, CheckCircle, AlertCircle, ImageIcon, History, Layers, Wallet, FileIcon, Grid3X3, Loader2, QrCode, FileCheck, ArrowRight, Copy, Clock } from "lucide-react";
+import { MimoHeader } from "../components/mimo-header";
+import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
+import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { HackathonBanner } from "../components/HackathonBanner";
-import { PDFDocument } from "pdf-lib";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 
@@ -535,6 +530,8 @@ export function UploadFile() {
         if (f.type === "application/pdf") {
           try {
             const arrayBuffer = await f.arrayBuffer();
+            // Loaded on demand: pdf-lib is ~400 KB and only needed once a PDF is picked.
+            const { PDFDocument } = await import("pdf-lib");
             const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
             pageCount = pdfDoc.getPageCount();
           } catch (err) {
@@ -855,477 +852,241 @@ export function UploadFile() {
     navigate("/print-options");
   };
 
+  const firstName = userName && userName !== "Admin User" ? userName.split(" ")[0] : "";
+  const hasUploading = files.some((f) => f.status === "uploading");
+
+  const clearAll = () => {
+    setFiles([]);
+    setUploadedFilesData([]);
+    setBackendTotalPages(0);
+    sessionStorage.removeItem("uploadedImages");
+    sessionStorage.removeItem("printFiles");
+    sessionStorage.removeItem("printOptions");
+    sessionStorage.removeItem("uploadAmount");
+    sessionStorage.removeItem("uploadTotalPages");
+  };
+
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-2 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4">
-      <div className="mx-auto max-w-5xl space-y-2 sm:space-y-3">
+    <div className="px-4 pb-10">
+      <MimoHeader />
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx"
+        onChange={(e) => handleFileSelect(e.target.files)}
+      />
 
-        {/* Global Styles for Custom Fonts */}
-        <style>
-          {`
-            @import url('https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Outfit:wght@400;500;600&family=Chewy&family=Pacifico&display=swap');
-            
-            @keyframes float-hey {
-              0%, 100% { transform: rotate(-10deg) translateY(0px); }
-              50% { transform: rotate(-3deg) translateY(-8px); }
-            }
-          `}
-        </style>
-
-        {/* Header */}
-        <div className="flex items-center justify-between pt-3 sm:pt-5">
-          <div className="flex flex-col items-start cursor-pointer group select-none ml-2 pt-1">
-            <div className="z-20 -mb-2 relative animate-[float-hey_3s_ease-in-out_infinite] hover:rotate-0 hover:scale-[1.15] transition-all duration-300">
-              <span
-                className="text-[3.5rem] sm:text-[6rem] bg-clip-text text-transparent bg-gradient-to-tr from-[#093765] via-blue-600 to-[#a855f7] leading-none drop-shadow-[0_8px_8px_rgba(9,55,101,0.4)] pr-2"
-                style={{ fontFamily: "'Chewy', cursive", letterSpacing: "1px" }}
-              >
-                HEY!
-              </span>
-            </div>
-            <h1
-              className="text-2xl sm:text-5xl font-bold text-gray-900 tracking-tight z-10 -mt-1"
-              style={{ fontFamily: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif" }}
-            >
-              {userName}
-            </h1>
-          </div>
-          <div className="flex items-center gap-3 sm:gap-4">
-            <Dialog>
-              <DialogTrigger asChild>
-                <button 
-                  className="flex items-center justify-center w-10 h-10 cursor-pointer bg-blue-50 hover:bg-blue-100 rounded-full transition-all border border-blue-200 shadow-sm shrink-0"
-                  title="How to print?"
-                >
-                  <svg 
-                    className="w-5 h-5 text-blue-600" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="3.5" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                </button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                    <Printer className="w-6 h-6 text-blue-600" />
-                    How to use MIMO
-                  </DialogTitle>
-                  <DialogDescription className="text-base">
-                    Follow these simple steps to print your documents easily.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="flex gap-4 items-start">
-                    <div className="bg-blue-100 p-2 rounded-full shrink-0"><Upload className="w-5 h-5 text-blue-600" /></div>
-                    <div>
-                      <h4 className="font-bold text-gray-900">1. Upload Files</h4>
-                      <p className="text-sm text-gray-600">Select and upload the PDF or Image files you wish to print.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 items-start">
-                    <div className="bg-blue-100 p-2 rounded-full shrink-0"><FileCheck className="w-5 h-5 text-blue-600" /></div>
-                    <div>
-                      <h4 className="font-bold text-gray-900">2. Configure Options</h4>
-                      <p className="text-sm text-gray-600">Choose your print destination, color mode, sides, layout, and number of copies.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 items-start">
-                    <div className="bg-blue-100 p-2 rounded-full shrink-0"><QrCode className="w-5 h-5 text-blue-600" /></div>
-                    <div>
-                      <h4 className="font-bold text-gray-900">3. Get Your Print Code</h4>
-                      <p className="text-sm text-gray-600">After payment, a secure 4-digit code will be generated for your print job.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 items-start">
-                    <div className="bg-blue-100 p-2 rounded-full shrink-0"><Printer className="w-5 h-5 text-blue-600" /></div>
-                    <div>
-                      <h4 className="font-bold text-gray-900">4. Print at Kiosk</h4>
-                      <p className="text-sm text-gray-600">Go to the selected MIMO printer kiosk, enter your 4-digit code on the keypad, and collect your printed document!</p>
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-            <MimoCoinsDisplay />
-            <div className="flex items-center gap-1 sm:gap-3 cursor-pointer p-1 sm:p-2 hover:bg-white/50 rounded-xl transition-colors" onClick={() => navigate("/user-profile")}>
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-gray-700">{userName}</p>
-                <p className="text-xs text-gray-500">View Profile</p>
-              </div>
-              <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
-                <AvatarFallback className="bg-gradient-to-br from-[#093765] to-blue-600 text-white">
-                  {userName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent animate-in fade-in slide-in-from-left-4 duration-500">Upload Documents</h1>
-        </div>
-
-        {/* Printer Status */}
-        <Card className="border-0 shadow-xl bg-gradient-to-br from-[#093765] via-blue-700 to-blue-500 text-white overflow-hidden relative group hover:shadow-2xl transition-shadow duration-300">
-          <div className="absolute top-0 right-0 p-6 opacity-[0.07] group-hover:opacity-[0.14] transition-opacity duration-500 pointer-events-none">
-            <Printer className="w-36 h-36 rotate-12" />
-          </div>
-          {/* Subtle shimmer overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 pointer-events-none" />
-          <CardContent className="p-4 sm:p-6 relative z-10">
-            <div className="flex flex-row items-center justify-between gap-3 sm:gap-6">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 sm:gap-3 mb-3">
-                  <h3 className="font-extrabold text-base sm:text-xl tracking-tight">My Dashboard</h3>
-                </div>
-                <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-md">
-                  <div className="bg-white/10 hover:bg-white/20 rounded-xl p-2 sm:p-3 text-center backdrop-blur-sm border border-white/10 transition-colors duration-200 cursor-default">
-                    <div className="text-[9px] sm:text-[10px] opacity-70 flex items-center justify-center gap-1 mb-1 uppercase tracking-wider font-semibold"><History className="w-3 h-3" /> Prints</div>
-                    <div className="font-black text-sm sm:text-xl">{userStats.totalDocs}</div>
-                  </div>
-                  <div className="bg-white/10 hover:bg-white/20 rounded-xl p-2 sm:p-3 text-center backdrop-blur-sm border border-white/10 transition-colors duration-200 cursor-default">
-                    <div className="text-[9px] sm:text-[10px] opacity-70 flex items-center justify-center gap-1 mb-1 uppercase tracking-wider font-semibold"><Layers className="w-3 h-3" /> Pages</div>
-                    <div className="font-black text-sm sm:text-xl">{userStats.totalPages}</div>
-                  </div>
-                  <div className="bg-white/10 hover:bg-white/20 rounded-xl p-2 sm:p-3 text-center backdrop-blur-sm border border-white/10 transition-colors duration-200 cursor-default">
-                    <div className="text-[9px] sm:text-[10px] opacity-70 flex items-center justify-center gap-1 mb-1 uppercase tracking-wider font-semibold"><Wallet className="w-3 h-3" /> Spent</div>
-                    <div className="font-black text-sm sm:text-xl">₹{Number(userStats.totalSpent).toFixed(0)}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Active Print Codes (Ready to Print) */}
-        {activePrintCodes.length > 0 && (
-          <Card className="gap-0 border border-blue-200/80 shadow-xs bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/50 backdrop-blur-xl rounded-lg sm:rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="px-2.5 py-1.5 sm:px-4 sm:py-2 border-b border-blue-100/70 flex items-center gap-1.5 sm:gap-2">
-              <div className="flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded px-1.5 py-0.5 shadow-2xs shrink-0" title="Ready to Print">
-                <Printer className="w-3 h-3 text-emerald-700" />
-                <CheckCircle className="w-2.5 h-2.5 text-emerald-600" />
-              </div>
-              <span className="text-xs sm:text-sm font-extrabold text-[#093765] tracking-tight leading-none">
-                Active Print Codes
-              </span>
-            </div>
-            <CardContent className="p-1 sm:p-3 space-y-1 sm:space-y-2 [&:last-child]:pb-1 sm:[&:last-child]:pb-3">
-              {activePrintCodes.map((job) => {
-                const isColor = job.colorMode === "color" || (job.details && job.details.toLowerCase().includes("color"));
-                const pageText = job.pageCount
-                  ? `${job.pageCount} ${job.pageCount === 1 ? "page" : "pages"}`
-                  : job.details
-                  ? job.details.split("•")[0].trim()
-                  : "1 page";
-                const copies = job.copies || 1;
-
-                // Calculate Valid till: creation timestamp + 24 hours
-                const jobTimestamp = typeof job.createdAtTime === "number" && job.createdAtTime > 0
-                  ? job.createdAtTime
-                  : job.date
-                  ? new Date(job.date).getTime()
-                  : 0;
-
-                let validTillText = "";
-                if (jobTimestamp && !isNaN(jobTimestamp)) {
-                  const expiryDate = new Date(jobTimestamp + 24 * 60 * 60 * 1000);
-                  const day = expiryDate.getDate();
-                  const month = expiryDate.toLocaleString("en-US", { month: "short" });
-                  const time = expiryDate.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-                  validTillText = `${day} ${month}, ${time}`;
-                }
-
-                return (
-                  <div
-                    key={job.id || job.printCode}
-                    className="p-1.5 sm:p-2.5 rounded-md sm:rounded-xl bg-white border border-slate-200/90 shadow-2xs hover:border-blue-300 transition-all flex items-center gap-2 sm:gap-3.5"
-                  >
-                    {/* Left: Code badge + Copy icon */}
-                    <div
-                      className="cursor-pointer group flex items-center gap-1 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded px-1.5 py-0.5 sm:px-2.5 sm:py-1 shrink-0 transition-colors"
-                      title="Click to copy code"
-                      onClick={() => {
-                        navigator.clipboard.writeText(job.printCode);
-                        toast.success(`Print code ${job.printCode} copied!`);
-                      }}
-                    >
-                      <span className="font-mono text-xs sm:text-base font-black text-[#093765] tracking-wider sm:tracking-widest">
-                        {job.printCode}
-                      </span>
-                      <Copy className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-blue-500 group-hover:text-blue-700 transition-colors" />
-                    </div>
-
-                    {/* Right: Filename, Metadata, Expiry */}
-                    <div className="min-w-0 flex-1 leading-tight">
-                      <p className="text-[11px] sm:text-sm font-bold text-slate-800 truncate" title={job.file || "Document"}>
-                        {job.file || "Document"}
-                      </p>
-                      <div className="text-[9px] sm:text-xs text-slate-500 mt-0.5 leading-tight">
-                        <span className="font-medium">{pageText} • {isColor ? "Color" : "B&W"}{copies > 1 ? ` • ${copies} copies` : ""}</span>
-                        {validTillText && (
-                          <span className="block sm:inline sm:before:content-['•'] sm:before:mx-1.5 text-slate-600 font-medium">
-                            Valid till: {validTillText}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Upload Area */}
-        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-xl">
-          <div className="p-3 sm:p-5">
-            <div
-              className={`border-2 border-dashed transition-all duration-300 ease-in-out group cursor-pointer ${
-                isDragging
-                  ? "border-[#093765] bg-blue-50/60 scale-[1.01] shadow-lg shadow-blue-100"
-                  : "border-slate-200 hover:border-[#093765]/60 hover:bg-blue-50/30"
-              } ${
-                files.length > 0
-                  ? "p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-center gap-4 text-center"
-                  : "p-6 sm:p-10 rounded-2xl text-center flex flex-col items-center justify-center"
-              }`}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {files.length > 0 ? (
-                <>
-                  <div className="flex items-center justify-center gap-3">
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-300 ${isDragging ? 'bg-blue-100' : 'bg-slate-100 group-hover:bg-blue-50'}`}>
-                      <Upload className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-300 ${isDragging ? "text-[#093765]" : "text-slate-400 group-hover:text-[#093765]"}`} />
-                    </div>
-                    <div className="text-left">
-                      <h3 className="text-sm sm:text-base font-bold text-slate-700 group-hover:text-[#093765] transition-colors">Add more files</h3>
-                      <p className="text-xs text-slate-400">PDF, DOCX, Images, TXT, PPTX, &amp; more</p>
-                    </div>
-                  </div>
-                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx" onChange={(e) => handleFileSelect(e.target.files)} />
-                </>
-              ) : (
-                <>
-                  {/* Pulsing ring + icon */}
-                  <div className="relative mb-5">
-                    <div className={`absolute inset-0 rounded-full transition-all duration-300 ${isDragging ? 'bg-blue-200 scale-125 opacity-40' : 'bg-transparent group-hover:bg-blue-100 group-hover:scale-110 opacity-0 group-hover:opacity-50'}`} />
-                    <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all duration-300 relative z-10 border-2 ${
-                      isDragging ? 'bg-blue-100 border-[#093765]' : 'bg-slate-100 border-transparent group-hover:bg-blue-50 group-hover:border-[#093765]/30'
-                    }`}>
-                      <Upload className={`w-7 h-7 sm:w-9 sm:h-9 transition-all duration-300 ${
-                        isDragging ? "text-[#093765] scale-110" : "text-slate-400 group-hover:text-[#093765] group-hover:scale-110 group-hover:-translate-y-0.5"
-                      }`} />
-                    </div>
-                  </div>
-                  <h3 className="text-base sm:text-xl font-extrabold mb-1.5 text-slate-700 group-hover:text-[#093765] transition-colors duration-200">
-                    {isDragging ? "Release to upload!" : "Click or drag files here to print"}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-400 mb-1 max-w-xs mx-auto">
-                    PDF, DOCX, JPG, PNG, TXT, PPTX, &amp; more
-                  </p>
-                  <input ref={fileInputRef} type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx" onChange={(e) => handleFileSelect(e.target.files)} />
-                </>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* Quick Print - A4 Sheet, Mimo Graph & Custom Document */}
-        {files.length === 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            {/* Blank A4 Sheet */}
-            <button
-              onClick={() => navigate("/blank-pages?type=a4")}
-              className="group relative overflow-hidden rounded-2xl p-3.5 sm:p-5 border border-slate-200/80 shadow-sm sm:shadow-lg bg-white/90 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-blue-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative z-10 flex flex-row sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-3">
-                <div className="flex items-center sm:flex-col sm:items-start gap-3">
-                  <div className="w-12 h-12 sm:w-14 sm:h-20 rounded-xl sm:rounded-lg border-2 border-slate-200 bg-white flex items-center justify-center shadow-2xs group-hover:border-[#093765] group-hover:shadow-md transition-all duration-300 shrink-0">
-                    <FileIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-400 group-hover:text-[#093765] transition-colors duration-300" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-[#093765] transition-colors">Blank A4 Sheet</h3>
-                    <p className="text-xs text-slate-400 sm:hidden mt-0.5">Print a blank A4 sheet</p>
-                  </div>
-                </div>
-                <div className="sm:hidden w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-blue-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
-            </button>
-
-            {/* MIMO Graph */}
-            <button
-              onClick={() => navigate("/blank-pages?type=graph")}
-              className="group relative overflow-hidden rounded-2xl p-3.5 sm:p-5 border border-slate-200/80 shadow-sm sm:shadow-lg bg-white/90 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative z-10 flex flex-row sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-3">
-                <div className="flex items-center sm:flex-col sm:items-start gap-3">
-                  <div
-                    className="w-12 h-12 sm:w-14 sm:h-20 rounded-xl sm:rounded-lg border-2 border-emerald-300 bg-white flex items-center justify-center shadow-2xs group-hover:border-emerald-500 group-hover:shadow-md transition-all duration-300 shrink-0"
-                    style={{
-                      backgroundImage: "linear-gradient(rgba(16, 185, 129, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.12) 1px, transparent 1px)",
-                      backgroundSize: "6px 6px",
-                    }}
-                  >
-                    <Grid3X3 className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-500 group-hover:text-emerald-600 transition-colors duration-300" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-emerald-700 transition-colors">MIMO Graph</h3>
-                    <p className="text-xs text-slate-400 sm:hidden mt-0.5">Print MIMO Graph paper</p>
-                  </div>
-                </div>
-                <div className="sm:hidden w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 shadow-2xs">
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-emerald-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
-            </button>
-
-            {/* Custom Document */}
-            <button
-              onClick={() => navigate("/text-editor")}
-              className="group relative overflow-hidden rounded-2xl p-3.5 sm:p-5 border border-slate-200/80 shadow-sm sm:shadow-lg bg-white/90 backdrop-blur-xl text-left transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-indigo-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative z-10 flex flex-row sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-3">
-                <div className="flex items-center sm:flex-col sm:items-start gap-3">
-                  <div className="w-12 h-12 sm:w-14 sm:h-20 rounded-xl sm:rounded-lg border-2 border-purple-200 bg-white flex items-center justify-center shadow-2xs group-hover:border-purple-500 group-hover:shadow-md transition-all duration-300 shrink-0">
-                    <FileText className="w-6 h-6 sm:w-7 sm:h-7 text-purple-500 group-hover:text-purple-600 transition-colors duration-300" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm sm:text-base text-slate-800 group-hover:text-purple-700 transition-colors">Custom Document</h3>
-                    <p className="text-xs text-slate-400 sm:hidden mt-0.5">Upload &amp; print your own file</p>
-                  </div>
-                </div>
-                <div className="sm:hidden w-8 h-8 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 shadow-2xs">
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-purple-100 to-transparent rounded-tl-full opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
-            </button>
-          </div>
-        )}
-
-        {/* Uploaded Files */}
-        {files.length > 0 && (
-          <Card className="border-0 shadow-lg overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-500 gap-3">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <CardTitle>Uploaded Files</CardTitle>
-                </div>
-
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {files.map((file, index) => {
-                  const isPdf = file.name.toLowerCase().endsWith('.pdf');
-                  const isImage = file.type?.startsWith('image/');
-                  return (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 p-3 sm:p-4 border border-slate-200 rounded-2xl bg-white hover:shadow-md hover:border-[#093765]/20 transition-all duration-200 group animate-in slide-in-from-left-2 fade-in duration-300"
-                  >
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-                      file.status === 'completed'
-                        ? isPdf ? 'bg-red-50 text-red-500' : isImage ? 'bg-purple-50 text-purple-500' : 'bg-blue-50 text-[#093765]'
-                        : file.status === 'uploading' ? 'bg-amber-50 text-amber-500' : 'bg-slate-100 text-slate-400'
-                    }`}>
-                      {isImage ? <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6" /> : <FileText className="w-5 h-5 sm:w-6 sm:h-6" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-medium truncate">{file.name}</p>
-                        {file.status === "completed" && (
-                          <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 whitespace-nowrap text-[10px] sm:text-xs">
-                            {file.pageCount ? `${file.pageCount} pgs` : `~${file.type?.startsWith('image/') ? 1 : (file.size > 2000000 ? Math.floor(file.size / 500000) : 1)} pgs`}
-                          </Badge>
-                        )}
-                        {file.status === "failed" && (
-                          <Badge variant="destructive">
-                            <AlertCircle className="w-3 h-3 mr-1" />
-                            Failed
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                      {file.status === "uploading" && (
-                        <div className="mt-3">
-                          <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className="bg-indigo-600 h-full rounded-full transition-all duration-300"
-                              style={{ width: `${file.progress}%` }}
-                            />
-                          </div>
-                          {file.progress >= 99 && (
-                            <p className="text-[10px] text-indigo-600 font-semibold mt-1 animate-pulse">
-                              Processing on server... this may take a moment.
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="opacity-100 transition-opacity hover:bg-red-50 hover:text-red-500 hover:border-red-200"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFile(index);
-                      }}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t border-slate-200 w-full">
-                <Button
-                  className="flex-1 h-12 text-sm sm:text-base font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl w-full sm:w-auto"
-                  disabled={files.length === 0 || files.some((f) => f.status === "uploading")}
-                  onClick={handlePrint}
-                >
-                  Continue to Print
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="flex-1 h-12 text-sm font-bold uppercase tracking-wider border-slate-200 hover:border-red-200 text-slate-600 hover:text-red-600 bg-white hover:bg-red-50/30 rounded-xl transition-all duration-300 w-full sm:w-auto shadow-xs cursor-pointer" 
-                  onClick={() => {
-                  setFiles([]);
-                  setUploadedFilesData([]);
-                  setBackendTotalPages(0);
-                  sessionStorage.removeItem("uploadedImages");
-                  sessionStorage.removeItem("printFiles");
-                  sessionStorage.removeItem("printOptions");
-                  sessionStorage.removeItem("uploadAmount");
-                  sessionStorage.removeItem("uploadTotalPages");
-                }}>
-                  Clear All
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Hackathon Event Spotlight Banner */}
-        <HackathonBanner />
+      <div className="rise-in pt-3 pb-6">
+        <h1 className="text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] text-ink">
+          {firstName ? `Hi, ${firstName}` : "Hi there"}
+        </h1>
+        <p className="mt-1.5 text-[16px] text-ink-2">What are we printing today?</p>
       </div>
+
+      {/* Active print codes */}
+      {activePrintCodes.length > 0 && (
+        <Group title="Ready to print" footer="Tap a code to copy it. Codes stay valid for 24 hours." className="mb-6">
+          {activePrintCodes.map((job: any) => {
+            const isColor = job.colorMode === "color" || (job.details && job.details.toLowerCase().includes("color"));
+            const pageText = job.pageCount
+              ? `${job.pageCount} ${job.pageCount === 1 ? "page" : "pages"}`
+              : job.details
+              ? job.details.split("•")[0].trim()
+              : "1 page";
+            const copies = job.copies || 1;
+
+            // Calculate Valid till: creation timestamp + 24 hours
+            const jobTimestamp = typeof job.createdAtTime === "number" && job.createdAtTime > 0
+              ? job.createdAtTime
+              : job.date
+              ? new Date(job.date).getTime()
+              : 0;
+
+            let validTillText = "";
+            if (jobTimestamp && !isNaN(jobTimestamp)) {
+              const expiryDate = new Date(jobTimestamp + 24 * 60 * 60 * 1000);
+              const day = expiryDate.getDate();
+              const month = expiryDate.toLocaleString("en-US", { month: "short" });
+              const time = expiryDate.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+              validTillText = `${day} ${month}, ${time}`;
+            }
+
+            return (
+              <button
+                key={job.id || job.printCode}
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(job.printCode);
+                  toast.success(`Print code ${job.printCode} copied!`);
+                }}
+                aria-label={`Copy print code ${job.printCode}`}
+                className="flex w-full items-center gap-4 border-t border-hairline px-4 py-3 text-left transition-colors first:border-t-0 active:bg-surface-2"
+              >
+                <span className="text-[28px] font-semibold leading-none tracking-[0.08em] tabular-nums text-ink">{job.printCode}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] text-ink">{job.file || "Document"}</span>
+                  <span className="mt-0.5 block text-[13px] text-ink-3">
+                    {pageText}, {isColor ? "colour" : "B&W"}{copies > 1 ? `, ${copies} copies` : ""}
+                    {validTillText && <span className="block">Valid till {validTillText}</span>}
+                  </span>
+                </span>
+                <Copy className="size-4 shrink-0 text-ink-3" />
+              </button>
+            );
+          })}
+        </Group>
+      )}
+
+      {/* Upload */}
+      {files.length === 0 ? (
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`press flex w-full flex-col items-start rounded-[24px] bg-brand p-5 text-left text-on-brand ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
+        >
+          <span className="flex size-11 items-center justify-center rounded-full bg-white/15">
+            <Plus className="size-6" strokeWidth={2} />
+          </span>
+          <span className="mt-8 text-[22px] font-semibold leading-tight tracking-tight">Choose files to print</span>
+          <span className="mt-1 text-[15px] text-white/75">PDF, Word, PowerPoint, Excel, text or photos</span>
+        </button>
+      ) : (
+        <Group
+          title="Files"
+          footer={
+            hasUploading
+              ? "Uploading. Office files are converted to PDF on our side, which can take a moment."
+              : `${displayTotalPages} ${displayTotalPages === 1 ? "page" : "pages"} in total`
+          }
+        >
+          {files.map((file, index) => {
+            const isImage = file.type?.startsWith("image/");
+            const pagesLabel = file.pageCount
+              ? `${file.pageCount} ${file.pageCount === 1 ? "page" : "pages"}`
+              : `about ${isImage ? 1 : (file.size > 2000000 ? Math.floor(file.size / 500000) : 1)} pages`;
+            return (
+              <div key={file.clientUploadId || index} className="relative flex items-center gap-3 border-t border-hairline px-4 py-3 first:border-t-0">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-2 text-ink-2">
+                  {isImage ? <ImageIcon className="size-5" strokeWidth={1.75} /> : <FileText className="size-5" strokeWidth={1.75} />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] text-ink">{file.name}</span>
+                  <span className="mt-0.5 flex items-center gap-2 text-[13px] text-ink-3">
+                    {file.status === "completed" && <span className="tabular-nums">{pagesLabel}, {formatFileSize(file.size)}</span>}
+                    {file.status === "uploading" && (
+                      <span className="tabular-nums">{file.progress >= 99 ? "Processing" : `Uploading ${file.progress}%`}</span>
+                    )}
+                    {file.status === "failed" && <StatusPill tone="danger">Upload failed</StatusPill>}
+                  </span>
+                  {file.status === "uploading" && (
+                    <span className="mt-2 block h-1 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={file.progress} aria-valuemin={0} aria-valuemax={100}>
+                      <span
+                        className={`block h-full rounded-full bg-brand transition-[width] duration-300 ${file.progress >= 99 ? "motion-safe:animate-pulse" : ""}`}
+                        style={{ width: `${file.progress}%` }}
+                      />
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${file.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(index);
+                  }}
+                  className="press flex size-9 shrink-0 items-center justify-center rounded-full text-ink-3 active:bg-surface-2"
+                >
+                  <X className="size-[18px]" />
+                </button>
+              </div>
+            );
+          })}
+          <Row
+            icon={<Plus className="size-5" />}
+            label={<span className="text-brand-text">Add more files</span>}
+            onClick={() => fileInputRef.current?.click()}
+          />
+        </Group>
+      )}
+
+      {/* Quick print */}
+      {files.length === 0 && (
+        <Group title="Quick print" className="mt-8">
+          <Row
+            icon={<FileIcon className="size-5" strokeWidth={1.75} />}
+            label="Blank A4 sheet"
+            detail="Plain paper, no upload needed"
+            chevron
+            onClick={() => navigate("/blank-pages?type=a4")}
+          />
+          <Row
+            icon={<Grid3X3 className="size-5" strokeWidth={1.75} />}
+            label="MIMO graph paper"
+            detail="Squared sheets for maths and drawings"
+            chevron
+            onClick={() => navigate("/blank-pages?type=graph")}
+          />
+          <Row
+            icon={<PenLine className="size-5" strokeWidth={1.75} />}
+            label="Type a document"
+            detail="Write or paste text, then print it"
+            chevron
+            onClick={() => navigate("/text-editor")}
+          />
+        </Group>
+      )}
+
+      {files.length === 0 && (
+        <Group className="mt-4">
+          <Row
+            icon={<MapPin className="size-5" strokeWidth={1.75} />}
+            label="Find a kiosk"
+            detail="Locations and which one prints colour"
+            chevron
+            onClick={() => navigate("/find-machine")}
+          />
+        </Group>
+      )}
+
+      {/* Activity */}
+      {files.length === 0 && (
+        <section className="mt-8" aria-label="Your activity">
+          <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-3">Your activity</h2>
+          <dl className="grid grid-cols-3 divide-x divide-hairline rounded-[20px] bg-surface py-4">
+            {[
+              { label: "Prints", value: userStats.totalDocs },
+              { label: "Pages", value: userStats.totalPages },
+              { label: "Spent", value: `₹${Number(userStats.totalSpent).toFixed(0)}` },
+            ].map((s) => (
+              <div key={s.label} className="flex flex-col-reverse px-3 text-center">
+                <dt className="mt-0.5 text-[13px] text-ink-3">{s.label}</dt>
+                <dd className="text-[22px] font-semibold tabular-nums tracking-tight text-ink">{s.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
+
+      {files.length === 0 && <HackathonBanner />}
+
+      {files.length > 0 && (
+        <>
+          <ActionBarSpacer size={140} />
+          <ActionBar>
+            <PrimaryButton disabled={files.length === 0 || hasUploading} onClick={handlePrint}>
+              Continue
+            </PrimaryButton>
+            <TextButton onClick={clearAll} className="mt-1 w-full text-ink-2">
+              Clear all
+            </TextButton>
+          </ActionBar>
+        </>
+      )}
     </div>
   );
 }

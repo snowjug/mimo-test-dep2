@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { MimoHeader } from "../components/mimo-header";
-import { ArrowLeft, Loader2, AlignLeft, AlignCenter, AlignRight, AlignJustify, Plus, Minus, FileText, Check, MapPin, Printer } from "lucide-react";
+import { AlignLeft, AlignCenter, AlignRight, AlignJustify } from "lucide-react";
+import { ActionBar, ActionBarSpacer, AppBar, ChoiceRow, Group, PrimaryButton, Row, Segmented, Stepper } from "../components/mimo/ui";
 import api from "../api";
 import { toast } from "sonner";
 
@@ -122,345 +119,200 @@ export function TextEditor() {
     if (fontFamily === "Courier") {
       return "'Courier New', Courier, monospace";
     }
-    return "'Outfit', 'Inter', Helvetica, sans-serif";
+    return "Helvetica, Arial, sans-serif";
   };
 
+  return <TextEditorView {...{
+    textContent, setTextContent, fontFamily, setFontFamily, fontSize, setFontSize, lineSpacing, setLineSpacing,
+    alignment, setAlignment, pageSize, setPageSize, margins, setMargins, directKioskId, setDirectKioskId,
+    copies, setCopies, isProcessing, estimatedPages, totalCost, handleContinue, getMarginPadding, getPreviewFont,
+  }} />;
+}
+
+const selectClass =
+  "h-10 appearance-none rounded-[12px] bg-surface-2 pl-3 pr-8 text-[15px] text-ink outline-none focus-visible:ring-4 focus-visible:ring-brand-soft bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b7079%22 stroke-width=%222.5%22><path d=%22m6 9 6 6 6-6%22/></svg>')] bg-[length:12px] bg-[right_10px_center] bg-no-repeat";
+
+function TextEditorView(p: {
+  textContent: string; setTextContent: (v: string) => void;
+  fontFamily: string; setFontFamily: (v: string) => void;
+  fontSize: number; setFontSize: (fn: (prev: number) => number) => void;
+  lineSpacing: number; setLineSpacing: (v: number) => void;
+  alignment: string; setAlignment: (v: string) => void;
+  pageSize: string; setPageSize: (v: string) => void;
+  margins: string; setMargins: (v: string) => void;
+  directKioskId: string | null; setDirectKioskId: (v: string) => void;
+  copies: number; setCopies: (fn: (prev: number) => number) => void;
+  isProcessing: boolean; estimatedPages: number; totalCost: number;
+  handleContinue: () => void; getMarginPadding: () => string; getPreviewFont: () => string;
+}) {
+  const [mode, setMode] = useState<"write" | "preview">("write");
+  const canContinue = !!p.textContent.trim() && !!p.directKioskId;
+
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-2 pt-0 pb-2 sm:px-4 sm:pt-0 sm:pb-4">
-      <div className="mx-auto max-w-5xl space-y-3 sm:space-y-4">
-        {/* Global Styles */}
-        <style>
-          {`
-            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
-            .editor-textarea::placeholder {
-              color: #cbd5e1;
+    <div className="min-h-[100dvh]">
+      <AppBar title="New document" backTo="/upload" />
+
+      <main className="px-4">
+        <Segmented<"write" | "preview">
+          label="Editor view"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "write", label: "Write" },
+            { value: "preview", label: "Preview" },
+          ]}
+        />
+
+        {mode === "write" ? (
+          <div className="mt-4">
+            <label htmlFor="doc-text" className="sr-only">Document text</label>
+            <textarea
+              id="doc-text"
+              value={p.textContent}
+              onChange={(e) => p.setTextContent(e.target.value)}
+              placeholder="Type or paste your text here"
+              className="h-[46dvh] min-h-[260px] w-full resize-none rounded-[20px] bg-surface p-4 text-[16px] leading-relaxed text-ink outline-none placeholder:text-ink-3 focus-visible:ring-4 focus-visible:ring-brand-soft"
+            />
+            <p className="mt-2 px-1 text-[13px] tabular-nums text-ink-3">
+              {p.textContent.length} characters, about {p.estimatedPages} {p.estimatedPages === 1 ? "page" : "pages"}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 flex justify-center rounded-[20px] bg-surface-2 p-5">
+            <div className="aspect-[1/1.414] w-full max-w-[300px] overflow-hidden rounded-[4px] bg-white shadow-float ring-1 ring-black/5">
+              <div
+                className="h-full w-full overflow-y-auto whitespace-pre-wrap break-words text-[#111318]"
+                style={{
+                  padding: p.getMarginPadding(),
+                  fontFamily: p.getPreviewFont(),
+                  fontSize: `${p.fontSize * 0.7}px`,
+                  lineHeight: p.lineSpacing,
+                  textAlign: p.alignment as any,
+                }}
+              >
+                {p.textContent || <span className="italic text-[#8d929b]">Your text will appear here.</span>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Group title="Format">
+          <Row
+            label="Font"
+            trailing={
+              <select aria-label="Font" value={p.fontFamily} onChange={(e) => p.setFontFamily(e.target.value)} className={selectClass}>
+                <option value="Helvetica">Sans serif</option>
+                <option value="Times-Roman">Serif</option>
+                <option value="Courier">Monospace</option>
+              </select>
             }
-          `}
-        </style>
-
-        {/* Header */}
-        <MimoHeader />
-
-        {/* Page Title */}
-        <div className="flex items-center gap-2 py-2">
-          <button
-            onClick={() => navigate("/")}
-            className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-200/40 -ml-1"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
-          </button>
-          <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent tracking-tight leading-tight py-1">
-            Custom Document Editor
-          </h1>
-        </div>
-
-        {/* Editor Workspace */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          
-          {/* Controls Panel & Input (Left) */}
-          <div className="md:col-span-7 space-y-4">
-            <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-xl">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Compose Document</CardTitle>
-                <CardDescription>Type or paste your text content below</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                
-                {/* Textarea */}
-                <textarea
-                  value={textContent}
-                  onChange={(e) => setTextContent(e.target.value)}
-                  placeholder="Start typing your document here..."
-                  className="editor-textarea w-full h-[320px] p-4 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-sans text-sm resize-none"
-                  style={{ fontFamily: getPreviewFont() }}
-                />
-
-                {/* Typography Settings */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  
-                  {/* Font Family */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Font Family</label>
-                    <select
-                      value={fontFamily}
-                      onChange={(e) => setFontFamily(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="Helvetica">Sans-Serif (Helvetica)</option>
-                      <option value="Times-Roman">Serif (Times)</option>
-                      <option value="Courier">Monospace (Courier)</option>
-                    </select>
-                  </div>
-
-                  {/* Font Size */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Font Size</label>
-                    <div className="flex items-center border border-slate-200 rounded-lg bg-white h-10 overflow-hidden">
-                      <button
-                        onClick={() => setFontSize(prev => Math.max(8, prev - 1))}
-                        className="flex-1 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="w-12 text-center text-sm font-bold text-slate-700">{fontSize}pt</span>
-                      <button
-                        onClick={() => setFontSize(prev => Math.min(24, prev + 1))}
-                        className="flex-1 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Line Spacing */}
-                  <div className="space-y-1 col-span-2 sm:col-span-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Line Spacing</label>
-                    <select
-                      value={lineSpacing}
-                      onChange={(e) => setLineSpacing(parseFloat(e.target.value))}
-                      className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="1.0">Single (1.0)</option>
-                      <option value="1.15">Default (1.15)</option>
-                      <option value="1.5">1.5 Lines</option>
-                      <option value="2.0">Double (2.0)</option>
-                    </select>
-                  </div>
-
-                </div>
-
-                {/* Document Options */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
-                  
-                  {/* Alignment */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Alignment</label>
-                    <div className="flex border border-slate-200 rounded-lg overflow-hidden h-10 bg-white">
-                      {[
-                        { name: "left", icon: AlignLeft },
-                        { name: "center", icon: AlignCenter },
-                        { name: "right", icon: AlignRight },
-                        { name: "justify", icon: AlignJustify }
-                      ].map((alignOpt) => {
-                        const Icon = alignOpt.icon;
-                        return (
-                          <button
-                            key={alignOpt.name}
-                            onClick={() => setAlignment(alignOpt.name)}
-                            className={`flex-1 h-full flex items-center justify-center transition-all ${
-                              alignment === alignOpt.name
-                                ? "bg-blue-50 text-blue-600 font-bold"
-                                : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-                            }`}
-                            title={`Align ${alignOpt.name}`}
-                          >
-                            <Icon className="w-4 h-4" />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Margins */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Margins</label>
-                    <select
-                      value={margins}
-                      onChange={(e) => setMargins(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="small">Small (0.5")</option>
-                      <option value="medium">Medium (0.75")</option>
-                      <option value="large">Large (1.0")</option>
-                    </select>
-                  </div>
-
-                  {/* Page Size */}
-                  <div className="space-y-1 col-span-2 sm:col-span-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Page Size</label>
-                    <select
-                      value={pageSize}
-                      onChange={(e) => setPageSize(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="A4">A4 (Standard)</option>
-                      <option value="Letter">Letter</option>
-                    </select>
-                  </div>
-
-                </div>
-
-              </CardContent>
-            </Card>
+          />
+          <Row
+            label="Size"
+            trailing={
+              <Stepper
+                value={p.fontSize}
+                min={8}
+                max={24}
+                onDecrement={() => p.setFontSize((prev) => Math.max(8, prev - 1))}
+                onIncrement={() => p.setFontSize((prev) => Math.min(24, prev + 1))}
+              >
+                <span className="w-11 text-center text-[15px] font-semibold tabular-nums">{p.fontSize}pt</span>
+              </Stepper>
+            }
+          />
+          <Row
+            label="Line spacing"
+            trailing={
+              <select aria-label="Line spacing" value={p.lineSpacing} onChange={(e) => p.setLineSpacing(parseFloat(e.target.value))} className={selectClass}>
+                <option value="1.0">Single</option>
+                <option value="1.15">1.15</option>
+                <option value="1.5">1.5</option>
+                <option value="2.0">Double</option>
+              </select>
+            }
+          />
+          <div className="border-t border-hairline px-4 py-3">
+            <p className="mb-2 text-[16px] text-ink">Alignment</p>
+            <Segmented
+              label="Alignment"
+              value={p.alignment}
+              onChange={p.setAlignment}
+              options={[
+                { value: "left", label: <><AlignLeft className="size-4" /><span className="sr-only">Left</span></> },
+                { value: "center", label: <><AlignCenter className="size-4" /><span className="sr-only">Centre</span></> },
+                { value: "right", label: <><AlignRight className="size-4" /><span className="sr-only">Right</span></> },
+                { value: "justify", label: <><AlignJustify className="size-4" /><span className="sr-only">Justify</span></> },
+              ]}
+            />
           </div>
-
-          {/* Preview Panel (Right) */}
-          <div className="md:col-span-5 space-y-4">
-            <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-xl h-full flex flex-col justify-between">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center justify-between">
-                  <span>Live Preview</span>
-                  <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-xs">
-                    Estimated {estimatedPages} {estimatedPages === 1 ? "Page" : "Pages"}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col items-center justify-center p-4">
-                
-                {/* Visual A4 Page Container */}
-                <div className="w-full max-w-[280px] sm:max-w-[320px] aspect-[1/1.414] bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden relative">
-                  <div
-                    className="w-full h-full text-slate-800 text-[8px] sm:text-[9.5px] leading-relaxed break-words overflow-y-auto whitespace-pre-wrap selection:bg-blue-100"
-                    style={{
-                      padding: getMarginPadding(),
-                      fontFamily: getPreviewFont(),
-                      fontSize: `${fontSize * 0.7}px`, // scale down font size slightly for miniature preview
-                      lineHeight: lineSpacing,
-                      textAlign: alignment as any
-                    }}
-                  >
-                    {textContent || <span className="text-slate-300 italic">Preview of your typed text will appear here...</span>}
-                  </div>
-                </div>
-
-                {/* Print Destination Selection */}
-                <div className="w-full space-y-3 mt-4 pt-4 border-t border-slate-100">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Where do you want to print this?</label>
-                  
-                  {/* MIMO 1.0 */}
-                  <div 
-                    onClick={() => setDirectKioskId("CV-001")}
-                    className={`group p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-center justify-between gap-3 ${
-                      directKioskId === 'CV-001' 
-                        ? 'border-[#093765] bg-blue-50/20 shadow-sm' 
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg transition-all ${
-                        directKioskId === 'CV-001' ? 'bg-[#093765] text-white' : 'bg-slate-100 text-slate-400'
-                      }`}>
-                        <Printer className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="text-left">
-                        <p className={`text-sm font-bold flex items-center gap-2 ${
-                          directKioskId === 'CV-001' ? 'text-[#093765]' : 'text-slate-700'
-                        }`}>
-                          MIMO 1.0
-                          <Badge className="bg-slate-700 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black border-0">
-                            B&W
-                          </Badge>
-                        </p>
-                      </div>
-                    </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                      directKioskId === 'CV-001' 
-                        ? 'bg-[#093765] border-[#093765] text-white' 
-                        : 'border-slate-200 bg-transparent'
-                    }`}>
-                      {directKioskId === 'CV-001' && <Check className="w-3 h-3" strokeWidth={3} />}
-                    </div>
-                  </div>
-
-                  {/* MIMO 2.0 */}
-                  <div 
-                    onClick={() => setDirectKioskId("SV-002")}
-                    className={`group p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-center justify-between gap-3 ${
-                      directKioskId === 'SV-002' 
-                        ? 'border-[#093765] bg-blue-50/20 shadow-sm' 
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg transition-all ${
-                        directKioskId === 'SV-002' ? 'bg-[#093765] text-white' : 'bg-slate-100 text-slate-400'
-                      }`}>
-                        <Printer className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="text-left">
-                        <p className={`text-sm font-bold flex items-center gap-2 ${
-                          directKioskId === 'SV-002' ? 'text-[#093765]' : 'text-slate-700'
-                        }`}>
-                          MIMO 2.0
-                          <Badge className="bg-slate-700 text-[9px] py-0 px-1.5 h-4 leading-4 text-white font-black border-0">
-                            B&W
-                          </Badge>
-                        </p>
-                      </div>
-                    </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                      directKioskId === 'SV-002' 
-                        ? 'bg-[#093765] border-[#093765] text-white' 
-                        : 'border-slate-200 bg-transparent'
-                    }`}>
-                      {directKioskId === 'SV-002' && <Check className="w-3 h-3" strokeWidth={3} />}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Copies Config */}
-                <div className="w-full flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Copies</label>
-                  <div className="flex items-center border border-slate-200 rounded-lg bg-white h-10 w-32 overflow-hidden">
-                    <button
-                      onClick={() => setCopies(prev => Math.max(1, prev - 1))}
-                      className="flex-1 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <span className="w-10 text-center text-sm font-bold text-slate-700">{copies}</span>
-                    <button
-                      onClick={() => setCopies(prev => Math.min(99, prev + 1))}
-                      className="flex-1 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Final Cost Summary Card */}
-                <div className="w-full bg-slate-50/80 rounded-xl p-4 mt-4 border border-slate-100 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Est. Cost</p>
-                    <p className="text-xs text-slate-400 font-semibold">{estimatedPages} pgs x {copies} copies</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-[#093765]">₹{totalCost.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Continue button */}
-                <Button
-                  className="w-full h-12 text-sm font-black uppercase tracking-widest bg-gradient-to-r from-[#093765] to-blue-600 hover:from-[#052345] hover:to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all duration-300 rounded-xl mt-4 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isProcessing || !textContent.trim() || !directKioskId}
-                  onClick={handleContinue}
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Compiling PDF...
-                    </>
-                  ) : (
-                    "Pay & Print"
-                  )}
-                </Button>
-
-                {!directKioskId && (
-                  <div className="flex items-center justify-center gap-2 pt-3">
-                    <span className="text-[11px] text-amber-600 font-bold bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20 shadow-sm">
-                      ⚠️ Please select a machine above to continue
-                    </span>
-                  </div>
-                )}
-
-              </CardContent>
-            </Card>
+          <div className="border-t border-hairline px-4 py-3">
+            <p className="mb-2 text-[16px] text-ink">Margins</p>
+            <Segmented
+              label="Margins"
+              value={p.margins}
+              onChange={p.setMargins}
+              options={[
+                { value: "small", label: "Narrow" },
+                { value: "medium", label: "Normal" },
+                { value: "large", label: "Wide" },
+              ]}
+            />
           </div>
+          <div className="border-t border-hairline px-4 py-3">
+            <p className="mb-2 text-[16px] text-ink">Paper</p>
+            <Segmented
+              label="Paper size"
+              value={p.pageSize}
+              onChange={p.setPageSize}
+              options={[
+                { value: "A4", label: "A4" },
+                { value: "Letter", label: "Letter" },
+              ]}
+            />
+          </div>
+        </Group>
 
+        <Group title="Printer">
+          <div role="radiogroup" aria-label="Printer">
+            <ChoiceRow label="MIMO 1.0" detail="Black and white" selected={p.directKioskId === "CV-001"} onSelect={() => p.setDirectKioskId("CV-001")} />
+            <ChoiceRow label="MIMO 2.0" detail="Black and white or colour" selected={p.directKioskId === "SV-002"} onSelect={() => p.setDirectKioskId("SV-002")} />
+          </div>
+        </Group>
+
+        <Group title="Copies">
+          <Row
+            label="Copies"
+            trailing={
+              <Stepper
+                value={p.copies}
+                onDecrement={() => p.setCopies((prev) => Math.max(1, prev - 1))}
+                onIncrement={() => p.setCopies((prev) => Math.min(99, prev + 1))}
+              />
+            }
+          />
+        </Group>
+      </main>
+
+      <ActionBarSpacer size={canContinue ? 124 : 150} />
+      <ActionBar>
+        {!canContinue && (
+          <p className="mb-2 text-center text-[13px] text-ink-2">
+            {!p.textContent.trim() ? "Type something to print." : "Choose a printer to continue."}
+          </p>
+        )}
+        <div className="flex items-center gap-4">
+          <div className="shrink-0">
+            <p className="text-[13px] tabular-nums text-ink-3">
+              About {p.estimatedPages} × {p.copies}
+            </p>
+            <p className="text-[24px] font-semibold leading-none tabular-nums tracking-tight text-ink">₹{p.totalCost.toFixed(2)}</p>
+          </div>
+          <PrimaryButton onClick={p.handleContinue} loading={p.isProcessing} disabled={!canContinue}>
+            Continue to pay
+          </PrimaryButton>
         </div>
-
-      </div>
+      </ActionBar>
     </div>
   );
 }

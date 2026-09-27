@@ -57,7 +57,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'sm' })
     case 'REFUNDED':
     case 'REFUND_SUCCESS':
       styles = 'bg-purple-50 text-purple-700 border-purple-200';
-      dotColor = 'bg-[#6D35E8]';
+      dotColor = 'bg-[#093765]';
       displayLabel = 'Refunded';
       break;
 

@@ -28,7 +28,7 @@ const Card: React.FC<{ title?: string; subtitle?: string; action?: React.ReactNo
 const Kpi: React.FC<{ title: string; value: string; icon: React.ReactNode; tint: string; sub?: React.ReactNode; loading: boolean }> = ({ title, value, icon, tint, sub, loading }) => (
   <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
     <div className="flex items-center justify-between mb-3">
-      <span className="text-xs font-bold text-[var(--text-2)] uppercase tracking-wider">{title}</span>
+      <span className="text-xs font-bold text-[var(--text-2)]">{title}</span>
       <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${tint}`}>{icon}</div>
     </div>
     {loading ? <div className="skeleton h-8 w-28" /> : <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)] tabular-nums">{value}</p>}
@@ -49,11 +49,8 @@ export const OverviewPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn font-sans select-none">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-1)]">Platform Overview</h1>
-          <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">Live revenue, print volume and machine health · {describeRange(range)}</p>
-        </div>
+      <div className="flex flex-col gap-3">
+        <p className="text-[14px] text-[var(--text-2)]">Revenue, print volume and machine health, {describeRange(range).toLowerCase()}</p>
         <div className="flex flex-wrap items-center gap-3">
           <LiveIndicator updatedAt={analytics.updatedAt} live={live} fetching={analytics.fetching} onRefresh={() => { analytics.refresh(); kiosks.refresh(); jobs.refresh(); }} />
           <DateRangePicker value={range} onChange={setRange} tone="admin" />
@@ -137,7 +134,7 @@ export const OverviewPage: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="text-[10px] uppercase tracking-wider text-[var(--text-3)] border-b border-[var(--border)]">
+                  <tr className="text-[10px] text-[var(--text-3)] border-b border-[var(--border)]">
                     <th className="py-2 pr-3 font-bold">Document</th><th className="py-2 pr-3 font-bold">Customer</th><th className="py-2 pr-3 font-bold">Machine</th>
                     <th className="py-2 pr-3 font-bold">Pages</th><th className="py-2 pr-3 font-bold">Amount</th><th className="py-2 pr-3 font-bold">Status</th><th className="py-2 font-bold text-right">Time</th>
                   </tr>

@@ -43,7 +43,7 @@ export const FinanceWalletPage: React.FC<FinanceWalletPageProps> = ({ users, loa
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-[#19162D] tracking-tight">Wallet &amp; Credits</h1>
+          <h1 className="text-xl font-black text-[#111318] tracking-tight">Wallet &amp; Credits</h1>
           <p className="text-xs text-slate-400 font-medium mt-0.5">MIMO-coin balances across all customers (live snapshot, not date-filtered)</p>
         </div>
         <button type="button" onClick={onRefresh} disabled={loading} className="px-4 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200/80 rounded-xl cursor-pointer disabled:opacity-50 self-start">{loading ? 'Loading…' : 'Refresh'}</button>
@@ -61,13 +61,13 @@ export const FinanceWalletPage: React.FC<FinanceWalletPageProps> = ({ users, loa
       <FinanceChartCard title="Customer balances" subtitle={`${shown.length} wallet${shown.length === 1 ? '' : 's'} with coins`}
         action={<div className="flex items-center gap-2">
           <div className="relative"><Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customer…" className="bg-[#FAF9FD] border border-[#EDE9FE] rounded-xl pl-8 pr-3 py-2 text-xs w-52 focus:outline-none focus:border-[#6D35E8]" /></div>
-          <button type="button" onClick={exportCsv} disabled={shown.length === 0} className="p-2 rounded-xl border border-[#EDE9FE] text-slate-600 hover:text-[#6D35E8] cursor-pointer disabled:opacity-40" title="Export CSV"><Download className="w-4 h-4" /></button>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customer…" className="bg-[#F3F4F6] border border-[#E4E7EB] rounded-xl pl-8 pr-3 py-2 text-xs w-52 focus:outline-none focus:border-[#093765]" /></div>
+          <button type="button" onClick={exportCsv} disabled={shown.length === 0} className="p-2 rounded-xl border border-[#E4E7EB] text-slate-600 hover:text-[#093765] cursor-pointer disabled:opacity-40" title="Export CSV"><Download className="w-4 h-4" /></button>
         </div>}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+              <tr className="border-b border-slate-100 text-slate-400 font-bold text-[10px]">
                 {['Customer', 'Coins', 'Value', 'Total spend', 'Orders', 'Joined'].map((h) => <th key={h} className="whitespace-nowrap py-2.5 px-3">{h}</th>)}
               </tr>
             </thead>
@@ -75,7 +75,7 @@ export const FinanceWalletPage: React.FC<FinanceWalletPageProps> = ({ users, loa
               {loading && <tr><td colSpan={6} className="p-4"><div className="h-5 bg-slate-50 rounded animate-pulse" /></td></tr>}
               {!loading && shown.length === 0 && <tr><td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">{holders.length === 0 ? 'No customer holds MIMO coins yet.' : 'No customer matches your search.'}</td></tr>}
               {shown.slice(0, 200).map((u) => (
-                <tr key={u.id} className="hover:bg-[#FAF9FD]">
+                <tr key={u.id} className="hover:bg-[#F3F4F6]">
                   <td className="py-3 px-3"><p className="font-bold text-slate-800">{u.username}</p><p className="text-[11px] text-slate-400">{u.email}</p></td>
                   <td className="whitespace-nowrap py-3 px-3 font-black font-mono text-slate-900">{int(u.mimoCoins)}</td>
                   <td className="whitespace-nowrap py-3 px-3 font-mono text-slate-600">{inr(u.mimoCoins * COIN_VALUE_INR)}</td>

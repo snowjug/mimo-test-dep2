@@ -41,7 +41,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         <div className="flex items-center gap-3.5 mb-3">
           <div
             className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              isDestructive ? 'bg-rose-50 text-rose-600' : 'bg-purple-50 text-[#6D35E8]'
+              isDestructive ? 'bg-rose-50 text-rose-600' : 'bg-purple-50 text-[#093765]'
             }`}
           >
             <AlertTriangle className="w-5 h-5" />
@@ -72,7 +72,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
             className={`px-4 py-2 text-xs font-bold text-white rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer ${
               isDestructive
                 ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20'
-                : 'bg-[#6D35E8] hover:bg-[#5b29c9] shadow-purple-500/20'
+                : 'bg-[#093765] hover:bg-[#062A4E] shadow-purple-500/20'
             }`}
           >
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
