@@ -263,7 +263,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   copies = 1,
   printCode,
   manualProgress,
-  colorMode: _colorMode = 'bw',
+  colorMode = 'bw',
   kioskId,
 }) => {
   const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
@@ -290,6 +290,19 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   const isCompleted = progress >= 100;
 
+  // Print duration budget: mirrors the backend/Pi's own per-sheet timing — the colour inkjet
+  // genuinely needs far longer per sheet than the B&W laser (see pi_scripts/firebase_listener.py's
+  // own cups_timeout, and pi-listener's per-colour-mode calibration) — plus a 30s buffer so a
+  // backend timeout (which triggers an auto-refund) wins the race over this screen giving up first.
+  // A flat timeout here regressed to 120s on 2026-09-24: MIMO 2.0 colour jobs (which routinely need
+  // several minutes) started failing while MIMO 1.0 B&W jobs (always well under 2 min) did not.
+  const printTimeoutMs = useMemo(() => {
+    const totalSheets = Math.max(1, pages * copies);
+    const isColor = colorMode === 'color';
+    const baseWarmupSec = 600; // 10 min base warmup/spooling/rendering time
+    const secPerPage = isColor ? 360 : 20; // 360s/page colour inkjet, 20s/page B&W laser
+    return (baseWarmupSec + totalSheets * secPerPage + 30) * 1000;
+  }, [pages, copies, colorMode]);
 
 
   const finalTitle = isCompleted
@@ -354,8 +367,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     if (!printCode || printCode === '0000' || !isActive) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
-      // Enforce global 120-second maximum timeout from the start of printing
-      if (Date.now() - startTimeRef.current >= 120000) {
+      // Enforce the colour/page-aware print deadline from the start of printing
+      if (Date.now() - startTimeRef.current >= printTimeoutMs) {
         if (!isCompletingRef.current) {
           clearAllTimers();
           if (onError) onError('Print timed out. If your document was not printed, please contact support.');
@@ -425,7 +438,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         }
       }
     }, delayMs);
-  }, [printCode, isActive, pages, copies, onError, clearAllTimers]);
+  }, [printCode, isActive, pages, copies, onError, clearAllTimers, printTimeoutMs]);
 
   // ─── demo mode fallback (used ONLY when printCode is '0000' or missing) ──
 
@@ -545,12 +558,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   // ── Stall & Timeout detector ──────────────────────────────────────────────
   // Fires every 1 second.
-  // 1. Global 120-Second Print Timeout: Absolute cutoff from the moment the print screen activates.
+  // 1. Print Timeout: colour/page-aware cutoff (printTimeoutMs above) from the moment the print
+  //    screen activates — NOT a flat number, so a genuinely slow colour job isn't killed early.
   // 2. Network Stall Check: If no poll response received for > 45 seconds, assume network loss.
   useEffect(() => {
     if (!isActive || !printCode || printCode === '0000') return;
 
-    const PRINT_TIMEOUT_MS = 120000; // 120-second maximum global deadline
     const networkStallThresholdMs = 45000; // 45 seconds with no network response
 
     const checkTimeout = () => {
@@ -559,9 +572,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       const elapsedMs = Date.now() - startTimeRef.current;
       const msSinceLastPoll = Date.now() - lastSuccessfulPollTimeRef.current;
 
-      // Enforce absolute 120-second maximum timeout from start of printing
-      if (elapsedMs >= PRINT_TIMEOUT_MS) {
-        console.warn(`[PrintingScreen] Global 120s print timeout reached (${elapsedMs}ms). Surfacing error.`);
+      // Enforce the colour/page-aware print deadline from start of printing
+      if (elapsedMs >= printTimeoutMs) {
+        console.warn(`[PrintingScreen] Print timeout reached (${elapsedMs}ms / ${printTimeoutMs}ms budget). Surfacing error.`);
         clearAllTimers();
         if (onError) {
           onError('Print timed out. Please contact support if your document was not printed.');
@@ -587,7 +600,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     return () => {
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
     };
-  }, [isActive, printCode, clearAllTimers, onError]);
+  }, [isActive, printCode, clearAllTimers, onError, printTimeoutMs]);
 
   // ─── SVG geometry ─────────────────────────────────────────────────────────
 
