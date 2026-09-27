@@ -198,11 +198,16 @@
     .paper i:nth-child(1) { width: 62%; height: 5px; background: #8a93a1; }
     .paper i:nth-child(3) { width: 88%; } .paper i:nth-child(5) { width: 70%; }
 
-    /* Plane 3 (near): the phone side, clipped at the divider so it passes over the kiosk. */
+    /* Plane 3 (near): the phone side, clipped at the divider so it passes over the kiosk.
+       A soft 28px mask fade (not a hard clip-path edge) so a headline or the phone mockup's own
+       text never freezes mid-glyph, half-in-white/half-in-navy, at a transitional scroll position.
+       clip-path stays as the fallback for the few engines without mask-image support. */
     .phone-side {
       position: absolute; inset: 0; z-index: 3;
       background: var(--sc-canvas); color: var(--sc-ink);
       clip-path: inset(0 calc((1 - var(--split)) * 100%) 0 0);
+      -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(var(--split) * 100cqw - 28px), transparent calc(var(--split) * 100cqw));
+      mask-image: linear-gradient(to right, #000 0, #000 calc(var(--split) * 100cqw - 28px), transparent calc(var(--split) * 100cqw));
     }
     .phone-side__inner {
       position: absolute; top: 0; bottom: 0; left: 0; width: 50cqw;
@@ -210,9 +215,12 @@
       display: grid; grid-template-rows: auto 1fr; gap: 24px;
       transform: translateX(calc((var(--split) - 0.5) * 30cqw));
     }
-    .bar { display: flex; align-items: center; justify-content: space-between; }
+    .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .bar .wordmark { font-size: 28px; color: var(--sc-accent); }
-    .bar a { font-size: 15px; font-weight: 600; text-decoration: none; color: var(--sc-accent); min-height: 44px; display: inline-flex; align-items: center; }
+    .bar-links { display: flex; align-items: center; gap: 16px; }
+    .bar a { font-size: 15px; font-weight: 600; text-decoration: none; color: var(--sc-accent); min-height: 44px; display: inline-flex; align-items: center; white-space: nowrap; }
+    /* Always reachable, at every scroll position during the pinned story (the bar never scrolls away). */
+    .bar a.bar-cta { color: var(--sc-accent-ink); background: var(--sc-accent); padding: 0 14px; border-radius: 999px; min-height: 36px; }
 
     .phone-body { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: clamp(20px, 3cqw, 48px); align-items: center; min-height: 0; }
     .chapters { position: relative; min-height: 320px; }
@@ -300,18 +308,30 @@
       .kiosk { transform:
         translate(calc(var(--z) * (0.5 - var(--fx)) * var(--kh) * 0.3697), calc(var(--z) * (0.5 - var(--fy)) * var(--kh)))
         scale(calc(1 + var(--z) * (var(--S) - 1))); }
-      .phone-side { clip-path: inset(0 0 calc((1 - var(--split)) * 100%) 0); }
+      .phone-side {
+        clip-path: inset(0 0 calc((1 - var(--split)) * 100%) 0);
+        -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(var(--split) * 100cqh - 28px), transparent calc(var(--split) * 100cqh));
+        mask-image: linear-gradient(to bottom, #000 0, #000 calc(var(--split) * 100cqh - 28px), transparent calc(var(--split) * 100cqh));
+      }
       .phone-side__inner {
         width: 100%; height: 56cqh; padding: max(14px, env(safe-area-inset-top)) 16px 16px;
         grid-template-rows: auto auto 1fr; gap: 10px;
         transform: none;
       }
       .bar .wordmark { font-size: 24px; }
+      .bar a:not(.bar-cta) { font-size: 13px; }
+      .bar a.bar-cta { font-size: 13px; padding: 0 12px; }
       .phone-body { display: contents; }
-      .chapters { min-height: 0; height: 84px; }
+      .chapters { min-height: 0; height: 108px; }
       .chapter { top: 0; translate: none; }
-      .chapter h1, .chapter h2 { font-size: clamp(1.7rem, 1.2rem + 2.4cqw, 2.2rem); }
-      .chapter p, .chapter .btn { display: none; }
+      .chapter h1, .chapter h2 { font-size: clamp(1.5rem, 1.1rem + 2.2cqw, 2rem); }
+      /* Buttons stay off mid-story (the bar's CTA is the reachable action instead); a short one-line
+         description survives so the phone side keeps some narrative, not just a bare headline. */
+      .chapter p {
+        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden;
+        font-size: 13px; line-height: 1.35; margin-top: 6px; max-width: none;
+      }
+      .chapter .btn { display: none; }
       .phone { width: 100%; aspect-ratio: auto; height: 100%; border-radius: 24px; box-shadow: 0 1px 2px rgba(17, 19, 24, 0.08); }
       .phone__tag { top: 10px; }
       .scr { inset: 34px 14px 14px; gap: 8px; }
@@ -450,7 +470,10 @@
           <div class="phone-side__inner">
             <div class="bar">
               <span class="wordmark" aria-label="MIMO">MIMO</span>
-              <a href="/find-machine">Find a kiosk</a>
+              <span class="bar-links">
+                <a href="/find-machine">Find a kiosk</a>
+                <a href="/login" class="bar-cta">Start printing</a>
+              </span>
             </div>
             <div class="phone-body">
               <div class="chapters">
