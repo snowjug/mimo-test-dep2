@@ -158,7 +158,7 @@ export const ConfigurationPage: React.FC = () => {
               {/* Audio & Idle Timeout */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                     Audio Playback
                   </label>
                   <button
@@ -176,7 +176,7 @@ export const ConfigurationPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                     Idle Timeout (Seconds)
                   </label>
                   <input
@@ -192,7 +192,7 @@ export const ConfigurationPage: React.FC = () => {
 
               {/* Playlist URLs */}
               <div>
-                <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-2">
+                <label className="block text-[11px] font-bold text-[var(--text-3)] mb-2">
                   Active Video Playlist URLs
                 </label>
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
@@ -275,7 +275,7 @@ export const ConfigurationPage: React.FC = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                     Paper Tray Low Alert Limit (%)
                   </label>
                   <input
@@ -287,7 +287,7 @@ export const ConfigurationPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                     Toner Cartridge Low Limit (%)
                   </label>
                   <input
@@ -299,7 +299,7 @@ export const ConfigurationPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                     Max Dispatch Retries Before Incident
                   </label>
                   <input
@@ -311,7 +311,7 @@ export const ConfigurationPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                     Heartbeat Check Interval (Seconds)
                   </label>
                   <input

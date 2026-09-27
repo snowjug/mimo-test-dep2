@@ -1,84 +1,138 @@
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * MIMO design tokens.
+ * One brand accent (MIMO navy), cool neutrals, status colours used only for state.
+ * Pages use the semantic utilities (bg-canvas, bg-surface, text-ink, text-ink-2, border-hairline,
+ * bg-brand, text-brand-text ...). The shadcn names below are kept so the ui/ primitives follow the same palette.
+ */
 :root {
   --font-size: 16px;
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.0058 264.53);
-  --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #e9ebef;
-  --accent-foreground: #030213;
-  --destructive: #d4183d;
+
+  --canvas: #f3f4f6;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --surface-3: #e4e7eb;
+  --ink: #111318;
+  --ink-2: #4d525c;
+  --ink-3: #6b7079;
+  --hairline: rgba(17, 19, 24, 0.09);
+  --hairline-strong: rgba(17, 19, 24, 0.16);
+
+  --brand: #093765;
+  --brand-press: #062a4e;
+  --brand-text: #0a4786;
+  --brand-soft: #e7eef7;
+  --on-brand: #ffffff;
+
+  --success: #1d7f46;
+  --success-soft: #e6f4ec;
+  --warning: #9a5b00;
+  --warning-soft: #fdf1dc;
+  --danger: #c0262d;
+  --danger-soft: #fbe9ea;
+
+  --shadow-float: 0 1px 2px rgba(17, 19, 24, 0.04), 0 8px 24px rgba(17, 19, 24, 0.08);
+
+  /* shadcn compatibility */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: var(--on-brand);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger);
   --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
-  --input: transparent;
-  --input-background: #f3f3f5;
-  --switch-background: #cbced4;
+  --border: var(--hairline);
+  --input: var(--hairline-strong);
+  --input-background: var(--surface);
+  --switch-background: #c9cdd3;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #030213;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --ring: var(--brand-text);
+  --chart-1: #093765;
+  --chart-2: #3d78b8;
+  --chart-3: #8fb3dc;
+  --chart-4: #1d7f46;
+  --chart-5: #9a5b00;
+  --radius: 0.875rem;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--on-brand);
+  --sidebar-accent: var(--surface-2);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--brand-text);
+
+  color-scheme: light;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  --canvas: #0c0d10;
+  --surface: #17181c;
+  --surface-2: #212227;
+  --surface-3: #2b2d33;
+  --ink: #f2f3f5;
+  --ink-2: #b1b5bd;
+  --ink-3: #8d929b;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.16);
+
+  --brand: #3b74ba;
+  --brand-press: #2f62a1;
+  --brand-text: #8ab6ea;
+  --brand-soft: rgba(90, 145, 214, 0.16);
+  --on-brand: #ffffff;
+
+  --success: #5ccf8c;
+  --success-soft: rgba(92, 207, 140, 0.14);
+  --warning: #f2b95a;
+  --warning-soft: rgba(242, 185, 90, 0.14);
+  --danger: #ff7b7f;
+  --danger-soft: rgba(255, 123, 127, 0.14);
+
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.45);
+
+  --switch-background: #3a3c42;
+  --destructive-foreground: #ffffff;
+
+  color-scheme: dark;
 }
 
 @theme inline {
+  --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-brand: var(--brand);
+  --color-brand-press: var(--brand-press);
+  --color-brand-text: var(--brand-text);
+  --color-brand-soft: var(--brand-soft);
+  --color-on-brand: var(--on-brand);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --shadow-float: var(--shadow-float);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -105,10 +159,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 6px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -117,6 +171,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer base {
@@ -126,150 +182,104 @@
 
   html {
     font-size: var(--font-size);
-    /* Ensure scroll is never blocked at the root level */
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
-    background-color: #f8fafc;
-    background-image: 
-      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.15) 0px, transparent 50%);
-    /* Removed background-attachment: fixed — causes scroll lock on mobile/certain viewports */
+    @apply bg-canvas text-ink antialiased;
+    font-family: var(--font-sans);
     min-height: 100dvh;
     overflow-x: hidden;
   }
 
-  .dark body {
-    background-color: #020817;
-    background-image: 
-      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.2) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
-    /* Removed background-attachment: fixed — causes scroll lock on mobile/certain viewports */
+  h1, h2, h3, h4 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    text-wrap: balance;
   }
+  h1 { font-size: var(--text-2xl); }
+  h2 { font-size: var(--text-xl); }
+  h3 { font-size: var(--text-lg); }
+  h4 { font-size: var(--text-base); }
 
-  /**
-  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
-  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
-  */
+  p { text-wrap: pretty; }
 
-  html {
-    font-size: var(--font-size);
-  }
+  label { font-weight: 500; }
 
-  h1 {
-    font-size: var(--text-2xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
-  }
+  button { font-weight: 500; cursor: pointer; }
 
-  h2 {
-    font-size: var(--text-xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
-  }
+  /* 16px inputs stop iOS Safari from zooming on focus. */
+  input, select, textarea { font-size: 16px; }
 
-  h3 {
-    font-size: var(--text-lg);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
-  }
-
-  h4 {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
-  }
-
-  label {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
-  }
-
-  button {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
-  }
-
-  input {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-normal);
-    line-height: 1.5;
+  :focus-visible {
+    outline: 2px solid var(--brand-text);
+    outline-offset: 2px;
   }
 }
 
-/* Tactile sliding segmented control animations */
+@layer components {
+  /* The customer app is designed for phones. Larger screens get the same phone-width column. */
+  .app-column {
+    width: 100%;
+    max-width: 440px;
+    margin-inline: auto;
+    min-height: 100dvh;
+    position: relative;
+    background: var(--canvas);
+  }
+
+  @media (min-width: 480px) {
+    .app-column { box-shadow: 0 0 0 1px var(--hairline); }
+    body { background: var(--surface-2); }
+  }
+
+  .pad-safe-bottom { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .pad-safe-top { padding-top: max(12px, env(safe-area-inset-top)); }
+
+  .press {
+    transition: transform 160ms var(--ease-out-soft), background-color 160ms, opacity 160ms;
+  }
+  .press:active { transform: scale(0.98); }
+}
+
+/* Tactile sliding segmented control (print options) */
 .sliding-pill {
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), scale 0.15s ease-out !important;
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important;
   transform-origin: center center;
 }
 
-.control-btn:active ~ .sliding-pill {
-  scale: 0.94 0.97;
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Micro-animations for icons */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-@keyframes pulse-subtle {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
-}
-
-@keyframes rotate-subtle {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(15deg); }
-}
-
-@keyframes slide-double {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(3px, -3px); }
-}
+.rise-in { animation: rise-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 @keyframes pop-in {
-  0% { transform: scale(0.85); opacity: 0.8; }
+  0% { transform: scale(0.9); opacity: 0.6; }
   100% { transform: scale(1); opacity: 1; }
 }
-
-.animate-float {
-  animation: float 2s ease-in-out infinite;
-}
-
-.animate-pulse-subtle {
-  animation: pulse-subtle 2s ease-in-out infinite;
-}
-
-.animate-rotate-subtle {
-  animation: rotate-subtle 2s ease-in-out infinite;
-}
-
-.animate-slide-double {
-  animation: slide-double 2s ease-in-out infinite;
-}
-
 .animate-pop-in {
-  animation: pop-in 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: pop-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-block;
 }
 
-@keyframes eye-blink {
-  0%, 80%, 100% { opacity: 1; }
-  90% { opacity: 0.15; }
+/* Kept as static no-ops so older markup referencing them does not loop forever. */
+.animate-float, .animate-pulse-subtle, .animate-rotate-subtle, .animate-slide-double, .animate-eye-blink { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-.animate-eye-blink {
-  animation: eye-blink 4s ease-in-out infinite;
-}
-
-
+/* Login identity: the kiosk rises once, the sheet slides over it. Reduced motion collapses both (see above). */
+@keyframes kiosk-rise { from { opacity: 0; transform: translateY(14%); } to { opacity: 1; transform: translateY(0); } }
+@keyframes sheet-rise { from { transform: translateY(28px); } to { transform: translateY(0); } }
+.kiosk-rise { animation: kiosk-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both; }
+.sheet-rise { animation: sheet-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both; }

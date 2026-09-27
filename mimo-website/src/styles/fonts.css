@@ -1,10 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap');
+@import '@fontsource-variable/geist';
 
+/* Lovelo is the MIMO wordmark face. Used for the logo only. */
 @font-face {
   font-family: 'Lovelo';
   src: url('/lovelo_black-webfont.woff2') format('woff2'),
-       url('/lovelo_black-webfont.woff') format('woff'),
-       url('/lovelo_black-webfont.ttf') format('truetype');
+       url('/lovelo_black-webfont.woff') format('woff');
   font-weight: 900;
   font-style: normal;
   font-display: swap;

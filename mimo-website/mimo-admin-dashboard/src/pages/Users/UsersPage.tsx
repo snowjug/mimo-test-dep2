@@ -153,7 +153,7 @@ export const UsersPage: React.FC = () => {
         {/* Total Users */}
         <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-[var(--text-2)] uppercase tracking-wider">Total Registered</span>
+            <span className="text-xs font-bold text-[var(--text-2)]">Total Registered</span>
             <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
               <Users size={16} />
             </div>
@@ -169,7 +169,7 @@ export const UsersPage: React.FC = () => {
         {/* Active Paying Customers */}
         <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-[var(--text-2)] uppercase tracking-wider">Paying Customers</span>
+            <span className="text-xs font-bold text-[var(--text-2)]">Paying Customers</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
               <UserCheck size={16} />
             </div>
@@ -185,7 +185,7 @@ export const UsersPage: React.FC = () => {
         {/* Conversion Rate */}
         <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-[var(--text-2)] uppercase tracking-wider">Conversion Rate</span>
+            <span className="text-xs font-bold text-[var(--text-2)]">Conversion Rate</span>
             <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
               <Percent size={16} />
             </div>
@@ -204,7 +204,7 @@ export const UsersPage: React.FC = () => {
         {/* ARPU */}
         <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-[var(--text-2)] uppercase tracking-wider">Avg Revenue / User</span>
+            <span className="text-xs font-bold text-[var(--text-2)]">Avg Revenue / User</span>
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
               <IndianRupee size={16} />
             </div>
@@ -273,7 +273,7 @@ export const UsersPage: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">
+              <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)]">
                 <th className="py-3 px-4 sm:px-6">Customer</th>
                 <th className="py-3 px-4">Contact</th>
                 <th className="py-3 px-4">Status</th>

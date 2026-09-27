@@ -22,7 +22,7 @@ const ago = (d: Date, now: number) => {
 export const LiveIndicator: React.FC<Props> = ({ updatedAt, live, fetching = false, onRefresh, tone = 'admin' }) => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 5000); return () => window.clearInterval(id); }, []);
-  const accent = tone === 'finance' ? 'text-[#6D35E8]' : 'text-indigo-600 dark:text-indigo-400';
+  const accent = tone === 'finance' ? 'text-[#093765]' : 'text-indigo-600 dark:text-indigo-400';
   return (
     <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
       {live ? (

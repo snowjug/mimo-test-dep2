@@ -58,9 +58,9 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
           <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-semibold leading-none mb-1">
             <span>MIMO Finance</span>
             <span>/</span>
-            <span className="text-[#6D35E8]">{current.breadcrumb}</span>
+            <span className="text-[#093765]">{current.breadcrumb}</span>
           </div>
-          <span className="text-base font-black text-[#19162D] tracking-tight leading-tight truncate">
+          <span className="text-base font-black text-[#111318] tracking-tight leading-tight truncate">
             {current.title}
           </span>
         </div>
@@ -75,7 +75,7 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
             placeholder="Search transactions, orders, users, kiosks..."
             value={searchQuery}
             onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
-            className="w-full bg-[#FAF9FD] border border-[#EDE9FE] hover:border-purple-300 focus:border-[#6D35E8] text-slate-900 placeholder-slate-400 text-xs rounded-xl pl-9 pr-12 py-2 focus:outline-none transition-all shadow-2xs font-medium"
+            className="w-full bg-[#F3F4F6] border border-[#E4E7EB] hover:border-purple-300 focus:border-[#093765] text-slate-900 placeholder-slate-400 text-xs rounded-xl pl-9 pr-12 py-2 focus:outline-none transition-all shadow-2xs font-medium"
           />
           <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-mono text-slate-400 select-none shadow-2xs pointer-events-none">
             <span>⌘</span>
@@ -97,9 +97,9 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
           onClick={onRefresh}
           disabled={isRefreshing}
           title="Refresh Financial Data"
-          className="p-2 text-slate-600 hover:text-[#6D35E8] hover:bg-[#EDE8FF] rounded-xl border border-[#EDE9FE] bg-white transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+          className="p-2 text-slate-600 hover:text-[#093765] hover:bg-[#E7EEF7] rounded-xl border border-[#E4E7EB] bg-white transition-all cursor-pointer shadow-2xs disabled:opacity-50"
         >
-          <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#6D35E8]' : ''}`} />
+          <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#093765]' : ''}`} />
         </button>
 
         {/* Pending refund requests */}
@@ -107,7 +107,7 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
           <button
             type="button"
             title={pendingRefundsCount ? `${pendingRefundsCount} refund request(s) waiting for review` : 'No refund requests waiting'}
-            className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-[#EDE9FE] bg-white transition-all cursor-pointer shadow-2xs relative"
+            className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-[#E4E7EB] bg-white transition-all cursor-pointer shadow-2xs relative"
           >
             <Bell className="w-4 h-4" />
             {pendingRefundsCount > 0 && (
@@ -120,7 +120,7 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
 
         {/* Profile Pill */}
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-          <div className="w-8 h-8 rounded-xl bg-[#6D35E8] text-white flex items-center justify-center font-black text-xs shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-[#093765] text-white flex items-center justify-center font-black text-xs shadow-xs">
             AD
           </div>
           <div className="hidden lg:flex flex-col">

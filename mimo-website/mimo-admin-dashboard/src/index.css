@@ -1,7 +1,89 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import '@fontsource-variable/geist';
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Lovelo';
+  src: url('/lovelo_black-webfont.woff2') format('woff2');
+  font-weight: 900;
+  font-display: swap;
+}
+
 @variant dark (&:where(.dark, .dark *));
+
+/*
+ * MIMO palette, shared with the customer app.
+ * The pages use Tailwind's slate/indigo/violet/purple/blue scales directly, so those scales are
+ * remapped here: slate becomes the MIMO cool neutrals and every blue-violet hue becomes the MIMO
+ * navy ramp. One accent across Admin and Finance without touching page logic.
+ */
+@theme {
+  /* Softer display weights: pages use font-black/extrabold for numbers and titles. */
+  --font-weight-black: 650;
+  --font-weight-extrabold: 600;
+
+  --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Variable", ui-monospace, SFMono-Regular, monospace;
+
+  --color-slate-50: #f3f4f6;
+  --color-slate-100: #eef0f3;
+  --color-slate-200: #e4e7eb;
+  --color-slate-300: #cfd3d9;
+  --color-slate-400: #8d929b;
+  --color-slate-500: #6b7079;
+  --color-slate-600: #4d525c;
+  --color-slate-700: #363a42;
+  --color-slate-800: #212227;
+  --color-slate-900: #17181c;
+  --color-slate-950: #0c0d10;
+
+  --color-indigo-50: #eef3f9;
+  --color-indigo-100: #dfe8f3;
+  --color-indigo-200: #bfd1e7;
+  --color-indigo-300: #93b2d6;
+  --color-indigo-400: #6a95c8;
+  --color-indigo-500: #3b74ba;
+  --color-indigo-600: #0a4786;
+  --color-indigo-700: #093765;
+  --color-indigo-800: #072b50;
+  --color-indigo-900: #062a4e;
+  --color-indigo-950: #041a31;
+
+  --color-violet-50: var(--color-indigo-50);
+  --color-violet-100: var(--color-indigo-100);
+  --color-violet-200: var(--color-indigo-200);
+  --color-violet-300: var(--color-indigo-300);
+  --color-violet-400: var(--color-indigo-400);
+  --color-violet-500: var(--color-indigo-500);
+  --color-violet-600: var(--color-indigo-600);
+  --color-violet-700: var(--color-indigo-700);
+  --color-violet-800: var(--color-indigo-800);
+  --color-violet-900: var(--color-indigo-900);
+  --color-violet-950: var(--color-indigo-950);
+
+  --color-purple-50: var(--color-indigo-50);
+  --color-purple-100: var(--color-indigo-100);
+  --color-purple-200: var(--color-indigo-200);
+  --color-purple-300: var(--color-indigo-300);
+  --color-purple-400: var(--color-indigo-400);
+  --color-purple-500: var(--color-indigo-500);
+  --color-purple-600: var(--color-indigo-600);
+  --color-purple-700: var(--color-indigo-700);
+  --color-purple-800: var(--color-indigo-800);
+  --color-purple-900: var(--color-indigo-900);
+  --color-purple-950: var(--color-indigo-950);
+
+  --color-blue-50: var(--color-indigo-50);
+  --color-blue-100: var(--color-indigo-100);
+  --color-blue-200: var(--color-indigo-200);
+  --color-blue-300: var(--color-indigo-300);
+  --color-blue-400: var(--color-indigo-400);
+  --color-blue-500: var(--color-indigo-500);
+  --color-blue-600: var(--color-indigo-600);
+  --color-blue-700: var(--color-indigo-700);
+  --color-blue-800: var(--color-indigo-800);
+  --color-blue-900: var(--color-indigo-900);
+  --color-blue-950: var(--color-indigo-950);
+}
 
 /* Tailwind v4 changed the default border colour from gray-200 to currentColor, so a bare `border`
    rendered black. Restore the v3 default (layered, so explicit border-* utilities still win). */
@@ -17,21 +99,21 @@
   --sidebar-collapsed-width: 76px;
   --topbar-height:           64px;
 
-  --primary:        #4f46e5;
-  --primary-hover:  #4338ca;
-  --primary-light:  #eef2ff;
-  --primary-border: #c7d2fe;
-  --primary-muted:  #818cf8;
+  --primary:        #093765;
+  --primary-hover:  #062a4e;
+  --primary-light:  #e7eef7;
+  --primary-border: #bfd1e7;
+  --primary-muted:  #6a95c8;
 
-  --bg:         #f8fafc;
+  --bg:         #f3f4f6;
   --surface:    #ffffff;
-  --surface-2:  #f1f5f9;
-  --border:     #e2e8f0;
+  --surface-2:  #eef0f3;
+  --border:     #e4e7eb;
   --border-2:   #cbd5e1;
 
-  --text-1: #0f172a;
-  --text-2: #475569;
-  --text-3: #94a3b8;
+  --text-1: #111318;
+  --text-2: #4d525c;
+  --text-3: #6b7079;
 
   --green:        #10b981;
   --green-bg:     #f0fdf4;
@@ -53,23 +135,24 @@
   --blue-border: #bfdbfe;
   --blue-text:   #1e40af;
 
-  --radius:    10px;
-  --radius-lg: 16px;
+  --radius:    14px;
+  --radius-lg: 20px;
 }
 
 .dark {
-  --bg:         #090d16;
-  --surface:    #0f172a;
-  --surface-2:  #1e293b;
-  --border:     #1e293b;
-  --border-2:   #334155;
+  --bg:         #0c0d10;
+  --surface:    #17181c;
+  --surface-2:  #212227;
+  --border:     #212227;
+  --border-2:   #363a42;
 
-  --text-1: #f8fafc;
-  --text-2: #94a3b8;
-  --text-3: #64748b;
+  --text-1: #f2f3f5;
+  --text-2: #b1b5bd;
+  --text-3: #8d929b;
 
-  --primary-light:  #1e1b4b;
-  --primary-border: #3730a3;
+  --primary:        #3b74ba;
+  --primary-light:  rgba(90,145,214,0.16);
+  --primary-border: #2f62a1;
 
   --green-bg:    #052e16;
   --green-border:#14532d;
@@ -94,10 +177,13 @@
    gap-*, mb-* …) and collapses the whole UI, so only box-sizing is set. */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { font-size: 14px; }
+html { font-size: 15px; -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+
+/* 16px inputs stop iOS Safari zooming on focus. */
+input, select, textarea { font-size: 16px; }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text-1);
   -webkit-font-smoothing: antialiased;
@@ -156,77 +242,72 @@ body {
 .toast-enter { animation: toastIn  .3s ease forwards; }
 .toast-exit  { animation: toastOut .3s ease forwards; }
 
-/* ── MIMO FINANCE APPLICATION SHELL (CSS GRID ARCHITECTURE) ──────────────── */
-.finance-layout {
-  display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  grid-template-rows: 64px minmax(0, 1fr);
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-  background-color: #FAF9FD;
+/* ── MOBILE SHEET ──────────────────────────────────────────────────────────── */
+@keyframes sheetIn { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.sheet-in { animation: sheetIn .28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
-.finance-sidebar {
-  grid-column: 1;
-  grid-row: 1 / -1;
-  width: 250px;
-  min-width: 250px;
-  max-width: 250px;
-  height: 100vh;
-  background-color: #FFFFFF;
-  border-right: 1px solid #EDE9FE;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  overflow: hidden;
-  z-index: 30;
-}
+/* ── STAFF SIGN-IN ENTRANCE (one time; reduced motion collapses it above) ── */
+@keyframes staffIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes ruleIn { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.staff-in { animation: staffIn .6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.ledger-rule { animation: ruleIn .9s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-.finance-topbar {
-  grid-column: 2;
-  grid-row: 1;
-  min-width: 0;
-  height: 64px;
-  background-color: #FFFFFF;
-  border-bottom: 1px solid #EDE9FE;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  z-index: 20;
-}
-
-.finance-main {
-  grid-column: 2;
-  grid-row: 2;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 24px 32px;
-  background-color: #FAF9FD;
-}
-
-@media (max-width: 767.98px) {
+/* ── FINANCE DESKTOP SHELL (CSS GRID, DESKTOP ONLY) ───────────────────────────
+   FinanceSidebar/FinanceTopbar are rendered only inside the `hidden lg:flex`
+   desktop branch of FinanceLayout.tsx; the mobile shell never has these class
+   names, so `display: none` here is a second, CSS-only guarantee they never
+   affect the phone layout regardless of stylesheet order. */
+.finance-layout { display: none; }
+@media (min-width: 1024px) {
   .finance-layout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-rows: 64px minmax(0, 1fr);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    background-color: #FAF9FD;
+  }
+  .finance-sidebar {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+    height: 100vh;
+    background-color: #FFFFFF;
+    border-right: 1px solid #EDE9FE;
     display: flex;
     flex-direction: column;
-    height: auto;
-    min-height: 100vh;
-    overflow-y: auto;
-  }
-  .finance-layout > .finance-sidebar {
-    display: none;
+    justify-content: space-between;
+    overflow: hidden;
+    z-index: 30;
   }
   .finance-topbar {
-    width: 100%;
-    position: sticky;
-    top: 0;
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    height: 64px;
+    background-color: #FFFFFF;
+    border-bottom: 1px solid #EDE9FE;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 20;
   }
   .finance-main {
-    width: 100%;
-    padding: 16px;
-    overflow: visible;
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 24px 32px;
+    background-color: #FAF9FD;
   }
 }

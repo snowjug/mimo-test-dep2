@@ -108,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
             {/* Live Indicator Badge */}
             {item.badgeType === 'live' && (
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black ${
                 active
                   ? 'bg-white/20 text-white'
                   : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
@@ -148,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const Section = ({ label, items }: { label: string; items: NavItemDef[] }) => (
     <div className="mb-4">
       {!isCollapsedView && (
-        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 mb-1.5">
+        <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 px-3 mb-1.5">
           {label}
         </p>
       )}
@@ -188,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="font-black text-base tracking-tight text-slate-900 dark:text-white">
                   MIMO
                 </span>
-                <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 px-1.5 py-0.5 rounded">
                   ADMIN
                 </span>
               </div>

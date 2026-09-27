@@ -312,7 +312,7 @@ export const FinancePage: React.FC = () => {
           {/* Financial KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-              <span className="text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">Gross Collections</span>
+              <span className="text-[11px] font-bold text-[var(--text-3)]">Gross Collections</span>
               <p className="text-2xl sm:text-3xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
                 ₹{totalGross.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
@@ -320,7 +320,7 @@ export const FinancePage: React.FC = () => {
             </div>
 
             <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-              <span className="text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">Net Realized Revenue</span>
+              <span className="text-[11px] font-bold text-[var(--text-3)]">Net Realized Revenue</span>
               <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
                 ₹{netRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
@@ -328,7 +328,7 @@ export const FinancePage: React.FC = () => {
             </div>
 
             <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-              <span className="text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">Disputes / Refunds</span>
+              <span className="text-[11px] font-bold text-[var(--text-3)]">Disputes / Refunds</span>
               <p className="text-2xl sm:text-3xl font-black text-amber-500 mt-1">
                 ₹{totalRefunded.toFixed(2)}
               </p>
@@ -336,7 +336,7 @@ export const FinancePage: React.FC = () => {
             </div>
 
             <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-              <span className="text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">Payment Success Rate</span>
+              <span className="text-[11px] font-bold text-[var(--text-3)]">Payment Success Rate</span>
               <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)] mt-1">
                 {paymentSuccessRate === null ? '—' : `${paymentSuccessRate}%`}
               </p>
@@ -359,8 +359,8 @@ export const FinancePage: React.FC = () => {
                 <AreaChart data={revenueTimeSeries.length > 0 ? revenueTimeSeries : [{ date: 'Today', amount: totalGross }]}>
                   <defs>
                     <linearGradient id="finGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#093765" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#093765" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#1e293b' : '#f1f5f9'} />
@@ -374,7 +374,7 @@ export const FinancePage: React.FC = () => {
                       fontSize: '12px',
                     }}
                   />
-                  <Area type="monotone" dataKey="amount" stroke="#4f46e5" strokeWidth={2.5} fillOpacity={1} fill="url(#finGrad)" name="Revenue (₹)" />
+                  <Area type="monotone" dataKey="amount" stroke="#093765" strokeWidth={2.5} fillOpacity={1} fill="url(#finGrad)" name="Revenue (₹)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -405,7 +405,7 @@ export const FinancePage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">
+                <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)]">
                   <th className="py-3 px-4 sm:px-6">Order ID</th>
                   <th className="py-3 px-4">Student</th>
                   <th className="py-3 px-4">Document</th>
@@ -487,7 +487,7 @@ export const FinancePage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">
+                <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)]">
                   <th className="py-3 px-4 sm:px-6">Order ID</th>
                   <th className="py-3 px-4">User</th>
                   <th className="py-3 px-4">Amount</th>
@@ -566,7 +566,7 @@ export const FinancePage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   {/* B&W */}
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                       B&W Print Rate (A4)
                     </label>
                     <div className="relative">
@@ -583,7 +583,7 @@ export const FinancePage: React.FC = () => {
 
                   {/* Color */}
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                       Color Print Rate (A4)
                     </label>
                     <div className="relative">
@@ -600,7 +600,7 @@ export const FinancePage: React.FC = () => {
 
                   {/* Duplex B&W */}
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                       Duplex B&W Rate
                     </label>
                     <div className="relative">
@@ -617,7 +617,7 @@ export const FinancePage: React.FC = () => {
 
                   {/* Graph Paper */}
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                       Graph / Special Sheet
                     </label>
                     <div className="relative">
