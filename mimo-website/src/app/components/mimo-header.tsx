@@ -104,8 +104,8 @@ export function MimoHeader() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 -mx-4 bg-canvas/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-      <div className="flex h-14 items-center justify-between">
+    <header className="sticky top-0 z-30 -mx-4 bg-canvas/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:mx-[calc(50%-50vw)] lg:border-b lg:border-hairline lg:px-8">
+      <div className="flex h-14 items-center justify-between lg:mx-auto lg:max-w-[768px]">
         <button type="button" onClick={() => navigate("/upload")} aria-label="MIMO home" className="press -ml-1 px-1 py-2">
           <Wordmark />
         </button>
