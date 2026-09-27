@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Check, X } from "lucide-react";
+import { PrimaryButton, SecondaryButton } from "../components/mimo/ui";
 import { toast } from "sonner";
 import api from "../api";
 
@@ -87,50 +87,48 @@ export function PaymentVerify() {
   }, [orderId, navigate]);
 
   return (
-    <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 bg-slate-50">
-      <Card className="w-full max-w-md border-0 shadow-2xl bg-white/90 backdrop-blur-xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Verifying Payment</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center justify-center py-12 space-y-6">
-          {status === "verifying" && (
-            <>
-              <Loader2 className="w-16 h-16 text-blue-600 animate-spin" />
-              <p className="text-slate-500 animate-pulse font-medium">Please wait while we confirm your transaction...</p>
-            </>
-          )}
+    <div className="flex min-h-[100dvh] flex-col px-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+      <div className="flex flex-1 flex-col items-center justify-center text-center" role="status" aria-live="polite">
+        {status === "verifying" && (
+          <>
+            <Loader2 className="size-10 animate-spin text-ink-3" strokeWidth={1.75} />
+            <h1 className="mt-6 text-[24px] font-semibold tracking-tight text-ink">Confirming payment</h1>
+            <p className="mt-2 max-w-[30ch] text-[15px] text-ink-2">This usually takes a few seconds. Please keep this screen open.</p>
+          </>
+        )}
 
-          {status === "success" && (
-            <>
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-12 h-12 text-green-600" />
-              </div>
-              <div className="text-center">
-                <h2 className="text-xl font-bold text-slate-900">Success!</h2>
-                <p className="text-slate-500">Your payment has been confirmed. Redirecting...</p>
-              </div>
-            </>
-          )}
+        {status === "success" && (
+          <>
+            <span className="rise-in flex size-16 items-center justify-center rounded-full bg-success-soft text-success">
+              <Check className="size-8" strokeWidth={2.5} />
+            </span>
+            <h1 className="mt-6 text-[24px] font-semibold tracking-tight text-ink">Payment received</h1>
+            <p className="mt-2 max-w-[30ch] text-[15px] text-ink-2">Getting your print code ready.</p>
+          </>
+        )}
 
-          {status === "failed" && (
-            <>
-              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
-                <XCircle className="w-12 h-12 text-red-600" />
-              </div>
-              <div className="text-center">
-                <h2 className="text-xl font-bold text-slate-900">Payment Failed</h2>
-                <p className="text-slate-500">We couldn't confirm your payment. Please try again or contact support.</p>
-              </div>
-              <button 
-                onClick={() => navigate("/payment")}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors"
-              >
-                Back to Payment
-              </button>
-            </>
-          )}
-        </CardContent>
-      </Card>
+        {status === "failed" && (
+          <>
+            <span className="rise-in flex size-16 items-center justify-center rounded-full bg-danger-soft text-danger">
+              <X className="size-8" strokeWidth={2.5} />
+            </span>
+            <h1 className="mt-6 text-[24px] font-semibold tracking-tight text-ink">We could not confirm this payment</h1>
+            <p className="mt-2 max-w-[32ch] text-[15px] text-ink-2">
+              If money left your account, call support on +91 81230 28797 and share this order ID.
+            </p>
+            {orderId && (
+              <p className="mt-3 select-all rounded-[10px] bg-surface-2 px-3 py-1.5 text-[13px] tabular-nums text-ink-2">{orderId}</p>
+            )}
+          </>
+        )}
+      </div>
+
+      {status === "failed" && (
+        <div className="flex flex-col gap-2">
+          <PrimaryButton onClick={() => navigate("/payment")}>Try again</PrimaryButton>
+          <SecondaryButton onClick={() => navigate("/upload")}>Back to home</SecondaryButton>
+        </div>
+      )}
     </div>
   );
 }

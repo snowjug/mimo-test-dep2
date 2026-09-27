@@ -177,19 +177,19 @@ export const OperationsPage: React.FC = () => {
       {/* ── Quick KPI Stat Tiles ────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-          <span className="text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">Total Stream</span>
+          <span className="text-[11px] font-bold text-[var(--text-3)]">Total Stream</span>
           <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)] mt-1">{stats.total}</p>
         </div>
         <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-          <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Completed</span>
+          <span className="text-[11px] font-bold text-emerald-500">Completed</span>
           <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{stats.completed}</p>
         </div>
         <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-          <span className="text-[11px] font-bold text-blue-500 uppercase tracking-wider">Printing Active</span>
+          <span className="text-[11px] font-bold text-blue-500">Printing Active</span>
           <p className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400 mt-1">{stats.printing}</p>
         </div>
         <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-          <span className="text-[11px] font-bold text-purple-500 uppercase tracking-wider">Refunded</span>
+          <span className="text-[11px] font-bold text-purple-500">Refunded</span>
           <p className="text-2xl sm:text-3xl font-black text-purple-600 dark:text-purple-400 mt-1">{stats.refunded}</p>
         </div>
       </div>
@@ -255,7 +255,7 @@ export const OperationsPage: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider">
+              <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)]">
                 <th className="py-3 px-4 sm:px-6">Document</th>
                 <th className="py-3 px-4">Student</th>
                 <th className="py-3 px-4">Terminal</th>
@@ -450,7 +450,7 @@ export const OperationsPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-[var(--text-3)] uppercase tracking-wider mb-1">
+              <label className="block text-[11px] font-bold text-[var(--text-3)] mb-1">
                 Refund Reason / Note
               </label>
               <input

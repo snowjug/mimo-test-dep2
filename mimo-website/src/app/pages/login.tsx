@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { useNavigate, Link } from "react-router-dom";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Printer, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Field, PasswordField, PrimaryButton, Wordmark, inputClass } from "../components/mimo/ui";
+import { AuthFooter } from "../components/mimo/auth-footer";
 import api from "../api";
 
 export function Login() {
@@ -18,7 +16,7 @@ export function Login() {
   const [rememberMe, setRememberMe] = useState(true);
 
   // Auto-login if token already exists
-  
+
   useEffect(() => {
     const token = sessionStorage.getItem("jwtToken") || localStorage.getItem("jwtToken");
     if (token) {
@@ -30,9 +28,9 @@ export function Login() {
 
   if (isCheckingSession) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F4F7FB]">
-        <Loader2 className="w-10 h-10 animate-spin text-[#093765] mb-4" />
-        <p className="text-[#093765] font-medium animate-pulse">Resuming your session...</p>
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3">
+        <Loader2 className="size-6 animate-spin text-ink-3" />
+        <p className="text-[15px] text-ink-2">Resuming your session</p>
       </div>
     );
   }
@@ -50,14 +48,14 @@ export function Login() {
       } else {
         sessionStorage.setItem("jwtToken", jwtToken);
       }
-      
+
       // Check if user already has a name
       const profileRes = await api.get("/profile", {
         headers: { Authorization: `Bearer ${jwtToken}` }
       });
-      
+
       toast.success("Signed in successfully!");
-      
+
       if (profileRes.data.username) {
         localStorage.setItem("mimo_user_name", profileRes.data.username);
         navigate("/upload");
@@ -73,147 +71,117 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-blue-100 to-white relative overflow-hidden">
-      {/* Background shapes */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-300/30 blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/10 blur-[120px]" />
-
-      <div className="w-full max-w-md space-y-6 sm:space-y-8 relative z-10">
-        {/* Logo and Title - Centered above card */}
-        <div className="text-center space-y-2 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-2xl mb-4 transform transition-all hover:scale-110 hover:rotate-3 duration-300">
-            <Printer className="w-8 h-8 text-[#093765]" />
-          </div>
-          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#093765] to-blue-600 tracking-tight">
-            Sign in to MIMO
-          </h1>
-        </div>
-        {/* Login Card - Simplified */}
-        <Card className="border-0 shadow-2xl bg-white/90 backdrop-blur-xl transition-all duration-300 hover:shadow-indigo-500/20 animate-in fade-in zoom-in-95 duration-500">
-          <CardHeader className="space-y-1 pb-4 sm:pb-6 pt-6 sm:pt-6 px-4 sm:px-6">
-            <CardTitle className="text-xl font-bold text-center text-gray-900">Welcome Back</CardTitle>
-            <CardDescription className="text-center text-gray-500">
-              Enter your credentials to access your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-4 sm:px-6 pb-6 sm:pb-6">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-700 font-medium">Email</Label>
-                <div className="relative group">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="name@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-11 border-gray-200 bg-gray-50/50 focus:bg-white transition-all duration-200 focus:scale-[1.01] focus:border-indigo-500 focus:ring-indigo-500/20"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-gray-700 font-medium">Password</Label>
-                <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 h-11 border-gray-200 bg-gray-50/50 focus:bg-white transition-all duration-200 focus:scale-[1.01] focus:border-indigo-500 focus:ring-indigo-500/20"
-                    disabled={loading}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input type="checkbox" className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-all" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-                  <span className="text-gray-600 group-hover:text-gray-900 transition-colors">Remember me</span>
-                </label>
-                <a href="#" className="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline transition-all">
-                  Forgot password?
-                </a>
-              </div>
-              <Button type="submit" className="w-full h-11 bg-gradient-to-r from-[#093765] to-blue-700 hover:from-[#052345] hover:to-blue-800 text-white shadow-lg shadow-blue-900/20 hover:-translate-y-0.5 transition-all duration-300 font-semibold" disabled={loading}>
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    Sign In <ArrowRight className="w-4 h-4 ml-2" />
-                  </>
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500 font-medium">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-center">
-              <GoogleLogin
-                onSuccess={async (credentialResponse) => {
-                  try {
-                    setLoading(true);
-                    const res = await api.post("/google-login", {
-                      token: credentialResponse.credential,
-                    });
-                    if (rememberMe) {
-                      localStorage.setItem("jwtToken", res.data.jwtToken);
-                    } else {
-                      sessionStorage.setItem("jwtToken", res.data.jwtToken);
-                    }
-                    
-                    if (res.data.name && res.data.mobileNumber) {
-                      localStorage.setItem("mimo_user_name", res.data.name);
-                      toast.success("Signed in with Google!");
-                      navigate("/upload");
-                    } else {
-                      toast.success("Almost there! Please provide your phone number.");
-                      navigate("/onboarding", { state: { name: res.data.name } });
-                    }
-                  } catch (err: any) {
-                    console.error(err);
-                    toast.error("Google sign-in failed");
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                onError={() => {
-                  toast.error("Google sign-in failed");
-                }}
-                useOneTap
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <p className="text-center text-sm text-gray-500">
-          Don't have an account?{" "}
-          <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-bold">
-            Sign Up
-          </Link>
+    <div className="flex min-h-[100dvh] flex-col bg-[#0a2342]">
+      {/* Identity band: the real kiosk rises into the navy ground; the sign-in sheet slides over it. */}
+      <div className="relative h-[34dvh] min-h-[220px] overflow-hidden px-5 pt-[max(20px,env(safe-area-inset-top))]">
+        <Wordmark className="text-white dark:text-white" />
+        <p className="mt-6 max-w-[11ch] text-[24px] font-semibold leading-[1.12] tracking-[-0.03em] text-white">
+          Your campus printer, in your pocket.
         </p>
+        <span aria-hidden className="pointer-events-none absolute -bottom-6 right-2 select-none text-[120px] leading-none text-white/[0.05]" style={{ fontFamily: "'Lovelo', sans-serif", fontWeight: 900 }}>
+          MIMO
+        </span>
+        <img
+          src="/images/landing/kiosk-1300.webp"
+          alt=""
+          width={481}
+          height={1300}
+          decoding="async"
+          className="kiosk-rise pointer-events-none absolute bottom-[-18%] right-1 h-[112%] w-auto drop-shadow-[0_20px_30px_rgba(0,0,0,0.45)]"
+        />
+      </div>
 
-        <div className="text-center text-xs text-slate-700 font-bold space-y-2 mt-8 pb-4">
-          <p className="uppercase tracking-wide text-sm">Vision Printt Technologies</p>
-          <p>REVA NEST, Rukmini Knowledge Park<br/>Kattegenahalli, Yelahanka, Bengaluru - 560064</p>
-          <div className="flex items-center justify-center gap-4 mt-2">
-            <span>🆘 Support: +91 8123028797</span>
-            <span>🕐 Mon-Fri: 9AM-6PM IST</span>
-          </div>
-          <p className="pt-2 border-t border-slate-300 mt-2 w-3/4 mx-auto text-slate-500 font-normal">
-            © 2026 VASUDEVA VISHAL (Vision Printt Technologies). All rights reserved.
-          </p>
-        </div>
+      <div className="sheet-rise relative -mt-6 flex flex-1 flex-col rounded-t-[28px] bg-canvas px-5 pt-7">
+      <div>
+        <h1 className="text-[34px] font-semibold leading-[1.08] tracking-[-0.035em] text-ink">Sign in</h1>
+        <p className="mt-2 text-[16px] leading-relaxed text-ink-2">Upload, pay, and collect at any MIMO kiosk.</p>
+      </div>
+
+      <div className="mt-7 flex justify-center">
+        <GoogleLogin
+          onSuccess={async (credentialResponse) => {
+            try {
+              setLoading(true);
+              const res = await api.post("/google-login", {
+                token: credentialResponse.credential,
+              });
+              if (rememberMe) {
+                localStorage.setItem("jwtToken", res.data.jwtToken);
+              } else {
+                sessionStorage.setItem("jwtToken", res.data.jwtToken);
+              }
+
+              if (res.data.name && res.data.mobileNumber) {
+                localStorage.setItem("mimo_user_name", res.data.name);
+                toast.success("Signed in with Google!");
+                navigate("/upload");
+              } else {
+                toast.success("Almost there! Please provide your phone number.");
+                navigate("/onboarding", { state: { name: res.data.name } });
+              }
+            } catch (err: any) {
+              console.error(err);
+              toast.error("Google sign-in failed");
+            } finally {
+              setLoading(false);
+            }
+          }}
+          onError={() => {
+            toast.error("Google sign-in failed");
+          }}
+          useOneTap
+          size="large"
+          shape="pill"
+          text="continue_with"
+          width="320"
+        />
+      </div>
+
+      <div className="my-7 flex items-center gap-3 text-[13px] text-ink-3" aria-hidden>
+        <span className="h-px flex-1 bg-hairline" />
+        or use email
+        <span className="h-px flex-1 bg-hairline" />
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Field label="Email" htmlFor="email">
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            placeholder="you@college.edu"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={inputClass}
+            disabled={loading}
+          />
+        </Field>
+        <PasswordField id="password" label="Password" autoComplete="current-password" value={password} onChange={setPassword} disabled={loading} required />
+
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 px-1 text-[15px] text-ink-2">
+          <input
+            type="checkbox"
+            className="size-5 rounded-md accent-[var(--brand)]"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+          />
+          Keep me signed in
+        </label>
+
+        <PrimaryButton type="submit" loading={loading}>
+          Sign in
+        </PrimaryButton>
+      </form>
+
+      <p className="mt-6 text-center text-[15px] text-ink-2">
+        New to MIMO?{" "}
+        <Link to="/register" className="inline-flex min-h-11 items-center font-semibold text-brand-text">
+          Create an account
+        </Link>
+      </p>
+
+      <AuthFooter />
       </div>
     </div>
   );

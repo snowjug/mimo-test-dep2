@@ -33,14 +33,14 @@ const TONES = {
     divider: 'border-slate-200 dark:border-slate-800',
   },
   finance: {
-    trigger: 'border border-[#EDE9FE] bg-[#FAF9FD] text-slate-700 hover:bg-[#F3EFFF]',
-    panel: 'bg-white border border-[#EDE9FE] text-slate-700',
+    trigger: 'border border-[#E4E7EB] bg-[#F3F4F6] text-slate-700 hover:bg-[#E7EEF7]',
+    panel: 'bg-white border border-[#E4E7EB] text-slate-700',
     item: 'hover:bg-[#F5F2FF]',
-    active: 'bg-[#EDE8FF] text-[#5b29c9]',
-    icon: 'text-[#6D35E8]',
-    input: 'border border-[#EDE9FE] bg-white text-slate-900',
-    apply: 'bg-[#6D35E8] hover:bg-[#5b29c9] text-white',
-    divider: 'border-[#EDE9FE]',
+    active: 'bg-[#E7EEF7] text-[#062A4E]',
+    icon: 'text-[#093765]',
+    input: 'border border-[#E4E7EB] bg-white text-slate-900',
+    apply: 'bg-[#093765] hover:bg-[#062A4E] text-white',
+    divider: 'border-[#E4E7EB]',
   },
 } as const;
 
@@ -107,7 +107,7 @@ export const DateRangePicker: React.FC<Props> = ({ value, onChange, tone = 'admi
             })}
           </ul>
           <div className={`mt-2 pt-3 px-2 pb-1 border-t ${t.divider}`}>
-            <p className="text-[10px] font-black uppercase tracking-wider opacity-60 mb-2">Custom range</p>
+            <p className="text-[10px] font-black opacity-60 mb-2">Custom range</p>
             <div className="grid grid-cols-2 gap-2">
               <label className="text-[10px] font-bold opacity-70">
                 From

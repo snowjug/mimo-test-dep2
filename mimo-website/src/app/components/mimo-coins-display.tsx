@@ -36,12 +36,14 @@ export function MimoCoinsDisplay() {
   }, []);
 
   return (
-    <div 
-      className="flex items-center justify-center w-10 h-10 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-full cursor-pointer transition-all shrink-0 shadow-sm"
+    <button
+      type="button"
+      className="press flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-surface-2 pl-2.5 pr-3 text-[14px] font-semibold tabular-nums text-ink active:bg-surface-3"
       onClick={(e) => { e.stopPropagation(); navigate("/user-profile?tab=mimo-coins"); }}
-      title={`${mimoCoinsBalance} Mimo Coins`}
+      aria-label={`${mimoCoinsBalance} MIMO coins`}
     >
-      <Gift className="w-5 h-5 text-purple-600" />
-    </div>
+      <Gift className="size-4 text-brand-text" strokeWidth={2} />
+      {mimoCoinsBalance}
+    </button>
   );
 }

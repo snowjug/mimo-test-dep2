@@ -2,25 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="google-adsense-account" content="ca-pub-6488030243565665">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6488030243565665" crossorigin="anonymous"></script>
   <title>MIMO — Printing Made Easy</title>
   <meta name="description" content="MIMO makes printing easy. Upload your file, get a 4-digit code, and print at the nearest MIMO kiosk in seconds. No queues, no cash, complete privacy." />
-  
-  <!-- Favicon -->
+  <meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0c0d10" media="(prefers-color-scheme: dark)" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="shortcut icon" href="/favicon.svg" />
-
-  <!-- Open Graph / SEO Metadata -->
   <meta property="og:title" content="MIMO — Printing Made Easy" />
   <meta property="og:description" content="MIMO makes printing easy. Upload your file, get a 4-digit code, and print at the nearest MIMO kiosk in seconds. No queues, no cash, complete privacy." />
   <meta property="og:image" content="https://printmimo.tech/koala-mascot.png" />
   <meta property="og:url" content="https://printmimo.tech" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="MIMO" />
-
-  <!-- Structured Data (JSON-LD Organization Schema) -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -33,2871 +29,589 @@
   }
   </script>
 
-  <!-- Tailwind CSS v3 CDN -->
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            mimoBlue: '#4666F6',
-            mimoLightBlue: '#EEF2FF',
-          },
-          borderRadius: {
-            '3xl': '1.5rem',
-            '4xl': '2rem',
-          }
-        }
-      }
-    }
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/images/landing/kiosk-1923.webp" as="image" media="(min-width: 861px)" />
+  <link rel="preload" href="/images/landing/kiosk-1300.webp" as="image" media="(max-width: 860px)" />
+  <link rel="stylesheet" href="/scrollcraft/scrollcraft.css" />
+
   <style>
     @font-face {
-      font-family: 'Lovelo';
-      src: url('./fonts/lovelo_black-webfont.woff2') format('woff2'),
-           url('./fonts/lovelo_black-webfont.woff') format('woff'),
-           url('./fonts/lovelo_black-webfont.ttf') format('truetype');
+      font-family: "Geist";
+      src: url("/fonts/geist-latin-wght-normal.woff2") format("woff2");
+      font-weight: 100 900;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Lovelo";
+      src: url("/fonts/lovelo_black-webfont.woff2") format("woff2");
       font-weight: 900;
-      font-style: normal;
       font-display: swap;
     }
 
-    /* ── Reset ── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    html, body {
-      font-family: 'Outfit', sans-serif;
-      background: #e8ecf5;
-      min-height: 100%;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-    a { text-decoration: none; color: inherit; }
+    /* ScrollCraft tokens: the whole theme. Phone side = paper ground, kiosk side = navy ground. */
+    :root {
+      --sc-canvas: #f3f4f6;
+      --sc-surface: #ffffff;
+      --sc-ink: #111318;
+      --sc-ink-soft: #4d525c;
+      --sc-accent: #093765;
+      --sc-accent-ink: #ffffff;
+      --sc-font-display: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --sc-font-text: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --sc-font-mono: "Geist", ui-monospace, monospace;
 
-    /* ── Page wrap ── */
-    .page-wrap {
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      min-height: 100vh;
-      padding: 0;
-      overflow-x: hidden;
-      width: 100%;
+      --kiosk-ground: #0a2342;
+      --kiosk-ground-2: #0f2f57;
+      --kiosk-ink: #f2f4f7;
+      --kiosk-ink-soft: #b3c2d6;
+      --line: rgba(17, 19, 24, 0.1);
+      --phone-surface: #ffffff;
+      --phone-fill: #eef0f3;
+      --success: #1d7f46;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --sc-canvas: #0c0d10;
+        --sc-surface: #17181c;
+        --sc-ink: #f2f3f5;
+        --sc-ink-soft: #b1b5bd;
+        --sc-accent: #8ab6ea;
+        --sc-accent-ink: #0c0d10;
+        --line: rgba(255, 255, 255, 0.1);
+        --phone-surface: #17181c;
+        --phone-fill: #212227;
+        --success: #5ccf8c;
+      }
     }
 
-    /* ── Phone-card container ── */
-    .phone-card {
-      --cards-padding: 1.5rem;
-      --cards-overlap: 4rem;
-      width: 100%;
-      max-width: 430px;
-      min-height: 100vh;
+    html { -webkit-text-size-adjust: 100%; }
+    body { background: var(--sc-canvas); }
+    a { color: inherit; }
+    :focus-visible { outline: 2px solid var(--sc-accent); outline-offset: 3px; border-radius: 6px; }
+    .skip { position: absolute; left: -9999px; top: 8px; z-index: 100; background: var(--sc-surface); padding: 10px 14px; border-radius: 10px; }
+    .skip:focus { left: 12px; }
+    .wordmark { font-family: "Lovelo", var(--sc-font-display); font-weight: 900; letter-spacing: 0.02em; line-height: 1; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      height: 52px; padding: 0 24px; border-radius: 14px;
+      background: var(--sc-accent); color: var(--sc-accent-ink);
+      font-weight: 600; font-size: 16px; text-decoration: none; white-space: nowrap;
+      transition: transform 160ms var(--sc-ease-out), background-color 160ms;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn--light { background: #ffffff; color: #0a2342; }
+    .btn svg { width: 16px; height: 16px; }
+
+    /* ─────────────────────────────── THE STORY (split stage) ─────────────────────────────── */
+    /*
+      One pinned stage. The engine publishes --sc-p (0..1) on the section. Everything below is
+      derived from it in CSS, so the signature move costs no JavaScript:
+        --a    divider travels to the peak position
+        --z    camera push-in on the kiosk (up, then back out)
+        --pan  focus moves from the screen to the tray
+        --out  the printed page slides out of the slot
+        --c    the collapse: the kiosk side takes the full width
+    */
+    .story { --sc-p: 0; }
+    .stage {
+      --p: var(--sc-p);
+      --a: clamp(0, (var(--p) - 0.60) / 0.05, 1);
+      --c: clamp(0, (var(--p) - 0.90) / 0.07, 1);
+      --z: calc(clamp(0, (var(--p) - 0.61) / 0.05, 1) - clamp(0, (var(--p) - 0.86) / 0.045, 1));
+      --pan: clamp(0, (var(--p) - 0.77) / 0.05, 1);
+      --out: clamp(0, (var(--p) - 0.80) / 0.06, 1);
+      --split: calc(0.5 - 0.14 * var(--a) - 0.36 * var(--c));
+      --kh: min(80cqh, 980px);
+      --S: 2.4;
+      --kx: calc((1 - var(--a)) * (1 - var(--c)) * 9cqw);
+      --fx: calc(0.277 + 0.048 * var(--pan));
+      --fy: calc(0.144 + 0.303 * var(--pan));
+      /* No position here: the engine makes the stage sticky, which is also its containing block. */
+      container-type: size;
       background:
-        linear-gradient(to bottom, rgba(238,242,255,0) 330px, #EEF2FF 490px),
-        radial-gradient(ellipse 110% 90% at 80% 360px, rgba(174,196,255,0.80) 0%, rgba(140,170,255,0.45) 30%, rgba(100,140,255,0.12) 55%, rgba(100,140,255,0) 80%),
-        radial-gradient(ellipse 60% 50% at 20% 230px, rgba(200,215,255,0.40) 0%, rgba(200,215,255,0) 70%),
-        #EEF2FF;
-      background-repeat: no-repeat;
-      background-size: 100% 540px, 100% 540px, 100% 540px, 100% 100%;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      box-shadow: 0 0 80px rgba(0,0,0,0.22);
-      overflow-x: hidden;
+        radial-gradient(60% 55% at calc(50% + var(--split) * 50%) 58%, var(--kiosk-ground-2), transparent 70%),
+        var(--kiosk-ground);
+      color: var(--kiosk-ink);
     }
 
-    /* ═══════════════════════════════════════════
-       HEADER
-       ═══════════════════════════════════════════ */
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 3rem 1.5rem 1rem;
-      position: relative;
-      z-index: 20;
-      animation: slideDown 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-      border-top-left-radius: inherit;
-      border-top-right-radius: inherit;
-      background: transparent;
-    }
-    .logo-block h1 {
-      font-family: 'Lovelo', sans-serif;
-      font-size: 1.875rem;
-      font-weight: 900;
-      color: #111827;
-      letter-spacing: -.03em;
-      line-height: 1;
-    }
-    .logo-block p {
-      font-size: .8125rem;
-      font-weight: 500;
-      color: #6B7280;
-      margin-top: .15rem;
-    }
-    .header-actions { display: flex; align-items: center; gap: .75rem; }
-    .btn-get-started {
-      display: inline-flex;
-      align-items: center;
-      gap: .45rem;
-      background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
-      color: #fff;
-      font-family: 'Outfit', sans-serif;
-      font-weight: 600;
-      font-size: .875rem;
-      padding: .65rem 1.25rem;
-      border-radius: 99px;
-      border: none;
-      cursor: pointer;
-      box-shadow: 0 4px 18px rgba(74,107,255,.38);
-      transition: all .25s cubic-bezier(0.34, 1.56, 0.64, 1);
-      white-space: nowrap;
-    }
-    .btn-get-started:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 8px 28px rgba(74,107,255,.5); }
-    .btn-get-started svg { width: 1rem; height: 1rem; }
-    .btn-menu {
-      width: 2.75rem; height: 2.75rem;
-      background: #fff;
-      border: none; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,.08);
-      transition: all .2s ease;
-    }
-    .btn-menu:hover { background: #EEF2FF; transform: scale(1.08); }
-    .btn-menu svg { width: 1.5rem; height: 1.5rem; }
-
-    /* ═══════════════════════════════════════════
-       HERO
-       ═══════════════════════════════════════════ */
-    .hero {
-      position: relative;
-      height: 440px;
-      flex-shrink: 0;
-      background: transparent;
-      margin-top: -1px;
+    /* Plane 1 (far): the wordmark set huge behind the kiosk, drifting slower than the kiosk. */
+    .ghost {
+      position: absolute; top: 50%; left: 0; width: 100%;
+      font-size: clamp(9rem, 26cqw, 26rem); color: rgba(255, 255, 255, 0.045);
+      text-align: center; white-space: nowrap; pointer-events: none; user-select: none;
+      transform: translate(calc((var(--split) + 1) / 2 * 100cqw - 50cqw + var(--kx) * 0.4), calc(-50% - var(--p) * 8cqh));
     }
 
-    /* Floating orbs behind mascot */
-    .hero-orb {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(40px);
-      pointer-events: none;
-      animation: pulse-orb 4s ease-in-out infinite;
-    }
-    .hero-orb-1 { width: 200px; height: 200px; background: rgba(100,140,255,0.14); right: -20px; bottom: 140px; animation-delay: 0s; }
-    .hero-orb-2 { width: 150px; height: 150px; background: rgba(124,58,237,0.10); right: 80px; bottom: 160px; animation-delay: 1.5s; }
-
-    /* Speech bubble */
-    .speech-bubble {
-      position: absolute;
-      top: 3.5rem; left: 2rem;
-      background: #fff;
-      padding: .75rem 1.1rem;
-      border-radius: 1.125rem;
-      box-shadow: 0 6px 20px rgba(0,0,0,.09);
-      transform: rotate(-3deg);
-      z-index: 20;
-      animation: bubblePop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s both, bobble 3s ease-in-out 1.2s infinite;
-    }
-    .speech-bubble::after {
-      content: '';
-      position: absolute;
-      bottom: -5px; right: 22px;
-      width: 12px; height: 12px;
-      background: #fff;
-      border-radius: 2px;
-      transform: rotate(45deg);
-      box-shadow: 2px 2px 4px rgba(0,0,0,.05);
-      z-index: -1;
-    }
-    .bubble-text { font-size: 1.0625rem; font-weight: 700; color: #111827; line-height: 1.3; }
-    .bubble-text span { font-family: 'Lovelo', sans-serif; color: #4A6BFF; }
-    .bubble-heart { margin-top: .25rem; color: #4A6BFF; }
-    .bubble-heart svg { width: 1rem; height: 1rem; }
-
-    /* Mascot */
-    .mascot-wrap {
+    /* Plane 2 (subject): the real machine, with its contact shadow anchored to its base. */
+    .kiosk-wrap {
       position: absolute; inset: 0;
-      display: flex; align-items: flex-end; justify-content: flex-end;
-      overflow: visible;
-      pointer-events: none;
-      -webkit-clip-path: polygon(
-        0% 0%, 
-        100% 0%, 
-        100% calc(100% - var(--cards-overlap)), 
-        calc(100% - var(--cards-padding) - 1.7rem) calc(100% - var(--cards-overlap)), 
-        calc(100% - var(--cards-padding) - 1.7rem) 100%, 
-        0% 100%
-      );
-      clip-path: polygon(
-        0% 0%, 
-        100% 0%, 
-        100% calc(100% - var(--cards-overlap)), 
-        calc(100% - var(--cards-padding) - 1.7rem) calc(100% - var(--cards-overlap)), 
-        calc(100% - var(--cards-padding) - 1.7rem) 100%, 
-        0% 100%
-      );
-    }
-    /* Soft ambient glow pad behind mascot */
-    .hero::before {
-      content: '';
-      position: absolute;
-      right: -30px; bottom: -20px;
-      width: 110%; height: 110%;
-      background: radial-gradient(ellipse at 58% 52%, rgba(160, 200, 255, 0.85) 0%, rgba(180, 215, 255, 0.50) 20%, rgba(200, 225, 255, 0.15) 35%, rgba(200, 225, 255, 0) 55%);
+      display: grid; place-items: center;
+      transform: translateX(calc((var(--split) + 1) / 2 * 100cqw - 50cqw + var(--kx)));
       pointer-events: none;
     }
-    .mascot-img {
-      height: 90%; width: auto; object-fit: contain;
-      transform: scale(1.05) translateY(-0.5rem) translateX(0.5rem);
-      transform-origin: bottom right;
-      animation: mascotFloat 6s ease-in-out infinite;
-      filter: saturate(1.75) hue-rotate(-20deg);
+    .kiosk {
+      position: relative; margin: 0;
+      height: var(--kh); aspect-ratio: 711 / 1923;
+      transform-origin: calc(var(--fx) * 100%) calc(var(--fy) * 100%);
+      transform:
+        translate(calc(var(--z) * (0.5 - var(--fx)) * var(--kh) * 0.3697), calc(var(--z) * (0.5 - var(--fy)) * var(--kh)))
+        scale(calc(1 + var(--z) * (var(--S) - 1)))
+        translateY(calc(var(--p) * -2cqh));
+    }
+    .kiosk img { width: 100%; height: 100%; display: block; }
+    .kiosk::after { /* contact shadow: shares the kiosk's base, so it never floats */
+      content: ""; position: absolute; left: -18%; right: -18%; bottom: 0.2%; height: 5%;
+      background: radial-gradient(50% 50% at 50% 50%, rgba(0, 0, 0, 0.55), transparent 70%);
+      transform: translateY(45%); z-index: -1;
     }
 
-    /* ═══════════════════════════════════════════
-       ACTION CARDS
-    ═══════════════════════════════════════════ */
-    .cards {
-      padding: 0 var(--cards-padding) 2rem;
-      display: flex; flex-direction: column; gap: 1rem;
-      z-index: 30; position: relative;
-      margin-top: calc(-1 * var(--cards-overlap));
-      background: #EEF2FF;
+    /* The real screen, measured on the photo: 18% / 10.8% / 19.4% / 7.2% of the cropped cutout. */
+    .screen {
+      position: absolute; left: 18.2%; top: 10.9%; width: 19.2%; height: 7.1%;
+      border-radius: 3%; overflow: hidden;
+      background: #0b1a2e; color: #eaf1fb;
+      font-size: calc(var(--kh) * 0.0105); line-height: 1.2;
+      display: grid; place-content: center; text-align: center; gap: 0.35em;
+      opacity: clamp(0, (var(--p) - 0.615) / 0.02, 1);
     }
-    /* Single gradient overlay: handles full fade from hero into cards — no seam */
-    .cards::before {
-      content: '';
-      position: absolute;
-      top: -4rem;
-      left: 0; right: 0;
-      height: 4rem;
-      background: linear-gradient(to bottom,
-        rgba(238,242,255,0) 0%,
-        #EEF2FF 100%
-      );
-      pointer-events: none;
-      z-index: 5;
+    .screen__label { font-size: 0.62em; letter-spacing: 0.02em; opacity: 0.75; }
+    .screen__code { display: flex; gap: 0.18em; justify-content: center; }
+    .screen__code span {
+      width: 1.05em; height: 1.35em; border-radius: 0.18em; background: rgba(255, 255, 255, 0.1);
+      display: grid; place-items: center; font-weight: 600; font-size: 1.3em;
+      font-variant-numeric: tabular-nums;
     }
+    .screen__code b { opacity: clamp(0, (var(--p) - var(--t)) * 70, 1); font-weight: 600; }
+    .screen__status { font-size: 0.56em; color: #8fd3a9; opacity: clamp(0, (var(--p) - 0.765) / 0.01, 1); }
 
-    /* ── Action Cards Custom Premium Styling ── */
-    #print-now-card, #find-machine-card, #how-it-works-card, #trust-card {
-      border: 1px solid rgba(70, 102, 246, 0.14) !important;
-      box-shadow: 0 12px 30px -4px rgba(70, 102, 246, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03) !important;
-      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+    /* The real tray slot: dark interior at 21.7% / 43.1%, 21.7% wide. The page leaves from inside it. */
+    .slot { position: absolute; left: 21.9%; top: 44.4%; width: 21.2%; height: 22%; overflow: hidden; }
+    .paper {
+      position: absolute; left: 4%; right: 4%; top: 0; height: 100%;
+      background: #fbfbfa; border-radius: 0 0 2px 2px;
+      box-shadow: 0 6px 10px rgba(0, 0, 0, 0.28);
+      transform: translateY(calc(-100% + var(--out) * 100%));
+      padding: 14% 12%; display: grid; align-content: start; gap: 7%;
     }
-    #print-now-card:hover {
-      transform: translateY(-5px) scale(1.01);
-      box-shadow: 0 20px 40px -8px rgba(74, 107, 255, 0.22) !important;
-      border-color: rgba(74, 107, 255, 0.35) !important;
-    }
-    #print-now-card:active {
-      transform: translateY(-1px) scale(0.99);
-    }
-    #find-machine-card:hover, #how-it-works-card:hover {
-      transform: translateY(-5px) scale(1.02);
-      box-shadow: 0 20px 40px -8px rgba(74, 107, 255, 0.18) !important;
-      border-color: rgba(74, 107, 255, 0.3) !important;
-    }
-    #find-machine-card:active, #how-it-works-card:active {
-      transform: translateY(-1px) scale(0.98);
-    }
-    #trust-card {
-      background: #ffffff !important;
-      box-shadow: 0 12px 30px -4px rgba(70, 102, 246, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03) !important;
-      border: 1px solid rgba(70, 102, 246, 0.14) !important;
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    #trust-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 16px 36px -6px rgba(74, 107, 255, 0.16) !important;
-      border-color: rgba(74, 107, 255, 0.3) !important;
-    }
-    .card-main {
-      background: #fff;
-      border-radius: 1.5rem;
-      padding: 1.5rem;
-      display: flex; align-items: center; justify-content: space-between;
-      box-shadow: 0 12px 32px rgba(74,107,255,.08);
-      cursor: pointer;
-      transition: transform .3s cubic-bezier(0.34,1.56,0.64,1), box-shadow .3s ease;
-      text-decoration: none;
-      animation: slideUp 0.6s ease 0.3s both;
-    }
-    .card-main:hover { transform: scale(1.02) translateY(-4px); box-shadow: 0 20px 48px rgba(74,107,255,.15); }
-    .card-main:active { transform: scale(0.98) translateY(0); box-shadow: 0 8px 24px rgba(74,107,255,.1); }
-    .card-main-left { display: flex; align-items: center; gap: 1.125rem; }
-    .card-icon {
-      width: 3.5rem; height: 3.5rem;
-      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    }
-    .card-icon svg { width: 1.625rem; height: 1.625rem; color: #4A6BFF; }
-    .card-title { font-size: 1.125rem; font-weight: 700; color: #111827; }
-    .card-sub { font-size: .8125rem; color: #6B7280; margin-top: .15rem; font-weight: 500; }
-    .card-arrow {
-      width: 2.625rem; height: 2.625rem;
-      background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      box-shadow: 0 4px 14px rgba(74,107,255,.35);
-      transition: transform .2s ease;
-    }
-    .card-main:hover .card-arrow { transform: translateX(4px) scale(1.08); box-shadow: 0 6px 20px rgba(74,107,255,.5); }
-    .card-arrow svg { width: 1.125rem; height: 1.125rem; color: #fff; }
+    .paper i { display: block; height: 3px; border-radius: 2px; background: #c9ced6; }
+    .paper i:nth-child(1) { width: 62%; height: 5px; background: #8a93a1; }
+    .paper i:nth-child(3) { width: 88%; } .paper i:nth-child(5) { width: 70%; }
 
-    /* Mini cards */
-    .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .card-mini {
-      background: #fff;
-      border-radius: 1.25rem; padding: 1.125rem;
-      display: flex; flex-direction: column; justify-content: space-between;
-      min-height: 8rem;
-      box-shadow: 0 10px 30px rgba(0,0,0,.04);
-      cursor: pointer;
-      transition: transform .3s cubic-bezier(0.34,1.56,0.64,1), box-shadow .3s ease;
-      text-decoration: none;
-      animation: slideUp 0.6s ease 0.45s both;
+    /* Plane 3 (near): the phone side, clipped at the divider so it passes over the kiosk. */
+    .phone-side {
+      position: absolute; inset: 0; z-index: 3;
+      background: var(--sc-canvas); color: var(--sc-ink);
+      clip-path: inset(0 calc((1 - var(--split)) * 100%) 0 0);
     }
-    .card-mini:hover { transform: scale(1.04) translateY(-4px); box-shadow: 0 18px 42px rgba(0,0,0,.08); }
-    .card-mini:active { transform: scale(0.98) translateY(0); box-shadow: 0 8px 20px rgba(0,0,0,.05); }
-    .card-mini-top { display: flex; align-items: flex-start; gap: .75rem; }
-    .card-mini-icon {
-      width: 2.5rem; height: 2.5rem;
-      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    .phone-side__inner {
+      position: absolute; top: 0; bottom: 0; left: 0; width: 50cqw;
+      padding: max(28px, env(safe-area-inset-top)) clamp(24px, 4cqw, 64px) 32px;
+      display: grid; grid-template-rows: auto 1fr; gap: 24px;
+      transform: translateX(calc((var(--split) - 0.5) * 30cqw));
     }
-    .card-mini-icon svg { width: 1.15rem; height: 1.15rem; color: #4A6BFF; }
-    .card-mini-info { padding-top: .1rem; }
-    .card-mini-title { font-size: .9375rem; font-weight: 700; color: #111827; line-height: 1.2; }
-    .card-mini-sub { font-size: .6875rem; color: #6B7280; margin-top: .2rem; font-weight: 500; }
-    .card-mini-bottom { display: flex; justify-content: flex-end; }
-    .mini-arrow { color: #4A6BFF; transition: transform .2s ease; }
-    .card-mini:hover .mini-arrow { transform: translateX(4px) scale(1.15); color: #7C3AED; }
-    .mini-arrow svg { width: 1.15rem; height: 1.15rem; }
+    .bar { display: flex; align-items: center; justify-content: space-between; }
+    .bar .wordmark { font-size: 28px; color: var(--sc-accent); }
+    .bar a { font-size: 15px; font-weight: 600; text-decoration: none; color: var(--sc-accent); min-height: 44px; display: inline-flex; align-items: center; }
 
-    /* ═══════════════════════════════════════════
-       STATS BAR
-    ═══════════════════════════════════════════ */
-    .stats-bar {
-      position: relative;
-      z-index: 20;
-      background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
-      margin: 0 1.5rem;
-      border-radius: 1.5rem;
-      padding: 1.5rem 1rem;
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 0;
-      box-shadow: 0 10px 30px rgba(74,107,255,.35);
+    .phone-body { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: clamp(20px, 3cqw, 48px); align-items: center; min-height: 0; }
+    .chapters { position: relative; min-height: 320px; }
+    .chapter { position: absolute; left: 0; right: 0; top: 50%; translate: 0 -50%; }
+    .chapter h1, .chapter h2 {
+      font-family: var(--sc-font-display); font-weight: 600; margin: 0;
+      letter-spacing: -0.035em; line-height: 1.04; text-wrap: balance;
     }
-    .stat-item {
-      text-align: center;
-      position: relative;
-    }
-    .stat-item:not(:last-child)::after {
-      content: '';
-      position: absolute;
-      right: 0; top: 15%; bottom: 15%;
-      width: 1px;
-      background: rgba(255,255,255,0.2);
-    }
-    .stat-num {
-      font-size: 1.5rem;
-      font-weight: 900;
-      color: #fff;
-      line-height: 1;
-      letter-spacing: -.02em;
-    }
-    .stat-label {
-      font-size: 0.6875rem;
-      color: rgba(255,255,255,0.75);
-      font-weight: 500;
-      margin-top: 0.3rem;
-    }
+    .chapter h1 { font-size: clamp(2.4rem, 1.2rem + 3.2cqw, 4.4rem); }
+    .chapter h2 { font-size: clamp(2rem, 1.1rem + 2.4cqw, 3.4rem); }
+    .chapter p { margin: 14px 0 0; max-width: 34ch; color: var(--sc-ink-soft); font-size: 17px; line-height: 1.5; }
+    .chapter .btn { margin-top: 24px; }
 
-    /* ═══════════════════════════════════════════
-       SECTIONS — SHARED
-    ═══════════════════════════════════════════ */
-    .section {
-      padding: 2.5rem 1.5rem;
-      position: relative;
-      /* overflow: visible so ::before can bleed into adjacent sections,
-         creating a true cross-boundary gradient blend */
-      overflow: visible;
-    }
-
-    /* ── True Cross-Section Blending ───────────────────────────────────────
-       Both bg classes are TRANSPARENT — the phone-card's solid #EEF2FF
-       shows through everywhere as the base.
-
-       White sections get a ::before that extends 5rem OUTSIDE their own
-       boundaries in both directions. It uses rgba(white) fading from
-       transparent→white→transparent so it physically bleeds into the
-       adjacent brand sections above and below, producing a genuine
-       cross-element gradient instead of two clipped halves.            */
-
-    .bg-subtle-brand {
-      background: transparent !important;
-      z-index: 20 !important;
-    }
-    .bg-subtle-white {
-      background: transparent !important;
-    }
-    .bg-subtle-white::before {
-      content: '';
-      position: absolute;
-      left: 0; right: 0;
-      top: -5rem;    /* bleeds 5rem UP into previous brand section */
-      bottom: -5rem; /* bleeds 5rem DOWN into next brand section  */
-      background: linear-gradient(to bottom,
-        rgba(255,255,255,0)    0%,
-        rgba(255,255,255,0.45) 8%,
-        rgba(255,255,255,0.85) 18%,
-        rgba(255,255,255,1)    28%,
-        rgba(255,255,255,1)    72%,
-        rgba(255,255,255,0.85) 82%,
-        rgba(255,255,255,0.45) 92%,
-        rgba(255,255,255,0)    100%
-      );
-      z-index: 0;
-      pointer-events: none;
-    }
-    /* Ambient Glow Blobs for Depth */
-    .section-glow-1 {
-      position: absolute;
-      top: -15%; left: -20%;
-      width: 75%; height: 50%;
-      background: radial-gradient(circle, rgba(70, 102, 246, 0.07) 0%, rgba(70, 102, 246, 0) 70%);
-      filter: blur(50px);
-      pointer-events: none;
-      z-index: 1;
-    }
-    .section-glow-2 {
-      position: absolute;
-      bottom: -15%; right: -20%;
-      width: 75%; height: 50%;
-      background: radial-gradient(circle, rgba(124, 58, 237, 0.05) 0%, rgba(124, 58, 237, 0) 70%);
-      filter: blur(50px);
-      pointer-events: none;
-      z-index: 1;
-    }
-    /* Page Ambient Glows */
-    .page-glow-1 {
-      position: fixed;
-      top: -20%; right: -10%;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(74, 107, 255, 0.1) 0%, rgba(74, 107, 255, 0) 70%);
-      filter: blur(100px);
-      pointer-events: none;
-      z-index: 0;
-    }
-    .page-glow-2 {
-      position: fixed;
-      bottom: -10%; left: -10%;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(124, 58, 237, 0.06) 0%, rgba(124, 58, 237, 0) 70%);
-      filter: blur(100px);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .section-header { margin-bottom: 1.75rem; position: relative; z-index: 5; }
-    .section-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      background: #EEF2FF;
-      color: #4A6BFF;
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 0.3rem 0.75rem;
-      border-radius: 99px;
-      margin-bottom: 0.75rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .section-title {
-      font-size: 1.5rem;
-      font-weight: 900;
-      color: #111827;
-      margin-bottom: 0.5rem;
-      letter-spacing: -.03em;
-      line-height: 1.2;
-    }
-    .section-subtitle {
-      font-size: 0.875rem;
-      color: #6B7280;
-      line-height: 1.6;
-      font-weight: 500;
-    }
-
-    /* ═══════════════════════════════════════════
-       PROBLEM CARDS
-    ═══════════════════════════════════════════ */
-    .list-card {
-      background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
-      border-radius: 1.25rem;
-      padding: 1.25rem;
-      margin-bottom: 0.875rem;
-      display: flex;
-      align-items: center;
-      gap: 1.125rem;
-      box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      border: 2px solid rgba(74, 107, 255, 0.18);
-      position: relative;
-      z-index: 2;
-      cursor: default !important;
-      user-select: text;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .list-icon {
-      width: 2.75rem; height: 2.75rem;
-      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      font-size: 1.25rem;
-      color: #4A6BFF;
-      font-weight: 700;
-      border: 1.5px solid rgba(74, 107, 255, 0.18);
-    }
-    .list-text h4 { font-family: 'Outfit', sans-serif; font-size: 1.125rem; font-weight: 750; color: #0f172a; margin-bottom: 0.35rem; letter-spacing: -0.015em; }
-    .list-text p { font-family: 'Inter', sans-serif; font-size: 0.875rem; color: #334155; line-height: 1.625; font-weight: 500; }
-
-    /* ═══════════════════════════════════════════
-       STEPS — HOW IT WORKS
-    ═══════════════════════════════════════════ */
-    .steps-wrap { position: relative; margin-top: 1rem; }
-    .step-card {
-      background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
-      border-radius: 1.25rem;
-      padding: 1.25rem 1.25rem 1.25rem 1rem;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 1.125rem;
-      box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      border: 1px solid rgba(74, 107, 255, 0.14);
-      position: relative;
-      left: 0;
-      z-index: 2;
-      cursor: default !important;
-      user-select: text;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .step-num {
-      min-width: 2.75rem; height: 2.75rem;
-      background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem;
-      font-weight: 800;
-      color: #fff;
-      box-shadow: 0 4px 12px rgba(74,107,255,.35);
-      flex-shrink: 0;
-      position: relative;
-      z-index: 3;
-    }
-    .step-text h4 { font-family: 'Outfit', sans-serif; font-size: 1.125rem; font-weight: 750; color: #0f172a; margin-bottom: 0.35rem; letter-spacing: -0.015em; }
-    .step-text p { font-family: 'Inter', sans-serif; font-size: 0.875rem; color: #334155; line-height: 1.625; font-weight: 500; }
-
-    /* ═══════════════════════════════════════════
-       FEATURES GRID
-    ═══════════════════════════════════════════ */
-    .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-    .feature-card {
-      background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
-      border-radius: 1.5rem;
-      padding: 1.5rem 1rem;
-      text-align: center;
-      box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      border: 2px solid rgba(74, 107, 255, 0.18);
-      position: relative;
-      z-index: 2;
-      cursor: default !important;
-      user-select: text;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .feature-icon {
-      width: 2.75rem; height: 2.75rem;
-      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 0.75rem auto;
-      font-size: 1.25rem;
-      border: 1.5px solid rgba(74, 107, 255, 0.18);
-    }
-    .feature-card h4 { font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 750; color: #0f172a; margin-bottom: 0.35rem; letter-spacing: -0.01em; }
-    .feature-card p { font-family: 'Inter', sans-serif; font-size: 0.8125rem; color: #334155; line-height: 1.55; font-weight: 500; }
-
-    /* ═══════════════════════════════════════════
-       TESTIMONIALS
-    ═══════════════════════════════════════════ */
-    .testimonial-scroll {
-      display: flex;
-      gap: 0.875rem;
-      overflow-x: auto;
-      padding-bottom: 0.5rem;
-      scroll-snap-type: x mandatory;
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-    .testimonial-scroll::-webkit-scrollbar { display: none; }
-    .testimonial-card {
-      background: #fff;
-      border-radius: 1.25rem;
-      padding: 1.25rem;
-      min-width: 240px;
-      flex-shrink: 0;
-      scroll-snap-align: start;
-      box-shadow: 0 4px 15px rgba(0,0,0,.04);
-      border: 1px solid #f3f4f6;
-      transition: transform .2s ease, box-shadow .2s ease;
-    }
-    .testimonial-card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(74,107,255,.1); }
-    .testimonial-stars { color: #FBBF24; font-size: 0.875rem; margin-bottom: 0.75rem; letter-spacing: 0.1em; }
-    .testimonial-text { font-size: 0.875rem; color: #374151; line-height: 1.6; font-style: italic; margin-bottom: 1rem; }
-    .testimonial-author { display: flex; align-items: center; gap: 0.625rem; }
-    .author-avatar {
-      width: 2rem; height: 2rem; border-radius: 50%;
-      background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.875rem; font-weight: 700; color: #fff; flex-shrink: 0;
-    }
-    .author-name { font-size: 0.875rem; font-weight: 700; color: #111827; }
-    .author-role { font-size: 0.75rem; color: #6B7280; }
-
-    /* ═══════════════════════════════════════════
-       CTA BANNER
-    ═══════════════════════════════════════════ */
-    .cta-banner {
-      margin: 0 1.5rem 2rem;
-      background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
-      border-radius: 1.5rem;
-      padding: 2rem 1.5rem;
-      text-align: center;
-      position: relative;
+    /* The phone: real markup on labelled sample data, never a screenshot. */
+    .phone {
+      position: relative; width: 260px; aspect-ratio: 9 / 18.5;
+      border-radius: 40px; background: var(--phone-surface);
+      box-shadow: 0 0 0 8px #15171c, 0 2px 4px rgba(17, 19, 24, 0.12), 0 30px 60px -20px rgba(9, 25, 45, 0.45);
       overflow: hidden;
-      box-shadow: 0 12px 36px rgba(74,107,255,.4);
     }
-    .cta-banner::before {
-      content: '';
-      position: absolute;
-      top: -40px; right: -40px;
-      width: 160px; height: 160px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.07);
+    .phone__tag { position: absolute; top: 14px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--sc-ink-soft); }
+    .scr { position: absolute; inset: 40px 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+    .scr h3 { margin: 0 0 4px; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+    .row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--phone-fill); font-size: 13px; }
+    .row small { display: block; color: var(--sc-ink-soft); font-size: 11px; }
+    .row .ic { width: 28px; height: 28px; border-radius: 8px; background: var(--sc-surface); display: grid; place-items: center; flex: none; }
+    .row .ic svg { width: 15px; height: 15px; }
+    .file { opacity: clamp(0, (var(--p) - var(--t)) / 0.02, 1); transform: translateY(calc((1 - clamp(0, (var(--p) - var(--t)) / 0.02, 1)) * 8px)); }
+    .seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--phone-fill); border-radius: 999px; padding: 3px; font-size: 12px; font-weight: 500; }
+    .seg span { position: relative; z-index: 1; text-align: center; padding: 7px 0; }
+    .seg::before {
+      content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px);
+      border-radius: 999px; background: var(--sc-surface); box-shadow: 0 1px 3px rgba(17, 19, 24, 0.15);
+      transform: translateX(calc(clamp(0, (var(--p) - 0.34) / 0.03, 1) * 100%));
     }
-    .cta-banner::after {
-      content: '';
-      position: absolute;
-      bottom: -30px; left: -30px;
-      width: 120px; height: 120px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.05);
-    }
-    .cta-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      background: rgba(255,255,255,0.15);
-      color: #fff;
-      font-size: 0.6875rem;
-      font-weight: 700;
-      padding: 0.3rem 0.875rem;
-      border-radius: 99px;
-      margin-bottom: 0.875rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      backdrop-filter: blur(4px);
-    }
-    .cta-title {
-      font-size: 1.5rem;
-      font-weight: 900;
-      color: #fff;
-      letter-spacing: -.03em;
-      line-height: 1.2;
-      margin-bottom: 0.5rem;
-      position: relative;
-      z-index: 1;
-    }
-    .cta-subtitle {
-      font-size: 0.875rem;
-      color: rgba(255,255,255,0.8);
-      line-height: 1.5;
-      margin-bottom: 1.5rem;
-      position: relative;
-      z-index: 1;
-    }
-    .btn-cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: #fff;
-      color: #4A6BFF;
-      font-family: 'Outfit', sans-serif;
-      font-weight: 700;
-      font-size: 0.9375rem;
-      padding: 0.875rem 1.75rem;
-      border-radius: 99px;
-      border: none;
-      cursor: pointer;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-      transition: all .25s cubic-bezier(0.34,1.56,0.64,1);
-      position: relative;
-      z-index: 1;
-    }
-    .btn-cta:hover { transform: scale(1.06) translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,.2); }
+    .step-lbl { font-size: 12px; color: var(--sc-ink-soft); margin: 4px 2px 0; }
+    .total { margin-top: auto; display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--sc-ink-soft); }
+    .total b { font-size: 22px; color: var(--sc-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .paybtn { height: 44px; border-radius: 12px; background: var(--sc-accent); color: var(--sc-accent-ink); display: grid; place-items: center; font-size: 14px; font-weight: 600; }
+    .paid { display: flex; align-items: center; gap: 8px; color: var(--success); font-size: 14px; font-weight: 600; opacity: clamp(0, (var(--p) - 0.51) / 0.02, 1); }
+    .bigcode { font-size: 54px; font-weight: 600; letter-spacing: 0.1em; text-align: center; font-variant-numeric: tabular-nums; margin: 24px 0 6px; }
 
-    /* ═══════════════════════════════════════════
-       FAQ
-    ═══════════════════════════════════════════ */
-    .faq-item {
-      background: #fff;
-      border-radius: 1.25rem;
-      margin-bottom: 0.875rem;
-      box-shadow: 0 12px 30px -4px rgba(74, 107, 255, 0.1), 0 6px 16px rgba(0, 0, 0, 0.04);
-      border: 2px solid rgba(74, 107, 255, 0.15);
-      overflow: hidden;
-      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    /* The divider is the chrome: both labels, and the story's progress. */
+    .divider {
+      position: absolute; top: 0; bottom: 0; left: 0; width: 1px; z-index: 4;
+      background: rgba(255, 255, 255, 0.18);
+      transform: translateX(calc(var(--split) * 100cqw));
+      opacity: calc(1 - var(--c));
     }
-    .faq-item:hover { box-shadow: 0 20px 40px rgba(74, 107, 255, 0.15); border-color: rgba(74, 107, 255, 0.3); transform: translateY(-3px); }
-    .faq-question {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1.125rem 1.25rem;
-      cursor: pointer;
-      font-size: 0.9375rem;
-      font-weight: 600;
-      color: #111827;
-      user-select: none;
-      gap: 0.5rem;
-    }
-    .faq-icon {
-      width: 1.75rem; height: 1.75rem;
-      background: #EEF2FF;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-      transition: transform .3s ease, background .2s ease;
-    }
-    .faq-icon svg { width: 0.875rem; height: 0.875rem; color: #4A6BFF; transition: transform .3s ease; }
-    .faq-item.open .faq-icon { background: #4A6BFF; }
-    .faq-item.open .faq-icon svg { color: #fff; transform: rotate(45deg); }
-    .faq-answer {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height .35s cubic-bezier(0.4, 0, 0.2, 1), padding .35s ease;
-      font-size: 0.875rem;
-      color: #6B7280;
-      line-height: 1.6;
-      padding: 0 1.25rem;
-    }
-    .faq-answer.open { max-height: 200px; padding-bottom: 1.25rem; }
+    .divider__fill { position: absolute; top: 0; left: 0; width: 1px; height: 100%; background: #ffffff; transform-origin: top; transform: scaleY(var(--p)); }
+    .divider__lbl { position: absolute; bottom: 24px; opacity: calc(1 - var(--a)); font-size: 12px; font-weight: 600; white-space: nowrap; padding: 6px 10px; border-radius: 999px; }
+    .divider__lbl--l { right: 12px; color: var(--sc-ink-soft); background: var(--sc-canvas); }
+    .divider__lbl--r { left: 12px; color: var(--kiosk-ink-soft); background: var(--kiosk-ground); }
 
-    /* ═══════════════════════════════════════════
-       TRUST BADGES (inline)
-    ═══════════════════════════════════════════ */
-    .trust-strip {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      padding: 0;
-      margin-top: 1rem;
+    /* Kiosk-side copy: hero line, the peak caption, and the close. */
+    .kcopy { position: absolute; z-index: 2; color: var(--kiosk-ink); }
+    .kcopy h2 { margin: 0; font-weight: 600; letter-spacing: -0.03em; line-height: 1.06; text-wrap: balance; }
+    .kcopy p { margin: 10px 0 0; color: var(--kiosk-ink-soft); font-size: 17px; line-height: 1.5; max-width: 30ch; }
+    .kcopy--hero { left: calc(50cqw + clamp(24px, 4cqw, 64px)); top: 50%; translate: 0 -50%; max-width: 20cqw; }
+    .kcopy--hero h2 { font-size: clamp(1.8rem, 1rem + 1.6cqw, 2.8rem); }
+    .kcopy--peak {
+      right: clamp(24px, 4cqw, 64px); bottom: 10cqh; text-align: right;
+      padding: 18px 22px; border-radius: 20px; background: rgba(10, 35, 66, 0.88);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
     }
-    .trust-row {
-      display: flex;
-      align-items: center;
-      gap: 1.125rem;
-      background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
-      border-radius: 1.25rem;
-      padding: 1.25rem;
-      box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      border: 2px solid rgba(74, 107, 255, 0.18);
-      position: relative;
-      z-index: 2;
-      cursor: default !important;
-      user-select: text;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .trust-icon-wrap {
-      width: 2.75rem; height: 2.75rem;
-      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      border: 1.5px solid rgba(74, 107, 255, 0.18);
-    }
-    .trust-icon-wrap svg { width: 1.25rem; height: 1.25rem; color: #4A6BFF; }
-    .trust-row-text h4 { font-family: 'Outfit', sans-serif; font-size: 1.0625rem; font-weight: 750; color: #0f172a; margin-bottom: 0.35rem; letter-spacing: -0.01em; }
-    .trust-row-text p { font-family: 'Inter', sans-serif; font-size: 0.875rem; color: #334155; line-height: 1.6; font-weight: 500; }
+    .kcopy--peak h2 { font-size: clamp(1.8rem, 1rem + 1.8cqw, 3rem); }
+    .kcopy--peak p { margin-left: auto; }
+    .kcopy--close { left: clamp(24px, 7cqw, 120px); top: 50%; translate: 0 -50%; max-width: 30cqw; }
+    .kcopy--close h2 { font-size: clamp(2.4rem, 1.2rem + 3cqw, 4.6rem); }
+    .kcopy--close .btn { margin-top: 28px; }
 
-    /* ═══════════════════════════════════════════
-       BUTTONS
-    ═══════════════════════════════════════════ */
-    .btn-primary {
-      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-      width: 100%;
-      background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
-      color: #fff;
-      font-family: 'Outfit', sans-serif;
-      font-weight: 700;
-      font-size: 1rem;
-      padding: 1rem;
-      border-radius: 1.25rem;
-      margin-top: 1.5rem;
-      box-shadow: 0 6px 22px rgba(74,107,255,.4);
-      transition: all .25s cubic-bezier(0.34,1.56,0.64,1);
-      text-decoration: none;
-      border: none;
-      cursor: pointer;
-    }
-    .btn-primary:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 32px rgba(74,107,255,.5); }
-    .btn-primary svg { width: 1.125rem; height: 1.125rem; }
-
-    /* ═══════════════════════════════════════════
-       SUPPORTED BY (MARQUEE)
-    ═══════════════════════════════════════════ */
-    .supported-by-section {
-      padding: 1.5rem 0 2rem;
-      text-align: center;
-      background: #ffffff;
-      border-top: 1px solid #cbd5e1;
-      overflow: hidden;
-      /* Place above footer but below problems */
-      position: relative;
-      z-index: 10;
-    }
-    .supported-by-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #0d3b66;
-      margin-top: 0;
-      margin-bottom: 2rem;
-      font-family: 'Inter', sans-serif;
-      position: relative;
-      z-index: 5;
-    }
-    .marquee-container {
-      width: 100%;
-      overflow: hidden;
-      position: relative;
-      z-index: 5;
-    }
-    .marquee-track {
-      display: flex;
-      width: max-content;
-      animation: marquee 45s linear infinite;
-      will-change: transform;
-    }
-    .marquee-set {
-      display: flex;
-      align-items: center;
-      gap: 4rem;
-      padding-right: 4rem; /* must match gap for seamless -50% loop */
-      flex-shrink: 0;
-    }
-    .marquee-set img {
-      height: 90px;
-      width: auto;
-      object-fit: contain;
-      flex-shrink: 0;
-    }
-    @keyframes marquee {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
+    /* ── Phone composition: the split runs top/bottom and the camera pushes in further. ── */
+    @media (max-width: 860px) {
+      .stage {
+        --split: calc(0.56 - 0.20 * var(--a) - 0.36 * var(--c));
+        --kh: min(40cqh, 120cqw);
+        --S: 2.9;
+        --kx: calc((1 - var(--a)) * (1 - var(--c)) * 22cqw);
+        background:
+          radial-gradient(80% 45% at 50% calc(50% + var(--split) * 50%), var(--kiosk-ground-2), transparent 70%),
+          var(--kiosk-ground);
+      }
+      .ghost { font-size: 42cqw; transform: translate(0, calc((var(--split) + 1) / 2 * 100cqh - 50cqh - 50%)); }
+      .kiosk-wrap { transform: translate(var(--kx), calc((var(--split) + 1) / 2 * 100cqh - 50cqh)); }
+      .kiosk { transform:
+        translate(calc(var(--z) * (0.5 - var(--fx)) * var(--kh) * 0.3697), calc(var(--z) * (0.5 - var(--fy)) * var(--kh)))
+        scale(calc(1 + var(--z) * (var(--S) - 1))); }
+      .phone-side { clip-path: inset(0 0 calc((1 - var(--split)) * 100%) 0); }
+      .phone-side__inner {
+        width: 100%; height: 56cqh; padding: max(14px, env(safe-area-inset-top)) 16px 16px;
+        grid-template-rows: auto auto 1fr; gap: 10px;
+        transform: none;
+      }
+      .bar .wordmark { font-size: 24px; }
+      .phone-body { display: contents; }
+      .chapters { min-height: 0; height: 84px; }
+      .chapter { top: 0; translate: none; }
+      .chapter h1, .chapter h2 { font-size: clamp(1.7rem, 1.2rem + 2.4cqw, 2.2rem); }
+      .chapter p, .chapter .btn { display: none; }
+      .phone { width: 100%; aspect-ratio: auto; height: 100%; border-radius: 24px; box-shadow: 0 1px 2px rgba(17, 19, 24, 0.08); }
+      .phone__tag { top: 10px; }
+      .scr { inset: 34px 14px 14px; gap: 8px; }
+      .bigcode { font-size: 44px; margin: 8px 0 2px; }
+      .divider { top: 0; left: 0; right: 0; bottom: auto; width: auto; height: 1px; transform: translateY(calc(var(--split) * 100cqh)); }
+      .divider__fill { width: 100%; height: 1px; transform-origin: left; transform: scaleX(var(--p)); }
+      .divider__lbl { bottom: auto; }
+      .divider__lbl--l { right: 16px; bottom: 10px; }
+      .divider__lbl--r { right: 16px; left: auto; top: 10px; }
+      .kcopy--hero { left: 16px; top: calc(56cqh + 44px); translate: none; max-width: 52cqw; }
+      .kcopy--hero h2 { font-size: 1.6rem; }
+      .kcopy--hero p { font-size: 15px; }
+      .kcopy--peak { left: 16px; right: 16px; bottom: max(20px, env(safe-area-inset-bottom)); text-align: left; padding: 14px 16px; }
+      .kcopy--peak h2 { font-size: 1.7rem; }
+      .kcopy--peak p { margin-left: 0; font-size: 15px; }
+      .kcopy--close { left: 16px; right: 16px; top: max(28px, env(safe-area-inset-top)); translate: none; max-width: none; }
+      .kcopy--close h2 { font-size: 2.2rem; }
+      .kcopy--close { top: auto; bottom: max(24px, env(safe-area-inset-bottom)); }
+      .kcopy--close .btn { width: 100%; margin-top: 18px; }
     }
 
-    /* ═══════════════════════════════════════════
-       FOOTER
-    ═══════════════════════════════════════════ */
-    .footer-main {
-      position: relative;
-      z-index: 15;
-      background: #f4f7fb;
-      color: #111827;
-      padding: 2rem 1.5rem 2rem;
-      border-top: 1px solid #cbd5e1; /* Clear separation line */
-    }
-    .footer-brand { margin-bottom: 2rem; }
-    .footer-brand-title {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.5rem;
-    }
-    .footer-logo {
-      width: 2.5rem;
-      height: 2.5rem;
-      object-fit: contain;
-      border-radius: 0.5rem;
-    }
-    .footer-brand h2 {
-      font-size: 1.75rem; font-weight: 900;
-      margin-bottom: 0;
-      letter-spacing: -.03em;
-      color: #174A87;
-    }
-    .footer-brand .tagline { font-size: 0.875rem; color: #6B7280; line-height: 1.5; margin-bottom: 1rem; }
-    .footer-address { font-size: 0.8125rem; color: #6B7280; line-height: 1.6; }
-    .footer-address strong { display: flex; gap: 0.35rem; align-items: flex-start; }
-    .footer-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-    .footer-col h4 { font-size: 0.9375rem; font-weight: 700; color: #111827; margin-bottom: 1rem; }
-    .footer-col ul { list-style: none; }
-    .footer-col li { margin-bottom: 0.625rem; }
-    .footer-col a {
-      font-size: 0.875rem; color: #6B7280;
-      transition: color .2s ease;
-      display: inline-flex; align-items: center; gap: 0.25rem;
-    }
-    .footer-col a:hover { color: #4A6BFF; }
-    .footer-divider { height: 1px; background: #e5e7eb; margin-bottom: 1.5rem; }
-    .footer-bottom { text-align: center; }
-    .footer-bottom-copy { font-size: 0.8125rem; color: #9CA3AF; }
-    .footer-legal { margin-top: 0.625rem; display: flex; justify-content: center; gap: 0.25rem; flex-wrap: wrap; }
-    .footer-legal a { font-size: 0.75rem; color: #9CA3AF; padding: 0 0.5rem; transition: color .2s; }
-    .footer-legal a:hover { color: #4A6BFF; }
-    .footer-legal span { color: #e5e7eb; }
-    .footer-credit {
-      margin-top: 0.875rem;
-      font-size: 0.75rem;
-      color: #9CA3AF;
-    }
-    .footer-credit strong { color: #4A6BFF; }
-
-    /* ═══════════════════════════════════════════
-       SCROLL REVEAL
-    ═══════════════════════════════════════════ */
-    .reveal {
-      opacity: 0;
-      transform: translateY(30px);
-      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .reveal-delay-1 { transition-delay: 0.1s; }
-    .reveal-delay-2 { transition-delay: 0.2s; }
-    .reveal-delay-3 { transition-delay: 0.3s; }
-
-    /* Card entry animations */
-    @keyframes cardFadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(24px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    .animate-fade-in-up {
-      animation: cardFadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-    }
-    .delay-100 { animation-delay: 100ms; }
-    .delay-200 { animation-delay: 200ms; }
-    .delay-300 { animation-delay: 300ms; }
-    .delay-400 { animation-delay: 400ms; }
-
-    /* ═══════════════════════════════════════════
-       KEYFRAMES
-    ═══════════════════════════════════════════ */
-    @keyframes slideDown {
-      from { opacity: 0; transform: translateY(-20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes bubblePop {
-      from { opacity: 0; transform: rotate(-3deg) scale(0.6); }
-      to   { opacity: 1; transform: rotate(-3deg) scale(1); }
-    }
-    @keyframes bobble {
-      0%, 100% { transform: rotate(-3deg) translateY(0); }
-      50%       { transform: rotate(-2deg) translateY(-6px); }
-    }
-    @keyframes mascotFloat {
-      0%, 100% {
-        filter:
-          drop-shadow(0 0 14px rgba(238,242,255,1))
-          drop-shadow(0 0 28px rgba(225,235,255,0.7))
-          drop-shadow(-12px 8px 16px rgba(9,55,101,0.12))
-          drop-shadow(-4px 4px 6px rgba(9,55,101,0.08));
-      }
-      50% {
-        filter:
-          drop-shadow(0 0 14px rgba(238,242,255,1))
-          drop-shadow(0 0 28px rgba(225,235,255,0.7))
-          drop-shadow(-16px 14px 22px rgba(9,55,101,0.18))
-          drop-shadow(-6px 6px 10px rgba(9,55,101,0.1));
-      }
-    }
-    @keyframes pulse-orb {
-      0%, 100% { transform: scale(1); opacity: 0.7; }
-      50%       { transform: scale(1.2); opacity: 1; }
-    }
-    @keyframes shimmer {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
-    }
-    @keyframes stepGlowBreathHover {
-      0% {
-        transform: scale(1.1) rotate(-5deg);
-        box-shadow: 0 4px 12px rgba(74,107,255,.35), 0 0 0 0px rgba(74,107,255,0.2);
-      }
-      100% {
-        transform: scale(1.15) rotate(-5deg);
-        box-shadow: 0 8px 24px rgba(74,107,255,.6), 0 0 0 8px rgba(74,107,255,0);
-      }
+    /* ── Static composition: no JS, or reduced motion. No pin, nothing hidden, depth kept. ── */
+    .story.is-static .stage { --p: 1; --a: 0; --c: 0; --z: 0; --pan: 0; --out: 1; --split: 0.5; --kx: 9cqw; height: 100svh; min-height: 640px; }
+    .story.is-static .screen { opacity: 1; }
+    .story.is-static .screen__status { opacity: 1; }
+    .story.is-static .screen__code b { opacity: 1; }
+    .story.is-static .divider__fill { transform: none; }
+    .story.is-static [data-sc-cue] { opacity: 1; }
+    .story.is-static .chapter:not(.chapter--hero), .story.is-static .kcopy--peak, .story.is-static .kcopy--close { display: none; }
+    .story.is-static .scr:not(.scr--code) { display: none; }
+    .story.is-static .kcopy--hero p::after { content: " Your code 4821 is on the screen, and the page is out."; }
+    @media (max-width: 860px) {
+      .story.is-static .stage { --split: 0.56; --kx: 22cqw; }
     }
 
-    /* ═══════════════════════════════════════════
-       PRICING SECTION
-    ═══════════════════════════════════════════ */
-    .pricing-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-top: 1rem;
+    /* ─────────────────────────────── AFTER THE STORY ─────────────────────────────── */
+    .after { background: var(--sc-canvas); color: var(--sc-ink); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(16px, 5vw, 64px); }
+
+    .facts { padding: clamp(72px, 10vw, 140px) 0 clamp(48px, 6vw, 80px); display: grid; grid-template-columns: 1.2fr 1fr; gap: clamp(32px, 6vw, 96px); align-items: end; }
+    .facts h2 { margin: 0; font-size: clamp(2.2rem, 1.3rem + 3vw, 4rem); font-weight: 600; letter-spacing: -0.035em; line-height: 1.04; text-wrap: balance; }
+    .facts p { margin: 16px 0 0; color: var(--sc-ink-soft); font-size: 17px; line-height: 1.55; max-width: 44ch; }
+    .figures { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); }
+    .figures div { padding: 20px 0 0; }
+    .figures dd { margin: 0; font-size: clamp(2.6rem, 1.8rem + 2.4vw, 3.8rem); font-weight: 600; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1; }
+    .figures dt { margin-top: 8px; color: var(--sc-ink-soft); font-size: 15px; }
+
+    .steps { border-top: 1px solid var(--line); padding: clamp(48px, 7vw, 96px) 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 3vw, 40px); }
+    .steps h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+    .steps p { margin: 8px 0 0; color: var(--sc-ink-soft); line-height: 1.55; font-size: 16px; }
+    .steps span { display: block; color: var(--sc-accent); font-weight: 600; font-size: 15px; margin-bottom: 14px; font-variant-numeric: tabular-nums; }
+
+    .faq { border-top: 1px solid var(--line); padding: clamp(48px, 7vw, 96px) 0; display: grid; grid-template-columns: 1fr 1.6fr; gap: clamp(24px, 6vw, 96px); }
+    .faq h2 { margin: 0; font-size: clamp(1.8rem, 1.2rem + 1.6vw, 2.6rem); font-weight: 600; letter-spacing: -0.03em; }
+    .faq details { border-bottom: 1px solid var(--line); }
+    .faq summary {
+      list-style: none; cursor: pointer; padding: 18px 36px 18px 0; position: relative;
+      font-size: 17px; font-weight: 500; min-height: 44px;
     }
-    .pricing-card {
-      background: #fff;
-      border-radius: 1.5rem;
-      padding: 1.5rem;
-      box-shadow: 0 6px 20px rgba(0,0,0,.04);
-      border: 2px solid transparent;
-      transition: all .3s cubic-bezier(0.34,1.56,0.64,1);
-      text-align: center;
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after {
+      content: ""; position: absolute; right: 6px; top: 50%; width: 10px; height: 10px;
+      border-right: 1.75px solid currentColor; border-bottom: 1.75px solid currentColor;
+      transform: translateY(-70%) rotate(45deg); transition: transform 200ms var(--sc-ease-out); opacity: 0.6;
     }
-    .pricing-card.featured {
-      border-color: #4A6BFF;
-      box-shadow: 0 10px 30px rgba(74,107,255,.15);
-    }
-    .pricing-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(74,107,255,.12); }
-    .pricing-card-icon { font-size: 1.75rem; margin-bottom: 0.625rem; }
-    .pricing-card-label { font-size: 0.8125rem; font-weight: 600; color: #6B7280; margin-bottom: 0.375rem; }
-    .pricing-card-price {
-      font-size: 1.625rem;
-      font-weight: 900;
-      color: #111827;
-      letter-spacing: -.02em;
-      line-height: 1;
-    }
-    .pricing-card-price sup { font-size: 0.9rem; font-weight: 700; vertical-align: super; }
-    .pricing-card-per { font-size: 0.75rem; color: #6B7280; margin-top: 0.25rem; font-weight: 500; }
-    .pricing-note {
-      background: #EEF2FF;
-      border-radius: 0.875rem;
-      padding: 0.875rem 1rem;
-      margin-top: 0.875rem;
-      font-size: 0.8125rem;
-      color: #4A6BFF;
-      font-weight: 600;
-      text-align: center;
-    }
+    .faq details[open] summary::after { transform: translateY(-30%) rotate(225deg); }
+    .faq details p { margin: 0 0 20px; color: var(--sc-ink-soft); line-height: 1.6; max-width: 62ch; }
 
-    /* Hide desktop panel on mobile/tablet */
-    .desktop-panel { display: none; }
-    /* Hide desktop site on mobile */
-    .desktop-site  { display: none; }
+    .partners { border-top: 1px solid var(--line); padding: clamp(40px, 6vw, 72px) 0; display: flex; align-items: center; gap: clamp(20px, 5vw, 56px); flex-wrap: wrap; }
+    .partners p { margin: 0; color: var(--sc-ink-soft); font-size: 15px; flex-basis: 100%; }
+    .partners img { height: 44px; width: auto; object-fit: contain; border-radius: 8px; filter: grayscale(1); opacity: 0.8; transition: filter 200ms, opacity 200ms; }
+    .partners img:hover { filter: none; opacity: 1; }
 
-    /* ═══════════════════════════════════════════
-       RESPONSIVE — TABLET (≥ 640px)
-    ═══════════════════════════════════════════ */
-    @media (min-width: 640px) {
-      .page-wrap { padding: 2rem; background: #e8ecf5; }
-      .phone-card {
-        --cards-padding: 2rem;
-        max-width: 600px;
-        border-radius: 2rem;
-        min-height: auto;
-        box-shadow: 0 24px 80px rgba(0,0,0,.2);
-      }
-      header { padding: 2.5rem 2rem 1rem; }
-      .hero { height: 360px; }
-      .cards { padding: 0 2rem 2rem; }
-      .section { padding: 2.5rem 2rem; }
-      .stats-bar { margin: 0 2rem; }
-      .cta-banner { margin: 0 2rem 2rem; }
-      .footer-main { padding: 2.5rem 2rem 2rem; }
-      .section-title { font-size: 1.625rem; }
-    }
+    .foot { border-top: 1px solid var(--line); padding: 40px 0 max(32px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; font-size: 15px; }
+    .foot .wordmark { font-size: 22px; color: var(--sc-accent); }
+    .foot p { margin: 10px 0 0; color: var(--sc-ink-soft); line-height: 1.55; max-width: 36ch; }
+    .foot h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--sc-ink-soft); }
+    .foot ul { list-style: none; margin: 0; padding: 0; }
+    .foot li a { display: inline-flex; min-height: 36px; align-items: center; text-decoration: none; }
+    .foot li a:hover { color: var(--sc-accent); }
+    .foot small { grid-column: 1 / -1; color: var(--sc-ink-soft); padding-top: 20px; border-top: 1px solid var(--line); }
 
-    /* ═══════════════════════════════════════════
-       RESPONSIVE — DESKTOP (≥ 1024px)
-    ═══════════════════════════════════════════ */
-    @media (min-width: 1024px) {
-      .page-wrap {
-        display: grid;
-        grid-template-columns: 420px 1fr;
-        align-items: start;
-        gap: 3rem;
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 3rem 2rem;
-        min-height: 100vh;
-      }
-      .desktop-panel { display: flex; }
-      .phone-card {
-        max-width: 420px;
-        border-radius: 2.5rem;
-        position: sticky;
-        top: 3rem;
-        height: calc(100vh - 6rem);
-        overflow: hidden;
-        overflow-y: auto;
-        scrollbar-width: none;
-      }
-      .phone-card::-webkit-scrollbar { display: none; }
-      .desktop-panel {
-        display: flex;
-        flex-direction: column;
-        gap: 2.5rem;
-        padding: 2.5rem;
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        border-radius: 2.5rem;
-        box-shadow: 0 30px 60px rgba(9, 55, 101, 0.05), 0 10px 20px rgba(9, 55, 101, 0.02);
-        animation: slideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-        position: relative;
-        overflow: visible;
-      }
-
-      /* ── Desktop Section Shared ── */
-      .desktop-divider {
-        height: 1px;
-        background: linear-gradient(to right, transparent, rgba(74,107,255,0.15), transparent);
-        margin: 0;
-      }
-      .desktop-section {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-      }
-      .desktop-section-pill {
-        display: inline-flex;
-        align-items: center;
-        background: #EEF2FF;
-        color: #4A6BFF;
-        font-size: 0.7rem;
-        font-weight: 700;
-        padding: 0.275rem 0.75rem;
-        border-radius: 99px;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        align-self: flex-start;
-        margin-bottom: 0.2rem;
-      }
-      .desktop-section-title {
-        font-size: 1.5rem;
-        font-weight: 900;
-        color: #111827;
-        letter-spacing: -0.03em;
-        line-height: 1.2;
-        margin-bottom: 0.25rem;
-      }
-      .desktop-section-subtitle {
-        font-size: 0.875rem;
-        color: #6B7280;
-        line-height: 1.6;
-      }
-      /* ── How It Works Steps ── */
-      .desktop-steps { display: flex; flex-direction: column; gap: 0.75rem; }
-      .desktop-step-row {
-        display: flex; align-items: center; gap: 1rem;
-        background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
-        border: 1px solid rgba(74,107,255,0.14);
-        border-radius: 1.125rem;
-        padding: 1rem 1.25rem;
-        box-shadow: 0 8px 24px -4px rgba(74,107,255,0.07), inset 0 1px 0 rgba(255,255,255,0.8);
-        transition: border-color 0.3s ease, box-shadow 0.3s ease;
-      }
-      .desktop-step-row:hover { border-color: rgba(74,107,255,0.25); box-shadow: 0 12px 32px -6px rgba(74,107,255,0.12); }
-      .desktop-step-badge {
-        min-width: 2.25rem; height: 2.25rem;
-        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-        border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 0.875rem; font-weight: 800; color: #fff; flex-shrink: 0;
-        box-shadow: 0 4px 12px rgba(74,107,255,.35);
-      }
-      .desktop-step-row h4 { font-family:'Outfit',sans-serif; font-size:0.9375rem; font-weight:750; color:#0f172a; margin-bottom:0.175rem; letter-spacing:-0.01em; }
-      .desktop-step-row p  { font-family:'Inter',sans-serif; font-size:0.8125rem; color:#334155; line-height:1.55; }
-      /* ── Trust Rows ── */
-      .desktop-trust-list { display: flex; flex-direction: column; gap: 0.75rem; }
-      .desktop-trust-row {
-        display: flex; align-items: center; gap: 1rem;
-        background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
-        border: 1px solid rgba(74,107,255,0.14);
-        border-radius: 1.125rem;
-        padding: 1rem 1.25rem;
-        box-shadow: 0 8px 24px -4px rgba(74,107,255,0.07), inset 0 1px 0 rgba(255,255,255,0.8);
-        transition: border-color 0.3s ease, box-shadow 0.3s ease;
-      }
-      .desktop-trust-row:hover { border-color: rgba(74,107,255,0.25); box-shadow: 0 12px 32px -6px rgba(74,107,255,0.12); }
-      .desktop-trust-icon-wrap {
-        width: 2.25rem; height: 2.25rem;
-        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-        border-radius: 50%;
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        border: 1.5px solid rgba(74,107,255,0.18);
-      }
-      .desktop-trust-icon-wrap svg { width: 1.125rem; height: 1.125rem; color: #4A6BFF; }
-      .desktop-trust-row h4 { font-family:'Outfit',sans-serif; font-size:0.9375rem; font-weight:750; color:#0f172a; margin-bottom:0.175rem; letter-spacing:-0.01em; }
-      .desktop-trust-row p  { font-family:'Inter',sans-serif; font-size:0.8125rem; color:#334155; line-height:1.55; }
-      /* ── Desktop CTA Card ── */
-      .desktop-cta-card {
-        background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
-        border-radius: 1.75rem;
-        padding: 2rem;
-        text-align: center;
-        position: relative; overflow: hidden;
-        box-shadow: 0 16px 48px rgba(74,107,255,.4);
-      }
-      .desktop-cta-card::before {
-        content:''; position:absolute; top:-40px; right:-40px;
-        width:180px; height:180px; border-radius:50%;
-        background:rgba(255,255,255,0.07);
-      }
-      .desktop-cta-card::after {
-        content:''; position:absolute; bottom:-30px; left:-30px;
-        width:140px; height:140px; border-radius:50%;
-        background:rgba(255,255,255,0.05);
-      }
-      .desktop-cta-card h3 {
-        font-size:1.625rem; font-weight:900; color:#fff;
-        letter-spacing:-0.03em; line-height:1.2;
-        margin-bottom:0.625rem; position:relative; z-index:1;
-      }
-      .desktop-cta-card p {
-        font-size:0.9rem; color:rgba(255,255,255,0.82);
-        line-height:1.55; margin-bottom:1.5rem;
-        position:relative; z-index:1;
-      }
-      .desktop-cta-btn {
-        display:inline-flex; align-items:center; gap:0.5rem;
-        background:#fff; color:#4A6BFF;
-        font-family:'Outfit',sans-serif; font-weight:700; font-size:0.9375rem;
-        padding:0.875rem 1.75rem;
-        border-radius:99px; border:none; cursor:pointer;
-        text-decoration:none;
-        box-shadow:0 6px 20px rgba(0,0,0,.15);
-        transition:all .25s cubic-bezier(0.34,1.56,0.64,1);
-        position:relative; z-index:1;
-      }
-      .desktop-cta-btn:hover { transform:scale(1.05) translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.2); }
-
-      .desktop-hero-text {
-        /* animated via parent container */
-      }
-      .desktop-hero-text .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        background: #EEF2FF;
-        color: #4A6BFF;
-        font-size: 0.75rem;
-        font-weight: 700;
-        padding: 0.35rem 0.875rem;
-        border-radius: 99px;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        margin-bottom: 1rem;
-      }
-      .desktop-hero-text h2 {
-        font-size: 2.5rem;
-        font-weight: 900;
-        color: #111827;
-        letter-spacing: -.04em;
-        line-height: 1.1;
-        margin-bottom: 0.875rem;
-      }
-      .desktop-hero-text h2 span { color: #4A6BFF; }
-      .desktop-hero-text p {
-        font-size: 1rem;
-        color: #6B7280;
-        line-height: 1.7;
-        margin-bottom: 1.5rem;
-      }
-      .desktop-cta-row {
-        display: flex;
-        gap: 0.875rem;
-        flex-wrap: wrap;
-      }
-      .desktop-btn-primary {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-        color: #fff;
-        font-family: 'Outfit', sans-serif;
-        font-weight: 700;
-        font-size: 1rem;
-        padding: 0.9rem 1.75rem;
-        border-radius: 99px;
-        border: none;
-        cursor: pointer;
-        box-shadow: 0 6px 22px rgba(74,107,255,.4);
-        transition: all .25s cubic-bezier(0.34,1.56,0.64,1);
-        text-decoration: none;
-      }
-      .desktop-btn-primary:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 12px 32px rgba(74,107,255,.5); }
-      .desktop-btn-primary:active { transform: scale(0.97); }
-      .desktop-btn-primary svg { transition: transform 0.25s ease; }
-      .desktop-btn-primary:hover svg { transform: translateX(4px); }
-
-      .desktop-btn-outline {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        background: #fff;
-        color: #4A6BFF;
-        font-family: 'Outfit', sans-serif;
-        font-weight: 600;
-        font-size: 1rem;
-        padding: 0.9rem 1.75rem;
-        border-radius: 99px;
-        border: 2px solid #EEF2FF;
-        cursor: pointer;
-        transition: all .2s ease;
-        text-decoration: none;
-      }
-      .desktop-btn-outline:hover { border-color: #4A6BFF; color: #4A6BFF; background: #EEF2FF; }
-      .desktop-btn-outline:active { transform: scale(0.97); }
-      .desktop-btn-outline svg { transition: transform 0.25s ease; }
-      .desktop-btn-outline:hover svg { transform: translateY(2px); }
-
-      .desktop-feature-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-        animation: slideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
-      }
-      .desktop-feature-tile {
-        background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
-        border: 2px solid rgba(74, 107, 255, 0.18);
-        border-radius: 1.25rem;
-        padding: 1.25rem;
-        display: flex;
-        gap: 0.875rem;
-        align-items: flex-start;
-        box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-        transition: border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        cursor: default !important;
-        user-select: text;
-        -webkit-tap-highlight-color: transparent;
-      }
-      .desktop-feature-tile:hover {
-        border-color: rgba(74, 107, 255, 0.25);
-        box-shadow: 0 20px 40px -8px rgba(74, 107, 255, 0.12);
-      }
-      .desktop-tile-icon {
-        width: 2.75rem; height: 2.75rem;
-        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-        border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-        font-size: 1.25rem;
-        border: 1.5px solid rgba(74, 107, 255, 0.18);
-      }
-      .desktop-tile-text h4 { font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 750; color: #0f172a; margin-bottom: 0.25rem; }
-      .desktop-tile-text p { font-family: 'Inter', sans-serif; font-size: 0.8125rem; color: #334155; line-height: 1.5; font-weight: 500; }
-
-      .desktop-stats-strip {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1rem;
-        animation: slideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both;
-      }
-      .desktop-stat-tile {
-        background: linear-gradient(185deg, #ffffff 0%, #f9faff 100%);
-        border: 1px solid rgba(74, 107, 255, 0.14);
-        border-radius: 1.25rem;
-        padding: 1.25rem;
-        text-align: center;
-        box-shadow: 0 15px 35px -5px rgba(74, 107, 255, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-        transition: border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        cursor: default !important;
-        user-select: text;
-        -webkit-tap-highlight-color: transparent;
-      }
-      .desktop-stat-tile:hover {
-        border-color: rgba(74, 107, 255, 0.25);
-        box-shadow: 0 20px 40px -8px rgba(74, 107, 255, 0.12);
-      }
-      .desktop-stat-num {
-        font-size: 1.75rem;
-        font-weight: 900;
-        color: #4A6BFF;
-        letter-spacing: -.02em;
-        line-height: 1;
-      }
-      .desktop-stat-label { font-size: 0.8125rem; color: #6B7280; margin-top: 0.3rem; font-weight: 500; }
-
-      /* ═══ RESPONSIVE SWITCH: Auto-switch between mobile and desktop ═══ */
-      .desktop-site { display: none; }
-      
-      @media (min-width: 1024px) {
-        .page-wrap { display: none !important; }
-        .desktop-site { display: block; }
-      }
-
-      .desktop-site  {
-        background: #e8ecf5;
-        min-height: 100vh;
-        font-family: 'Outfit', sans-serif;
-        -webkit-font-smoothing: antialiased;
-      }
-
-      /* ─ NAVBAR ─ */
-      .ds-nav {
-        position: sticky; top: 0; z-index: 100;
-        background: rgba(232, 236, 245, 0.85); /* Matches #e8ecf5 hero background */
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-bottom: none;
-        box-shadow: none;
-      }
-      .ds-nav-inner {
-        width: 100%; max-width: none; margin: 0;
-        padding: 3.5rem 3vw 0 3vw; height: 7.5rem;
-        display: flex; align-items: center; justify-content: space-between;
-      }
-      .ds-nav-logo {
-        font-family: 'Lovelo', sans-serif;
-        font-size: 3.5rem; font-weight: 900;
-        color: #111827; letter-spacing: -0.03em; text-decoration: none;
-      }
-      .ds-nav-links { display: flex; align-items: center; gap: 3.5rem; transform: translateY(-1.2rem); }
-      .ds-nav-links a {
-        font-size: 1.1rem; font-weight: 600;
-        color: #374151; text-decoration: none;
-        position: relative;
-        padding: 0.25rem 0;
-        transition: color 0.25s ease;
-      }
-      .ds-nav-links a::after {
-        content: '';
-        position: absolute;
-        bottom: -2px;
-        left: 50%;
-        width: 0;
-        height: 3px;
-        background: linear-gradient(90deg, #4A6BFF, #7C3AED);
-        border-radius: 99px;
-        transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1), transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-        transform: translateX(-50%);
-      }
-      .ds-nav-links a:hover {
-        color: #111827;
-      }
-      .ds-nav-links a:hover::after {
-        width: 100%;
-      }
-      .ds-nav-cta {
-        display: inline-flex; align-items: center; gap: 0.4rem;
-        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-        color: #fff; font-family: 'Outfit', sans-serif;
-        font-weight: 700; font-size: 0.9375rem;
-        padding: 0.65rem 1.5rem;
-        border-radius: 99px; border: none; cursor: pointer;
-        box-shadow: 0 4px 18px rgba(74,107,255,.38);
-        transition: all .25s cubic-bezier(0.34,1.56,0.64,1);
-        text-decoration: none;
-      }
-      .ds-nav-cta:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 8px 28px rgba(74,107,255,.5); }
-
-      /* ─ HERO ─ */
-      .ds-hero-wrap {
-        min-height: calc(100vh - 4.5rem);
-        display: flex; align-items: center;
-        padding-bottom: 3rem;
-      }
-      .ds-hero {
-        width: 100%; max-width: 1280px; margin: 0 auto;
-        padding: 3rem 3vw 2rem;
-        display: grid;
-        grid-template-columns: 1fr 500px;
-        justify-content: space-between;
-        gap: 3rem; align-items: center;
-        transform: translateY(-5rem);
-      }
-      .ds-hero-eyebrow {
-        display: inline-flex; align-items: center;
-        background: #EEF2FF; color: #4A6BFF;
-        font-size: 0.875rem; font-weight: 700;
-        padding: 0.5rem 1.25rem; border-radius: 99px;
-        letter-spacing: 0.05em; text-transform: uppercase;
-        margin-bottom: 1.5rem;
-      }
-      .ds-hero-h1 {
-        font-size: 4rem; font-weight: 900;
-        color: #111827; letter-spacing: -0.04em;
-        line-height: 1.05; margin-bottom: 1.5rem;
-      }
-      .ds-hero-h1 span { color: #4A6BFF; }
-      .ds-hero-p {
-        font-size: 1.125rem; color: #4B5563;
-        line-height: 1.6; margin-bottom: 1.5rem; max-width: 620px;
-      }
-      .ds-hero-p * { color: inherit !important; background: transparent !important; }
-      .ds-hero-btns { display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap; }
-      .ds-btn-primary {
-        display: inline-flex; align-items: center; gap: 0.5rem;
-        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-        color: #fff; font-family: 'Outfit', sans-serif;
-        font-weight: 700; font-size: 1.05rem;
-        padding: 1.125rem 2.5rem; border-radius: 99px; border: none; cursor: pointer;
-        box-shadow: 0 8px 28px rgba(74,107,255,.45);
-        transition: all .25s cubic-bezier(0.34,1.56,0.64,1); text-decoration: none;
-      }
-      .ds-btn-primary:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 14px 36px rgba(74,107,255,.55); }
-      .ds-btn-outline {
-        display: inline-flex; align-items: center; gap: 0.5rem;
-        background: #fff; color: #4A6BFF;
-        font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1.05rem;
-        padding: 1.125rem 2.5rem; border-radius: 99px;
-        border: 2px solid rgba(74,107,255,0.2); cursor: pointer;
-        transition: all .2s ease; text-decoration: none;
-      }
-      .ds-btn-outline:hover { border-color: #4A6BFF; background: #EEF2FF; }
-      .ds-hero-visual {
-        position: relative; display: flex;
-        align-items: center; justify-content: center;
-        padding: 2rem; margin-top: -3rem;
-      }
-      .ds-hero-bg-blob {
-        position: absolute; width: 480px; height: 480px;
-        background: radial-gradient(ellipse at center, rgba(100,140,255,0.22) 0%, rgba(124,58,237,0.1) 50%, transparent 70%);
-        border-radius: 50%; filter: blur(30px);
-        z-index: 0;
-      }
-      .ds-hero-kiosk-wrapper {
-        width: 100%; max-width: 440px;
-        filter: drop-shadow(0 24px 48px rgba(0,0,0,0.12));
-        animation: heroImgFloat 6s ease-in-out infinite;
-        position: relative; z-index: 2;
-        display: flex; justify-content: center;
-      }
-      .ds-hero-image {
-        width: 100%; height: auto;
-        object-fit: contain;
-        /* Shave off the dirty fuzzy edges from the background removal */
-        clip-path: inset(3.2% 4.5% 2% 4.5%);
-        filter: contrast(1.02) saturate(1.05);
-      }
-      @keyframes heroImgFloat {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-12px); }
-      }
-      .ds-bubble-text { font-size: 1.125rem; font-weight: 700; color: #111827; line-height: 1.3; }
-
-      /* ─ STATS BAR ─ */
-      .ds-stats-bar {
-        background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
-        padding: 2.5rem 0;
-      }
-      .ds-stats-inner {
-        max-width: 1200px; margin: 0 auto; padding: 0 2.5rem;
-        display: grid; grid-template-columns: repeat(3, 1fr);
-      }
-      .ds-stat-item { text-align: center; position: relative; }
-      .ds-stat-item:not(:last-child)::after {
-        content: ''; position: absolute; right: 0; top: 15%; bottom: 15%;
-        width: 1px; background: rgba(255,255,255,0.2);
-      }
-      .ds-stat-num { font-size: 2.5rem; font-weight: 900; color: #fff; letter-spacing: -0.02em; line-height: 1; }
-      .ds-stat-label { font-size: 0.9rem; color: rgba(255,255,255,0.78); font-weight: 500; margin-top: 0.4rem; }
-
-      /* ─ SHARED SECTION ─ */
-      .ds-section { padding: 5rem 0; position: relative; }
-      .ds-section-inner { max-width: 1200px; margin: 0 auto; padding: 0 2.5rem; }
-      .ds-section-header { text-align: center; margin-bottom: 3rem; }
-      .ds-section-pill {
-        display: inline-flex; align-items: center;
-        background: #EEF2FF; color: #4A6BFF;
-        font-size: 0.75rem; font-weight: 700;
-        padding: 0.3rem 0.875rem; border-radius: 99px;
-        letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.875rem;
-      }
-      .ds-section-title {
-        font-size: 2.25rem; font-weight: 900;
-        color: #111827; letter-spacing: -0.04em; line-height: 1.15;
-        margin-bottom: 0.75rem;
-      }
-      .ds-section-subtitle { font-size: 1rem; color: #6B7280; line-height: 1.7; max-width: 560px; margin: 0 auto; }
-      .ds-alt-bg { background: #fff; }
-
-      /* ─ 3-COL CARD GRID (How It Works + Problems) ─ */
-      .ds-three-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-      .ds-card {
-        background: linear-gradient(185deg, #fff 0%, #f9faff 100%);
-        border: 1px solid rgba(74,107,255,0.14);
-        border-radius: 1.5rem; padding: 2rem 1.5rem;
-        box-shadow: 0 12px 32px -4px rgba(74,107,255,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
-        transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s, border-color 0.35s;
-        text-align: center;
-      }
-      .ds-card:hover { transform: translateY(-6px); box-shadow: 0 24px 48px -8px rgba(74,107,255,0.16); border-color: rgba(74,107,255,0.28); }
-      .ds-card-badge {
-        width: 3rem; height: 3rem;
-        background: linear-gradient(135deg, #4A6BFF, #7C3AED);
-        border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.125rem; font-weight: 900; color: #fff;
-        margin: 0 auto 1.25rem;
-        box-shadow: 0 6px 16px rgba(74,107,255,.4);
-      }
-      .ds-card-badge-emoji {
-        width: 3rem; height: 3rem;
-        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-        border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.375rem; margin: 0 auto 1.25rem;
-        border: 1.5px solid rgba(74,107,255,0.18);
-      }
-      .ds-card h3 { font-size: 1.125rem; font-weight: 800; color: #0f172a; margin-bottom: 0.625rem; letter-spacing: -0.02em; }
-      .ds-card p { font-size: 0.9rem; color: #334155; line-height: 1.65; }
-
-      /* ─ FEATURES 3-COL ─ */
-      .ds-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-      .ds-feature-card {
-        background: linear-gradient(185deg, #fff 0%, #f9faff 100%);
-        border: 2px solid rgba(74,107,255,0.14);
-        border-radius: 1.5rem; padding: 1.75rem;
-        box-shadow: 0 12px 32px -4px rgba(74,107,255,0.07);
-        transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s, border-color 0.35s;
-      }
-      .ds-feature-card:hover { transform: translateY(-5px); box-shadow: 0 20px 44px -8px rgba(74,107,255,0.14); border-color: rgba(74,107,255,0.28); }
-      .ds-feature-icon {
-        width: 3rem; height: 3rem;
-        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-        border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        margin-bottom: 1.125rem; font-size: 1.375rem;
-        border: 1.5px solid rgba(74,107,255,0.18);
-      }
-      .ds-feature-card h3 { font-size: 1.0625rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
-      .ds-feature-card p { font-size: 0.875rem; color: #334155; line-height: 1.65; }
-
-      /* ─ TRUST 3-COL ─ */
-      .ds-trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-      .ds-trust-card {
-        background: linear-gradient(185deg, #fff 0%, #f9faff 100%);
-        border: 2px solid rgba(74,107,255,0.14);
-        border-radius: 1.5rem; padding: 2rem 1.5rem; text-align: center;
-        box-shadow: 0 12px 32px -4px rgba(74,107,255,0.07);
-        transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s;
-      }
-      .ds-trust-card:hover { transform: translateY(-4px); box-shadow: 0 20px 44px -8px rgba(74,107,255,0.14); }
-      .ds-trust-icon {
-        width: 3.5rem; height: 3.5rem;
-        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-        border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        margin: 0 auto 1.125rem;
-        border: 1.5px solid rgba(74,107,255,0.18);
-      }
-      .ds-trust-icon svg { width: 1.375rem; height: 1.375rem; color: #4A6BFF; }
-      .ds-trust-card h3 { font-size: 1.125rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
-      .ds-trust-card p { font-size: 0.875rem; color: #334155; line-height: 1.65; }
-
-      /* ─ FAQ ─ */
-      .ds-faq-wrap { max-width: 720px; margin: 0 auto; }
-
-      /* ─ CTA BANNER ─ */
-      .ds-cta {
-        background: linear-gradient(135deg, #4A6BFF 0%, #7C3AED 100%);
-        padding: 5rem 0; text-align: center;
-        position: relative; overflow: hidden;
-      }
-      .ds-cta::before {
-        content: ''; position: absolute; top: -60px; right: -60px;
-        width: 300px; height: 300px; border-radius: 50%;
-        background: rgba(255,255,255,0.06);
-      }
-      .ds-cta::after {
-        content: ''; position: absolute; bottom: -60px; left: -60px;
-        width: 240px; height: 240px; border-radius: 50%;
-        background: rgba(255,255,255,0.04);
-      }
-      .ds-cta-inner { max-width: 1200px; margin: 0 auto; padding: 0 2.5rem; position: relative; z-index: 1; }
-      .ds-cta h2 { font-size: 2.625rem; font-weight: 900; color: #fff; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 0.75rem; }
-      .ds-cta p { font-size: 1.0625rem; color: rgba(255,255,255,0.82); line-height: 1.6; margin-bottom: 2rem; }
-      .ds-cta-btn {
-        display: inline-flex; align-items: center; gap: 0.5rem;
-        background: #fff; color: #4A6BFF;
-        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.0625rem;
-        padding: 1rem 2.25rem; border-radius: 99px; border: none; cursor: pointer;
-        box-shadow: 0 8px 28px rgba(0,0,0,.15);
-        transition: all .25s cubic-bezier(0.34,1.56,0.64,1); text-decoration: none;
-      }
-      .ds-cta-btn:hover { transform: scale(1.06) translateY(-2px); box-shadow: 0 14px 36px rgba(0,0,0,.2); }
-
-      /* ─ MARQUEE (reuses .marquee-track/.marquee-set) ─ */
-      .ds-marquee-section {
-        background: #fff; border-top: 1px solid #cbd5e1;
-        padding: 2rem 0; overflow: hidden;
-      }
-      .ds-marquee-title {
-        text-align: center; font-size: 1.5rem; font-weight: 700;
-        color: #0d3b66; margin-bottom: 1.75rem;
-        font-family: 'Inter', sans-serif;
-      }
-
-      /* ─ FOOTER ─ */
-      .ds-footer { background: #f4f7fb; border-top: 1px solid #cbd5e1; padding: 3.5rem 0 2rem; }
-      .ds-footer-inner { max-width: 1200px; margin: 0 auto; padding: 0 2.5rem; }
-      .ds-footer-grid {
-        display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
-        gap: 3rem; margin-bottom: 2.5rem;
-      }
-      .ds-footer-brand h2 { font-size: 1.625rem; font-weight: 900; color: #174A87; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
-      .ds-footer-logo { width: 2.5rem; height: 2.5rem; object-fit: contain; border-radius: 0.5rem; margin-bottom: 0.75rem; display: block; }
-      .ds-footer-tagline { font-size: 0.9rem; color: #6B7280; line-height: 1.6; margin-bottom: 1rem; max-width: 280px; }
-      .ds-footer-address { font-size: 0.8125rem; color: #6B7280; line-height: 1.7; }
-      .ds-footer-col h4 { font-size: 0.9375rem; font-weight: 700; color: #111827; margin-bottom: 1.125rem; }
-      .ds-footer-col ul { list-style: none; }
-      .ds-footer-col li { margin-bottom: 0.625rem; }
-      .ds-footer-col a { font-size: 0.875rem; color: #6B7280; text-decoration: none; transition: color .2s; }
-      .ds-footer-col a:hover { color: #4A6BFF; }
-      .ds-footer-divider { height: 1px; background: #e5e7eb; margin-bottom: 1.5rem; }
-      .ds-footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
-      .ds-footer-copy { font-size: 0.8125rem; color: #9CA3AF; }
-      .ds-footer-credit { font-size: 0.75rem; color: #9CA3AF; }
-      .ds-footer-credit strong { color: #4A6BFF; }
+    @media (max-width: 860px) {
+      .facts, .faq { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; gap: 28px; }
+      .foot { grid-template-columns: 1fr 1fr; }
+      .foot > div:first-child { grid-column: 1 / -1; }
     }
   </style>
 </head>
 <body>
-<div class="page-wrap">
-  <!-- Page-level ambient background glows -->
-  <div class="page-glow-1"></div>
-  <div class="page-glow-2"></div>
-<div class="phone-card">
+  <a class="skip" href="#after">Skip to details</a>
 
-  <!-- ── HEADER ── -->
-  <header class="flex items-center justify-between px-6 pt-6 pb-2 z-50 bg-transparent relative" data-purpose="navigation-header" style="font-family:'Inter',sans-serif;">
-    <div class="flex flex-col">
-      <h1 class="text-4xl font-black tracking-tight leading-none text-slate-900" style="font-family:'Lovelo',sans-serif;">MIMO</h1>
-    </div>
-    <div class="flex items-center gap-3">
-      <a href="/login" id="header-cta"
-         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white text-sm font-bold transition-all bg-[#4666F6] hover:bg-[#3B82F6]"
-         style="box-shadow:0 4px 14px rgba(70,102,246,0.3);font-family:'Inter',sans-serif;">
-        Get Started
-        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" class="w-4 h-4">
-          <path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </a>
-    </div>
-  </header>
+  <main>
+    <!-- The story: a split stage. Left/top is your phone, right/bottom is the kiosk. -->
+    <section class="story is-static" id="story" data-sc-span="7" aria-label="How MIMO works">
+      <div class="stage" data-sc-stage>
+        <span class="ghost wordmark" aria-hidden="true">MIMO</span>
 
-  <!-- ── HERO ── -->
-  <section class="hero" data-purpose="hero-character">
-    <div class="hero-orb hero-orb-1"></div>
-    <div class="hero-orb hero-orb-2"></div>
-
-    <div class="speech-bubble">
-      <p class="bubble-text">Hi! <span>I'm MIMO</span></p>
-      <div class="bubble-heart">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z"/>
-        </svg>
-      </div>
-    </div>
-
-    <div class="mascot-wrap">
-      <img src="koala-mascot.png" alt="MIMO Blue Koala Mascot" class="mascot-img" />
-    </div>
-  </section>
-
-  <!-- ── ACTION CARDS ── -->
-  <div class="cards" data-purpose="action-navigation">
-    <a href="/login" id="print-now-card"
-       class="bg-white p-5 rounded-3xl flex items-center justify-between group cursor-pointer border border-slate-100 no-underline animate-fade-in-up delay-100"
-       style="box-shadow:0 10px 30px -5px rgba(0,0,0,0.07);font-family:'Inter',sans-serif;" data-purpose="card-print-now">
-      <div class="flex items-center gap-5">
-        <div class="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center flex-shrink-0">
-          <svg class="h-7 w-7 text-[#4666F6]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+        <div class="kiosk-wrap">
+          <figure class="kiosk">
+            <picture>
+              <source media="(max-width: 860px)" srcset="/images/landing/kiosk-1300.webp">
+              <img src="/images/landing/kiosk-1923.webp" width="711" height="1923" alt="The MIMO printing kiosk: a white cabinet with a touch screen, a paper tray and a wooden base." fetchpriority="high" decoding="async">
+            </picture>
+            <div class="screen" aria-hidden="true">
+              <span class="screen__label">Enter your code</span>
+              <span class="screen__code">
+                <span><b style="--t:0.665">4</b></span><span><b style="--t:0.69">8</b></span><span><b style="--t:0.715">2</b></span><span><b style="--t:0.74">1</b></span>
+              </span>
+              <span class="screen__status">Printing</span>
+            </div>
+            <div class="slot" aria-hidden="true">
+              <div class="paper"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+          </figure>
         </div>
-        <div>
-          <div class="font-bold text-lg text-slate-900" style="font-family:'Inter',sans-serif;">Print Now</div>
-          <div class="text-slate-400 text-sm" style="font-family:'Inter',sans-serif;">Start printing in seconds</div>
+
+        <div class="kcopy kcopy--hero" data-sc-cue="0 0.12 0">
+          <h2>Collect it at the kiosk.</h2>
+          <p>Four digits on the keypad and your pages come out.</p>
         </div>
-      </div>
-      <div class="w-12 h-12 bg-[#4666F6] text-white rounded-full flex items-center justify-center flex-shrink-0"
-           style="box-shadow:0 6px 18px rgba(70,102,246,0.35);">
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-          <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-    </a>
-
-    <div class="cards-grid">
-      <a href="/find-machine" id="find-machine-card" onclick="window.location.href='/find-machine';"
-         class="bg-white p-5 rounded-3xl flex flex-col justify-between border border-slate-100 cursor-pointer no-underline animate-fade-in-up delay-200"
-         style="box-shadow:0 10px 30px -5px rgba(0,0,0,0.07);min-height:11rem;font-family:'Inter',sans-serif;" data-purpose="card-find-machine">
-        <div class="w-11 h-11 bg-indigo-50 rounded-full flex items-center justify-center">
-          <svg class="h-5 w-5 text-[#4666F6]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+        <div class="kcopy kcopy--peak" data-sc-cue="0.64 0.88">
+          <h2>Type 4821.</h2>
+          <p>That is the whole visit.</p>
         </div>
-        <div>
-          <div class="font-bold text-slate-900 leading-tight" style="font-family:'Inter',sans-serif;">Find Machine</div>
-          <div class="text-[11px] text-slate-400 mt-1" style="font-family:'Inter',sans-serif;">Locate nearby machine</div>
+        <div class="kcopy kcopy--close" data-sc-cue="0.93 1 0.25 0">
+          <h2>Your campus printer.</h2>
+          <p>No queue, no pen drive, no cash.</p>
+          <a class="btn btn--light" href="/login">Start printing
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
         </div>
-        <div class="flex justify-end">
-          <svg class="h-5 w-5 text-[#4666F6]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-      </a>
 
-      <a href="#how-it-works" id="how-it-works-card"
-         class="bg-white p-5 rounded-3xl flex flex-col justify-between border border-slate-100 cursor-pointer no-underline animate-fade-in-up delay-300"
-         style="box-shadow:0 10px 30px -5px rgba(0,0,0,0.07);min-height:11rem;font-family:'Inter',sans-serif;" data-purpose="card-how-it-works">
-        <div class="w-11 h-11 bg-indigo-50 rounded-full flex items-center justify-center">
-          <svg class="h-5 w-5 text-[#4666F6]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div>
-          <div class="font-bold text-slate-900 leading-tight" style="font-family:'Inter',sans-serif;">How It Works</div>
-          <div class="text-[11px] text-slate-400 mt-1" style="font-family:'Inter',sans-serif;">Simple &amp; quick</div>
-        </div>
-        <div class="flex justify-end">
-          <svg class="h-5 w-5 text-[#4666F6]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-      </a>
-    </div>
+        <div class="phone-side">
+          <div class="phone-side__inner">
+            <div class="bar">
+              <span class="wordmark" aria-label="MIMO">MIMO</span>
+              <a href="/find-machine">Find a kiosk</a>
+            </div>
+            <div class="phone-body">
+              <div class="chapters">
+                <div class="chapter chapter--hero" data-sc-cue="0 0.12 0">
+                  <h1>Print from your phone.</h1>
+                  <p>Upload your file, pay by UPI and get a 4-digit code. Nothing to install.</p>
+                  <a class="btn" href="/login">Start printing
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                  </a>
+                </div>
+                <div class="chapter" data-sc-cue="0.1 0.3"><h2>Drop in your files.</h2><p>PDF, Word, PowerPoint, Excel, text or photos. Office files become PDFs for you.</p></div>
+                <div class="chapter" data-sc-cue="0.27 0.46"><h2>Choose how it prints.</h2><p>The machine, black and white or colour, one side or both, and how many copies.</p></div>
+                <div class="chapter" data-sc-cue="0.43 0.58"><h2>Pay with UPI.</h2><p>Google Pay, PhonePe, Paytm or a card, handled by Cashfree.</p></div>
+                <div class="chapter" data-sc-cue="0.55 0.97"><h2>Your code is ready.</h2><p>It stays valid for 24 hours. Walk over when you like.</p></div>
+              </div>
 
-    <!-- ── TRUST CARD (Secure. Private. Reliable.) ── -->
-    <div id="trust-card"
-         class="bg-white p-5 rounded-3xl flex items-center gap-5 border border-slate-100 animate-fade-in-up delay-400 mt-4"
-         style="box-shadow:0 10px 30px -5px rgba(0,0,0,0.07);font-family:'Inter',sans-serif;" data-purpose="card-trust-badge">
-      <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
-        <svg class="h-6 w-6 text-[#4666F6]" fill="currentColor" viewBox="0 0 24 24">
-          <path fill-rule="evenodd" clip-rule="evenodd" d="M12.516 2.17a.75.75 0 00-1.032 0 11.209 11.209 0 01-7.877 3.08.75.75 0 00-.722.515A12.74 12.74 0 002.25 9.75c0 5.942 4.064 10.933 9.563 12.348a.749.749 0 00.374 0c5.499-1.415 9.563-6.406 9.563-12.348 0-1.39-.223-2.73-.635-3.985a.75.75 0 00-.722-.516l-.143.001c-2.996 0-5.717-1.17-7.734-3.08zM11 15.25l-3.25-3.25 1.06-1.06 2.19 2.19 5.19-5.19 1.06 1.06-6.25 6.25z"/>
-        </svg>
-      </div>
-      <div>
-        <div class="font-bold text-base text-slate-800" style="font-family:'Inter',sans-serif;">Secure. Private. Reliable.</div>
-        <div class="text-slate-400 text-xs mt-0.5" style="font-family:'Inter',sans-serif;">Your prints are safe with us.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── STATS BAR ── -->
-  <div class="stats-bar reveal" style="margin-bottom: 2rem;">
-    <div class="stat-item">
-      <div class="stat-num" data-target="1600">0</div>
-      <div class="stat-label">Happy Students</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-num" data-target="2">0</div>
-      <div class="stat-label">Campus Kiosks</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-num">90%</div>
-      <div class="stat-label">Uptime</div>
-    </div>
-  </div>
-
-  <!-- ── PROBLEM SOLVED ── -->
-  <section class="section bg-subtle-white" id="problems">
-    <!-- Section-level ambient background glows -->
-    <div class="section-glow-1"></div>
-    <div class="section-glow-2"></div>
-    <div class="section-header reveal">
-      <div class="section-pill">✦ The Problem</div>
-      <h2 class="section-title">Printing, Finally Fixed.</h2>
-      <p class="section-subtitle">Tired of long queues, exact change, and unhelpful shopkeepers? We were too. MIMO is here to change printing for students, forever.</p>
-    </div>
-
-    <div class="list-card reveal reveal-delay-1">
-      <div class="list-icon">🥇</div>
-      <div class="list-text">
-        <h4>No More Long Queues</h4>
-        <p>Print instantly from your phone and collect from our self-service kiosks. Zero waiting.</p>
-      </div>
-    </div>
-    <div class="list-card reveal reveal-delay-2">
-      <div class="list-icon">🪙</div>
-      <div class="list-text">
-        <h4>Cashless &amp; Convenient</h4>
-        <p>Pay seamlessly using UPI, cards, or net banking. No more scrambling for exact change.</p>
-      </div>
-    </div>
-    <div class="list-card reveal reveal-delay-3">
-      <div class="list-icon">🔒</div>
-      <div class="list-text">
-        <h4>Complete Privacy</h4>
-        <p>Your documents are yours. Once printed, they are instantly and permanently deleted.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── HOW IT WORKS ── -->
-  <section class="section bg-subtle-brand" id="how-it-works">
-    <!-- Section-level ambient background glows -->
-    <div class="section-glow-1"></div>
-    <div class="section-glow-2"></div>
-    <div class="section-header reveal">
-      <div class="section-pill">✦ The Process</div>
-      <h2 class="section-title">How MIMO Works</h2>
-      <p class="section-subtitle">A seamless, delightful experience in just 3 simple steps.</p>
-    </div>
-
-    <div class="steps-wrap">
-      <div class="step-card reveal reveal-delay-1">
-        <div class="step-num">1</div>
-        <div class="step-text">
-          <h4>Upload Your Files</h4>
-          <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload your documents from anywhere.</p>
-        </div>
-      </div>
-      <div class="step-card reveal reveal-delay-2">
-        <div class="step-num">2</div>
-        <div class="step-text">
-          <h4>Customise Your Print</h4>
-          <p>Select copies, B&amp;W or color, and paper size directly on your phone — no app needed.</p>
-        </div>
-      </div>
-      <div class="step-card reveal reveal-delay-3">
-        <div class="step-num">3</div>
-        <div class="step-text">
-          <h4>Enter Code &amp; Collect</h4>
-          <p>You'll receive a secure 4-digit code. Enter it at the kiosk, and your prints come out instantly!</p>
-        </div>
-      </div>
-    </div>
-
-    <a href="/login" class="btn-primary">
-      Print Now
-      <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-        <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </a>
-  </section>
-
-  <!-- ── FEATURES ── -->
-  <section class="section bg-subtle-white" id="features">
-    <!-- Section-level ambient background glows -->
-    <div class="section-glow-1"></div>
-    <div class="section-glow-2"></div>
-    <div class="section-header reveal">
-      <div class="section-pill">✦ Features</div>
-      <h2 class="section-title">Built for Modern Students</h2>
-      <p class="section-subtitle">Everything you need for a hassle-free printing experience, built into one seamless platform.</p>
-    </div>
-
-    <div class="features-grid">
-      <div class="feature-card reveal reveal-delay-1">
-        <div class="feature-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;">
-            <path d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <h4>Cloud Ready</h4>
-        <p>Upload from Drive or local storage.</p>
-      </div>
-      <div class="feature-card reveal reveal-delay-2">
-        <div class="feature-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;">
-            <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <h4>High-Quality</h4>
-        <p>Professional laser printing for crisp, clear text.</p>
-      </div>
-      <div class="feature-card reveal reveal-delay-1">
-        <div class="feature-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;">
-            <path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <h4>No App Needed</h4>
-        <p>Works smoothly in any mobile browser.</p>
-      </div>
-      <div class="feature-card reveal reveal-delay-2">
-        <div class="feature-icon">🕒</div>
-        <h4>Convenient Access</h4>
-        <p>Kiosks are available throughout regular campus hours.</p>
-      </div>
-      <div class="feature-card reveal reveal-delay-1">
-        <div class="feature-icon">💵</div>
-        <h4>Pay What You Print</h4>
-        <p>Transparent pricing, no hidden fees. Ever.</p>
-      </div>
-      <div class="feature-card reveal reveal-delay-2">
-        <div class="feature-icon">🎓</div>
-        <h4>Campus First</h4>
-        <p>Placed strategically in student zones.</p>
-      </div>
-    </div>
-  </section>
-
-
-  <!-- ── FAQ ── -->
-  <section class="section bg-subtle-brand" id="faq">
-    <!-- Section-level ambient background glows -->
-    <div class="section-glow-1"></div>
-    <div class="section-glow-2"></div>
-    <div class="section-header reveal">
-      <div class="section-pill">✦ FAQ</div>
-      <h2 class="section-title">Got Questions?</h2>
-    </div>
-
-    <div class="reveal">
-      <div class="faq-item" id="faq-1">
-        <div class="faq-question" onclick="toggleFaq('faq-1')">
-          What file formats does MIMO support?
-          <div class="faq-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-              <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+              <div class="phone" aria-hidden="true">
+                <span class="phone__tag">Example</span>
+                <div class="scr" data-sc-cue="0 0.12 0">
+                  <h3>Hi, Ananya</h3>
+                  <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span>Choose files to print</div>
+                  <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/></svg></span>Blank A4 sheet</div>
+                  <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM4 10h16M4 16h16M10 4v16M16 4v16"/></svg></span>MIMO graph paper</div>
+                </div>
+                <div class="scr" data-sc-cue="0.1 0.3">
+                  <h3>Files</h3>
+                  <div class="row file" style="--t:0.14"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/></svg></span><span>DBMS_notes.pdf<small>12 pages</small></span></div>
+                  <div class="row file" style="--t:0.18"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/></svg></span><span>Lab_record.docx<small>4 pages</small></span></div>
+                  <div class="row file" style="--t:0.22"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/></svg></span><span>Timetable.jpg<small>1 page</small></span></div>
+                </div>
+                <div class="scr" data-sc-cue="0.27 0.46">
+                  <h3>Print settings</h3>
+                  <p class="step-lbl">Colour</p>
+                  <div class="seg"><span>B&amp;W</span><span>Colour</span></div>
+                  <p class="step-lbl">Sides</p>
+                  <div class="seg"><span>One</span><span>Both</span></div>
+                  <div class="total">Total <b>₹47.60</b></div>
+                </div>
+                <div class="scr" data-sc-cue="0.43 0.58">
+                  <h3>Checkout</h3>
+                  <div class="row">17 pages<small style="margin-left:auto">₹47.60</small></div>
+                  <div class="paid"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>Paid with UPI</div>
+                  <div class="total" style="margin-top:auto"></div>
+                  <div class="paybtn">Pay ₹47.60</div>
+                </div>
+                <div class="scr scr--code" data-sc-cue="0.55 0.97">
+                  <h3>You're all set</h3>
+                  <p class="bigcode">4821</p>
+                  <p class="step-lbl" style="text-align:center">Enter this on the MIMO keypad</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="faq-answer" id="faq-1-answer">
-          MIMO supports PDF, DOC, DOCX, JPG, and PNG files. PDFs are recommended for the best print quality. You can convert most documents to PDF before uploading.
-        </div>
-      </div>
 
-      <div class="faq-item" id="faq-2">
-        <div class="faq-question" onclick="toggleFaq('faq-2')">
-          How long is my print code valid?
-          <div class="faq-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-              <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-        </div>
-        <div class="faq-answer" id="faq-2-answer">
-          Your 4-digit print code is valid for 24 hours after payment. If you don't collect your prints within this window, your payment is automatically refunded.
+        <div class="divider" aria-hidden="true">
+          <span class="divider__fill"></span>
+          <span class="divider__lbl divider__lbl--l">Your phone</span>
+          <span class="divider__lbl divider__lbl--r">The kiosk</span>
         </div>
       </div>
+    </section>
 
-      <div class="faq-item" id="faq-3">
-        <div class="faq-question" onclick="toggleFaq('faq-3')">
-          What payment methods are accepted?
-          <div class="faq-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-              <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-        </div>
-        <div class="faq-answer" id="faq-3-answer">
-          We accept all major UPI apps (Google Pay, PhonePe, Paytm), debit/credit cards, and net banking. All payments are processed securely via Cashfree.
-        </div>
-      </div>
-
-      <div class="faq-item" id="faq-4">
-        <div class="faq-question" onclick="toggleFaq('faq-4')">
-          Is my document data private and safe?
-          <div class="faq-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-              <path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-        </div>
-        <div class="faq-answer" id="faq-4-answer">
-          Absolutely. Your documents are encrypted in transit, and permanently deleted from our servers immediately after printing. We never store, read, or share your files.
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── TRUST BADGES ── -->
-  <section class="section bg-subtle-white" id="trust">
-    <!-- Section-level ambient background glows -->
-    <div class="section-glow-1"></div>
-    <div class="section-glow-2"></div>
-    <div class="section-header reveal">
-      <div class="section-pill">✦ Why Us</div>
-      <h2 class="section-title">You Can Trust MIMO</h2>
-    </div>
-
-    <div class="trust-strip">
-      <div class="trust-row reveal reveal-delay-1">
-        <div class="trust-icon-wrap">
-          <svg fill="currentColor" viewBox="0 0 24 24">
-            <path fill-rule="evenodd" clip-rule="evenodd" d="M12.516 2.17a.75.75 0 00-1.032 0 11.209 11.209 0 01-7.877 3.08.75.75 0 00-.722.515A12.74 12.74 0 002.25 9.75c0 5.942 4.064 10.933 9.563 12.348a.749.749 0 00.374 0c5.499-1.415 9.563-6.406 9.563-12.348 0-1.39-.223-2.73-.635-3.985a.75.75 0 00-.722-.516l-.143.001c-2.996 0-5.717-1.17-7.734-3.08z"/>
-          </svg>
-        </div>
-        <div class="trust-row-text">
-          <h4>Secure by Design</h4>
-          <p>End-to-end encrypted. Your data is never stored or shared.</p>
-        </div>
-      </div>
-
-      <div class="trust-row reveal reveal-delay-2">
-        <div class="trust-icon-wrap">
-          <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
-            <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div class="trust-row-text">
-          <h4>Instant Refunds</h4>
-          <p>If your print fails for any reason, you get an automatic refund.</p>
-        </div>
-      </div>
-
-      <div class="trust-row reveal reveal-delay-3">
-        <div class="trust-icon-wrap">
-          <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
-            <path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div class="trust-row-text">
-          <h4>Convenient Access</h4>
-          <p>Kiosks are available throughout regular campus hours.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── SUPPORTED BY ── -->
-  <section class="supported-by-section">
-    <h3 class="supported-by-title">Supported by</h3>
-    <div class="marquee-container">
-      <div class="marquee-track">
-        <!-- Set 1 -->
-        <div class="marquee-set">
-          <img src="Brands/IMG_3075.PNG" alt="Raajply">
-          <img src="Brands/logo1.png" alt="REVA NEST">
-          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
-          <img src="Brands/Vasavi.jpg" alt="Vasavi">
-        </div>
-        <!-- Set 2 -->
-        <div class="marquee-set">
-          <img src="Brands/IMG_3075.PNG" alt="Raajply">
-          <img src="Brands/logo1.png" alt="REVA NEST">
-          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
-          <img src="Brands/Vasavi.jpg" alt="Vasavi">
-        </div>
-        <!-- Set 3 -->
-        <div class="marquee-set">
-          <img src="Brands/IMG_3075.PNG" alt="Raajply">
-          <img src="Brands/logo1.png" alt="REVA NEST">
-          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
-          <img src="Brands/Vasavi.jpg" alt="Vasavi">
-        </div>
-        <!-- Set 4 -->
-        <div class="marquee-set">
-          <img src="Brands/IMG_3075.PNG" alt="Raajply">
-          <img src="Brands/logo1.png" alt="REVA NEST">
-          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
-          <img src="Brands/Vasavi.jpg" alt="Vasavi">
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── FOOTER ── -->
-  <footer class="footer-main" id="footer">
-    <div class="footer-brand">
-      <div class="footer-brand-title">
-        <img src="vision-print-logo.jpg" alt="VisionPrintt Logo" class="footer-logo">
-        <h2>VisionPrintt</h2>
-      </div>
-      <p class="tagline">Smart printing solutions for modern campuses and offices.</p>
-      <div class="footer-address">
-        <strong><span>📍</span><span>Vision Printt Technologies<br>REVA NEST, Rukmini Knowledge Park<br>Kattegenahalli, Yelahanka<br>Bengaluru - 560064</span></strong>
-      </div>
-    </div>
-
-    <div class="footer-grid">
-      <div class="footer-col">
-        <h4>Quick Links</h4>
-        <ul>
-          <li><a href="/">Home</a></li>
-          <li><a href="#features">Features</a></li>
-          <li><a href="#how-it-works">How It Works</a></li>
-          <li><a href="#faq">FAQ</a></li>
-          <li><a href="/about">About Us</a></li>
-          <li><a href="/blog">Blog &amp; Guides</a></li>
-          <li><a href="/refund-policy">Refund Policy</a></li>
-          <li><a href="/login">Print Now</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h4>Support</h4>
-        <ul>
-          <li><a href="/contact">Contact Support</a></li>
-          <li><a href="/contact#report">Report Issue</a></li>
-          <li><a href="https://wa.me/919364028349">Feedback</a></li>
-          <li><a href="tel:+918123028797">+91 8123028797</a></li>
-          <li><a href="#">Mon–Fri, 9AM–6PM IST</a></li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="footer-divider"></div>
-    <div class="footer-bottom">
-      <div class="footer-bottom-copy">&copy; 2026 VisionPrintt. All rights reserved.</div>
-      <div class="footer-legal">
-        <a href="/privacy">Privacy Policy</a>
-        <span>|</span>
-        <a href="/terms">Terms of Service</a>
-        <span>|</span>
-        <a href="/cookie-policy">Cookie Policy</a>
-      </div>
-      <div class="footer-credit">Crafted with innovation by <strong>Md Huzaif, Rathin &amp; Atharv</strong></div>
-    </div>
-  </footer>
-
-</div><!-- /phone-card -->
-
-  <!-- ── DESKTOP PANEL (visible only at 1024px+) ── -->
-  <div class="desktop-panel" id="desktop-panel">
-    <!-- Section-level ambient background glows -->
-    <div class="section-glow-1"></div>
-    <div class="section-glow-2"></div>
-
-    <div class="desktop-hero-text">
-      <div class="eyebrow">✦ Smart Campus Printing</div>
-      <h2>Print anything,<br>from <span>anywhere</span> on campus.</h2>
-      <p>MIMO lets you upload your documents from your phone, customise your print settings, pay via UPI, and collect a crisp printout — all without standing in a single queue.</p>
-      <div class="desktop-cta-row">
-        <a href="https://printmimo.tech" class="desktop-btn-primary">
-          Start Printing
-          <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;">
-            <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </a>
-        <a href="#how-it-works" class="desktop-btn-outline">
-          How It Works
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1rem;height:1rem;">
-            <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </a>
-      </div>
-    </div>
-
-    <div class="desktop-stats-strip">
-      <div class="desktop-stat-tile">
-        <div class="desktop-stat-num">1,600+</div>
-        <div class="desktop-stat-label">Happy Students</div>
-      </div>
-      <div class="desktop-stat-tile">
-        <div class="desktop-stat-num">2</div>
-        <div class="desktop-stat-label">Campus Kiosks</div>
-      </div>
-      <div class="desktop-stat-tile">
-        <div class="desktop-stat-num">90%</div>
-        <div class="desktop-stat-label">Kiosk Uptime</div>
-      </div>
-    </div>
-
-    <div class="desktop-feature-grid">
-      <div class="desktop-feature-tile">
-        <div class="desktop-tile-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
-            <path d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div class="desktop-tile-text">
-          <h4>Cloud Ready</h4>
-          <p>Upload from Google Drive or your local device.</p>
-        </div>
-      </div>
-      <div class="desktop-feature-tile">
-        <div class="desktop-tile-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
-            <path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div class="desktop-tile-text">
-          <h4>Complete Privacy</h4>
-          <p>Files are permanently deleted right after printing.</p>
-        </div>
-      </div>
-      <div class="desktop-feature-tile">
-        <div class="desktop-tile-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
-            <path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div class="desktop-tile-text">
-          <h4>UPI &amp; Cards</h4>
-          <p>Pay via any UPI app, debit/credit card, or net banking.</p>
-        </div>
-      </div>
-      <div class="desktop-feature-tile">
-        <div class="desktop-tile-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
-            <path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div class="desktop-tile-text">
-          <h4>Convenient Access</h4>
-          <p>Kiosks are available throughout regular campus hours.</p>
-        </div>
-      </div>
-      <div class="desktop-feature-tile">
-        <div class="desktop-tile-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#4A6BFF;">
-            <path d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div class="desktop-tile-text">
-          <h4>B&amp;W at ₹2.80/page</h4>
-          <p>Affordable, transparent pricing with zero hidden fees.</p>
-        </div>
-      </div>
-      <div class="desktop-feature-tile">
-        <div class="desktop-tile-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.25rem;height:1.25rem;color:#7C3AED;">
-            <path d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.813-3.814a1.151 1.151 0 00-1.627-1.628l-3.814 3.813a15.995 15.995 0 00-4.648 4.764m3.42 3.42a15.994 15.994 0 01-3.395 1.622m-3.395 1.622a15.995 15.995 0 004.648 4.764l3.814 3.813a1.151 1.151 0 001.628-1.628l-3.813-3.814a15.995 15.995 0 00-4.764-4.648z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div class="desktop-tile-text">
-          <h4>Color at ₹10/page</h4>
-          <p>Vibrant color prints for presentations and assignments.</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="desktop-divider"></div>
-
-    <!-- ── How It Works ── -->
-    <div class="desktop-section">
-      <div>
-        <div class="desktop-section-pill">✦ The Process</div>
-        <h3 class="desktop-section-title">How MIMO Works</h3>
-        <p class="desktop-section-subtitle">A seamless, delightful experience in just 3 simple steps.</p>
-      </div>
-      <div class="desktop-steps">
-        <div class="desktop-step-row">
-          <div class="desktop-step-badge">1</div>
+    <div class="after" id="after">
+      <div class="wrap">
+        <section class="facts" aria-labelledby="facts-h">
           <div>
-            <h4>Upload Your Files</h4>
-            <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload from anywhere.</p>
+            <h2 id="facts-h">Printing, finally fixed.</h2>
+            <p>No queue at the shop, no pen drive, no hunting for change. Your files are deleted right after they print.</p>
           </div>
-        </div>
-        <div class="desktop-step-row">
-          <div class="desktop-step-badge">2</div>
-          <div>
-            <h4>Customise Your Print</h4>
-            <p>Select copies, B&amp;W or color, and paper size directly on your phone — no app needed.</p>
-          </div>
-        </div>
-        <div class="desktop-step-row">
-          <div class="desktop-step-badge">3</div>
-          <div>
-            <h4>Enter Code &amp; Collect</h4>
-            <p>Receive a secure 4-digit code. Enter it at the kiosk and collect your prints instantly.</p>
-          </div>
-        </div>
-      </div>
-    </div>
+          <dl class="figures">
+            <div><dd><span data-sc-count="0 1,600">1,600</span>+</dd><dt>Students printing</dt></div>
+            <div><dd><span data-sc-count="0 2">2</span></dd><dt>Campus kiosks</dt></div>
+          </dl>
+        </section>
 
-    <div class="desktop-divider"></div>
+        <section class="steps" aria-label="Three steps" data-sc-in data-sc-stagger="80">
+          <div><span>Upload</span><h3>From any phone</h3><p>No app to install. Sign in with Google and add your files.</p></div>
+          <div><span>Pay</span><h3>Only for what you print</h3><p>Choose colour, sides and copies. The total updates as you go.</p></div>
+          <div><span>Collect</span><h3>At the kiosk</h3><p>Type your 4-digit code on the keypad and take your pages from the tray.</p></div>
+        </section>
 
-    <!-- ── Why Trust MIMO ── -->
-    <div class="desktop-section">
-      <div>
-        <div class="desktop-section-pill">✦ Why Us</div>
-        <h3 class="desktop-section-title">You Can Trust MIMO</h3>
-      </div>
-      <div class="desktop-trust-list">
-        <div class="desktop-trust-row">
-          <div class="desktop-trust-icon-wrap">
-            <svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.516 2.17a.75.75 0 00-1.032 0 11.209 11.209 0 01-7.877 3.08.75.75 0 00-.722.515A12.74 12.74 0 002.25 9.75c0 5.942 4.064 10.933 9.563 12.348a.749.749 0 00.374 0c5.499-1.415 9.563-6.406 9.563-12.348 0-1.39-.223-2.73-.635-3.985a.75.75 0 00-.722-.516l-.143.001c-2.996 0-5.717-1.17-7.734-3.08z"/></svg>
+        <section class="faq" aria-labelledby="faq-h">
+          <h2 id="faq-h">Questions</h2>
+          <div>
+            <details>
+              <summary>Which files can I print?</summary>
+              <p>PDF, Word, PowerPoint, Excel, text files, JPG and PNG. PDFs give the most faithful result; other formats are converted to PDF before printing.</p>
+            </details>
+            <details>
+              <summary>How long is my print code valid?</summary>
+              <p>Your 4-digit code is valid for 24 hours. If you don't collect your prints within that window, your payment is refunded automatically.</p>
+            </details>
+            <details>
+              <summary>How can I pay?</summary>
+              <p>All major UPI apps (Google Pay, PhonePe, Paytm), debit and credit cards, and net banking. Payments are processed securely by Cashfree.</p>
+            </details>
+            <details>
+              <summary>Is my document private?</summary>
+              <p>Files are encrypted in transit and permanently deleted from our servers right after printing. We never store, read or share your documents.</p>
+            </details>
+          </div>
+        </section>
+
+        <section class="partners" aria-label="Supported by">
+          <p>Supported by</p>
+          <img src="/Brands/IMG_3075.PNG" alt="Raajply" loading="lazy" decoding="async">
+          <img src="/Brands/logo1.png" alt="REVA NEST" loading="lazy" decoding="async">
+          <img src="/Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX" loading="lazy" decoding="async">
+          <img src="/Brands/Vasavi.jpg" alt="Vasavi" loading="lazy" decoding="async">
+        </section>
+
+        <footer class="foot">
+          <div>
+            <span class="wordmark">MIMO</span>
+            <p>VisionPrintt Technologies. REVA NEST, Rukmini Knowledge Park, Yelahanka, Bengaluru 560064.</p>
           </div>
           <div>
-            <h4>Secure by Design</h4>
-            <p>End-to-end encrypted. Your data is never stored or shared with anyone.</p>
-          </div>
-        </div>
-        <div class="desktop-trust-row">
-          <div class="desktop-trust-icon-wrap">
-            <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <div>
-            <h4>Instant Refunds</h4>
-            <p>If your print fails for any reason, you get an automatic full refund.</p>
-          </div>
-        </div>
-        <div class="desktop-trust-row">
-          <div class="desktop-trust-icon-wrap">
-            <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <h4>Product</h4>
+            <ul>
+              <li><a href="/login">Start printing</a></li>
+              <li><a href="/find-machine">Find a kiosk</a></li>
+              <li><a href="/blog">Blog and guides</a></li>
+              <li><a href="/about">About us</a></li>
+            </ul>
           </div>
           <div>
-            <h4>Convenient Campus Hours</h4>
-            <p>Kiosks are available throughout regular campus hours, ready when you are.</p>
+            <h4>Help</h4>
+            <ul>
+              <li><a href="/contact">Contact support</a></li>
+              <li><a href="/contact#report">Report an issue</a></li>
+              <li><a href="/refund-policy">Refund policy</a></li>
+            </ul>
           </div>
-        </div>
+          <div>
+            <h4>Legal</h4>
+            <ul>
+              <li><a href="/privacy">Privacy policy</a></li>
+              <li><a href="/terms">Terms of service</a></li>
+              <li><a href="/cookie-policy">Cookie policy</a></li>
+            </ul>
+          </div>
+          <small>© 2026 VASUDEVA VISHAL (VisionPrintt Technologies). All rights reserved.</small>
+        </footer>
       </div>
     </div>
+  </main>
 
-    <div class="desktop-divider"></div>
-
-    <!-- ── FAQ ── -->
-    <div class="desktop-section">
-      <div>
-        <div class="desktop-section-pill">✦ FAQ</div>
-        <h3 class="desktop-section-title">Got Questions?</h3>
-      </div>
-      <div>
-        <div class="faq-item" id="dfaq-1">
-          <div class="faq-question" onclick="toggleFaq('dfaq-1')">What file formats does MIMO support?
-            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          </div>
-          <div class="faq-answer" id="dfaq-1-answer">MIMO supports PDF, DOC, DOCX, JPG, and PNG. PDFs are recommended for the best print quality.</div>
-        </div>
-        <div class="faq-item" id="dfaq-2">
-          <div class="faq-question" onclick="toggleFaq('dfaq-2')">How long is my print code valid?
-            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          </div>
-          <div class="faq-answer" id="dfaq-2-answer">Your 4-digit code is valid for 24 hours. If uncollected, your payment is automatically refunded.</div>
-        </div>
-        <div class="faq-item" id="dfaq-3">
-          <div class="faq-question" onclick="toggleFaq('dfaq-3')">What payment methods are accepted?
-            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          </div>
-          <div class="faq-answer" id="dfaq-3-answer">All major UPI apps (Google Pay, PhonePe, Paytm), debit/credit cards, and net banking via Cashfree.</div>
-        </div>
-        <div class="faq-item" id="dfaq-4">
-          <div class="faq-question" onclick="toggleFaq('dfaq-4')">Is my document data safe?
-            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          </div>
-          <div class="faq-answer" id="dfaq-4-answer">Absolutely. Files are encrypted in transit and permanently deleted immediately after printing. We never store or share your documents.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── CTA Banner ── -->
-    <div class="desktop-cta-card">
-      <h3>Ready to Print?</h3>
-      <p>Join 1,600+ students already printing smarter on campus. Upload, pay, collect — done in seconds.</p>
-      <a href="/login" class="desktop-cta-btn">
-        Start Printing Now
-        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-    </div>
-
-  </div><!-- /desktop-panel -->
-
-</div><!-- /page-wrap -->
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  /* ── Scroll Reveal ── */
-  const reveals = document.querySelectorAll('.reveal');
-  const revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        revealObserver.unobserve(entry.target);
+  <script defer src="/scrollcraft/scrollcraft.js"></script>
+  <script>
+    // Progressive enhancement: the page ships as a complete static composition. Only when motion is
+    // allowed and the engine loaded does the story become a pinned, scroll-driven stage.
+    window.addEventListener("DOMContentLoaded", function () {
+      if (!window.ScrollCraft) return;
+      var story = document.getElementById("story");
+      if (!ScrollCraft.reduce) {
+        story.classList.remove("is-static");
+        story.setAttribute("data-sc-act", "pin");
       }
+      ScrollCraft.mount(document.body);
     });
-  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-  reveals.forEach(el => revealObserver.observe(el));
-
-  /* ── Counter Animation ── */
-  const counters = document.querySelectorAll('[data-target]');
-  const counterObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const el = entry.target;
-        const target = +el.dataset.target;
-        const suffix = target >= 1000 ? '+' : '+';
-        const duration = 1500;
-        const step = target / (duration / 16);
-        let current = 0;
-        const tick = () => {
-          current = Math.min(current + step, target);
-          el.textContent = (target >= 1000
-            ? Math.floor(current / 100) * 100
-            : Math.floor(current)) + suffix;
-          if (current < target) requestAnimationFrame(tick);
-          else el.textContent = (target >= 1000 ? target.toLocaleString() : target) + suffix;
-        };
-        tick();
-        counterObserver.unobserve(el);
-      }
-    });
-  }, { threshold: 0.1 });
-  counters.forEach(el => counterObserver.observe(el));
-});
-
-  /* ── FAQ Toggle ── */
-  function toggleFaq(id) {
-    const item = document.getElementById(id);
-    const answer = document.getElementById(id + '-answer');
-    const isOpen = item.classList.contains('open');
-    document.querySelectorAll('.faq-item.open').forEach(el => {
-      el.classList.remove('open');
-      el.querySelector('.faq-answer').classList.remove('open');
-    });
-    if (!isOpen) {
-      item.classList.add('open');
-      answer.classList.add('open');
-    }
-  }
-
-</script>
-<!-- ══════════════════════════════════════════════════════════════
-     DESKTOP SITE — visible only at ≥1024px via CSS
-     The mobile phone-card layout above is completely untouched
-     ══════════════════════════════════════════════════════════════ -->
-<div class="desktop-site" aria-label="Desktop website">
-
-  <!-- ── NAVBAR ── -->
-  <nav class="ds-nav">
-    <div class="ds-nav-inner">
-      <a href="#" class="ds-nav-logo">MIMO</a>
-      <div class="ds-nav-links">
-        <a href="#ds-problems">Why MIMO</a>
-        <a href="#ds-how">How It Works</a>
-        <a href="#ds-features">Features</a>
-        <a href="#ds-faq">FAQ</a>
-        <a href="/blog">Blog &amp; Guides</a>
-      </div>
-    </div>
-  </nav>
-
-  <!-- ── HERO ── -->
-  <section style="background:#e8ecf5;">
-    <div class="ds-hero-wrap">
-      <div class="ds-hero">
-        <!-- Left: copy -->
-        <div class="ds-hero-text">
-          <h1 class="ds-hero-h1">Print anything, from<br><span>anywhere</span> on<br>campus.</h1>
-          <p class="ds-hero-p">MIMO lets you upload your documents from your phone, customise your print settings, pay via UPI, and collect a crisp printout — all without standing in a single queue.</p>
-          <div class="ds-hero-btns">
-            <a href="/login" class="ds-btn-primary">
-              Start Printing
-              <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </a>
-          </div>
-        </div>
-        <!-- Right: kiosk image -->
-        <div class="ds-hero-visual">
-          <div class="ds-hero-bg-blob"></div>
-          <div class="ds-hero-kiosk-wrapper">
-            <img src="kiosk-image-transparent.png" alt="MIMO Kiosk" class="ds-hero-image">
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── STATS BAR ── -->
-  <div class="ds-stats-bar">
-    <div class="ds-stats-inner">
-      <div class="ds-stat-item">
-        <div class="ds-stat-num" data-target="1600" data-suffix="+">0</div>
-        <div class="ds-stat-label">Happy Students</div>
-      </div>
-      <div class="ds-stat-item">
-        <div class="ds-stat-num" data-target="2">0</div>
-        <div class="ds-stat-label">Campus Kiosks</div>
-      </div>
-      <div class="ds-stat-item">
-        <div class="ds-stat-num">90%</div>
-        <div class="ds-stat-label">Kiosk Uptime</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── PROBLEMS ── -->
-  <section class="ds-section" id="ds-problems">
-    <div class="ds-section-inner">
-      <div class="ds-section-header">
-        <div class="ds-section-pill">✦ The Problem</div>
-        <h2 class="ds-section-title">Printing, Finally Fixed.</h2>
-        <p class="ds-section-subtitle">Tired of long queues, exact change, and unhelpful shopkeepers? We were too. MIMO is here to change printing for students, forever.</p>
-      </div>
-      <div class="ds-three-grid">
-        <div class="ds-card">
-          <div class="ds-card-badge-emoji">🥇</div>
-          <h3>No More Long Queues</h3>
-          <p>Print instantly from your phone and collect from our self-service kiosks. Zero waiting, zero stress.</p>
-        </div>
-        <div class="ds-card">
-          <div class="ds-card-badge-emoji">🪙</div>
-          <h3>Cashless &amp; Convenient</h3>
-          <p>Pay seamlessly using UPI, cards, or net banking. No more scrambling for exact change at odd hours.</p>
-        </div>
-        <div class="ds-card">
-          <div class="ds-card-badge-emoji">🔒</div>
-          <h3>Complete Privacy</h3>
-          <p>Your documents are yours. Once printed, they are instantly and permanently deleted from our servers.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── HOW IT WORKS ── -->
-  <section class="ds-section ds-alt-bg" id="ds-how">
-    <div class="ds-section-inner">
-      <div class="ds-section-header">
-        <div class="ds-section-pill">✦ The Process</div>
-        <h2 class="ds-section-title">How MIMO Works</h2>
-        <p class="ds-section-subtitle">A seamless, delightful experience in just 3 simple steps.</p>
-      </div>
-      <div class="ds-three-grid">
-        <div class="ds-card">
-          <div class="ds-card-badge">1</div>
-          <h3>Upload Your Files</h3>
-          <p>Scan the QR code at the kiosk or visit <strong>printmimo.tech</strong> to upload your documents from anywhere.</p>
-        </div>
-        <div class="ds-card">
-          <div class="ds-card-badge">2</div>
-          <h3>Customise Your Print</h3>
-          <p>Select copies, B&amp;W or color, and paper size directly on your phone — no app needed.</p>
-        </div>
-        <div class="ds-card">
-          <div class="ds-card-badge">3</div>
-          <h3>Enter Code &amp; Collect</h3>
-          <p>Receive a secure 4-digit code. Enter it at the kiosk and your prints come out instantly.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── FEATURES ── -->
-  <section class="ds-section" id="ds-features">
-    <div class="ds-section-inner">
-      <div class="ds-section-header">
-        <div class="ds-section-pill">✦ Features</div>
-        <h2 class="ds-section-title">Built for Modern Students</h2>
-        <p class="ds-section-subtitle">Everything you need for a hassle-free printing experience, built into one seamless platform.</p>
-      </div>
-      <div class="ds-features-grid">
-        <div class="ds-feature-card">
-          <div class="ds-feature-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <h3>Cloud Ready</h3>
-          <p>Upload from Google Drive or your local storage. Works with any device and browser.</p>
-        </div>
-        <div class="ds-feature-card">
-          <div class="ds-feature-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <h3>High-Quality Prints</h3>
-          <p>Professional laser printing for crisp, clear text and vibrant colors every time.</p>
-        </div>
-        <div class="ds-feature-card">
-          <div class="ds-feature-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <h3>No App Needed</h3>
-          <p>Works smoothly in any mobile browser. No downloads, no installs, no friction.</p>
-        </div>
-        <div class="ds-feature-card">
-          <div class="ds-feature-icon">🕒</div>
-          <h3>Convenient Access</h3>
-          <p>Kiosks are placed strategically in student zones and available during regular campus hours.</p>
-        </div>
-        <div class="ds-feature-card">
-          <div class="ds-feature-icon">💵</div>
-          <h3>Pay What You Print</h3>
-          <p>B&amp;W at ₹2.80/page · Color at ₹10/page. Transparent pricing, zero hidden fees.</p>
-        </div>
-        <div class="ds-feature-card">
-          <div class="ds-feature-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:1.5rem;height:1.5rem;color:#4A6BFF;"><path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <h3>UPI &amp; Cards</h3>
-          <p>Pay via any UPI app, debit/credit card, or net banking — all through a secure gateway.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── TRUST ── -->
-  <section class="ds-section ds-alt-bg" id="ds-trust">
-    <div class="ds-section-inner">
-      <div class="ds-section-header">
-        <div class="ds-section-pill">✦ Why Us</div>
-        <h2 class="ds-section-title">You Can Trust MIMO</h2>
-        <p class="ds-section-subtitle">Built with security, reliability, and student convenience at the core of every decision.</p>
-      </div>
-      <div class="ds-trust-grid">
-        <div class="ds-trust-card">
-          <div class="ds-trust-icon">
-            <svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.516 2.17a.75.75 0 00-1.032 0 11.209 11.209 0 01-7.877 3.08.75.75 0 00-.722.515A12.74 12.74 0 002.25 9.75c0 5.942 4.064 10.933 9.563 12.348a.749.749 0 00.374 0c5.499-1.415 9.563-6.406 9.563-12.348 0-1.39-.223-2.73-.635-3.985a.75.75 0 00-.722-.516l-.143.001c-2.996 0-5.717-1.17-7.734-3.08z"/></svg>
-          </div>
-          <h3>Secure by Design</h3>
-          <p>End-to-end encrypted. Your data is never stored or shared with anyone.</p>
-        </div>
-        <div class="ds-trust-card">
-          <div class="ds-trust-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <h3>Instant Refunds</h3>
-          <p>If your print fails for any reason, you receive an automatic full refund — no questions asked.</p>
-        </div>
-        <div class="ds-trust-card">
-          <div class="ds-trust-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <h3>Reliable Uptime</h3>
-          <p>90% kiosk uptime with active monitoring ensures you can always print when you need to.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── FAQ ── -->
-  <section class="ds-section" id="ds-faq">
-    <div class="ds-section-inner">
-      <div class="ds-section-header">
-        <div class="ds-section-pill">✦ FAQ</div>
-        <h2 class="ds-section-title">Got Questions?</h2>
-        <p class="ds-section-subtitle">Everything you need to know about MIMO.</p>
-      </div>
-      <div class="ds-faq-wrap">
-        <div class="faq-item" id="dsfaq-1">
-          <div class="faq-question" onclick="toggleFaq('dsfaq-1')">What file formats does MIMO support?
-            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          </div>
-          <div class="faq-answer" id="dsfaq-1-answer">MIMO supports PDF, DOC, DOCX, JPG, and PNG files. PDFs are recommended for the best print quality. You can convert most documents to PDF before uploading.</div>
-        </div>
-        <div class="faq-item" id="dsfaq-2">
-          <div class="faq-question" onclick="toggleFaq('dsfaq-2')">How long is my print code valid?
-            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          </div>
-          <div class="faq-answer" id="dsfaq-2-answer">Your 4-digit print code is valid for 24 hours. If you don't collect your prints within this window, your payment is automatically refunded.</div>
-        </div>
-        <div class="faq-item" id="dsfaq-3">
-          <div class="faq-question" onclick="toggleFaq('dsfaq-3')">What payment methods are accepted?
-            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          </div>
-          <div class="faq-answer" id="dsfaq-3-answer">We accept all major UPI apps (Google Pay, PhonePe, Paytm), debit/credit cards, and net banking. All payments are processed securely via Cashfree.</div>
-        </div>
-        <div class="faq-item" id="dsfaq-4">
-          <div class="faq-question" onclick="toggleFaq('dsfaq-4')">Is my document data private and safe?
-            <div class="faq-icon"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          </div>
-          <div class="faq-answer" id="dsfaq-4-answer">Absolutely. Files are encrypted in transit and permanently deleted from our servers immediately after printing. We never store, read, or share your documents.</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── CTA BANNER ── -->
-  <section class="ds-cta">
-    <div class="ds-cta-inner">
-      <h2>Ready to Print Smarter?</h2>
-      <p>Join 1,600+ students already printing smarter on campus.<br>Upload, pay, collect — done in seconds.</p>
-      <a href="/login" class="ds-cta-btn">
-        Start Printing Now
-        <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="width:1rem;height:1rem;"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-    </div>
-  </section>
-
-  <!-- ── SUPPORTED BY ── -->
-  <div class="ds-marquee-section">
-    <h3 class="ds-marquee-title">Supported by</h3>
-    <div class="marquee-container">
-      <div class="marquee-track">
-        <div class="marquee-set">
-          <img src="Brands/IMG_3075.PNG" alt="Raajply">
-          <img src="Brands/logo1.png" alt="REVA NEST">
-          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
-          <img src="Brands/Vasavi.jpg" alt="Vasavi">
-        </div>
-        <div class="marquee-set">
-          <img src="Brands/IMG_3075.PNG" alt="Raajply">
-          <img src="Brands/logo1.png" alt="REVA NEST">
-          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
-          <img src="Brands/Vasavi.jpg" alt="Vasavi">
-        </div>
-        <div class="marquee-set">
-          <img src="Brands/IMG_3075.PNG" alt="Raajply">
-          <img src="Brands/logo1.png" alt="REVA NEST">
-          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
-          <img src="Brands/Vasavi.jpg" alt="Vasavi">
-        </div>
-        <div class="marquee-set">
-          <img src="Brands/IMG_3075.PNG" alt="Raajply">
-          <img src="Brands/logo1.png" alt="REVA NEST">
-          <img src="Brands/IMG_3715.JPG.jpeg" alt="SUDOBOX">
-          <img src="Brands/Vasavi.jpg" alt="Vasavi">
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── FOOTER ── -->
-  <footer class="ds-footer">
-    <div class="ds-footer-inner">
-      <div class="ds-footer-grid">
-        <div class="ds-footer-brand">
-          <img src="vision-print-logo.jpg" alt="VisionPrintt" class="ds-footer-logo">
-          <h2>VisionPrintt</h2>
-          <p class="ds-footer-tagline">Smart printing solutions for modern campuses and offices.</p>
-          <div class="ds-footer-address">📍 REVA NEST, Rukmini Knowledge Park<br>Kattegenahalli, Yelahanka<br>Bengaluru — 560064</div>
-        </div>
-        <div class="ds-footer-col">
-          <h4>Quick Links</h4>
-          <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="#ds-features">Features</a></li>
-            <li><a href="#ds-how">How It Works</a></li>
-            <li><a href="#ds-faq">FAQ</a></li>
-            <li><a href="/about">About Us</a></li>
-            <li><a href="/blog">Blog &amp; Guides</a></li>
-            <li><a href="/login">Print Now</a></li>
-          </ul>
-        </div>
-        <div class="ds-footer-col">
-          <h4>Support</h4>
-          <ul>
-            <li><a href="/contact">Contact Support</a></li>
-            <li><a href="/contact#report">Report an Issue</a></li>
-            <li><a href="https://wa.me/919364028349">Send Feedback</a></li>
-            <li><a href="tel:+918123028797">+91 8123028797</a></li>
-            <li><a href="#">Mon–Fri, 9AM–6PM IST</a></li>
-          </ul>
-        </div>
-        <div class="ds-footer-col">
-          <h4>Legal</h4>
-          <ul>
-            <li><a href="/privacy">Privacy Policy</a></li>
-            <li><a href="/terms">Terms of Service</a></li>
-            <li><a href="/cookie-policy">Cookie Policy</a></li>
-            <li><a href="/refund-policy">Refund Policy</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="ds-footer-divider"></div>
-      <div class="ds-footer-bottom">
-        <div class="ds-footer-copy">© 2026 VisionPrintt Technologies. All rights reserved.</div>
-        <div class="ds-footer-credit">Crafted with innovation by <strong>Md Huzaif, Rathin &amp; Atharv</strong></div>
-      </div>
-    </div>
-  </footer>
-
-</div><!-- /desktop-site -->
-
+  </script>
 </body>
 </html>

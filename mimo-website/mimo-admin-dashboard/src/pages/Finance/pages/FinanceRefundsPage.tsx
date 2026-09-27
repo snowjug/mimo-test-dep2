@@ -108,7 +108,7 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
           trend="neutral"
           icon={<RotateCcw className="w-5 h-5" />}
           iconBgColor="bg-purple-50"
-          iconColor="text-[#6D35E8]"
+          iconColor="text-[#093765]"
           loading={loading}
         />
         <FinanceMetricCard
@@ -168,7 +168,7 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
       )}
 
       {/* ── FILTER & SEARCH BAR ────────────────────────────────────────────────── */}
-      <div className="bg-white border border-[#EDE9FE] rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="bg-white border border-[#E4E7EB] rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -177,11 +177,11 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
               placeholder="Search by Order ID, User ID, or Reason..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#FAF9FD] border border-[#EDE9FE] text-slate-800 placeholder-slate-400 text-xs rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:border-[#6D35E8]"
+              className="w-full bg-[#F3F4F6] border border-[#E4E7EB] text-slate-800 placeholder-slate-400 text-xs rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:border-[#093765]"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 bg-[#FAF9FD] border border-[#EDE9FE] px-3 py-1.5 rounded-xl text-xs">
+          <div className="flex items-center gap-1.5 bg-[#F3F4F6] border border-[#E4E7EB] px-3 py-1.5 rounded-xl text-xs">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <select
               value={statusFilter}
@@ -206,11 +206,11 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
       </div>
 
       {/* ── REFUNDS TABLE ──────────────────────────────────────────────────────── */}
-      <div className="bg-white border border-[#EDE9FE] rounded-2xl shadow-xs overflow-hidden">
+      <div className="bg-white border border-[#E4E7EB] rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-[#FAF9FD] border-b border-[#EDE9FE] text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+              <tr className="bg-[#F3F4F6] border-b border-[#E4E7EB] text-slate-400 font-semibold text-[10px]">
                 <th className="py-3 px-4">Request ID</th>
                 <th className="py-3 px-4">Order ID</th>
                 <th className="py-3 px-4">Customer</th>
@@ -233,7 +233,7 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
                   const isPending = req.status === 'pending' || req.status === 'PENDING';
                   return (
                     <tr key={req.id || idx} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-[#6D35E8]">
+                      <td className="py-3.5 px-4 font-mono font-bold text-[#093765]">
                         {req.id ? `REF-${String(req.id).slice(-4)}` : `REF-${7401 + idx}`}
                       </td>
                       <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
@@ -266,7 +266,7 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
                           {isPending && (
                             <button
                               onClick={() => handleOpenProcessModal(req)}
-                              className="px-2.5 py-1 text-xs font-bold text-white bg-[#6D35E8] hover:bg-[#5b29c9] rounded-lg shadow-xs transition-all cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] rounded-lg shadow-xs transition-all cursor-pointer"
                             >
                               Approve
                             </button>
@@ -304,7 +304,7 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
               step="0.01"
               value={customRefundAmount}
               onChange={(e) => setCustomRefundAmount(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold font-mono focus:outline-none focus:border-[#6D35E8]"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold font-mono focus:outline-none focus:border-[#093765]"
             />
           </div>
           <div>
@@ -315,7 +315,7 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
               type="text"
               value={refundNote}
               onChange={(e) => setRefundNote(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#6D35E8]"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#093765]"
             />
           </div>
         </div>

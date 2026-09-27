@@ -1,20 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Building,
-  Loader2,
-} from 'lucide-react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import api from './api';
 import { ThemeProvider } from './context/ThemeContext';
 import { RangeProvider } from './context/RangeContext';
 import { AppShell } from './components/layout/AppShell';
-import { OverviewPage } from './pages/Overview/OverviewPage';
-import { OperationsPage } from './pages/Operations/OperationsPage';
-import { KiosksPage } from './pages/Kiosks/KiosksPage';
-import { IncidentsPage } from './pages/Incidents/IncidentsPage';
-import { AnalyticsPage } from './pages/Analytics/AnalyticsPage';
-import { UsersPage } from './pages/Users/UsersPage';
-import { FinancePage } from './pages/Finance/FinancePage';
-import { ConfigurationPage } from './pages/Configuration/ConfigurationPage';
+
+// Admin and Finance are separate portals, so each (and each admin page) ships as its own chunk.
+const OverviewPage = lazy(() => import('./pages/Overview/OverviewPage').then((m) => ({ default: m.OverviewPage })));
+const OperationsPage = lazy(() => import('./pages/Operations/OperationsPage').then((m) => ({ default: m.OperationsPage })));
+const KiosksPage = lazy(() => import('./pages/Kiosks/KiosksPage').then((m) => ({ default: m.KiosksPage })));
+const IncidentsPage = lazy(() => import('./pages/Incidents/IncidentsPage').then((m) => ({ default: m.IncidentsPage })));
+const AnalyticsPage = lazy(() => import('./pages/Analytics/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
+const UsersPage = lazy(() => import('./pages/Users/UsersPage').then((m) => ({ default: m.UsersPage })));
+const FinancePage = lazy(() => import('./pages/Finance/FinancePage').then((m) => ({ default: m.FinancePage })));
+const ConfigurationPage = lazy(() => import('./pages/Configuration/ConfigurationPage').then((m) => ({ default: m.ConfigurationPage })));
+const FinanceApp = lazy(() => import('./pages/Finance/FinanceApp').then((m) => ({ default: m.FinanceApp })));
+
+const PageSkeleton = () => (
+  <div aria-busy="true" aria-label="Loading" className="space-y-3">
+    <div className="skeleton h-24" />
+    <div className="skeleton h-40" />
+    <div className="skeleton h-40" />
+  </div>
+);
 
 import { AdminLoginPage } from './components/auth/AdminLoginPage';
 
@@ -105,6 +112,7 @@ function DashboardApp() {
       onResetMetrics={handleResetMetrics}
       isResetting={isResetting}
     >
+      <Suspense fallback={<PageSkeleton />}>
       {activeTab === 'overview' && <OverviewPage />}
       {activeTab === 'operations' && <OperationsPage />}
       {activeTab === 'kiosks' && <KiosksPage />}
@@ -113,11 +121,11 @@ function DashboardApp() {
       {activeTab === 'users' && <UsersPage />}
       {activeTab === 'finance' && <FinancePage />}
       {activeTab === 'configuration' && <ConfigurationPage />}
+      </Suspense>
     </AppShell>
   );
 }
 
-import { FinanceApp } from './pages/Finance/FinanceApp';
 
 export default function RootApp() {
   const [isFinanceRoute, setIsFinanceRoute] = useState(() => {
@@ -135,7 +143,9 @@ export default function RootApp() {
   if (isFinanceRoute) {
     return (
       <RangeProvider>
-        <FinanceApp />
+        <Suspense fallback={null}>
+          <FinanceApp />
+        </Suspense>
       </RangeProvider>
     );
   }

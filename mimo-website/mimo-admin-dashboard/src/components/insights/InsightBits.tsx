@@ -8,8 +8,8 @@ import { inr, int } from '../../lib/format';
 export type Tone = 'admin' | 'finance';
 
 const T = {
-  admin: { accent: '#6366f1', accent2: '#10b981', grid: '#94a3b833', axis: '#94a3b8', muted: 'text-[var(--text-3)]', text: 'text-[var(--text-1)]', sub: 'text-[var(--text-2)]', track: 'bg-[var(--surface-2)]', chip: 'bg-[var(--surface-2)] text-[var(--text-2)]', chipOn: 'bg-indigo-600 text-white' },
-  finance: { accent: '#6D35E8', accent2: '#00C7F2', grid: '#EDE9FE', axis: '#94a3b8', muted: 'text-slate-400', text: 'text-[#19162D]', sub: 'text-slate-600', track: 'bg-[#F3EFFF]', chip: 'bg-[#F3EFFF] text-slate-600', chipOn: 'bg-[#6D35E8] text-white' },
+  admin: { accent: '#093765', accent2: '#10b981', grid: '#94a3b833', axis: '#94a3b8', muted: 'text-[var(--text-3)]', text: 'text-[var(--text-1)]', sub: 'text-[var(--text-2)]', track: 'bg-[var(--surface-2)]', chip: 'bg-[var(--surface-2)] text-[var(--text-2)]', chipOn: 'bg-indigo-600 text-white' },
+  finance: { accent: '#093765', accent2: '#6A95C8', grid: '#E4E7EB', axis: '#94a3b8', muted: 'text-slate-400', text: 'text-[#111318]', sub: 'text-slate-600', track: 'bg-[#E7EEF7]', chip: 'bg-[#E7EEF7] text-slate-600', chipOn: 'bg-[#093765] text-white' },
 } as const;
 
 /** "▲ 12.5%" style badge. `goodWhenDown` flips the colour for things like refunds / failures. */

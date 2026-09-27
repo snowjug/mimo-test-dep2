@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IndianRupee, CreditCard, Clock, RotateCcw, TrendingUp, ShoppingBag, Download, RotateCw, AlertTriangle, ArrowRight, CheckCircle2, BarChart3, Eye } from 'lucide-react';
+import { IndianRupee, CreditCard, Clock, RotateCcw, TrendingUp, ShoppingBag, Download, AlertTriangle, ArrowRight, CheckCircle2, Eye } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { FinanceMetricCard } from '../components/FinanceMetricCard';
 import { FinanceChartCard } from '../components/FinanceChartCard';
@@ -23,7 +23,7 @@ export interface FinanceOverviewProps {
   onNavigateToTab?: (tab: string) => void;
 }
 
-const PIE = ['#6D35E8', '#00C7F2', '#10B981', '#F59E0B', '#8B5CF6', '#F43F5E'];
+const PIE = ['#093765', '#6A95C8', '#10B981', '#F59E0B', '#8FB3DC', '#F43F5E'];
 
 const change = (cur: number, prev?: number | null) => {
   const c = pctChange(cur, prev);
@@ -61,29 +61,17 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({ analytics:
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-[#EDE9FE] rounded-2xl p-5 shadow-xs">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-[#EDE8FF] text-[#6D35E8] flex items-center justify-center shrink-0 shadow-xs"><BarChart3 className="w-6 h-6" /></div>
-          <div>
-            <h1 className="text-xl font-black text-[#19162D] tracking-tight leading-tight">Finance Overview</h1>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Payments, refunds and revenue · {describeRange(range)}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <LiveIndicator updatedAt={updatedAt} live={live} tone="finance" />
-          <button type="button" onClick={onRefresh} disabled={loading} className="px-4 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200/80 rounded-xl flex items-center gap-2 cursor-pointer">
-            <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#6D35E8]' : ''}`} /> Refresh
-          </button>
-          <button type="button" onClick={exportSummary} disabled={!a} className="px-5 py-2.5 text-xs font-bold text-white bg-[#6D35E8] hover:bg-[#5b29c9] shadow-md shadow-purple-500/20 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-50">
-            <Download className="w-3.5 h-3.5" /> Export Report
-          </button>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <LiveIndicator updatedAt={updatedAt} live={live} tone="finance" />
+        <button type="button" onClick={exportSummary} disabled={!a} className="flex h-10 items-center gap-2 rounded-full bg-slate-200/70 px-4 text-[14px] font-medium text-slate-900 active:bg-slate-300 disabled:opacity-50">
+          <Download className="h-4 w-4" /> Export
+        </button>
       </div>
 
       {error && <ErrorBanner message={error} onRetry={onRefresh} />}
       <TruncatedNote show={a?.truncated} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <FinanceMetricCard title="Total Revenue" value={cur ? inr(cur.revenue) : '—'} {...change(cur?.revenue ?? 0, prev?.revenue)} icon={<IndianRupee className="w-5 h-5" />} sparklineData={spark('revenue')} loading={loading} />
         <FinanceMetricCard title="Paid Orders" value={cur ? int(cur.orders) : '—'} {...change(cur?.orders ?? 0, prev?.orders)} icon={<CreditCard className="w-5 h-5" />} iconBgColor="bg-blue-50" iconColor="text-blue-600" sparklineColor="#3B82F6" sparklineData={spark('orders')} loading={loading} />
         <FinanceMetricCard title="Pending Payments" value={cur ? inr(cur.pendingAmount) : '—'} change={cur ? `${cur.pendingPayments} order${cur.pendingPayments === 1 ? '' : 's'}` : undefined} icon={<Clock className="w-5 h-5" />} iconBgColor="bg-amber-50" iconColor="text-amber-600" loading={loading} comparisonText="not completed" />
@@ -133,7 +121,7 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({ analytics:
                     <span className="font-bold text-slate-800">{k.name} <span className="font-mono font-medium text-slate-400">{k.kioskId}</span></span>
                     <span className="font-black font-mono text-slate-900">{inr(k.revenue)}</span>
                   </div>
-                  <div className="h-2 rounded-full bg-[#F3EFFF] overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(k.revenue / maxKiosk) * 100}%`, background: PIE[i % PIE.length] }} /></div>
+                  <div className="h-2 rounded-full bg-[#E7EEF7] overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(k.revenue / maxKiosk) * 100}%`, background: PIE[i % PIE.length] }} /></div>
                   <p className="text-[11px] text-slate-400 mt-1">{k.completed} printed · {int(k.pages)} pages{k.failed > 0 ? ` · ${k.failed} failed` : ''}</p>
                 </li>
               ))}
@@ -165,26 +153,26 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({ analytics:
       </div>
 
       <FinanceChartCard title="Recent Transactions" subtitle={transactions.length ? `Latest ${Math.min(8, transactions.length)} in this period` : 'Payments appear here as they happen'}
-        action={<button type="button" onClick={() => onNavigateToTab?.('transactions')} className="text-xs font-bold text-[#6D35E8] hover:underline flex items-center gap-1 cursor-pointer">View all <ArrowRight className="w-3.5 h-3.5" /></button>}>
+        action={<button type="button" onClick={() => onNavigateToTab?.('transactions')} className="text-xs font-bold text-[#093765] hover:underline flex items-center gap-1 cursor-pointer">View all <ArrowRight className="w-3.5 h-3.5" /></button>}>
         {transactions.length === 0 ? <p className="py-10 text-center text-xs font-semibold text-slate-400">No transactions in this period.</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                <tr className="border-b border-slate-100 text-slate-400 font-bold text-[10px]">
                   {['Order', 'Customer', 'Machine', 'Amount', 'Method', 'Status', 'Time', ''].map((h) => <th key={h} className="whitespace-nowrap py-2.5 px-3">{h}</th>)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {transactions.slice(0, 8).map((t) => (
-                  <tr key={t.id} className="hover:bg-[#FAF9FD]">
-                    <td className="whitespace-nowrap py-3 px-3 font-mono font-bold text-[#6D35E8]">{t.orderId}</td>
+                  <tr key={t.id} className="hover:bg-[#F3F4F6]">
+                    <td className="whitespace-nowrap py-3 px-3 font-mono font-bold text-[#093765]">{t.orderId}</td>
                     <td className="py-3 px-3 text-slate-700 font-semibold truncate max-w-[180px]" title={t.userEmail || ''}>{t.userEmail || t.userName || '—'}</td>
                     <td className="whitespace-nowrap py-3 px-3 font-mono text-slate-600">{t.kioskId || '—'}</td>
                     <td className="whitespace-nowrap py-3 px-3 font-black font-mono text-slate-900">{inr(t.amount)}</td>
                     <td className="whitespace-nowrap py-3 px-3 text-slate-600 font-semibold">{t.method}</td>
                     <td className="py-3 px-3"><StatusBadge status={t.status} /></td>
                     <td className="whitespace-nowrap py-3 px-3 text-slate-400 text-[11px] font-medium">{dateTime(t.createdAt)}</td>
-                    <td className="py-3 px-3 text-right"><button type="button" onClick={() => setSelected(t)} className="text-slate-400 hover:text-[#6D35E8] cursor-pointer" title="Details"><Eye className="w-4 h-4" /></button></td>
+                    <td className="py-3 px-3 text-right"><button type="button" onClick={() => setSelected(t)} className="text-slate-400 hover:text-[#093765] cursor-pointer" title="Details"><Eye className="w-4 h-4" /></button></td>
                   </tr>
                 ))}
               </tbody>

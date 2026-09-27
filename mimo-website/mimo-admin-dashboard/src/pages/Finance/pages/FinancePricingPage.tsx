@@ -181,14 +181,14 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
       )}
 
       {/* ── SECTION A: PRINT PRICING CONFIGURATION ─────────────────────────────── */}
-      <div className="bg-white border border-[#EDE9FE] rounded-2xl p-6 shadow-xs space-y-6">
+      <div className="bg-white border border-[#E4E7EB] rounded-2xl p-6 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <IndianRupee className="w-4 h-4" />
               </div>
-              <h2 className="text-base font-extrabold text-[#19162D] tracking-tight">
+              <h2 className="text-base font-extrabold text-[#111318] tracking-tight">
                 Print Tariff & Pricing Rules
               </h2>
             </div>
@@ -214,7 +214,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 pricingSuccess
                   ? 'bg-emerald-600 text-white'
                   : isPricingDirty
-                  ? 'bg-[#6D35E8] hover:bg-[#5b29c9] text-white shadow-purple-500/20'
+                  ? 'bg-[#093765] hover:bg-[#062A4E] text-white shadow-purple-500/20'
                   : 'bg-slate-100 text-slate-400 cursor-not-allowed'
               }`}
             >
@@ -226,7 +226,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* Black & White Simplex */}
-          <div className="p-4 rounded-xl border border-slate-150 bg-[#FAF9FD]/50 space-y-3">
+          <div className="p-4 rounded-xl border border-slate-150 bg-[#F3F4F6]/50 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800">Black & White (A4 Simplex)</span>
               <StatusBadge status="ACTIVE" size="sm" />
@@ -238,14 +238,14 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 step="0.10"
                 value={pricing.pricePerPageBW}
                 onChange={(e) => setPricing({ ...pricing, pricePerPageBW: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#093765]"
               />
             </div>
             <span className="text-[11px] text-slate-400 block">Default standard paper rate</span>
           </div>
 
           {/* Color Simplex */}
-          <div className="p-4 rounded-xl border border-slate-150 bg-[#FAF9FD]/50 space-y-3">
+          <div className="p-4 rounded-xl border border-slate-150 bg-[#F3F4F6]/50 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800">Full Color (A4 Simplex)</span>
               <StatusBadge status="ACTIVE" size="sm" />
@@ -257,14 +257,14 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 step="0.50"
                 value={pricing.pricePerPageColor}
                 onChange={(e) => setPricing({ ...pricing, pricePerPageColor: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#093765]"
               />
             </div>
             <span className="text-[11px] text-slate-400 block">Laser / Inkjet high resolution</span>
           </div>
 
           {/* Duplex B&W */}
-          <div className="p-4 rounded-xl border border-slate-150 bg-[#FAF9FD]/50 space-y-3">
+          <div className="p-4 rounded-xl border border-slate-150 bg-[#F3F4F6]/50 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800">B&W Duplex (Double Sided)</span>
               <StatusBadge status="ACTIVE" size="sm" />
@@ -276,14 +276,14 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 step="0.10"
                 value={pricing.pricePerPageBWDuplex}
                 onChange={(e) => setPricing({ ...pricing, pricePerPageBWDuplex: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#093765]"
               />
             </div>
             <span className="text-[11px] text-slate-400 block">Double-sided discount rate</span>
           </div>
 
           {/* Graph Paper */}
-          <div className="p-4 rounded-xl border border-slate-150 bg-[#FAF9FD]/50 space-y-3">
+          <div className="p-4 rounded-xl border border-slate-150 bg-[#F3F4F6]/50 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800">Engineering / Graph Paper</span>
               <StatusBadge status="ACTIVE" size="sm" />
@@ -295,7 +295,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 step="0.10"
                 value={pricing.pricePerPageGraph}
                 onChange={(e) => setPricing({ ...pricing, pricePerPageGraph: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#093765]"
               />
             </div>
             <span className="text-[11px] text-slate-400 block">Pre-printed engineering grids</span>
@@ -304,14 +304,14 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
       </div>
 
       {/* ── SECTION B: COUPONS & PROMOTIONS ────────────────────────────────────── */}
-      <div className="bg-white border border-[#EDE9FE] rounded-2xl p-6 shadow-xs space-y-6">
+      <div className="bg-white border border-[#E4E7EB] rounded-2xl p-6 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-lg bg-purple-50 text-[#6D35E8] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 text-[#093765] flex items-center justify-center">
                 <Tag className="w-4 h-4" />
               </div>
-              <h2 className="text-base font-extrabold text-[#19162D] tracking-tight">
+              <h2 className="text-base font-extrabold text-[#111318] tracking-tight">
                 Discount Coupons & Promo Campaigns
               </h2>
             </div>
@@ -330,7 +330,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
             </button>
             <button
               onClick={() => setShowCreateCoupon(true)}
-              className="px-4 py-2 text-xs font-bold text-white bg-[#6D35E8] hover:bg-[#5b29c9] rounded-xl shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] rounded-xl shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               New Coupon
@@ -342,7 +342,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-[#FAF9FD] border-b border-[#EDE9FE] text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+              <tr className="bg-[#F3F4F6] border-b border-[#E4E7EB] text-slate-400 font-semibold text-[10px]">
                 <th className="py-3 px-4">Coupon Code</th>
                 <th className="py-3 px-4">Discount</th>
                 <th className="py-3 px-4">Type</th>
@@ -367,7 +367,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
               ) : (
                 coupons.map((coupon) => (
                   <tr key={coupon.id || coupon.code} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-[#6D35E8]">
+                    <td className="py-3.5 px-4 font-mono font-bold text-[#093765]">
                       {coupon.code || coupon.id}
                     </td>
                     <td className="py-3.5 px-4 font-black font-mono text-emerald-600 text-sm">
@@ -412,7 +412,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 placeholder="e.g. EXAM25"
                 value={couponCode}
                 onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase focus:outline-none focus:border-[#093765]"
               />
             </div>
             <div>
@@ -424,7 +424,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 required
                 value={couponDiscount}
                 onChange={(e) => setCouponDiscount(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#093765]"
               />
             </div>
             <div>
@@ -433,7 +433,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 type="date"
                 value={couponExpiry}
                 onChange={(e) => setCouponExpiry(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#093765]"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -446,7 +446,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-bold text-white bg-[#6D35E8] hover:bg-[#5b29c9] rounded-xl shadow-xs"
+                className="px-4 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] rounded-xl shadow-xs"
               >
                 Save Coupon
               </button>
@@ -468,7 +468,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 placeholder="e.g. CAMPUS"
                 value={bulkPrefix}
                 onChange={(e) => setBulkPrefix(e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase focus:outline-none focus:border-[#093765]"
               />
             </div>
             <div>
@@ -480,7 +480,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 required
                 value={bulkCount}
                 onChange={(e) => setBulkCount(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#093765]"
               />
             </div>
             <div>
@@ -492,7 +492,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 required
                 value={bulkDiscount}
                 onChange={(e) => setBulkDiscount(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#6D35E8]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#093765]"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -505,7 +505,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-bold text-white bg-[#6D35E8] hover:bg-[#5b29c9] rounded-xl shadow-xs"
+                className="px-4 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] rounded-xl shadow-xs"
               >
                 Generate Codes
               </button>

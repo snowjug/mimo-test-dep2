@@ -23,14 +23,14 @@ export const FinanceMetricCard: React.FC<FinanceMetricCardProps> = ({
   comparisonText = 'vs. prev. period',
   icon,
   iconBgColor = 'bg-purple-50',
-  iconColor = 'text-[#6D35E8]',
+  iconColor = 'text-[#093765]',
   sparklineData,
-  sparklineColor = '#6D35E8',
+  sparklineColor = '#093765',
   loading = false,
 }) => {
   if (loading) {
     return (
-      <div className="bg-white border border-[#EDE9FE] rounded-2xl p-5 shadow-xs animate-pulse flex flex-col justify-between h-36 min-w-0">
+      <div className="bg-white border border-[#E4E7EB] rounded-2xl p-5 shadow-xs animate-pulse flex flex-col justify-between h-36 min-w-0">
         <div className="flex items-center justify-between">
           <div className="w-10 h-10 rounded-xl bg-slate-100" />
           <div className="w-12 h-4 rounded bg-slate-100" />
@@ -78,7 +78,7 @@ export const FinanceMetricCard: React.FC<FinanceMetricCardProps> = ({
   const isNegative = trend === 'down';
 
   return (
-    <div className="bg-white border border-[#EDE9FE] hover:border-purple-300 transition-all duration-200 rounded-2xl p-4 md:p-5 shadow-xs hover:shadow-md flex flex-col justify-between min-w-0">
+    <div className="bg-white border border-[#E4E7EB] hover:border-purple-300 transition-all duration-200 rounded-2xl p-4 md:p-5 shadow-xs hover:shadow-md flex flex-col justify-between min-w-0">
       <div className="flex items-center justify-between mb-3">
         <div className={`w-10 h-10 rounded-xl ${iconBgColor} flex items-center justify-center ${iconColor} shadow-2xs shrink-0`}>
           {icon}
@@ -90,7 +90,7 @@ export const FinanceMetricCard: React.FC<FinanceMetricCardProps> = ({
         <span className="text-[12px] font-semibold text-slate-500 tracking-tight block truncate mb-1">
           {title}
         </span>
-        <div className="text-xl md:text-2xl font-black text-[#19162D] tracking-tight font-mono truncate">
+        <div className="text-xl md:text-2xl font-black text-[#111318] tracking-tight font-mono truncate">
           {value}
         </div>
       </div>

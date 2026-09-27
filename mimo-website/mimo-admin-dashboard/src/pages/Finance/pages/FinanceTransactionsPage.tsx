@@ -81,26 +81,26 @@ export const FinanceTransactionsPage: React.FC<FinanceTransactionsPageProps> = (
         <FinanceMetricCard title="Collected" value={inr(ledger)} icon={<IndianRupee className="w-5 h-5" />} iconBgColor="bg-indigo-50" iconColor="text-indigo-600" loading={loading} />
       </div>
 
-      <div className="bg-white border border-[#EDE9FE] rounded-2xl p-4 shadow-xs flex flex-col lg:flex-row lg:items-center gap-3">
+      <div className="bg-white border border-[#E4E7EB] rounded-2xl p-4 shadow-xs flex flex-col lg:flex-row lg:items-center gap-3">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order ID, customer, machine, gateway reference…"
-            className="w-full bg-[#FAF9FD] border border-[#EDE9FE] rounded-xl pl-10 pr-3 py-2.5 text-xs font-medium focus:outline-none focus:border-[#6D35E8]" />
+            className="w-full bg-[#F3F4F6] border border-[#E4E7EB] rounded-xl pl-10 pr-3 py-2.5 text-xs font-medium focus:outline-none focus:border-[#093765]" />
         </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="bg-[#FAF9FD] border border-[#EDE9FE] rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700">
+        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="bg-[#F3F4F6] border border-[#E4E7EB] rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700">
           {STATUS_FILTERS.map((s) => <option key={s} value={s}>{s === 'ALL' ? 'All statuses' : s.charAt(0) + s.slice(1).toLowerCase()}</option>)}
         </select>
-        <select value={method} onChange={(e) => setMethod(e.target.value)} className="bg-[#FAF9FD] border border-[#EDE9FE] rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700">
+        <select value={method} onChange={(e) => setMethod(e.target.value)} className="bg-[#F3F4F6] border border-[#E4E7EB] rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700">
           {methods.map((m) => <option key={m} value={m}>{m === 'ALL' ? 'All methods' : m}</option>)}
         </select>
         <button type="button" onClick={exportCsv} disabled={rows.length === 0} className="px-4 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200/80 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-50"><Download className="w-3.5 h-3.5" /> Export CSV</button>
       </div>
 
-      <div className="bg-white border border-[#EDE9FE] rounded-2xl shadow-xs overflow-hidden">
+      <div className="bg-white border border-[#E4E7EB] rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#FAF9FD]">
-              <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+            <thead className="bg-[#F3F4F6]">
+              <tr className="text-slate-400 font-bold text-[10px]">
                 <th className="whitespace-nowrap py-3 px-4">Order</th>
                 <th className="whitespace-nowrap py-3 px-4">Customer</th>
                 <th className="whitespace-nowrap py-3 px-4">Machine</th>
@@ -117,8 +117,8 @@ export const FinanceTransactionsPage: React.FC<FinanceTransactionsPageProps> = (
               {loading && Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={10} className="p-4"><div className="h-5 bg-slate-50 rounded animate-pulse" /></td></tr>)}
               {!loading && visible.length === 0 && <tr><td colSpan={10} className="py-14 text-center text-xs font-semibold text-slate-400">No transactions match in {describeRange(range).toLowerCase()}.</td></tr>}
               {visible.map((t) => (
-                <tr key={t.id} className="hover:bg-[#FAF9FD]">
-                  <td className="whitespace-nowrap py-3 px-4 font-mono font-bold text-[#6D35E8]">{t.orderId}</td>
+                <tr key={t.id} className="hover:bg-[#F3F4F6]">
+                  <td className="whitespace-nowrap py-3 px-4 font-mono font-bold text-[#093765]">{t.orderId}</td>
                   <td className="py-3 px-4 text-slate-700 font-semibold truncate max-w-[200px]" title={t.userEmail || ''}>{t.userEmail || t.userName || '—'}</td>
                   <td className="whitespace-nowrap py-3 px-4 font-mono text-slate-600">{t.kioskId || '—'}</td>
                   <td className="whitespace-nowrap py-3 px-4 text-slate-600 font-semibold">{t.method}</td>
@@ -127,7 +127,7 @@ export const FinanceTransactionsPage: React.FC<FinanceTransactionsPageProps> = (
                   <td className="whitespace-nowrap py-3 px-4 font-mono font-black text-slate-900">{inr(t.amount)}</td>
                   <td className="py-3 px-4"><StatusBadge status={t.status} /></td>
                   <td className="whitespace-nowrap py-3 px-4 text-slate-400 text-[11px] font-medium">{dateTime(t.createdAt)}</td>
-                  <td className="py-3 px-4 text-right"><button type="button" onClick={() => setSelected(t)} className="text-slate-400 hover:text-[#6D35E8] cursor-pointer" title="Details"><Eye className="w-4 h-4" /></button></td>
+                  <td className="py-3 px-4 text-right"><button type="button" onClick={() => setSelected(t)} className="text-slate-400 hover:text-[#093765] cursor-pointer" title="Details"><Eye className="w-4 h-4" /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -136,9 +136,9 @@ export const FinanceTransactionsPage: React.FC<FinanceTransactionsPageProps> = (
         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
           <span>Showing {rows.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, rows.length)} of {rows.length}</span>
           <div className="flex items-center gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="p-1.5 rounded-lg border border-[#EDE9FE] disabled:opacity-40 cursor-pointer"><ChevronLeft className="w-4 h-4" /></button>
-            <span className="font-bold text-[#6D35E8]">{page} / {pages}</span>
-            <button type="button" disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="p-1.5 rounded-lg border border-[#EDE9FE] disabled:opacity-40 cursor-pointer"><ChevronRight className="w-4 h-4" /></button>
+            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="p-1.5 rounded-lg border border-[#E4E7EB] disabled:opacity-40 cursor-pointer"><ChevronLeft className="w-4 h-4" /></button>
+            <span className="font-bold text-[#093765]">{page} / {pages}</span>
+            <button type="button" disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="p-1.5 rounded-lg border border-[#E4E7EB] disabled:opacity-40 cursor-pointer"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
       </div>

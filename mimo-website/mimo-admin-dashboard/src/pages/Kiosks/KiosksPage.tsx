@@ -70,7 +70,7 @@ export const KiosksPage: React.FC = () => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg font-black text-[var(--text-1)]">{k.name}</h2>
                     <span className="font-mono text-xs text-[var(--text-3)]">{k.kioskId}</span>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${k.type === 'color' ? 'bg-fuchsia-500/10 text-fuchsia-600' : 'bg-slate-500/10 text-slate-500'}`}>{k.type === 'color' ? 'Colour' : 'B&W'}</span>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${k.type === 'color' ? 'bg-fuchsia-500/10 text-fuchsia-600' : 'bg-slate-500/10 text-slate-500'}`}>{k.type === 'color' ? 'Colour' : 'B&W'}</span>
                   </div>
                   <p className="text-xs text-[var(--text-3)]">{k.description}</p>
                 </div>
@@ -88,7 +88,7 @@ export const KiosksPage: React.FC = () => {
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[['Jobs', String(k.stats.jobs)], ['Printed', String(k.stats.completed)], ['Failed', String(k.stats.failed)], ['Revenue', inr(k.stats.revenue)]].map(([label, value]) => (
                 <div key={label} className="p-3 rounded-xl bg-[var(--surface-2)]/60 border border-[var(--border)]">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-3)]">{label}</p>
+                  <p className="text-[10px] font-bold text-[var(--text-3)]">{label}</p>
                   <p className={`text-lg font-black tabular-nums ${label === 'Failed' && k.stats.failed > 0 ? 'text-rose-600' : 'text-[var(--text-1)]'}`}>{value}</p>
                 </div>
               ))}

@@ -2,12 +2,15 @@
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+      <meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)" />
+      <meta name="theme-color" content="#0c0d10" media="(prefers-color-scheme: dark)" />
       <meta name="google-adsense-account" content="ca-pub-6488030243565665">
       <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6488030243565665" crossorigin="anonymous"></script>
       <title>MIMO</title>
       <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-      <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+      <!-- Deferred: only needed when "Pay" is tapped, which is always after the document has parsed. -->
+      <script defer src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
 
       <!-- Sentry Loader Script -->
       <script
@@ -15,7 +18,8 @@
         crossorigin="anonymous"
       ></script>
       <script>
-        Sentry.onLoad(function() {
+        // Guarded: if an ad blocker stops the Sentry loader, this must not throw on every page.
+        if (window.Sentry) Sentry.onLoad(function() {
           Sentry.init({
             // Tracing
             tracesSampleRate: 1.0, 
