@@ -1359,8 +1359,10 @@ def on_snapshot(col_snapshot, changes, read_time):
 def heartbeat_loop():
     while True:
         try:
-            status_bw = "Idle" if is_printer_online(BW_PRINTER_NAME) else "Paused/Error"
-            status_color = "Idle" if is_printer_online(COLOR_PRINTER_NAME) else "Paused/Error"
+            bw_ok, _bw_reason = is_printer_online(BW_PRINTER_NAME)
+            color_ok, _color_reason = is_printer_online(COLOR_PRINTER_NAME)
+            status_bw = "Idle" if bw_ok else "Paused/Error"
+            status_color = "Idle" if color_ok else "Paused/Error"
                 
             db.collection("system_status").document(KIOSK_ID).set({
                 "lastSeen": firestore.SERVER_TIMESTAMP,
