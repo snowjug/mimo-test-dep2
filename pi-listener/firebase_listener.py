@@ -389,8 +389,17 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
             return True
             
         time.sleep(0.1)
-        
-    print(f"❌ Timeout ({timeout_sec}s) waiting for physical completion of CUPS job {cups_job_id} (cups_confirmed={cups_confirmed})")
+
+    timeout_msg = (
+        f"Print timed out after {timeout_sec}s waiting for physical completion"
+        + (" (CUPS confirmed the job but the printer never finished)" if cups_confirmed else " (CUPS never confirmed the job)")
+    )
+    print(f"❌ {timeout_msg}")
+    if doc_ref:
+        try:
+            doc_ref.update({"status": "failed", "printerStatus": timeout_msg})
+        except Exception:
+            pass
     return False
 
 def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NAME, 
@@ -416,6 +425,11 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         total_size = sum(os.path.getsize(p) for p in file_paths if os.path.exists(p))
         if total_size < 100:
             print(f"❌ File(s) too small ({total_size} bytes)")
+            if doc_ref:
+                try:
+                    doc_ref.update({"status": "failed", "printerStatus": f"Uploaded file is empty or too small ({total_size} bytes)"})
+                except Exception:
+                    pass
             return False
 
         for file_path in file_paths:
@@ -424,6 +438,11 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                     header = f.read(8)
                 if not header.startswith(b'%PDF'):
                     print(f"❌ File not a valid PDF: {file_path}")
+                    if doc_ref:
+                        try:
+                            doc_ref.update({"status": "failed", "printerStatus": f"Uploaded file is not a valid PDF: {os.path.basename(file_path)}"})
+                        except Exception:
+                            pass
                     return False
 
         # Pre-flight check
@@ -520,10 +539,21 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                 pass
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Print failed: {e.stderr.strip() if e.stderr else str(e)}")
+        reason = e.stderr.strip() if e.stderr else str(e)
+        print(f"❌ Print failed: {reason}")
+        if doc_ref:
+            try:
+                doc_ref.update({"status": "failed", "printerStatus": f"CUPS rejected the print job: {reason[:200]}"})
+            except Exception:
+                pass
         return False
     except Exception as e:
         print(f"❌ Unexpected print error: {e}")
+        if doc_ref:
+            try:
+                doc_ref.update({"status": "failed", "printerStatus": str(e)[:200]})
+            except Exception:
+                pass
         return False
 
 def download_file(file_url, file_name):
