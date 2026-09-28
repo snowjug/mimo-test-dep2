@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { WarningCircle, Info, X } from '@phosphor-icons/react';
 import { MainScreen } from './components/screens/MainScreen';
 import { CodeEntryScreen } from './components/screens/CodeEntryScreen';
 import { PrintingScreen } from './components/screens/PrintingScreen';
@@ -261,14 +262,21 @@ function App() {
     <>
       {/* ================= TOAST ================= */}
       {toastMsg && (
-        <div className={`toast-container visible ${toastError ? 'error' : ''}`}>
-          <span className="material-symbols-outlined icon-main">
-            {toastError ? 'error' : 'info'}
-          </span>
-          <span>{toastMsg}</span>
-          <div className="toast-close" onClick={() => setToastMsg('')}>
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
-          </div>
+        <div
+          className={`fixed left-1/2 top-9 z-[1000] flex -translate-x-1/2 items-center gap-4 rounded-2xl border px-7 py-4 shadow-2xl backdrop-blur-xl ${
+            toastError
+              ? 'border-danger-500/30 bg-danger-600/90 text-white'
+              : 'border-white/10 bg-ink-800/95 text-white'
+          }`}
+        >
+          {toastError ? <WarningCircle size={22} weight="fill" /> : <Info size={22} weight="fill" className="text-gold-400" />}
+          <span className="text-[17px] font-semibold">{toastMsg}</span>
+          <button
+            onClick={() => setToastMsg('')}
+            className="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <X size={16} weight="bold" />
+          </button>
         </div>
       )}
 

@@ -10,12 +10,11 @@
  */
 
 export const FESTIVAL_CONFIG = {
-  // Festival start date (inclusive) — YYYY-MM-DD or full ISO 8601 string
-  START_DATE: '2026-09-01T00:00:00+05:30',
-  // Festival end date (inclusive)
-  END_DATE: '2026-09-30T23:59:59+05:30',
+  // Sharad Navratri 2026: Ghatasthapana Oct 11 through Vijayadashami/Dussehra Oct 20.
+  START_DATE: '2026-10-11T00:00:00+05:30',
+  END_DATE: '2026-10-20T23:59:59+05:30',
   // Name of the festival
-  NAME: 'Ganesh Chaturthi',
+  NAME: 'Navaratri',
 };
 
 /**
