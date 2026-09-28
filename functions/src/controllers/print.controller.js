@@ -1,5 +1,5 @@
 const { db } = require("../config/firebase");
-const { isColorJob } = require("../services/printJob.service");
+const { isColorJob, unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
 
 // ================= KIOSK: GET DOCUMENTS BY CODE =================
 const postGetDocumentsByCode = async (req, res) => {
@@ -48,6 +48,11 @@ const postGetDocumentsByCode = async (req, res) => {
           error: "Invalid printer station. Please use Machine 1 (CV-001) or Machine 2 (SV-002)."
         });
       }
+    }
+
+    const unprintable = unprintableFilesForKiosk(snapshot.docs.map((doc) => doc.data()), kioskId);
+    if (unprintable.length) {
+      return res.status(400).json({ error: unprintableFilesMessage(unprintable) });
     }
 
     const userId = firstJob.userId;
