@@ -1747,6 +1747,37 @@ def cancel_stale_cups_jobs_for_printer(printer_name):
         print(f"⚠️ cancel_stale_cups_jobs_for_printer failed: {e}")
 
 
+AUTO_RESUME_MAX_AGE = timedelta(minutes=45)
+
+
+def is_eligible_for_auto_resume(doc_id, data, active_jobs, now, max_age=AUTO_RESUME_MAX_AGE):
+    """
+    Pure decision logic for whether a job stuck in "printing" should get one automatic resume
+    attempt from the watchdog fallback. Kept separate from watchdog_loop (and free of any I/O)
+    so it can be unit tested directly. Returns (eligible: bool, reason: str).
+
+    STRICT AUTO-PRINT RULE: a job is only ever auto-resumed once, ever — tracked by a Firestore
+    marker (autoResumedAt) that survives a Pi restart, unlike the in-memory active_jobs set alone.
+    That in-memory-only check was the root cause of jobs getting reprinted without any customer
+    instruction: it resets on every restart, so a whole backlog of jobs still marked "printing"
+    (regardless of how old) looked "never tried" again and got blasted to the printer at once.
+    Only jobs started recently are eligible — not merely "less than 24h old" but within a window
+    that covers a genuine crashed-mid-print recovery, not a stale backlog. A job still stuck after
+    its one attempt is left for the backend's own timeout/refund to resolve, never retried again.
+    """
+    if doc_id in active_jobs:
+        return False, "already tracked as active in this process"
+    if data.get("autoResumedAt"):
+        return False, "already given one auto-resume attempt (persisted marker)"
+    started_at = data.get("printStartedAt") or data.get("createdAt") or data.get("updatedAt")
+    if not started_at:
+        return False, "no timestamp to judge age from"
+    age = now - started_at
+    if age > max_age:
+        return False, f"too old ({age} > {max_age})"
+    return True, f"eligible (age {age})"
+
+
 def watchdog_loop():
     stuck_cycles = {BW_PRINTER_NAME: 0, COLOR_PRINTER_NAME: 0}
     counter = 0
@@ -1797,19 +1828,31 @@ def watchdog_loop():
                     else:
                         stuck_cycles[printer] = 0
             
-            # 2. Run Firestore polling every 10 seconds (every iteration)
+            # 2. Run Firestore polling every 10 seconds (every iteration).
+            # See is_eligible_for_auto_resume() above for the strict auto-print rule this enforces.
+            # At most a couple of jobs are auto-resumed per pass, so even a worst-case pile-up can
+            # never fire an unbounded burst of unattended prints.
+            MAX_AUTO_RESUME_PER_PASS = 2
+            auto_resumed_this_pass = 0
             docs = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID)).stream(timeout=30)
             for doc in docs:
-                if doc.id not in active_jobs:
-                    data = doc.to_dict()
-                    updated_at = data.get("updatedAt")
-                    if updated_at:
-                        now = datetime.now(updated_at.tzinfo)
-                        if (now - updated_at) > timedelta(hours=24):
-                            continue
-                    print(f"\n⚠️ Fallback detected stuck job: {doc.id}")
-                    active_jobs.add(doc.id)
-                    threading.Thread(target=process_job, args=(doc,), daemon=True).start()
+                if auto_resumed_this_pass >= MAX_AUTO_RESUME_PER_PASS:
+                    break
+                data = doc.to_dict()
+                started_at = data.get("printStartedAt") or data.get("createdAt") or data.get("updatedAt")
+                now = datetime.now(started_at.tzinfo) if started_at else datetime.now()
+                eligible, reason = is_eligible_for_auto_resume(doc.id, data, active_jobs, now)
+                if not eligible:
+                    continue
+                print(f"\n⚠️ Fallback detected stuck job: {doc.id} ({reason})")
+                try:
+                    doc.reference.update({"autoResumedAt": firestore.SERVER_TIMESTAMP})
+                except Exception as mark_err:
+                    print(f"⚠️ Failed to mark auto-resume for {doc.id}, skipping to be safe: {mark_err}")
+                    continue
+                active_jobs.add(doc.id)
+                auto_resumed_this_pass += 1
+                threading.Thread(target=process_job, args=(doc,), daemon=True).start()
                     
         except Exception as e:
             print(f"⚠️ Watchdog failed: {e}")
