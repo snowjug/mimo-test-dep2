@@ -39,6 +39,12 @@ diagnose() {
   say "Printers on USB";                        lsusb | grep -iE 'brother|epson' || echo "(neither printer visible on USB)"
   say "Driverless printers discovered";         (command -v driverless >/dev/null && timeout 20 driverless 2>/dev/null) || echo "(none / driverless tool missing)"
   say "Last CUPS errors";                       tail -n 40 /var/log/cups/error_log 2>/dev/null || true
+  # B&W broke at ~13:30 IST on 23 Sep with no change in the job data or the listener: check whether the Pi's own
+  # printing software (CUPS, filters, Ghostscript, ipp-usb, drivers) was updated around then.
+  say "Printing software updated on this Pi (look for 22-23 Sep)"
+  zgrep -hE ' (install|upgrade) [^ ]*(cups|filters|ppd|ipp-usb|ghostscript|libgs|poppler|qpdf|brlaser|brother|printer-driver|foomatic|gutenprint|epson|escpr)' /var/log/dpkg.log* 2>/dev/null | sort | tail -n 40 || echo "(no dpkg log)"
+  zgrep -hE -B1 'Upgrade:.*(cups|filters|ipp-usb|ghostscript|printer-driver)' /var/log/apt/history.log* 2>/dev/null | tail -n 20 || true
+  say "Automatic updates enabled?";              systemctl is-enabled unattended-upgrades apt-daily-upgrade.timer 2>&1
   say "Listener code that switches ipp-usb off"
   for f in /home/pi/mimo/firebase_listener.py /home/pi/firebase_listener.py; do
     [ -f "$f" ] && { echo "$f:"; grep -n "ipp-usb" "$f" || echo "  (none)"; }
