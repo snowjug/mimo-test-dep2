@@ -767,6 +767,8 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         total_size = sum(os.path.getsize(p) for p in file_paths)
         if total_size < 100:
             print("❌ Invalid file(s) size")
+            if doc_ref:
+                report_print_failure(doc_ref, f"Uploaded file is empty or too small ({total_size} bytes)")
             return False
 
         for file_path in file_paths:
@@ -775,6 +777,8 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                     header = f.read(8)
                 if not header.startswith(b'%PDF'):
                     print(f"❌ File not a valid PDF: {file_path}")
+                    if doc_ref:
+                        report_print_failure(doc_ref, f"Uploaded file is not a valid PDF: {os.path.basename(file_path)}")
                     return False
 
         # ── Printer online guard ──
