@@ -13,6 +13,7 @@
 const express = require("express");
 const { createLimiters } = require("../middleware/rateLimit");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
+const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
 const {
   validateKioskPrintRequest,
   validateKioskPrintResponse,
@@ -92,11 +93,7 @@ function createKioskRouter(dependencies) {
         totalFileSizeBytes += d.fileSize || d.fileSizeBytes || 0;
       });
 
-      // Base warmup: 600s (10 min) — covers Pi receiving snapshot + downloading + compressing + USB spooling
-      const baseWarmupSec = 600;
-      const secPerPage = isColor ? 360 : 15; // Epson EcoTank inkjet color needs ~5 min/page; B&W laser ~15s/page
-      const fileSizeBonusSec = Math.min(Math.floor(totalFileSizeBytes / (100 * 1024)), 600);
-      const timeoutMs = (baseWarmupSec + totalPageCount * secPerPage + fileSizeBonusSec) * 1000;
+      const timeoutMs = computePrintTimeoutMs({ totalPageCount, isColor, fileSizeBytes: totalFileSizeBytes });
 
       let anyStuck = false;
       for (const d of currentSessionDocs) {
@@ -110,7 +107,8 @@ function createKioskRouter(dependencies) {
               validateStateTransition(d.status, PRINT_JOB_STATUS.FAILED);
               await db.collection("print_jobs").doc(d.id).update({
                 status: "failed",
-                printerStatus: "Print timeout: Printer not responding (check power/cable)"
+                printerStatus: PRINT_TIMEOUT_MESSAGE,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
               });
             } catch (err) {
               console.error(`Failed to update stuck job ${d.id}:`, err);
@@ -123,7 +121,7 @@ function createKioskRouter(dependencies) {
         const responsePayload = {
           status: "failed",
           isPrinted: false,
-          printerStatus: "Print timeout: Printer not responding (check power/cable)"
+          printerStatus: PRINT_TIMEOUT_MESSAGE
         };
         return res.json(responsePayload);
       }

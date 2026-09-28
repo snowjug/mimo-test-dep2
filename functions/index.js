@@ -10,3 +10,6 @@ Object.assign(
   require("./src/triggers/printJob.triggers"),
   require("./src/triggers/retention.trigger")
 );
+// printTimeout.trigger also exports a plain runPrintTimeoutSweep() for direct unit testing —
+// only the wrapped Cloud Function itself should be deployed.
+exports.scheduledPrintTimeoutSweep = require("./src/triggers/printTimeout.trigger").scheduledPrintTimeoutSweep;
