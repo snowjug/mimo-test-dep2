@@ -24,6 +24,10 @@ on:
         description: "Also deploy the 6 Firestore/scheduler triggers (read docs/deployment/CI_CD.md section 5 first: region mismatch)"
         type: boolean
         default: false
+      deploy_print_timeout_sweep:
+        description: "Also deploy scheduledPrintTimeoutSweep (new, us-central1, no region-mismatch risk — safe to run standalone)"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-functions
@@ -156,6 +160,15 @@ jobs:
           TRIGGERS="autoRefundJob autoCleanupStorageJob sendFailureNotification printerHardwareNotification colourPaperUsageNotification scheduledFileRetentionCleanup"
           TARGETS=$(for t in $TRIGGERS; do printf "functions:%s," "$t"; done)
           firebase deploy --only "${TARGETS%,}" --force --project "$PROJECT_ID"
+
+      # Isolated on purpose: scheduledPrintTimeoutSweep is new and has no explicit region (defaults to
+      # us-central1, same as scheduledFileRetentionCleanup), so unlike the bulk trigger deploy above it
+      # carries no risk of creating a duplicate copy in the wrong region.
+      - name: Deploy scheduledPrintTimeoutSweep
+        if: inputs.deploy_print_timeout_sweep
+        env:
+          FIREBASE_FUNCTIONS_DISCOVERY_TIMEOUT: "60000"
+        run: firebase deploy --only "functions:scheduledPrintTimeoutSweep" --force --project "$PROJECT_ID"
 
       - name: Remove generated .env
         if: always()
