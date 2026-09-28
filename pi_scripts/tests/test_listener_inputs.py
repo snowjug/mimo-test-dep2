@@ -19,6 +19,7 @@ import types
 import unittest
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -735,6 +736,75 @@ class MergeAndFinalGateTests(ListenerTestCase):
             listener.process_job(snap)
         self.assert_merge_failed_closed("Could not merge")
         self.assertEqual(len([c for c in self.sub.calls if c[0] == "gs"]), 1)
+
+
+class AutoResumeEligibilityTests(unittest.TestCase):
+    """is_eligible_for_auto_resume: the strict rule that stops the watchdog fallback from
+    silently reprinting a backlog of stuck jobs with no customer instruction (see the function's
+    own docstring in firebase_listener.py for the incident this fixes)."""
+
+    NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    def test_fresh_job_is_eligible(self):
+        data = {"printStartedAt": self.NOW - timedelta(seconds=5)}
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", data, set(), self.NOW)
+        self.assertTrue(eligible, reason)
+
+    def test_job_already_auto_resumed_is_never_eligible_again(self):
+        # Even if it is otherwise perfectly fresh — one attempt only, ever.
+        data = {"printStartedAt": self.NOW - timedelta(seconds=5), "autoResumedAt": self.NOW - timedelta(seconds=4)}
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", data, set(), self.NOW)
+        self.assertFalse(eligible)
+        self.assertIn("already given one auto-resume attempt", reason)
+
+    def test_job_older_than_max_age_is_not_eligible(self):
+        data = {"printStartedAt": self.NOW - timedelta(hours=3)}
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", data, set(), self.NOW)
+        self.assertFalse(eligible)
+        self.assertIn("too old", reason)
+
+    def test_job_just_under_the_max_age_boundary_is_still_eligible(self):
+        data = {"printStartedAt": self.NOW - (listener.AUTO_RESUME_MAX_AGE - timedelta(seconds=1))}
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", data, set(), self.NOW)
+        self.assertTrue(eligible, reason)
+
+    def test_job_just_over_the_max_age_boundary_is_not_eligible(self):
+        data = {"printStartedAt": self.NOW - (listener.AUTO_RESUME_MAX_AGE + timedelta(seconds=1))}
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", data, set(), self.NOW)
+        self.assertFalse(eligible)
+
+    def test_job_already_tracked_in_process_is_not_re_resumed(self):
+        data = {"printStartedAt": self.NOW - timedelta(seconds=5)}
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", data, {"j1"}, self.NOW)
+        self.assertFalse(eligible)
+        self.assertIn("already tracked as active", reason)
+
+    def test_job_with_no_timestamp_at_all_is_not_eligible(self):
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", {}, set(), self.NOW)
+        self.assertFalse(eligible)
+        self.assertIn("no timestamp", reason)
+
+    def test_prefers_printStartedAt_over_createdAt_and_updatedAt(self):
+        # printStartedAt says "just started" (eligible); createdAt/updatedAt say "ancient" — if the
+        # wrong field won, this job would be wrongly rejected as too old.
+        data = {
+            "printStartedAt": self.NOW - timedelta(seconds=5),
+            "createdAt": self.NOW - timedelta(hours=10),
+            "updatedAt": self.NOW - timedelta(hours=10),
+        }
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", data, set(), self.NOW)
+        self.assertTrue(eligible, reason)
+
+    def test_falls_back_to_createdAt_when_printStartedAt_missing(self):
+        data = {"createdAt": self.NOW - timedelta(seconds=5)}
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", data, set(), self.NOW)
+        self.assertTrue(eligible, reason)
+
+    def test_falsy_autoResumedAt_does_not_block_eligibility(self):
+        # A stray falsy value (None/""), as opposed to a real marker, must not be treated as "already resumed".
+        data = {"printStartedAt": self.NOW - timedelta(seconds=5), "autoResumedAt": None}
+        eligible, reason = listener.is_eligible_for_auto_resume("j1", data, set(), self.NOW)
+        self.assertTrue(eligible, reason)
 
 
 class ImportSafetyTests(unittest.TestCase):
