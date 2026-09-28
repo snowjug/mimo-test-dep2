@@ -49,6 +49,10 @@ function App() {
   const [showRefundBanner, setShowRefundBanner] = useState(false);
   const [showScreensaver, setShowScreensaver] = useState(false);
   const [idleTimeout, setIdleTimeout] = useState(60);
+  // True while a submitted code is being verified/triggered on the backend. The idle timer must not
+  // reset to the home screen mid-request — that races the network round trip and silently discards
+  // an in-flight print, showing the customer nothing but a jump back to home.
+  const [isSubmittingCode, setIsSubmittingCode] = useState(false);
 
   const [jobData, setJobData] = useState<{
     userName: string;
@@ -81,7 +85,9 @@ function App() {
     const resetIdleTimer = () => {
       clearTimeout(idleTimer);
       setShowScreensaver(false);
-      if (currentScreen === 'code-entry-screen') {
+      // A submitted code is being verified/triggered on the backend — that round trip can take
+      // longer than 20s (cold start, slow network), and this timer must not fire mid-request.
+      if (currentScreen === 'code-entry-screen' && !isSubmittingCode) {
         idleTimer = window.setTimeout(() => {
           setCurrentScreen('main-interface');
         }, 20000); // 20 seconds of idle time -> reset to main interface
@@ -107,7 +113,7 @@ function App() {
       window.removeEventListener('click', resetIdleTimer);
       window.removeEventListener('keypress', resetIdleTimer);
     };
-  }, [currentScreen, idleTimeout]);
+  }, [currentScreen, idleTimeout, isSubmittingCode]);
 
   // ================= VALIDATION + DOWNLOAD =================
   const handleValidationSuccess = useCallback(async () => {
@@ -115,6 +121,7 @@ function App() {
 
     return new Promise<void>((resolve, reject) => {
       validationTimerRef.current = window.setTimeout(async () => {
+        setIsSubmittingCode(true);
         try {
           if (!dynamicKioskId && code !== "0000" && code !== "9999") {
             throw new Error("Kiosk ID not configured on this device (?kioskId= missing)");
@@ -221,6 +228,7 @@ function App() {
           reject(err);
         } finally {
           validationTimerRef.current = null;
+          setIsSubmittingCode(false);
         }
       }, 300);
     });
