@@ -246,6 +246,39 @@ def check_reasons_for_error(reasons) -> str | None:
             return "Input tray missing"
     return None
 
+def is_printable_document(path):
+    """Only a real PDF (judged by its bytes, not its file name) or plain text may be handed to CUPS.
+    Anything else — an image whose conversion failed, an unknown upload type — reaches the printer as raw
+    bytes, and a Brother laser prints unrecognised binary as page after page of garbage text."""
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(1024)
+    except OSError:
+        return False
+    if head.startswith(b"%PDF"):
+        return True
+    return path.lower().endswith(".txt") and len(head) > 0 and b"\x00" not in head
+
+
+def cancel_cups_job(cups_job_id, printer_name, conn=None):
+    """Remove a job from the CUPS queue. Used on every failure after lp accepted the job: the job is reported
+    failed (and refunded), so it must never print later when the printer or its queue comes back."""
+    if conn is not None:
+        try:
+            conn.cancelJob(cups_job_id)
+            print(f"🚫 Cancelled CUPS job {cups_job_id} on [{printer_name}]")
+            return True
+        except Exception as e:
+            print(f"⚠️ pycups could not cancel job {cups_job_id}: {e}")
+    try:
+        subprocess.run(["cancel", f"{printer_name}-{cups_job_id}"], capture_output=True, text=True, timeout=10)
+        print(f"🚫 Cancelled CUPS job {printer_name}-{cups_job_id}")
+        return True
+    except Exception as e:
+        print(f"❌ Could not cancel CUPS job {printer_name}-{cups_job_id}: {e}")
+        return False
+
+
 def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_color: bool = False, is_duplex: bool = False, doc_ref=None, printer_name: str = BW_PRINTER_NAME) -> bool:
     """
     Polls CUPS via pycups for the specific job ID until IPP_JOB_COMPLETED (state 9)
@@ -255,6 +288,7 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
     """
     if cups is None:
         print(f"❌ pycups is not installed or available. Cannot monitor CUPS job {cups_job_id}.")
+        cancel_cups_job(cups_job_id, printer_name)
         return False
 
     # Calibrated mechanical cadence:
@@ -274,6 +308,11 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
         per_sheet_sec = 8.5 if is_duplex else 2.2
         timeout_sec = max(60, int(60 + warmup_sec + (total_sheets * (20 if is_duplex else 8))))
 
+    # A timed-out job is cancelled below, so the timeout must not be shorter than a job can legitimately
+    # wait behind another customer's job in the same queue. 5 minutes stays inside the backend's own
+    # timeout (10+ minutes), so the Pi still reports first with the specific reason.
+    timeout_sec = max(timeout_sec, 300)
+
     required_duration = warmup_sec + (total_sheets * per_sheet_sec)
     
     start_time = time.time()
@@ -284,6 +323,7 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
         conn = cups.Connection()
     except Exception as conn_err:
         print(f"❌ Failed to connect to CUPS via pycups: {conn_err}")
+        cancel_cups_job(cups_job_id, printer_name)
         return False
         
     IPP_JOB_STOPPED = 6
@@ -347,6 +387,10 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
                             doc_ref.update({"status": "failed", "printerStatus": err_msg})
                         except Exception as up_err:
                             print(f"⚠️ Failed to update Firestore error status: {up_err}")
+                    # A STOPPED job stays queued and resumes when the printer is re-enabled (the watchdog does
+                    # that every cycle), printing a job already reported failed and refunded.
+                    if job_state == IPP_JOB_STOPPED:
+                        cancel_cups_job(cups_job_id, printer_name, conn)
                     return False
                     
                 if job_state == IPP_JOB_COMPLETED:
@@ -395,6 +439,9 @@ def wait_for_cups_job_completion(cups_job_id: int, total_sheets: int = 1, is_col
         + (" (CUPS confirmed the job but the printer never finished)" if cups_confirmed else " (CUPS never confirmed the job)")
     )
     print(f"❌ {timeout_msg}")
+    # The job is still sitting in the queue. Reporting it failed (which refunds it) without removing it
+    # let it print hours later when the printer recovered — a burst of prints nobody was waiting for.
+    cancel_cups_job(cups_job_id, printer_name, conn)
     if doc_ref:
         try:
             doc_ref.update({"status": "failed", "printerStatus": timeout_msg})
@@ -432,18 +479,28 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                     pass
             return False
 
+        # Every file is checked by content, not just the ones named .pdf: a raw image or unknown binary
+        # handed to lp is printed by the Brother lasers as endless pages of garbage text.
         for file_path in file_paths:
-            if file_path.endswith('.pdf'):
-                with open(file_path, 'rb') as f:
-                    header = f.read(8)
-                if not header.startswith(b'%PDF'):
-                    print(f"❌ File not a valid PDF: {file_path}")
-                    if doc_ref:
-                        try:
-                            doc_ref.update({"status": "failed", "printerStatus": f"Uploaded file is not a valid PDF: {os.path.basename(file_path)}"})
-                        except Exception:
-                            pass
-                    return False
+            if not is_printable_document(file_path):
+                print(f"❌ Refusing to send a non-PDF file to the printer: {file_path}")
+                if doc_ref:
+                    try:
+                        doc_ref.update({"status": "failed", "printerStatus": f"File could not be prepared for printing: {os.path.basename(file_path)}"})
+                    except Exception:
+                        pass
+                return False
+
+        # Without pycups the job cannot be monitored (or cancelled on failure) after lp accepts it — refuse
+        # before submitting, never after.
+        if cups is None:
+            print("❌ pycups is not available; refusing to submit a job that could not be monitored.")
+            if doc_ref:
+                try:
+                    doc_ref.update({"status": "failed", "printerStatus": "Printer monitoring unavailable on the Pi (pycups missing)"})
+                except Exception:
+                    pass
+            return False
 
         # Pre-flight check
         status_cmd = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True)
@@ -740,7 +797,7 @@ def process_job(doc_snapshot):
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             
-            if ext in [".jpg", ".jpeg", ".png", ".heic"]:
+            if ext in [".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp"]:
                 # ALL images get converted to PDF so CUPS number-up works reliably
                 pdf_path = convert_image_to_pdf(l_path, image_scaling, custom_scale, is_color)
                 if pdf_path:
@@ -753,9 +810,14 @@ def process_job(doc_snapshot):
                         with Image.open(l_path) as img:
                             img.convert("RGB").save(fallback_pdf, "PDF", resolution=150.0)
                         f_final = fallback_pdf
-                    except:
-                        pass
-                        
+                    except Exception as conv_err:
+                        print(f"❌ Could not convert image {f_name} to PDF: {conv_err}")
+                if not is_printable_document(f_final):
+                    # Never fall through with the raw image: sending it to lp printed garbage text until
+                    # the paper ran out (e.g. HEIC on a Pi without pillow_heif).
+                    doc_ref.update({"status": "failed", "printerStatus": f"This photo format could not be printed on this machine: {f_name}"})
+                    return
+
             elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"]:
                 pdf_path = convert_to_pdf(l_path)
                 if pdf_path:
@@ -778,7 +840,8 @@ def process_job(doc_snapshot):
                     pdf_paths.append(pdf_fp)
                 except Exception as e:
                     print(f"❌ Failed to wrap image in PDF: {e}")
-                    pdf_paths.append(fp)
+                    doc_ref.update({"status": "failed", "printerStatus": f"This photo format could not be printed on this machine: {os.path.basename(fp)}"})
+                    return
             else:
                 pdf_paths.append(fp)
 
