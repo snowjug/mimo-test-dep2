@@ -5,6 +5,8 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 import time
 import subprocess
 import os
+import tempfile
+import zipfile
 import urllib.parse
 from datetime import datetime, timedelta
 import threading
@@ -43,10 +45,9 @@ PRINTER_USB_IDS = {
     "Brother": "04f9:0503"
 }
 
-if not os.path.exists(TEMP_DIR):
-    os.makedirs(TEMP_DIR)
-if not os.path.exists(PRE_FETCH_DIR):
-    os.makedirs(PRE_FETCH_DIR)
+def ensure_work_dirs():
+    os.makedirs(TEMP_DIR, exist_ok=True)
+    os.makedirs(PRE_FETCH_DIR, exist_ok=True)
 
 # ── Ghostscript compression presets ──
 # /ebook  → downsample images to 150 DPI; great for B&W laser (small spool, fast USB transfer)
@@ -63,18 +64,156 @@ GS_COLOR_COMPRESS = ["-dPDFSETTINGS=/ebook",
                      "-dGrayImageDownsampleType=/Bicubic", "-dGrayImageResolution=180",
                      "-dCompatibilityLevel=1.4", "-dEmbedAllFonts=true", "-dSubsetFonts=true"]
 
-# Initialize Firebase
-try:
-    cred = credentials.Certificate('serviceAccountKey.json')
-    firebase_admin.initialize_app(cred, {
-        'storageBucket': 'mimo-v2-11868.firebasestorage.app'
-    })
-    db = firestore.client()
-    bucket = storage.bucket()
-    print("✅ Successfully connected to Firebase!")
-except Exception as e:
-    print(f"❌ Failed to initialize Firebase: {e}")
-    exit(1)
+# Firebase handles are created by init_firebase() at startup (see the __main__ block at the end of this file),
+# so the module can be imported (e.g. by tests) without connecting to Firebase.
+db = None
+bucket = None
+
+def init_firebase():
+    global db, bucket
+    try:
+        cred = credentials.Certificate('serviceAccountKey.json')
+        firebase_admin.initialize_app(cred, {
+            'storageBucket': 'mimo-v2-11868.firebasestorage.app'
+        })
+        db = firestore.client()
+        bucket = storage.bucket()
+        print("✅ Successfully connected to Firebase!")
+    except Exception as e:
+        print(f"❌ Failed to initialize Firebase: {e}")
+        exit(1)
+
+# ── Input validation (multi-file print reliability) ──
+# Every input that can reach the merge/CUPS stage must pass these checks. A file that merely starts with
+# "%PDF" is not accepted: pdfinfo must parse it, report a page count, and the file must not be truncated.
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".heic", ".webp", ".img", ".bmp", ".tiff", ".tif", ".gif", ".jfif")
+OFFICE_EXTENSIONS = (".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".txt", ".rtf", ".csv", ".odt", ".ods", ".odp")
+ZIP_OFFICE_EXTENSIONS = (".docx", ".pptx", ".xlsx", ".odt", ".ods", ".odp")
+OLE_OFFICE_EXTENSIONS = (".doc", ".ppt", ".xls")
+OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+MIN_PDF_BYTES = 100
+PDF_EOF_SCAN_BYTES = 2048
+PDFINFO_TIMEOUT_SEC = 20
+# pdfinfo stderr messages that mean the file had to be reconstructed (truncated / damaged structure)
+PDF_DAMAGE_MARKERS = (
+    "couldn't find trailer dictionary",
+    "couldn't read xref table",
+    "may not be a pdf file",
+    "pdf file is damaged",
+    "try to reconstruct",
+)
+
+def validate_pdf_strict(path):
+    """Strictly validate a PDF. Returns (ok, page_count, reason); page_count is None when not ok.
+
+    Unlike get_pdf_page_count(), a failure is never reported as "1 page": a missing file, a missing
+    pdfinfo binary, a parse error, a truncated file or a zero page count all make the PDF invalid.
+    """
+    try:
+        if not path or not os.path.isfile(path):
+            return False, None, f"file missing: {path}"
+        size = os.path.getsize(path)
+        if size < MIN_PDF_BYTES:
+            return False, None, f"file too small ({size} bytes): {os.path.basename(path)}"
+        with open(path, "rb") as fh:
+            fh.seek(max(0, size - PDF_EOF_SCAN_BYTES))
+            if b"%%EOF" not in fh.read():
+                return False, None, f"PDF is truncated (no %%EOF marker): {os.path.basename(path)}"
+        try:
+            res = subprocess.run(["pdfinfo", path], capture_output=True, text=True, timeout=PDFINFO_TIMEOUT_SEC)
+        except FileNotFoundError:
+            return False, None, "pdfinfo is not installed (poppler-utils required)"
+        except subprocess.TimeoutExpired:
+            return False, None, f"pdfinfo timed out on {os.path.basename(path)}"
+        if res.returncode != 0:
+            err = (res.stderr or "").strip().splitlines()
+            return False, None, f"pdfinfo could not parse {os.path.basename(path)}: {err[-1] if err else 'exit ' + str(res.returncode)}"
+        stderr_lower = (res.stderr or "").lower()
+        for marker in PDF_DAMAGE_MARKERS:
+            if marker in stderr_lower:
+                return False, None, f"PDF is damaged ({marker}): {os.path.basename(path)}"
+        pages = None
+        for line in (res.stdout or "").splitlines():
+            if line.startswith("Pages:"):
+                try:
+                    pages = int(line.split(":", 1)[1].strip())
+                except ValueError:
+                    pages = None
+                break
+        if pages is None:
+            return False, None, f"pdfinfo reported no page count for {os.path.basename(path)}"
+        if pages < 1:
+            return False, None, f"PDF has no pages: {os.path.basename(path)}"
+        return True, pages, "ok"
+    except Exception as e:
+        return False, None, f"PDF validation error: {e}"
+
+def validate_input_file(path):
+    """Validate a downloaded/cached input according to its type. Returns (ok, reason).
+
+    PDFs (and files without a known image/Office extension, which are treated as PDFs) use validate_pdf_strict.
+    Images must be readable by Pillow. Office files must be complete archives/documents; their converted PDF is
+    validated again after conversion.
+    """
+    try:
+        if not path or not os.path.isfile(path):
+            return False, f"file missing: {path}"
+        size = os.path.getsize(path)
+        if size == 0:
+            return False, f"file is empty: {os.path.basename(path)}"
+        ext = os.path.splitext(path)[1].lower()
+        if ext in IMAGE_EXTENSIONS:
+            from PIL import Image
+            with Image.open(path) as img:
+                img.verify()
+            return True, "ok"
+        if ext in ZIP_OFFICE_EXTENSIONS:
+            if not zipfile.is_zipfile(path):
+                return False, f"Office file is incomplete or corrupt: {os.path.basename(path)}"
+            return True, "ok"
+        if ext in OLE_OFFICE_EXTENSIONS:
+            with open(path, "rb") as fh:
+                if fh.read(8) != OLE_MAGIC:
+                    return False, f"Office file is incomplete or corrupt: {os.path.basename(path)}"
+            return True, "ok"
+        if ext in OFFICE_EXTENSIONS:
+            return True, "ok"  # .txt / .rtf / .csv: any non-empty content; the converted PDF is validated later
+        ok, _pages, reason = validate_pdf_strict(path)
+        return ok, reason
+    except Exception as e:
+        return False, f"input validation error for {os.path.basename(str(path))}: {e}"
+
+def _safe_remove(path):
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except OSError as e:
+        print(f"⚠️ Could not remove {path}: {e}")
+
+MIMETYPE_EXTENSIONS = {
+    "application/pdf": ".pdf",
+    "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/png": ".png", "image/webp": ".webp",
+    "image/heic": ".heic", "image/gif": ".gif", "image/bmp": ".bmp", "image/tiff": ".tiff",
+}
+
+def effective_file_name(f):
+    """File name used for download/cache/processing of one files[] entry.
+
+    Keeps the uploaded name. Only when the name has no recognised extension and the entry's mimetype is known
+    (e.g. an image uploaded without an extension) is the matching extension appended, so the file takes the
+    correct processing branch instead of being validated as a PDF.
+    """
+    name = (f.get("name") if isinstance(f, dict) else None) or "document.pdf"
+    ext = os.path.splitext(name)[1].lower()
+    if ext == ".pdf" or ext in IMAGE_EXTENSIONS or ext in OFFICE_EXTENSIONS:
+        return name
+    mime_ext = MIMETYPE_EXTENSIONS.get(str(f.get("type") or "").lower().split(";")[0].strip())
+    return name + mime_ext if mime_ext else name
+
+def prefetch_cache_path(doc_id, f_idx, f_name):
+    """Cache identity for one file entry of one job: <docId>_<idx><ext> (shared by prefetch and process_job)."""
+    ext = os.path.splitext(f_name or "")[1].lower() or ".pdf"
+    return os.path.join(PRE_FETCH_DIR, f"{doc_id}_{f_idx}{ext}")
 
 def convert_to_pdf(input_path):
     try:
@@ -878,6 +1017,14 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
         cmd.extend(file_paths)
 
+        # ── Final pre-lp gate: every file handed to CUPS must be a strictly valid PDF with >= 1 page ──
+        # No failure is reported here; the caller (process_job) reports it once when this returns False.
+        for file_path in file_paths:
+            gate_ok, gate_pages, gate_reason = validate_pdf_strict(file_path)
+            if not gate_ok or not gate_pages or gate_pages < 1:
+                print(f"❌ Final pre-print check failed, not sending to CUPS: {gate_reason}")
+                return False
+
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=120)
         lp_output = result.stdout.strip()
         print(f"CUPS accepted: {lp_output}")
@@ -922,13 +1069,23 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             report_print_failure(doc_ref, f"Print command execution error: {e}")
         return False
 
-def download_file(file_url, file_name):
-    """Download file from Firebase Storage or a signed URL. Uses GCS SDK for fastest transfer."""
+def download_file(file_url, file_name, dest_dir=None, temp_prefix=None):
+    """Download file from Firebase Storage or a signed URL. Uses GCS SDK for fastest transfer.
+
+    Every call writes to its own unique temporary file (tempfile.mkstemp), so concurrent downloads (parallel
+    files of one job, prefetch threads, process_job) never share a path or inode, even for identical file
+    names. The original name is kept as the suffix so the extension still selects the processing branch.
+    Returns the local path, or None on failure (the partial file is removed).
+    """
+    local_path = None
     try:
-        safe_name = "".join([c for c in file_name if c.isalpha() or c.isdigit() or c in ' ._-']).rstrip()
+        safe_name = "".join([c for c in (file_name or "") if c.isalpha() or c.isdigit() or c in ' ._-']).rstrip()
         if not safe_name:
             safe_name = "document.pdf"
-        local_path = os.path.join(TEMP_DIR, f"{int(time.time())}_{safe_name}")
+        target_dir = dest_dir or TEMP_DIR
+        os.makedirs(target_dir, exist_ok=True)
+        fd, local_path = tempfile.mkstemp(prefix=temp_prefix or f"{int(time.time())}_", suffix=f"_{safe_name}", dir=target_dir)
+        os.close(fd)
         print(f"⬇️  Downloading: {file_name}")
         blob_path = None
 
@@ -960,6 +1117,7 @@ def download_file(file_url, file_name):
         return local_path
     except Exception as e:
         print(f"❌ Download failed: {e}")
+        _safe_remove(local_path)
         return None
 
 
@@ -1004,6 +1162,60 @@ def report_print_failure(doc_ref, reason):
     return False
 
 
+GS_MERGE_TIMEOUT_SEC = 60  # unchanged merge timeout
+
+def new_temp_pdf_path(label):
+    """Unique temporary PDF path in TEMP_DIR (never in the prefetch cache), e.g. <ts>_<random>_merged_all.pdf."""
+    os.makedirs(TEMP_DIR, exist_ok=True)
+    fd, path = tempfile.mkstemp(prefix=f"{int(time.time())}_", suffix=f"_{label}.pdf", dir=TEMP_DIR)
+    os.close(fd)
+    return path
+
+def merge_pdfs_strict(input_paths, output_pdf, compress_flags):
+    """Merge validated PDFs with Ghostscript and fail closed. Returns (ok, merged_page_count, reason).
+
+    Every input must pass validate_pdf_strict() first. Any Ghostscript problem (non-zero exit, timeout, missing
+    executable, other execution error), a missing/invalid output, or a merged page count that differs from the sum
+    of the input page counts is a failure. On failure the output file is removed; there is no fallback to the
+    unmerged inputs.
+    """
+    input_page_counts = []
+    for p in input_paths:
+        ok, pages, reason = validate_pdf_strict(p)
+        if not ok:
+            return False, None, f"merge input invalid: {reason}"
+        input_page_counts.append(pages)
+    expected_pages = sum(input_page_counts)
+
+    started = time.time()
+    try:
+        subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
+                       ] + compress_flags + [f"-sOutputFile={output_pdf}"] + list(input_paths),
+                       check=True, timeout=GS_MERGE_TIMEOUT_SEC)
+    except FileNotFoundError:
+        _safe_remove(output_pdf)
+        return False, None, "Ghostscript (gs) is not installed"
+    except subprocess.TimeoutExpired:
+        _safe_remove(output_pdf)
+        return False, None, f"Ghostscript merge timed out after {GS_MERGE_TIMEOUT_SEC}s"
+    except subprocess.CalledProcessError as e:
+        _safe_remove(output_pdf)
+        return False, None, f"Ghostscript merge failed (exit code {e.returncode})"
+    except Exception as e:
+        _safe_remove(output_pdf)
+        return False, None, f"Ghostscript merge error: {e}"
+    elapsed = time.time() - started
+
+    ok, merged_pages, reason = validate_pdf_strict(output_pdf)
+    if not ok:
+        _safe_remove(output_pdf)
+        return False, None, f"merged output invalid: {reason}"
+    if merged_pages != expected_pages:
+        _safe_remove(output_pdf)
+        return False, None, f"merged page count {merged_pages} != {expected_pages} (sum of {len(input_paths)} inputs)"
+    print(f"⏱️ Ghostscript merged {len(input_paths)} PDFs ({merged_pages} pages) in {elapsed:.1f}s")
+    return True, merged_pages, "ok"
+
 def process_job(doc_snapshot):
     async_spawned = False
     doc = doc_snapshot.to_dict()
@@ -1033,9 +1245,13 @@ def process_job(doc_snapshot):
     files = doc.get("files")
     if not files:
         files = [{"url": file_url, "name": file_name, "type": doc.get("mimetype")}]
+    # The job's own file list is the only source of the expected count. Exactly this many inputs must be
+    # acquired, processed and validated; a missing, corrupt or substituted input fails the whole job.
+    expected_count = len(files) if isinstance(files, list) else 0
 
     local_paths = []
     final_paths = []
+    artifact_paths = []  # per-file intermediates created during processing (removed in finally)
 
     # ── Monochrome-only guard (e.g. CV-001 which has only B&W Brother) ──
     # If IS_MONOCHROME_ONLY is set, we always print on the B&W printer regardless of color mode.
@@ -1048,76 +1264,116 @@ def process_job(doc_snapshot):
     target_printer = COLOR_PRINTER_NAME if is_color else BW_PRINTER_NAME
 
     try:
+        if expected_count < 1:
+            report_print_failure(doc_ref, "Print job has no valid file list")
+            return
+
         # ── PARALLEL DOWNLOAD: fetch all files simultaneously ──────────────────
         # Each file is downloaded in its own thread so multi-file jobs are as fast
         # as a single-file job (limited only by the slowest individual download).
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         def _download_one(f_tuple):
-            """Download one file entry and return (f_dict, local_path, error)."""
+            """Acquire one file entry (validated cache hit or validated fresh download).
+
+            Returns (f_dict, local_path, error). A cache entry is used only if it passes strict validation;
+            an invalid cache entry is purged and the file is downloaded again. An invalid fresh download is
+            an error: the invalid cache is never used as a fallback.
+            """
             f_idx, f = f_tuple
-            f_url  = f.get("url")
-            f_name = f.get("name", "document.pdf")
-            ext = os.path.splitext(f_name)[1].lower() or ".pdf"
-            cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}_{f_idx}{ext}")
+            if not isinstance(f, dict):
+                return f, None, f"Invalid file entry #{f_idx + 1}"
+            f_url = f.get("url")
+            f_name = effective_file_name(f)
+            if not f_url:
+                return f, None, f"Missing download URL for {f_name}"
+            cache_path = prefetch_cache_path(doc_id, f_idx, f_name)
+            path = None
             if os.path.exists(cache_path):
-                if cache_path.lower().endswith(".pdf"):
-                    with open(cache_path, "rb") as test_f:
-                        if not test_f.read(8).startswith(b'%PDF'):
-                            print(f"⚠️ [CACHE INVALID] Cached file {cache_path} is not a valid PDF. Purging from cache...")
-                            os.remove(cache_path)
-            if os.path.exists(cache_path):
-                print(f"⚡ [INSTANT PRINT] Job {doc_id} (file {f_idx+1}) found in pre-fetch edge cache! Using cached file (0s download delay).")
-                path = cache_path
-            else:
+                cache_ok, cache_reason = validate_input_file(cache_path)
+                if cache_ok:
+                    print(f"⚡ [INSTANT PRINT] Job {doc_id} (file {f_idx+1}) found in pre-fetch edge cache! Using cached file (0s download delay).")
+                    path = cache_path
+                else:
+                    print(f"⚠️ [CACHE INVALID] Cached file {cache_path} rejected ({cache_reason}). Purging and downloading again...")
+                    _safe_remove(cache_path)
+            if path is None:
                 path = download_file(f_url, f_name)
-            if not path:
-                return f, None, f"Failed to download {f_name}"
+                if not path:
+                    return f, None, f"Failed to download {f_name}"
+                fresh_ok, fresh_reason = validate_input_file(path)
+                if not fresh_ok:
+                    _safe_remove(path)
+                    return f, None, f"Downloaded file is invalid: {fresh_reason}"
             # Pre-flight compression (currently a no-op, but keep the hook)
             if path.lower().endswith(".pdf"):
                 path = fast_compress_pdf(path, is_color=is_color)
                 path = pre_rasterize_pdf_for_color(path, is_color=is_color)
             return f, path, None
 
-        # Run downloads in parallel — cap at 4 threads to avoid Pi memory pressure
+        # Run downloads in parallel — cap at 4 threads to avoid Pi memory pressure.
+        # All downloads are collected (so every temporary file is tracked for cleanup) before a failure is reported.
         download_results = [None] * len(files)  # preserve file order
+        first_error = None
         with ThreadPoolExecutor(max_workers=min(4, len(files))) as pool:
             future_to_idx = {pool.submit(_download_one, (i, f)): i for i, f in enumerate(files)}
             for future in as_completed(future_to_idx):
                 idx = future_to_idx[future]
-                f_entry, l_path, err = future.result()
+                try:
+                    f_entry, l_path, err = future.result()
+                except Exception as dl_err:
+                    f_entry, l_path, err = None, None, f"Download error: {dl_err}"
+                if l_path:
+                    local_paths.append(l_path)
                 if err:
-                    # One file failed — abort the whole job
-                    report_print_failure(doc_ref, err)
-                    return
+                    if first_error is None:
+                        first_error = err
+                    continue
                 download_results[idx] = (f_entry, l_path)
-                local_paths.append(l_path)
+
+        if first_error:
+            # One file failed — abort the whole job
+            report_print_failure(doc_ref, first_error)
+            return
+
+        acquired = [r for r in download_results if r is not None]
+        if len(acquired) != expected_count:
+            report_print_failure(doc_ref, f"Only {len(acquired)} of {expected_count} files could be downloaded")
+            return
+        if len({os.path.realpath(r[1]) for r in acquired}) != expected_count:
+            report_print_failure(doc_ref, "Two job files resolved to the same local file")
+            return
 
         # ── Per-file processing (conversion, scaling) ──────────────────────────
+        # Any conversion failure fails the job: an unconverted raw input is never passed on.
         any_file_sliced = False
         for f_entry, l_path in download_results:
             f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
-            
-            if ext in [".jpg", ".jpeg", ".png", ".heic", ".webp", ".img", ".bmp", ".tiff", ".tif", ".gif", ".jfif"]:
+            entry_name = f_entry.get("name", "document")
+
+            if ext in IMAGE_EXTENSIONS:
                 if image_scaling == "fill":
                     pdf_path = process_image_fill(l_path, photo_layout, is_color)
-                    if pdf_path: f_final = pdf_path
                 elif image_scaling == "custom":
                     pdf_path = process_image_custom(l_path, custom_scale, is_color)
-                    if pdf_path: f_final = pdf_path
                 else:
                     # FIT mode: still convert to PDF so CUPS number-up works reliably
                     pdf_path = convert_image_to_pdf_fit(l_path, is_color)
-                    if pdf_path: f_final = pdf_path
-                    
-            elif ext in [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".txt", ".rtf", ".csv", ".odt", ".ods", ".odp"]:
-                pdf_path = convert_to_pdf(l_path)
-                if pdf_path: f_final = pdf_path
-                else:
-                    report_print_failure(doc_ref, f"LibreOffice failed for {f_entry.get('name', 'document')}")
+                if not pdf_path:
+                    report_print_failure(doc_ref, f"Image processing failed for {entry_name}")
                     return
-            
+                artifact_paths.append(pdf_path)
+                f_final = pdf_path
+
+            elif ext in OFFICE_EXTENSIONS:
+                pdf_path = convert_to_pdf(l_path)
+                if not pdf_path:
+                    report_print_failure(doc_ref, f"LibreOffice failed for {entry_name}")
+                    return
+                artifact_paths.append(pdf_path)
+                f_final = pdf_path
+
             # Slice pages based on individual fileConfigs if available
             file_name_key = f_entry.get("name")
             file_config = print_options.get("fileConfigs", {}).get(file_name_key, {})
@@ -1125,57 +1381,59 @@ def process_job(doc_snapshot):
             f_page_range = None
             if f_page_selection == "custom":
                 f_page_range = file_config.get("pageRange") or file_config.get("customPageRange")
-            
+
             if f_page_range and f_final.lower().endswith(".pdf"):
                 sliced = slice_pdf_pages(f_final, f_page_range)
                 if sliced:
+                    if sliced != f_final:
+                        artifact_paths.append(sliced)
                     f_final = sliced
                     any_file_sliced = True
-            
+
             final_paths.append(f_final)
 
-        # Ensure all files are PDFs before merging
+        # ── Hand-off gate: exactly one strictly valid PDF per expected file ──
         pdf_paths = []
-        for fp in final_paths:
-            if fp.lower().endswith(('.jpg', '.jpeg', '.png', '.heic', '.webp', '.img', '.bmp', '.tiff', '.tif', '.gif', '.jfif')):
-                pdf_fp = fp + ".pdf"
-                try:
-                    from PIL import Image
-                    with Image.open(fp) as img:
-                        img.convert("RGB").save(pdf_fp)
-                    pdf_paths.append(pdf_fp)
-                except Exception as e:
-                    print(f"❌ Failed to wrap image in PDF: {e}")
-                    pdf_paths.append(fp)
-            else:
-                pdf_paths.append(fp)
+        validated_pages = 0
+        for (f_entry, _l_path), fp in zip(download_results, final_paths):
+            ok, pages, reason = validate_pdf_strict(fp)
+            if not ok:
+                report_print_failure(doc_ref, f"Processed file for {f_entry.get('name', 'document')} is not a valid PDF: {reason}")
+                return
+            pdf_paths.append(fp)
+            validated_pages += pages
+        if len(pdf_paths) != expected_count or len({os.path.realpath(p) for p in pdf_paths}) != expected_count:
+            report_print_failure(doc_ref, f"Only {len(pdf_paths)} of {expected_count} files are ready to print")
+            return
+        print(f"✅ All {expected_count} file(s) of job {doc_id} validated ({validated_pages} page(s)).")
 
-        # Merge all PDF files into a single PDF if there are multiple documents
+        # Merge all PDF files into a single PDF if there are multiple documents.
+        # This is the only merge. It fails closed: any merge problem fails the job here, and the unmerged
+        # inputs are never sent to CUPS instead.
         if len(pdf_paths) > 1:
-            merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_all.pdf")
-            try:
-                compress_flags = GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS
-                print(f"🔗 Merging {len(pdf_paths)} documents into a single PDF using Ghostscript...")
-                subprocess.run(["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
-                               ] + compress_flags + [f"-sOutputFile={merged_pdf}"] + pdf_paths, check=True, timeout=60)
-                pdf_paths = [merged_pdf]
-            except Exception as merge_err:
-                print(f"❌ Failed to merge PDF files: {merge_err}")
+            if len(pdf_paths) != expected_count:
+                report_print_failure(doc_ref, f"Merge refused: {len(pdf_paths)} inputs for {expected_count} files")
+                return
+            merged_pdf = new_temp_pdf_path("merged_all")
+            artifact_paths.append(merged_pdf)
+            compress_flags = GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS
+            print(f"🔗 Merging {len(pdf_paths)} documents into a single PDF using Ghostscript...")
+            merge_ok, merged_pages, merge_reason = merge_pdfs_strict(pdf_paths, merged_pdf, compress_flags)
+            if not merge_ok:
+                print(f"❌ Failed to merge PDF files: {merge_reason}")
+                report_print_failure(doc_ref, f"Could not merge the job's files: {merge_reason}")
+                return
+            pdf_paths = [merged_pdf]
 
         # ── N-up layout imposition ──
         was_imposed = False
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             print(f"🖼️ N-up: generating {photo_layout}-per-page layout...")
-            # Merge all PDFs into one before imposing
-            if len(pdf_paths) > 1:
-                merged_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_merged_layout.pdf")
-                subprocess.run(
-                    ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
-                    ] + (GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS) + [f"-sOutputFile={merged_pdf}"] + pdf_paths,
-                    check=True, timeout=60
-                )
-            else:
-                merged_pdf = pdf_paths[0]
+            # Multiple inputs were already merged (fail closed) above, so N-up always receives exactly one PDF.
+            if len(pdf_paths) != 1:
+                report_print_failure(doc_ref, "N-up layout requires a single merged PDF")
+                return
+            merged_pdf = pdf_paths[0]
 
             imposed_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_imposed_layout.pdf")
 
@@ -1333,6 +1591,8 @@ def process_job(doc_snapshot):
                 if lp and os.path.exists(lp): os.remove(lp)
             for fp in final_paths:
                 if fp and fp not in local_paths and os.path.exists(fp): os.remove(fp)
+            for ap in artifact_paths:
+                if ap and ap not in local_paths and ap not in final_paths and os.path.exists(ap): os.remove(ap)
         except Exception as e:
             print(f"⚠️ Cleanup failed: {e}")
         finally:
@@ -1569,39 +1829,61 @@ def ping_printer_raw(printer_name, payload):
     except Exception as e:
         print(f"⚠️ Failed to ping printer {printer_name}: {e}")
 
+def prefetch_one_file(doc_id, f_idx, f, total):
+    """Prefetch one file entry into the edge cache. Returns True when a valid cache entry exists afterwards.
+
+    The file is downloaded to a unique temporary file inside PRE_FETCH_DIR, strictly validated, and only then
+    published with an atomic os.replace() to <docId>_<idx><ext>. A partial or invalid download is never visible
+    under the cache name. Prefetch is only an optimisation: process_job re-validates and re-downloads anything
+    missing or invalid, and prefetch never reports print failures.
+    """
+    if not isinstance(f, dict) or not f.get("url"):
+        return False
+    f_url = f.get("url")
+    f_name = effective_file_name(f)
+    cache_path = prefetch_cache_path(doc_id, f_idx, f_name)
+    if os.path.exists(cache_path):
+        cache_ok, _reason = validate_input_file(cache_path)
+        if cache_ok:
+            return True
+        _safe_remove(cache_path)
+
+    print(f"🚀 [PRE-FETCH] Pre-downloading file {f_idx+1}/{total} for job {doc_id} ({f_name}) in background...")
+    downloaded = download_file(f_url, f_name, dest_dir=PRE_FETCH_DIR, temp_prefix=".partial_")
+    if not downloaded:
+        return False
+    try:
+        valid, reason = validate_input_file(downloaded)
+        if not valid:
+            print(f"⚠️ [PRE-FETCH] Job {doc_id} (file {f_idx+1}) not cached: {reason}")
+            return False
+        os.replace(downloaded, cache_path)
+        downloaded = None
+        print(f"⚡ [PRE-FETCH CACHED] Job {doc_id} (file {f_idx+1}) pre-downloaded & cached → {cache_path}")
+        return True
+    finally:
+        _safe_remove(downloaded)
+
 def prefetch_job(doc_snapshot):
     try:
         doc = doc_snapshot.to_dict()
         doc_id = doc_snapshot.id
         file_url = doc.get("fileUrl")
         file_name = doc.get("fileName", "document.pdf")
-        
+
         files = doc.get("files")
         if not files:
-            files = [{"url": file_url, "name": file_name}]
-            
-        for f_idx, f in enumerate(files):
-            f_url = f.get("url")
-            f_name = f.get("name", "document.pdf")
-            if not f_url:
-                continue
-            ext = os.path.splitext(f_name)[1].lower() or ".pdf"
-            cache_path = os.path.join(PRE_FETCH_DIR, f"{doc_id}_{f_idx}{ext}")
-            if os.path.exists(cache_path):
-                if cache_path.lower().endswith(".pdf"):
-                    with open(cache_path, "rb") as test_f:
-                        if not test_f.read(8).startswith(b'%PDF'):
-                            os.remove(cache_path)
-            if os.path.exists(cache_path):
-                continue
-                
-            print(f"🚀 [PRE-FETCH] Pre-downloading file {f_idx+1}/{len(files)} for job {doc_id} ({f_name}) in background...")
-            downloaded = download_file(f_url, f_name)
-            if downloaded and os.path.exists(downloaded):
-                os.rename(downloaded, cache_path)
-                print(f"⚡ [PRE-FETCH CACHED] Job {doc_id} (file {f_idx+1}) pre-downloaded & cached → {cache_path}")
+            files = [{"url": file_url, "name": file_name, "type": doc.get("mimetype")}]
     except Exception as e:
-        print(f"⚠️ [PRE-FETCH] Failed to pre-fetch job: {e}")
+        print(f"⚠️ [PRE-FETCH] Failed to read job for pre-fetch: {e}")
+        return
+
+    # Each entry is independent: one failed file never stops the remaining entries from being prefetched.
+    for f_idx, f in enumerate(files):
+        try:
+            prefetch_one_file(doc_id, f_idx, f, len(files))
+        except Exception as e:
+            print(f"⚠️ [PRE-FETCH] Failed to pre-fetch file {f_idx+1} of job {doc_id}: {e}")
 
 def on_prefetch_snapshot(doc_snapshot, changes, read_time):
     for change in changes:
@@ -1628,26 +1910,31 @@ def startup_purge_cups():
     except Exception as e:
         print(f"⚠️ [STARTUP] Failed to purge stale CUPS queues: {e}")
 
-startup_purge_cups()
+# Startup runs only when executed as a script (systemd: python firebase_listener.py), never on import.
+if __name__ == "__main__":
+    ensure_work_dirs()
+    init_firebase()
 
-# Start background threads
-threading.Thread(target=heartbeat_loop, daemon=True).start()
-threading.Thread(target=watchdog_loop, daemon=True).start()
-threading.Thread(target=keep_warm_loop, daemon=True).start()
+    startup_purge_cups()
 
-print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
-print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")
-print(f"📡 Edge Pre-Fetch Cache Active: {PRE_FETCH_DIR}")
-print(f"📡 Waiting for jobs (status: 'printing', kioskId: '{KIOSK_ID}')...")
+    # Start background threads
+    threading.Thread(target=heartbeat_loop, daemon=True).start()
+    threading.Thread(target=watchdog_loop, daemon=True).start()
+    threading.Thread(target=keep_warm_loop, daemon=True).start()
 
-query = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
-query_watch = query.on_snapshot(on_snapshot)
+    print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
+    print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")
+    print(f"📡 Edge Pre-Fetch Cache Active: {PRE_FETCH_DIR}")
+    print(f"📡 Waiting for jobs (status: 'printing', kioskId: '{KIOSK_ID}')...")
 
-query_prefetch = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'paid')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
-query_prefetch_watch = query_prefetch.on_snapshot(on_prefetch_snapshot)
+    query = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
+    query_watch = query.on_snapshot(on_snapshot)
 
-try:
-    while True:
-        time.sleep(1)
-except KeyboardInterrupt:
-    print("\n🛑 Shutting down listener.")
+    query_prefetch = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'paid')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
+    query_prefetch_watch = query_prefetch.on_snapshot(on_prefetch_snapshot)
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n🛑 Shutting down listener.")
