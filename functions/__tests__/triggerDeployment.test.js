@@ -7,7 +7,12 @@ const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 
 createFakeFirestore().install();
-const triggers = { ...require("../src/triggers/printJob.triggers"), ...require("../src/triggers/retention.trigger") };
+const { scheduledPrintTimeoutSweep } = require("../src/triggers/printTimeout.trigger");
+const triggers = {
+  ...require("../src/triggers/printJob.triggers"),
+  ...require("../src/triggers/retention.trigger"),
+  scheduledPrintTimeoutSweep,
+};
 
 // name -> [region, event document / schedule]   (live state checked with `firebase functions:list` on 2026-09-27)
 const EXPECTED = {
@@ -17,9 +22,10 @@ const EXPECTED = {
   sendFailureNotification: ["asia-south1", "print_jobs/{jobId}"],
   printerHardwareNotification: ["asia-south1", "hardware/printers"],
   colourPaperUsageNotification: ["asia-south1", "print_jobs/{jobId}"],
+  scheduledPrintTimeoutSweep: ["us-central1", "every 2 minutes"],
 };
 
-test("the exported triggers are exactly the six deployed ones", () => {
+test("the exported triggers are exactly the seven deployed ones", () => {
   assert.deepStrictEqual(Object.keys(triggers).sort(), Object.keys(EXPECTED).sort());
 });
 
