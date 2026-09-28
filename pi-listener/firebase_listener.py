@@ -946,12 +946,25 @@ def process_job(doc_snapshot):
         finally:
             active_jobs.discard(doc_id)
 
+_seen_first_snapshot = False
+
+
 def on_snapshot(col_snapshot, changes, read_time):
+    """Firestore delivers every currently-matching doc as an 'ADDED' change on the very first callback
+    after the listener (re)connects — not just genuinely new jobs. Reproduced on CV-001, 28 Sep: two jobs
+    submitted while the Pi was down sat in "printing" for 4-8 minutes, then both printed unattended the
+    instant the Pi came back online, because this function fired them exactly like a fresh customer action.
+    Only that first batch is treated as "already-waiting, resume with the same one-time rule the watchdog
+    fallback uses" (see is_eligible_for_auto_resume); every later, genuinely live change is unaffected."""
+    global _seen_first_snapshot
+    is_reconnect_snapshot = not _seen_first_snapshot
+    _seen_first_snapshot = True
+
     for change in changes:
         if change.type.name in ['ADDED', 'MODIFIED']:
             doc = change.document
             data = doc.to_dict()
-            
+
             updated_at = data.get("updatedAt")
             if updated_at:
                 now = datetime.now(updated_at.tzinfo)
@@ -959,14 +972,30 @@ def on_snapshot(col_snapshot, changes, read_time):
                     print(f"⚠️ Skipping job {doc.id} - older than 15 minutes")
                     db.collection('print_jobs').document(doc.id).update({"status": "failed", "printerStatus": "Job expired"})
                     continue
-            
+
             if data.get("status") == "printing" and not data.get("isPrinted", False):
-                if doc.id not in active_jobs:
-                    active_jobs.add(doc.id)
-                    print(f"\n🔔 New {data.get('colorMode', 'monochrome')} job detected: {doc.id}")
-                    threading.Thread(target=process_job, args=(doc,), daemon=True).start()
-                else:
+                if doc.id in active_jobs:
                     print(f"⚠️ Skipping duplicate snapshot for already-active job: {doc.id}")
+                    continue
+
+                if is_reconnect_snapshot and change.type.name == 'ADDED':
+                    started_at = data.get("printStartedAt") or data.get("createdAt") or data.get("updatedAt")
+                    now = datetime.now(started_at.tzinfo) if started_at else datetime.now()
+                    eligible, reason = is_eligible_for_auto_resume(doc.id, data, active_jobs, now)
+                    if not eligible:
+                        print(f"⚠️ Skipping job seen on reconnect: {doc.id} ({reason})")
+                        continue
+                    try:
+                        doc.reference.update({"autoResumedAt": firestore.SERVER_TIMESTAMP})
+                    except Exception as mark_err:
+                        print(f"⚠️ Failed to mark auto-resume for {doc.id}, skipping to be safe: {mark_err}")
+                        continue
+                    print(f"\n🔔 Resuming job seen on reconnect: {doc.id} ({reason})")
+                else:
+                    print(f"\n🔔 New {data.get('colorMode', 'monochrome')} job detected: {doc.id}")
+
+                active_jobs.add(doc.id)
+                threading.Thread(target=process_job, args=(doc,), daemon=True).start()
 
 def heartbeat_loop():
     while True:

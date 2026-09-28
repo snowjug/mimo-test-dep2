@@ -244,5 +244,130 @@ class UnconvertibleImagesFailTheJob(ListenerCase):
         self.assertEqual(printer.call_args[0][0], [pdf])
 
 
+# ── on_snapshot: a job already "printing" when the listener (re)connects gets the same one-time rule
+# as the watchdog fallback, instead of firing unconditionally. Reproduces the CV-001 incident of 28 Sep:
+# two jobs submitted while the Pi was down (13:20-16:00) both printed unattended the instant it came back
+# online at 16:04, because the first Firestore snapshot after reconnecting delivered them as 'ADDED'.
+SNAPSHOT_FUNCS = ["is_eligible_for_auto_resume", "on_snapshot"]
+SNAPSHOT_MODULE_NAMES = ["AUTO_RESUME_MAX_AGE", "_seen_first_snapshot"]
+
+
+class FakeThread:
+    calls = []
+
+    def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+        self.args = args
+
+    def start(self):
+        FakeThread.calls.append(self.args[0].id if self.args else None)
+
+
+class FakeDbChain:
+    """Supports db.collection('print_jobs').document(doc_id).update(...) — only used by the 15-minute
+    job-expiry branch, unrelated to the reconnect fix, but on_snapshot always references it."""
+
+    def __init__(self):
+        self.docs = {}
+
+    def collection(self, name):
+        return self
+
+    def document(self, doc_id):
+        return self.docs.setdefault(doc_id, FakeDocRef())
+
+
+class FakeQueryDocSnapshot:
+    def __init__(self, doc_id, data):
+        self.id = doc_id
+        self._data = data
+        self.reference = FakeDocRef(data)
+
+    def to_dict(self):
+        return dict(self._data)
+
+
+class FakeChange:
+    def __init__(self, type_name, doc_id, data):
+        self.type = types.SimpleNamespace(name=type_name)
+        self.document = FakeQueryDocSnapshot(doc_id, data)
+
+
+def load_snapshot_module(db):
+    tree = ast.parse(open(SOURCE, encoding="utf-8").read())
+    nodes = [
+        n for n in tree.body
+        if (isinstance(n, ast.FunctionDef) and n.name in SNAPSHOT_FUNCS)
+        or (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id in SNAPSHOT_MODULE_NAMES for t in n.targets))
+    ]
+    found = {n.name for n in nodes if isinstance(n, ast.FunctionDef)}
+    assert found == set(SNAPSHOT_FUNCS), f"missing from source: {set(SNAPSHOT_FUNCS) - found}"
+    ns = {
+        "db": db,
+        "active_jobs": set(),
+        "threading": types.SimpleNamespace(Thread=FakeThread),
+        "datetime": __import__("datetime").datetime,
+        "timedelta": __import__("datetime").timedelta,
+        "firestore": types.SimpleNamespace(SERVER_TIMESTAMP="SERVER_TIMESTAMP"),
+        "process_job": mock.Mock(),
+    }
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), SOURCE, "exec"), ns)
+    return ns
+
+
+class ReconnectSnapshotTests(unittest.TestCase):
+    def setUp(self):
+        FakeThread.calls = []
+        self.ns = load_snapshot_module(FakeDbChain())
+
+    def job(self, minutes_ago=0, **extra):
+        started = self.ns["datetime"].now() - self.ns["timedelta"](minutes=minutes_ago)
+        return {"status": "printing", "isPrinted": False, "printStartedAt": started, **extra}
+
+    def fire(self, *changes):
+        self.ns["on_snapshot"](None, list(changes), None)
+
+    def test_job_already_waiting_when_the_listener_reconnects_is_resumed_once_and_marked(self):
+        # Matches the real incident: a job submitted 8 minutes before the Pi came back online.
+        change = FakeChange("ADDED", "job1", self.job(minutes_ago=8))
+        self.fire(change)
+        self.assertEqual(FakeThread.calls, ["job1"])
+        self.assertEqual(change.document.reference.last("autoResumedAt"), "SERVER_TIMESTAMP")
+
+    def test_a_job_already_given_one_resume_attempt_is_never_fired_again_on_a_later_reconnect(self):
+        change = FakeChange("ADDED", "job1", self.job(minutes_ago=8, autoResumedAt="2026-09-28T16:00:00"))
+        self.fire(change)
+        self.assertEqual(FakeThread.calls, [])
+
+    def test_a_job_waiting_too_long_is_not_fired_on_reconnect(self):
+        change = FakeChange("ADDED", "job1", self.job(minutes_ago=50))
+        self.fire(change)
+        self.assertEqual(FakeThread.calls, [])
+        self.assertIsNone(change.document.reference.last("autoResumedAt"))
+
+    def test_normal_operation_after_the_first_snapshot_is_completely_unaffected(self):
+        # First call (the reconnect snapshot) — any content, just to consume is_reconnect_snapshot.
+        self.fire(FakeChange("ADDED", "startup-job", self.job(minutes_ago=0)))
+        FakeThread.calls = []
+        # Second call: a genuinely new customer job. Must fire unconditionally, with no eligibility
+        # gate and no autoResumedAt marker — this is the normal, everyday path and must not regress.
+        change = FakeChange("ADDED", "job2", self.job(minutes_ago=0))
+        self.fire(change)
+        self.assertEqual(FakeThread.calls, ["job2"])
+        self.assertIsNone(change.document.reference.last("autoResumedAt"))
+
+    def test_a_modified_event_on_the_first_snapshot_is_not_treated_as_a_reconnect_resume(self):
+        # Only ADDED events represent "was already sitting there when we connected"; MODIFIED never does.
+        change = FakeChange("MODIFIED", "job1", self.job(minutes_ago=50))
+        self.fire(change)
+        self.assertEqual(FakeThread.calls, ["job1"])
+        self.assertIsNone(change.document.reference.last("autoResumedAt"))
+
+    def test_an_already_active_job_is_never_double_fired_even_on_the_reconnect_snapshot(self):
+        self.ns["active_jobs"].add("job1")
+        change = FakeChange("ADDED", "job1", self.job(minutes_ago=1))
+        self.fire(change)
+        self.assertEqual(FakeThread.calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()
