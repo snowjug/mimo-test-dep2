@@ -14,6 +14,7 @@ const express = require("express");
 const { createLimiters } = require("../middleware/rateLimit");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
 const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
+const { unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
 const {
   validateKioskPrintRequest,
   validateKioskPrintResponse,
@@ -240,6 +241,12 @@ function createKioskRouter(dependencies) {
               };
               throw new Error("TX_ABORT");
             }
+          }
+
+          const unprintable = unprintableFilesForKiosk([jobData], kioskId);
+          if (unprintable.length) {
+            transactionFailedError = { status: 400, message: unprintableFilesMessage(unprintable) };
+            throw new Error("TX_ABORT");
           }
 
           if (jobData.status !== "paid") {

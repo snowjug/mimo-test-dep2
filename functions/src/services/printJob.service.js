@@ -48,6 +48,40 @@ const triggerPiPrint = async (fileUrl, copies = 1, piUrl = null, printerName = n
   return results;
 };
 
+// File types a kiosk's Pi cannot convert. Photos are stored as uploaded (only Office files are converted to PDF
+// at upload), and CV-001's Pi has no HEIC decoder: a raw HEIC reached its printer on Sat 26 Sep and began
+// five hours of failures. It has never printed a HEIC (0/2); SV-002 prints them (6/6).
+const UNSUPPORTED_EXTENSIONS_BY_KIOSK = {
+  "CV-001": new Set([".heic", ".heif"]),
+};
+
+const extensionOf = (value) => {
+  const clean = String(value || "").split("?")[0].split("#")[0];
+  let decoded = clean;
+  try { decoded = decodeURIComponent(clean); } catch { /* keep raw */ }
+  const match = decoded.match(/(\.[A-Za-z0-9]{1,5})$/);
+  return match ? match[1].toLowerCase() : "";
+};
+
+/** Names of the files in these jobs that the given kiosk cannot print (empty when all are printable). */
+function unprintableFilesForKiosk(jobs, kioskId) {
+  const blocked = UNSUPPORTED_EXTENSIONS_BY_KIOSK[kioskId];
+  if (!blocked) return [];
+  const names = [];
+  for (const job of jobs) {
+    const files = Array.isArray(job.files) && job.files.length ? job.files : [{ name: job.fileName, url: job.fileUrl }];
+    for (const f of files) {
+      if (blocked.has(extensionOf(f.name)) || blocked.has(extensionOf(f.url))) names.push(f.name || "photo");
+    }
+  }
+  return names;
+}
+
+const unprintableFilesMessage = (names) =>
+  `Machine 1 cannot print iPhone photos (HEIC): ${names.join(", ")}. Please use Machine 2 (SV-002) for this order.`;
+
 module.exports = {
   isColorJob,
+  unprintableFilesForKiosk,
+  unprintableFilesMessage,
 };
