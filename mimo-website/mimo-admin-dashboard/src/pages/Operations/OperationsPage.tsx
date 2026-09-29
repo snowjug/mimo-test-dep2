@@ -133,11 +133,11 @@ export const OperationsPage: React.FC = () => {
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] py-2 pl-9 pr-3 text-sm text-[var(--text-1)] placeholder:text-[var(--text-3)] focus:border-[var(--primary)] focus:outline-none"
             />
           </div>
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5">
+          <div className="flex flex-wrap gap-2">
             {STATUS_FILTERS.map((f) => (
               <button key={f.id} type="button" onClick={() => setStatusFilter(f.id)} className={chip(statusFilter === f.id)}>{f.label}</button>
             ))}
-            <span className="mx-1 w-px shrink-0 bg-[var(--border)]" />
+            <span className="hidden w-px self-stretch bg-[var(--border)] sm:block" />
             {MACHINE_FILTERS.map((f) => (
               <button key={f.id} type="button" onClick={() => setMachineFilter(f.id)} className={chip(machineFilter === f.id)}>{f.label}</button>
             ))}
