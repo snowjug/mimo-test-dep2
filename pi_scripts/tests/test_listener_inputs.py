@@ -57,6 +57,7 @@ def _load_listener():
     spec = importlib.util.spec_from_file_location("firebase_listener_under_test", LISTENER_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # __name__ != "__main__": no Firebase, threads, watchers or CUPS purge
+    module.SHEET_CHECK_ENABLED = False  # these tests cover inputs; the printer page-counter check has its own tests
     return module
 
 
