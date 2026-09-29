@@ -4,11 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="google-adsense-account" content="ca-pub-6488030243565665">
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6488030243565665" crossorigin="anonymous"></script>
   <title>MIMO — Printing Made Easy</title>
   <meta name="description" content="MIMO makes printing easy. Upload your file, get a 4-digit code, and print at the nearest MIMO kiosk in seconds. No queues, no cash, complete privacy." />
-  <meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#0c0d10" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="shortcut icon" href="/favicon.svg" />
   <meta property="og:title" content="MIMO — Printing Made Easy" />
@@ -30,9 +28,7 @@
   </script>
 
   <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="/images/landing/kiosk-1923.webp" as="image" media="(min-width: 861px)" />
-  <link rel="preload" href="/images/landing/kiosk-1300.webp" as="image" media="(max-width: 860px)" />
-  <link rel="stylesheet" href="/scrollcraft/scrollcraft.css" />
+  <link rel="preload" href="/images/landing/kiosk-1300.webp" as="image" />
 
   <style>
     @font-face {
@@ -41,618 +37,822 @@
       font-weight: 100 900;
       font-display: swap;
     }
-    @font-face {
-      font-family: "Lovelo";
-      src: url("/fonts/lovelo_black-webfont.woff2") format("woff2");
-      font-weight: 900;
-      font-display: swap;
-    }
 
-    /* ScrollCraft tokens: the whole theme. Phone side = paper ground, kiosk side = navy ground. */
+    /* Neutral, Apple Store–style palette. One warm accent, taken from the kiosk's wood panel. */
     :root {
-      --sc-canvas: #f3f4f6;
-      --sc-surface: #ffffff;
-      --sc-ink: #111318;
-      --sc-ink-soft: #4d525c;
-      --sc-accent: #093765;
-      --sc-accent-ink: #ffffff;
-      --sc-font-display: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --sc-font-text: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --sc-font-mono: "Geist", ui-monospace, monospace;
-
-      --kiosk-ground: #0a2342;
-      --kiosk-ground-2: #0f2f57;
-      --kiosk-ink: #f2f4f7;
-      --kiosk-ink-soft: #b3c2d6;
-      --line: rgba(17, 19, 24, 0.1);
-      --phone-surface: #ffffff;
-      --phone-fill: #eef0f3;
-      --success: #1d7f46;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --sc-canvas: #0c0d10;
-        --sc-surface: #17181c;
-        --sc-ink: #f2f3f5;
-        --sc-ink-soft: #b1b5bd;
-        --sc-accent: #8ab6ea;
-        --sc-accent-ink: #0c0d10;
-        --line: rgba(255, 255, 255, 0.1);
-        --phone-surface: #17181c;
-        --phone-fill: #212227;
-        --success: #5ccf8c;
-      }
+      --bg: #f5f5f7;
+      --card: #ffffff;
+      --ink: #1d1d1f;
+      --ink-2: #6e6e73;
+      --ink-3: #86868b;
+      --line: #d2d2d7;
+      --hair: rgba(0, 0, 0, 0.08);
+      --night: #000000;
+      --night-2: #161617;
+      --link: #0066cc;
+      --accent: #b25a1e;
+      --ok: #1f8a4c;
+      --radius: 28px;
+      --gutter: 20px;
+      --ease: cubic-bezier(0.25, 1, 0.3, 1);
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Geist", "Helvetica Neue", system-ui, sans-serif;
     }
 
-    html { -webkit-text-size-adjust: 100%; }
-    body { background: var(--sc-canvas); }
-    a { color: inherit; }
-    :focus-visible { outline: 2px solid var(--sc-accent); outline-offset: 3px; border-radius: 6px; }
-    .skip { position: absolute; left: -9999px; top: 8px; z-index: 100; background: var(--sc-surface); padding: 10px 14px; border-radius: 10px; }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font);
+      font-size: 17px;
+      line-height: 1.47;
+      letter-spacing: -0.022em;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    img { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    h1, h2, h3, p { margin: 0; }
+    button { font: inherit; }
+
+    .skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: #fff; padding: 8px 14px; border-radius: 999px; z-index: 100; }
     .skip:focus { left: 12px; }
-    .wordmark { font-family: "Lovelo", var(--sc-font-display); font-weight: 900; letter-spacing: 0.02em; line-height: 1; }
+
+    .wrap { width: 100%; max-width: 1024px; margin: 0 auto; padding: 0 var(--gutter); }
+
+    .link { color: var(--link); font-weight: 400; }
+    .link:hover { text-decoration: underline; }
+    .link .chev { display: inline-block; margin-left: 2px; transition: transform 0.3s var(--ease); }
+    .link:hover .chev { transform: translateX(2px); }
 
     .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      height: 52px; padding: 0 24px; border-radius: 14px;
-      background: var(--sc-accent); color: var(--sc-accent-ink);
-      font-weight: 600; font-size: 16px; text-decoration: none; white-space: nowrap;
-      transition: transform 160ms var(--sc-ease-out), background-color 160ms;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 44px; padding: 0 22px; border-radius: 999px;
+      background: var(--ink); color: #fff; font-size: 17px; font-weight: 500; letter-spacing: -0.01em;
+      transition: transform 0.2s var(--ease), background 0.2s;
     }
-    .btn:active { transform: scale(0.98); }
-    .btn--light { background: #ffffff; color: #0a2342; }
-    .btn svg { width: 16px; height: 16px; }
+    .btn:active { transform: scale(0.97); }
+    .btn:hover { background: #000; }
+    .btn.light { background: #fff; color: var(--ink); }
 
-    /* ─────────────────────────────── THE STORY (split stage) ─────────────────────────────── */
-    /*
-      One pinned stage. The engine publishes --sc-p (0..1) on the section. Everything below is
-      derived from it in CSS, so the signature move costs no JavaScript:
-        --a    divider travels to the peak position
-        --z    camera push-in on the kiosk (up, then back out)
-        --pan  focus moves from the screen to the tray
-        --out  the printed page slides out of the slot
-        --c    the collapse: the kiosk side takes the full width
-    */
-    .story { --sc-p: 0; }
-    .stage {
-      --p: var(--sc-p);
-      --a: clamp(0, (var(--p) - 0.60) / 0.05, 1);
-      --c: clamp(0, (var(--p) - 0.90) / 0.07, 1);
-      --z: calc(clamp(0, (var(--p) - 0.61) / 0.05, 1) - clamp(0, (var(--p) - 0.86) / 0.045, 1));
-      --pan: clamp(0, (var(--p) - 0.77) / 0.05, 1);
-      --out: clamp(0, (var(--p) - 0.80) / 0.06, 1);
-      --split: calc(0.5 - 0.14 * var(--a) - 0.36 * var(--c));
-      --kh: min(80cqh, 980px);
-      --S: 2.4;
-      --kx: calc((1 - var(--a)) * (1 - var(--c)) * 9cqw);
-      --fx: calc(0.277 + 0.048 * var(--pan));
-      --fy: calc(0.144 + 0.303 * var(--pan));
-      /* No position here: the engine makes the stage sticky, which is also its containing block. */
-      container-type: size;
-      background:
-        radial-gradient(60% 55% at calc(50% + var(--split) * 50%) 58%, var(--kiosk-ground-2), transparent 70%),
-        var(--kiosk-ground);
-      color: var(--kiosk-ink);
-    }
+    .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--accent); }
+    .dim { color: var(--ink-2); }
 
-    /* Plane 1 (far): the wordmark set huge behind the kiosk, drifting slower than the kiosk. */
-    .ghost {
-      position: absolute; top: 50%; left: 0; width: 100%;
-      font-size: clamp(9rem, 26cqw, 26rem); color: rgba(255, 255, 255, 0.045);
-      text-align: center; white-space: nowrap; pointer-events: none; user-select: none;
-      transform: translate(calc((var(--split) + 1) / 2 * 100cqw - 50cqw + var(--kx) * 0.4), calc(-50% - var(--p) * 8cqh));
+    /* ── NAV ─────────────────────────────────────────── */
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(245, 245, 247, 0.8);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s;
     }
+    .nav.scrolled { border-bottom-color: var(--hair); }
+    .nav .wrap { height: 52px; display: flex; align-items: center; justify-content: space-between; }
+    .wordmark { font-weight: 700; font-size: 19px; letter-spacing: 0.02em; }
+    .nav-links { display: flex; align-items: center; gap: 18px; font-size: 14px; }
+    .nav-links a:not(.btn) { color: var(--ink); opacity: 0.8; }
+    .nav .btn { min-height: 32px; padding: 0 14px; font-size: 14px; }
 
-    /* Plane 2 (subject): the real machine, with its contact shadow anchored to its base. */
-    .kiosk-wrap {
-      position: absolute; inset: 0;
-      display: grid; place-items: center;
-      transform: translateX(calc((var(--split) + 1) / 2 * 100cqw - 50cqw + var(--kx)));
-      pointer-events: none;
-    }
-    .kiosk {
-      position: relative; margin: 0;
-      height: var(--kh); aspect-ratio: 711 / 1923;
-      transform-origin: calc(var(--fx) * 100%) calc(var(--fy) * 100%);
-      transform:
-        translate(calc(var(--z) * (0.5 - var(--fx)) * var(--kh) * 0.3697), calc(var(--z) * (0.5 - var(--fy)) * var(--kh)))
-        scale(calc(1 + var(--z) * (var(--S) - 1)))
-        translateY(calc(var(--p) * -2cqh));
-    }
-    .kiosk img { width: 100%; height: 100%; display: block; }
-    .kiosk::after { /* contact shadow: shares the kiosk's base, so it never floats */
-      content: ""; position: absolute; left: -18%; right: -18%; bottom: 0.2%; height: 5%;
-      background: radial-gradient(50% 50% at 50% 50%, rgba(0, 0, 0, 0.55), transparent 70%);
-      transform: translateY(45%); z-index: -1;
-    }
+    .ribbon { background: #fff; text-align: center; font-size: 14px; line-height: 1.43; padding: 12px var(--gutter); color: var(--ink); }
 
-    /* The real screen, measured on the photo: 18% / 10.8% / 19.4% / 7.2% of the cropped cutout. */
-    .screen {
-      position: absolute; left: 18.2%; top: 10.9%; width: 19.2%; height: 7.1%;
-      border-radius: 3%; overflow: hidden;
-      background: #0b1a2e; color: #eaf1fb;
-      font-size: calc(var(--kh) * 0.0105); line-height: 1.2;
-      display: grid; place-content: center; text-align: center; gap: 0.35em;
-      opacity: clamp(0, (var(--p) - 0.615) / 0.02, 1);
-    }
-    .screen__label { font-size: 0.62em; letter-spacing: 0.02em; opacity: 0.75; }
-    .screen__code { display: flex; gap: 0.18em; justify-content: center; }
-    .screen__code span {
-      width: 1.05em; height: 1.35em; border-radius: 0.18em; background: rgba(255, 255, 255, 0.1);
-      display: grid; place-items: center; font-weight: 600; font-size: 1.3em;
-      font-variant-numeric: tabular-nums;
-    }
-    .screen__code b { opacity: clamp(0, (var(--p) - var(--t)) * 70, 1); font-weight: 600; }
-    .screen__status { font-size: 0.56em; color: #8fd3a9; opacity: clamp(0, (var(--p) - 0.765) / 0.01, 1); }
+    /* ── HERO ─────────────────────────────────────────── */
+    .hero { padding: 40px 0 8px; overflow: hidden; }
+    .hero-copy h1 { font-size: 80px; line-height: 1; font-weight: 700; letter-spacing: -0.045em; }
+    .hero-copy h2 { margin-top: 18px; font-size: 28px; line-height: 1.14; font-weight: 600; letter-spacing: -0.028em; max-width: 13ch; }
+    .hero-copy .links { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; font-size: 17px; }
 
-    /* The real tray slot: dark interior at 21.7% / 43.1%, 21.7% wide. The page leaves from inside it. */
-    .slot { position: absolute; left: 21.9%; top: 44.4%; width: 21.2%; height: 22%; overflow: hidden; }
-    .paper {
-      position: absolute; left: 4%; right: 4%; top: 0; height: 100%;
-      background: #fbfbfa; border-radius: 0 0 2px 2px;
-      box-shadow: 0 6px 10px rgba(0, 0, 0, 0.28);
-      transform: translateY(calc(-100% + var(--out) * 100%));
-      padding: 14% 12%; display: grid; align-content: start; gap: 7%;
+    .stage { position: relative; height: 520px; margin-top: 8px; display: flex; justify-content: center; }
+    .stage .floor {
+      position: absolute; bottom: 20px; left: 50%; width: 220px; height: 26px; transform: translateX(-50%);
+      background: radial-gradient(closest-side, rgba(0, 0, 0, 0.22), transparent); filter: blur(4px);
     }
-    .paper i { display: block; height: 3px; border-radius: 2px; background: #c9ced6; }
-    .paper i:nth-child(1) { width: 62%; height: 5px; background: #8a93a1; }
-    .paper i:nth-child(3) { width: 88%; } .paper i:nth-child(5) { width: 70%; }
-
-    /* Plane 3 (near): the phone side, clipped at the divider so it passes over the kiosk.
-       A soft 28px mask fade (not a hard clip-path edge) so a headline or the phone mockup's own
-       text never freezes mid-glyph, half-in-white/half-in-navy, at a transitional scroll position.
-       clip-path stays as the fallback for the few engines without mask-image support. */
-    .phone-side {
-      position: absolute; inset: 0; z-index: 3;
-      background: var(--sc-canvas); color: var(--sc-ink);
-      clip-path: inset(0 calc((1 - var(--split)) * 100%) 0 0);
-      -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(var(--split) * 100cqw - 28px), transparent calc(var(--split) * 100cqw));
-      mask-image: linear-gradient(to right, #000 0, #000 calc(var(--split) * 100cqw - 28px), transparent calc(var(--split) * 100cqw));
+    .stage .kiosk { position: relative; height: 480px; width: auto; margin-top: 12px; will-change: transform; }
+    .chip {
+      position: absolute; display: flex; align-items: center; gap: 10px;
+      background: rgba(255, 255, 255, 0.78);
+      -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
+      border-radius: 18px; padding: 10px 14px; font-size: 13px; line-height: 1.25;
+      animation: float 6s ease-in-out infinite;
     }
-    .phone-side__inner {
-      position: absolute; top: 0; bottom: 0; left: 0; width: 50cqw;
-      padding: max(28px, env(safe-area-inset-top)) clamp(24px, 4cqw, 64px) 32px;
-      display: grid; grid-template-rows: auto 1fr; gap: 24px;
-      transform: translateX(calc((var(--split) - 0.5) * 30cqw));
+    .chip strong { display: block; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+    .chip .tick { width: 26px; height: 26px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; font-size: 14px; font-weight: 700; }
+    .chip.code { right: 4px; top: 118px; }
+    .chip.code strong { font-size: 22px; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; }
+    .chip.paid { left: 2px; top: 300px; animation-delay: -3s; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+    /* ── SECTION HEADERS (Apple "The latest. Take a look…") ── */
+    .sec { padding: 64px 0 0; }
+    .sec-head { font-size: 28px; line-height: 1.14; font-weight: 600; letter-spacing: -0.028em; }
+    .sec-head .dim { font-weight: 600; }
+
+    /* ── RAILS ─────────────────────────────────────────── */
+    .rail {
+      display: flex; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory; scroll-padding: 0 var(--gutter);
+      padding: 22px var(--gutter) 30px; margin: 0 auto; max-width: 1024px;
+      scrollbar-width: none;
     }
-    .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .bar .wordmark { font-size: 28px; color: var(--sc-accent); }
-    .bar-links { display: flex; align-items: center; gap: 16px; }
-    .bar a { font-size: 15px; font-weight: 600; text-decoration: none; color: var(--sc-accent); min-height: 44px; display: inline-flex; align-items: center; white-space: nowrap; }
-    /* Always reachable, at every scroll position during the pinned story (the bar never scrolls away). */
-    .bar a.bar-cta { color: var(--sc-accent-ink); background: var(--sc-accent); padding: 0 14px; border-radius: 999px; min-height: 36px; }
+    .rail::-webkit-scrollbar { display: none; }
+    .rail > * { scroll-snap-align: start; flex: none; }
 
-    .phone-body { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: clamp(20px, 3cqw, 48px); align-items: center; min-height: 0; }
-    .chapters { position: relative; min-height: 320px; }
-    .chapter { position: absolute; left: 0; right: 0; top: 50%; translate: 0 -50%; }
-    .chapter h1, .chapter h2 {
-      font-family: var(--sc-font-display); font-weight: 600; margin: 0;
-      letter-spacing: -0.035em; line-height: 1.04; text-wrap: balance;
+    /* File-type rail, like the Store's product row */
+    .type { width: 104px; text-align: center; }
+    .type .tile { height: 112px; border-radius: 18px; background: var(--card); display: grid; place-items: center; }
+    .type .label { margin-top: 10px; font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+    .sheet {
+      position: relative; width: 52px; height: 68px; background: #fff; border: 1px solid #e3e3e8; border-radius: 5px;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+      clip-path: polygon(0 0, 72% 0, 100% 20%, 100% 100%, 0 100%);
     }
-    .chapter h1 { font-size: clamp(2.4rem, 1.2rem + 3.2cqw, 4.4rem); }
-    .chapter h2 { font-size: clamp(2rem, 1.1rem + 2.4cqw, 3.4rem); }
-    .chapter p { margin: 14px 0 0; max-width: 34ch; color: var(--sc-ink-soft); font-size: 17px; line-height: 1.5; }
-    .chapter .btn { margin-top: 24px; }
-
-    /* The phone: real markup on labelled sample data, never a screenshot. */
-    .phone {
-      position: relative; width: 260px; aspect-ratio: 9 / 18.5;
-      border-radius: 40px; background: var(--phone-surface);
-      box-shadow: 0 0 0 8px #15171c, 0 2px 4px rgba(17, 19, 24, 0.12), 0 30px 60px -20px rgba(9, 25, 45, 0.45);
-      overflow: hidden;
+    .sheet::before { content: ""; position: absolute; right: 0; top: 0; width: 28%; height: 20%; background: #ececf0; border-bottom-left-radius: 4px; }
+    .sheet i { position: absolute; left: 8px; right: 12px; height: 3px; border-radius: 2px; background: #e5e5ea; }
+    .sheet i:nth-child(1) { top: 22px; } .sheet i:nth-child(2) { top: 30px; right: 18px; } .sheet i:nth-child(3) { top: 38px; }
+    .sheet b {
+      position: absolute; left: -6px; bottom: 9px; padding: 2px 5px; border-radius: 4px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.04em; color: #fff; background: var(--c, #6e6e73);
     }
-    .phone__tag { position: absolute; top: 14px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--sc-ink-soft); }
-    .scr { position: absolute; inset: 40px 16px 20px; display: flex; flex-direction: column; gap: 10px; }
-    .scr h3 { margin: 0 0 4px; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
-    .row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--phone-fill); font-size: 13px; }
-    .row small { display: block; color: var(--sc-ink-soft); font-size: 11px; }
-    .row .ic { width: 28px; height: 28px; border-radius: 8px; background: var(--sc-surface); display: grid; place-items: center; flex: none; }
-    .row .ic svg { width: 15px; height: 15px; }
-    .file { opacity: clamp(0, (var(--p) - var(--t)) / 0.02, 1); transform: translateY(calc((1 - clamp(0, (var(--p) - var(--t)) / 0.02, 1)) * 8px)); }
-    .seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--phone-fill); border-radius: 999px; padding: 3px; font-size: 12px; font-weight: 500; }
-    .seg span { position: relative; z-index: 1; text-align: center; padding: 7px 0; }
-    .seg::before {
-      content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px);
-      border-radius: 999px; background: var(--sc-surface); box-shadow: 0 1px 3px rgba(17, 19, 24, 0.15);
-      transform: translateX(calc(clamp(0, (var(--p) - 0.34) / 0.03, 1) * 100%));
+    .sheet.graph { background-image: linear-gradient(#e7ecf3 1px, transparent 1px), linear-gradient(90deg, #e7ecf3 1px, transparent 1px); background-size: 7px 7px; }
+    .sheet.blank i { display: none; }
+
+    /* Step cards: alternating black and white, like "The latest." */
+    .step {
+      width: min(310px, 82vw); height: 480px; border-radius: var(--radius); padding: 28px 26px;
+      display: flex; flex-direction: column; overflow: hidden; background: var(--card);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
     }
-    .step-lbl { font-size: 12px; color: var(--sc-ink-soft); margin: 4px 2px 0; }
-    .total { margin-top: auto; display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--sc-ink-soft); }
-    .total b { font-size: 22px; color: var(--sc-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
-    .paybtn { height: 44px; border-radius: 12px; background: var(--sc-accent); color: var(--sc-accent-ink); display: grid; place-items: center; font-size: 14px; font-weight: 600; }
-    .paid { display: flex; align-items: center; gap: 8px; color: var(--success); font-size: 14px; font-weight: 600; opacity: clamp(0, (var(--p) - 0.51) / 0.02, 1); }
-    .bigcode { font-size: 54px; font-weight: 600; letter-spacing: 0.1em; text-align: center; font-variant-numeric: tabular-nums; margin: 24px 0 6px; }
+    .step.dark { background: var(--night); color: #f5f5f7; }
+    .step .eyebrow { color: var(--accent); }
+    .step.dark .eyebrow { color: #e0894c; }
+    .step h3 { margin-top: 6px; font-size: 28px; line-height: 1.12; font-weight: 600; letter-spacing: -0.03em; }
+    .step p.sub { margin-top: 10px; font-size: 16px; line-height: 1.4; color: var(--ink-2); }
+    .step.dark p.sub { color: #a1a1a6; }
+    .step .vis { margin-top: auto; }
 
-    /* The divider is the chrome: both labels, and the story's progress. */
-    .divider {
-      position: absolute; top: 0; bottom: 0; left: 0; width: 1px; z-index: 4;
-      background: rgba(255, 255, 255, 0.18);
-      transform: translateX(calc(var(--split) * 100cqw));
-      opacity: calc(1 - var(--c));
+    .files { display: grid; gap: 8px; }
+    .file { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.08); font-size: 14px; }
+    .file .ext { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 9.5px; font-weight: 700; color: #fff; background: var(--c); }
+    .file .meta { margin-left: auto; color: #a1a1a6; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+    .opts { display: grid; gap: 14px; }
+    .opt { display: flex; align-items: center; justify-content: space-between; font-size: 15px; }
+    .seg { display: inline-flex; background: #e8e8ed; border-radius: 10px; padding: 3px; }
+    .seg span { padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+    .seg span.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+    .stepper { display: inline-flex; align-items: center; gap: 14px; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .stepper span { width: 30px; height: 30px; border-radius: 50%; background: #e8e8ed; display: grid; place-items: center; color: var(--ink); }
+    .opt-total { margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--hair); display: flex; justify-content: space-between; font-weight: 600; }
+
+    .pay { text-align: center; }
+    .pay .amt { font-size: 56px; font-weight: 700; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+    .pay .for { color: #a1a1a6; font-size: 14px; margin-top: 2px; }
+    .pay .done { margin: 18px auto 0; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; background: rgba(48, 209, 88, 0.14); color: #30d158; font-size: 14px; font-weight: 600; }
+
+    .codebox { display: flex; gap: 10px; justify-content: center; }
+    .codebox span {
+      width: 56px; height: 68px; border-radius: 14px; background: var(--bg); display: grid; place-items: center;
+      font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums;
     }
-    .divider__fill { position: absolute; top: 0; left: 0; width: 1px; height: 100%; background: #ffffff; transform-origin: top; transform: scaleY(var(--p)); }
-    .divider__lbl { position: absolute; bottom: 24px; opacity: calc(1 - var(--a)); font-size: 12px; font-weight: 600; white-space: nowrap; padding: 6px 10px; border-radius: 999px; }
-    .divider__lbl--l { right: 12px; color: var(--sc-ink-soft); background: var(--sc-canvas); }
-    .divider__lbl--r { left: 12px; color: var(--kiosk-ink-soft); background: var(--kiosk-ground); }
+    .code-note { margin-top: 14px; text-align: center; font-size: 13px; color: var(--ink-2); }
 
-    /* Kiosk-side copy: hero line, the peak caption, and the close. */
-    .kcopy { position: absolute; z-index: 2; color: var(--kiosk-ink); }
-    .kcopy h2 { margin: 0; font-weight: 600; letter-spacing: -0.03em; line-height: 1.06; text-wrap: balance; }
-    .kcopy p { margin: 10px 0 0; color: var(--kiosk-ink-soft); font-size: 17px; line-height: 1.5; max-width: 30ch; }
-    .kcopy--hero { left: calc(50cqw + clamp(24px, 4cqw, 64px)); top: 50%; translate: 0 -50%; max-width: 20cqw; }
-    .kcopy--hero h2 { font-size: clamp(1.8rem, 1rem + 1.6cqw, 2.8rem); }
-    .kcopy--peak {
-      right: clamp(24px, 4cqw, 64px); bottom: 10cqh; text-align: right;
-      padding: 18px 22px; border-radius: 20px; background: rgba(10, 35, 66, 0.88);
-      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    /* ── SIGNATURE: the four digits, typed by your scroll ── */
+    .moment { position: relative; height: 320svh; background: var(--night); color: #f5f5f7; margin-top: 64px; }
+    .moment-pin { position: sticky; top: 0; height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px var(--gutter) 40px; overflow: hidden; }
+    .moment .eyebrow { color: #e0894c; }
+    .moment h2 { margin-top: 8px; text-align: center; font-size: 44px; line-height: 1.08; font-weight: 700; letter-spacing: -0.035em; }
+    .moment h2 .dim { color: #86868b; }
+    .m-code { margin-top: 30px; display: flex; gap: 10px; }
+    .m-code span {
+      width: 58px; height: 70px; border-radius: 16px; border: 1.5px solid #3a3a3c; display: grid; place-items: center;
+      font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; color: transparent;
+      transition: color 0.25s, border-color 0.25s, background 0.25s, transform 0.35s var(--ease);
     }
-    .kcopy--peak h2 { font-size: clamp(1.8rem, 1rem + 1.8cqw, 3rem); }
-    .kcopy--peak p { margin-left: auto; }
-    .kcopy--close { left: clamp(24px, 7cqw, 120px); top: 50%; translate: 0 -50%; max-width: 30cqw; }
-    .kcopy--close h2 { font-size: clamp(2.4rem, 1.2rem + 3cqw, 4.6rem); }
-    .kcopy--close .btn { margin-top: 28px; }
-
-    /* ── Phone composition (art-directed separately, not a shrunk desktop) ──────────────────
-       One navy scene instead of a cramped top/bottom split: the story headline at the top, the real
-       kiosk standing large on the right, and a real-proportion phone held in front of it at the
-       bottom-left (overlapping the kiosk for depth). At the peak the phone drops away, the kiosk
-       centres and the camera pushes into its screen; at the close it settles above the CTA. */
-    @media (max-width: 860px) {
-      .stage {
-        --kh: calc(min(63cqh, 160cqw) - var(--c) * 21cqh);
-        --S: 2.7;
-        --kx: calc((1 - var(--a)) * (1 - var(--c)) * 19cqw);
-        --ky: calc(13cqh - var(--c) * 19cqh);
-        background:
-          radial-gradient(90% 55% at 62% 62%, var(--kiosk-ground-2), transparent 72%),
-          var(--kiosk-ground);
-      }
-      .ghost { font-size: 44cqw; transform: translate(calc(var(--kx) * 0.3), calc(var(--ky) - 50% - var(--p) * 6cqh)); }
-      .kiosk-wrap { transform: translate(var(--kx), var(--ky)); }
-      .kiosk { transform:
-        translate(calc(var(--z) * (0.5 - var(--fx)) * var(--kh) * 0.3697), calc(var(--z) * (0.5 - var(--fy)) * var(--kh)))
-        scale(calc(1 + var(--z) * (var(--S) - 1))); }
-
-      /* The phone layer is no longer a clipped half: it is a transparent overlay on the navy scene.
-         It sits above the kiosk-side copy, so only its links take pointer events. */
-      .phone-side {
-        background: transparent; color: var(--kiosk-ink); pointer-events: none;
-        clip-path: none; -webkit-mask-image: none; mask-image: none;
-      }
-      .phone-side a, .phone-side button { pointer-events: auto; }
-      /* While the camera is pushed in, the kiosk rises under the bar and headline: a navy scrim
-         (only where the text sits, only during the zoom) keeps them legible. */
-      .phone-side::before {
-        content: ""; position: absolute; inset: 0 0 auto 0; height: 200px; pointer-events: none;
-        background: linear-gradient(to bottom, var(--kiosk-ground) 62%, transparent);
-        opacity: var(--z);
-      }
-      .phone-side__inner {
-        width: 100%; height: auto; padding: max(14px, env(safe-area-inset-top)) 16px 16px;
-        grid-template-rows: auto auto; align-content: start; gap: 14px;
-        transform: none;
-      }
-      .bar .wordmark { font-size: 24px; color: #ffffff; }
-      .bar a:not(.bar-cta) { font-size: 13px; color: var(--kiosk-ink); }
-      .bar a.bar-cta { font-size: 13px; padding: 0 12px; background: #ffffff; color: #0a2342; opacity: calc(1 - var(--c)); }
-      .phone-body { display: contents; }
-
-      .chapters { min-height: 0; height: 132px; }
-      .chapter { top: 0; translate: none; }
-      .chapter h1, .chapter h2 { color: var(--kiosk-ink); font-size: clamp(1.6rem, 1.15rem + 2.4cqw, 2.2rem); }
-      .chapter--hero h1 { font-size: clamp(2rem, 1.4rem + 3cqw, 2.6rem); }
-      /* Buttons stay off mid-story (the bar CTA is always reachable); the description stays, clamped. */
-      .chapter p {
-        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
-        color: var(--kiosk-ink-soft); font-size: 14px; line-height: 1.4; margin-top: 8px; max-width: 30ch;
-      }
-      .chapter .btn { display: none; }
-
-      /* The phone keeps its desktop-sized internals (already verified) and is scaled as one object. */
-      .phone {
-        position: absolute; left: 16px; bottom: max(22px, env(safe-area-inset-bottom));
-        width: 260px; color: var(--sc-ink);
-        transform-origin: bottom left;
-        transform: translateY(calc(var(--a) * 130%)) scale(var(--ps, 0.64));
-        opacity: calc(1 - var(--a));
-        box-shadow: 0 0 0 8px #15171c, 0 24px 50px -12px rgba(0, 0, 0, 0.55);
-      }
-      .divider, .kcopy--hero { display: none; }
-
-      .kcopy--peak { left: 16px; right: 16px; bottom: max(20px, env(safe-area-inset-bottom)); text-align: left; padding: 14px 16px; }
-      .kcopy--peak h2 { font-size: 1.7rem; }
-      .kcopy--peak p { margin-left: 0; font-size: 15px; }
-      .kcopy--close { left: 16px; right: 16px; top: auto; bottom: max(24px, env(safe-area-inset-bottom)); translate: none; max-width: none; }
-      .kcopy--close h2 { font-size: 2.2rem; }
-      .kcopy--close .btn { width: 100%; margin-top: 18px; }
+    .m-code span.on { color: #fff; border-color: #f5f5f7; background: #1c1c1e; transform: translateY(-2px); }
+    .m-keys { margin-top: 22px; display: grid; grid-template-columns: repeat(3, 62px); gap: 10px; }
+    .m-keys span {
+      height: 46px; border-radius: 13px; background: #1c1c1e; display: grid; place-items: center;
+      font-size: 22px; font-weight: 500; color: #d1d1d6; transition: background 0.2s, color 0.2s, transform 0.2s;
     }
-    /* Larger phones and small tablets hold a bigger phone. */
-    @media (min-width: 560px) and (max-width: 860px) {
-      .stage { --ps: 0.82; }
+    .m-keys span.press { background: #f5f5f7; color: #000; transform: scale(0.94); }
+    .m-tray { position: relative; margin-top: 24px; width: 220px; height: 120px; }
+    .m-tray::before { content: ""; position: absolute; inset: 0 0 auto; height: 14px; border-radius: 7px; background: #2c2c2e; z-index: 2; }
+    .m-slot { position: absolute; left: 0; right: 0; top: 7px; bottom: 0; overflow: hidden; }
+    .m-page {
+      position: absolute; left: 50%; top: 0; width: 150px; height: 104px; margin-left: -75px;
+      background: #fff; border-radius: 0 0 6px 6px; padding: 16px 16px;
+      transform: translateY(-100%); transition: transform 1.1s var(--ease);
+    }
+    .m-page i { display: block; height: 5px; border-radius: 3px; background: #e5e5ea; margin-bottom: 9px; }
+    .m-page i:nth-child(2) { width: 72%; } .m-page i:nth-child(3) { width: 86%; } .m-page i:nth-child(4) { width: 54%; }
+    .moment.printed .m-page { transform: translateY(0); }
+    .m-status { margin-top: 8px; font-size: 15px; color: #86868b; min-height: 22px; transition: color 0.3s; }
+    .moment.printed .m-status { color: #30d158; }
+
+    /* ── PRICING ─────────────────────────────────────── */
+    .prices { margin-top: 22px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .price { background: var(--card); border-radius: 22px; padding: 20px 18px 22px; }
+    .price.wide { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; }
+    .price .k { font-size: 14px; color: var(--ink-2); }
+    .price .v { margin-top: 6px; font-size: 34px; font-weight: 700; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
+    .price.wide .v { font-size: 48px; }
+    .price .u { font-size: 13px; color: var(--ink-3); }
+    .price-note { margin-top: 14px; font-size: 14px; color: var(--ink-2); }
+
+    /* ── KIOSKS ─────────────────────────────────────── */
+    .kiosk-card { width: min(300px, 80vw); border-radius: var(--radius); background: var(--card); overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); }
+    .kiosk-card img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
+    .kiosk-card .body { padding: 18px 20px 22px; }
+    .kiosk-card h3 { font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
+    .kiosk-card .loc { color: var(--ink-2); font-size: 15px; margin-top: 2px; }
+    .pills { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--bg); font-size: 12px; font-weight: 500; color: var(--ink); }
+    .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+    .pill.soon { color: var(--ink-3); }
+
+    /* ── GUESS THE NEXT MIMO ─────────────────────────── */
+    .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .btn.small { margin-top: 14px; min-height: 36px; padding: 0 18px; font-size: 15px; }
+    .link.plain { background: none; border: 0; padding: 0; cursor: pointer; font-size: 16px; }
+    .kiosk-card.guess { background: transparent; box-shadow: none; overflow: visible; perspective: 1400px; }
+    .flip { position: relative; height: 100%; min-height: 380px; transform-style: preserve-3d; transition: transform 0.9s var(--ease); }
+    .guess.open .flip { transform: rotateY(180deg); }
+    .face {
+      position: absolute; inset: 0; border-radius: var(--radius); background: var(--card); overflow: hidden;
+      -webkit-backface-visibility: hidden; backface-visibility: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    }
+    .face.back { transform: rotateY(180deg); padding: 24px 22px; display: flex; flex-direction: column; }
+    .mystery { position: relative; aspect-ratio: 4 / 3; background: radial-gradient(120% 90% at 50% 20%, #fbfbfd, #ececf0); display: grid; place-items: center; overflow: hidden; }
+    .mystery::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.7) 50%, transparent 65%); transform: translateX(-100%); animation: shimmer 3.2s ease-in-out infinite; }
+    .ghost { position: relative; width: 66px; height: 150px; border: 2px dashed #b9b9bf; border-radius: 12px; animation: hover 4s ease-in-out infinite; }
+    .ghost .scr { position: absolute; left: 10px; top: 16px; width: 26px; height: 18px; border: 1.5px dashed #c7c7cc; border-radius: 4px; }
+    .ghost .slot { position: absolute; left: 10px; top: 64px; width: 30px; height: 7px; border: 1.5px dashed #c7c7cc; border-radius: 3px; }
+    .ghost .q { position: absolute; right: -20px; top: -18px; width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 22px; font-weight: 700; box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18); animation: bob 2.4s ease-in-out infinite; }
+    .ghost-floor { position: absolute; bottom: 22px; left: 50%; width: 90px; height: 12px; margin-left: -45px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0, 0, 0, 0.14), transparent); animation: floor 4s ease-in-out infinite; }
+    @keyframes shimmer { 0%, 55% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    @keyframes hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    @keyframes floor { 0%, 100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(0.85); opacity: 0.7; } }
+    @keyframes bob { 0%, 100% { transform: rotate(-8deg) scale(1); } 50% { transform: rotate(8deg) scale(1.06); } }
+
+    .guess-form h3, .guess-done h3 { margin-top: 6px; font-size: 24px; line-height: 1.15; font-weight: 600; letter-spacing: -0.028em; }
+    .guess-form input {
+      margin-top: 18px; width: 100%; height: 50px; border-radius: 14px; border: 1.5px solid transparent; background: var(--bg);
+      padding: 0 16px; font: inherit; font-size: 17px; color: var(--ink); outline: none; transition: border-color 0.2s, background 0.2s;
+    }
+    .guess-form input:focus { border-color: var(--ink); background: #fff; }
+    .guess-form.bad input { border-color: #d70015; animation: shake 0.4s; }
+    .guess-err { min-height: 20px; margin-top: 6px; font-size: 13px; color: #d70015; }
+    .guess-actions { margin-top: auto; display: flex; align-items: center; gap: 18px; }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+    .guess-form { display: flex; flex-direction: column; height: 100%; transition: opacity 0.35s, transform 0.35s var(--ease); }
+    .guess-done { position: absolute; inset: 24px 22px; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.4s 0.15s; }
+    .guess.sent .guess-form { opacity: 0; transform: translateY(-10px); pointer-events: none; }
+    .guess.sent .guess-done { opacity: 1; pointer-events: auto; }
+    .guess-done .loc { margin-top: 6px; }
+    .guess-done .link.plain { margin-top: auto; text-align: left; }
+    .g-tray { position: relative; height: 150px; }
+    .g-tray::before { content: ""; position: absolute; left: 12%; right: 12%; top: 0; height: 12px; border-radius: 6px; background: var(--ink); z-index: 2; }
+    .g-slot { position: absolute; left: 12%; right: 12%; top: 6px; bottom: 0; overflow: hidden; }
+    .g-sheet {
+      position: absolute; left: 8%; right: 8%; top: 0; height: 132px; background: #fff; border: 1px solid #e3e3e8; border-top: 0;
+      border-radius: 0 0 8px 8px; padding: 16px 14px; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+      transform: translateY(-100%); transition: transform 1.2s var(--ease) 0.35s;
+    }
+    .guess.sent .g-sheet { transform: translateY(0); }
+    .g-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); font-weight: 600; }
+    .g-sheet strong { display: block; margin-top: 4px; font-size: 20px; line-height: 1.15; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+    .g-sheet i { display: block; height: 4px; border-radius: 2px; background: #ececf0; margin-top: 10px; }
+    .g-sheet i + i { width: 60%; margin-top: 7px; }
+
+    .confetti { position: absolute; left: 50%; top: 40%; width: 8px; height: 11px; border-radius: 2px; pointer-events: none; z-index: 5;
+      animation: burst 1.3s var(--ease) forwards; }
+    @keyframes burst {
+      0% { transform: translate(-50%, -50%) rotate(0) scale(0.6); opacity: 1; }
+      100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) rotate(var(--r)) scale(1); opacity: 0; }
     }
 
-    /* ── Static composition: no JS, or reduced motion. No pin, nothing hidden, depth kept. ── */
-    .story.is-static .stage { --p: 1; --a: 0; --c: 0; --z: 0; --pan: 0; --out: 1; --split: 0.5; --kx: 9cqw; height: 100svh; min-height: 640px; }
-    .story.is-static .screen { opacity: 1; }
-    .story.is-static .screen__status { opacity: 1; }
-    .story.is-static .screen__code b { opacity: 1; }
-    .story.is-static .divider__fill { transform: none; }
-    .story.is-static [data-sc-cue] { opacity: 1; }
-    .story.is-static .chapter:not(.chapter--hero), .story.is-static .kcopy--peak, .story.is-static .kcopy--close { display: none; }
-    .story.is-static .scr:not(.scr--code) { display: none; }
-    .story.is-static .kcopy--hero p::after { content: " Your code 4821 is on the screen, and the page is out."; }
-    @media (max-width: 860px) {
-      .story.is-static .stage { --kx: 19cqw; --ky: 13cqh; --kh: min(63cqh, 160cqw); }
-    }
+    /* ── PRIVACY ─────────────────────────────────────── */
+    .privacy { margin-top: 18px; border-radius: var(--radius); background: var(--night); color: #f5f5f7; padding: 44px 26px 40px; position: relative; overflow: hidden; }
+    .privacy .eyebrow { color: #e0894c; }
+    .privacy h2 { margin-top: 8px; font-size: 44px; line-height: 1.04; font-weight: 700; letter-spacing: -0.04em; }
+    .privacy p { margin-top: 16px; color: #a1a1a6; font-size: 17px; max-width: 34ch; }
+    .shred { margin-top: 30px; display: flex; gap: 6px; height: 64px; align-items: flex-end; }
+    .shred i { flex: 1; border-radius: 3px 3px 0 0; background: linear-gradient(#3a3a3c, #1c1c1e); height: var(--h); transform-origin: bottom; transform: scaleY(0); transition: transform 0.9s var(--ease); }
+    .privacy.in .shred i { transform: scaleY(1); }
 
-    /* ─────────────────────────────── AFTER THE STORY ─────────────────────────────── */
-    .after { background: var(--sc-canvas); color: var(--sc-ink); }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(16px, 5vw, 64px); }
+    /* ── AD SLOT (off by default; see ADS config at the bottom) ── */
+    .ad-slot { margin-top: 48px; border-radius: 22px; background: var(--card); padding: 12px; min-height: 120px; }
+    .ad-slot .ad-label { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin: 2px 4px 8px; }
 
-    .facts { padding: clamp(72px, 10vw, 140px) 0 clamp(48px, 6vw, 80px); display: grid; grid-template-columns: 1.2fr 1fr; gap: clamp(32px, 6vw, 96px); align-items: end; }
-    .facts h2 { margin: 0; font-size: clamp(2.2rem, 1.3rem + 3vw, 4rem); font-weight: 600; letter-spacing: -0.035em; line-height: 1.04; text-wrap: balance; }
-    .facts p { margin: 16px 0 0; color: var(--sc-ink-soft); font-size: 17px; line-height: 1.55; max-width: 44ch; }
-    .figures { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); }
-    .figures div { padding: 20px 0 0; }
-    .figures dd { margin: 0; font-size: clamp(2.6rem, 1.8rem + 2.4vw, 3.8rem); font-weight: 600; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1; }
-    .figures dt { margin-top: 8px; color: var(--sc-ink-soft); font-size: 15px; }
-
-    .steps { border-top: 1px solid var(--line); padding: clamp(48px, 7vw, 96px) 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 3vw, 40px); }
-    .steps h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-    .steps p { margin: 8px 0 0; color: var(--sc-ink-soft); line-height: 1.55; font-size: 16px; }
-    .steps span { display: block; color: var(--sc-accent); font-weight: 600; font-size: 15px; margin-bottom: 14px; font-variant-numeric: tabular-nums; }
-
-    .faq { border-top: 1px solid var(--line); padding: clamp(48px, 7vw, 96px) 0; display: grid; grid-template-columns: 1fr 1.6fr; gap: clamp(24px, 6vw, 96px); }
-    .faq h2 { margin: 0; font-size: clamp(1.8rem, 1.2rem + 1.6vw, 2.6rem); font-weight: 600; letter-spacing: -0.03em; }
-    .faq details { border-bottom: 1px solid var(--line); }
-    .faq summary {
-      list-style: none; cursor: pointer; padding: 18px 36px 18px 0; position: relative;
-      font-size: 17px; font-weight: 500; min-height: 44px;
-    }
+    /* ── FAQ ─────────────────────────────────────── */
+    .faq { margin-top: 22px; background: var(--card); border-radius: 22px; padding: 4px 20px; }
+    .faq details { border-bottom: 1px solid var(--hair); }
+    .faq details:last-child { border-bottom: 0; }
+    .faq summary { list-style: none; cursor: pointer; padding: 18px 30px 18px 0; position: relative; font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
     .faq summary::-webkit-details-marker { display: none; }
-    .faq summary::after {
-      content: ""; position: absolute; right: 6px; top: 50%; width: 10px; height: 10px;
-      border-right: 1.75px solid currentColor; border-bottom: 1.75px solid currentColor;
-      transform: translateY(-70%) rotate(45deg); transition: transform 200ms var(--sc-ease-out); opacity: 0.6;
+    .faq summary::before, .faq summary::after { content: ""; position: absolute; right: 4px; top: 50%; width: 13px; height: 1.6px; background: var(--ink-2); border-radius: 1px; transition: transform 0.3s var(--ease); }
+    .faq summary::after { transform: rotate(90deg); }
+    .faq details[open] summary::after { transform: rotate(0deg); }
+    .faq details p { padding: 0 8px 20px 0; color: var(--ink-2); font-size: 16px; }
+
+    /* ── SPONSORS ─────────────────────────────────────── */
+    .sponsors { margin-top: 22px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .sponsor { min-width: 0; background: var(--card); border-radius: 22px; aspect-ratio: 1.25; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; }
+    .sponsor img { max-height: 84px; width: auto; max-width: 80%; object-fit: contain; border-radius: 12px; }
+    .sponsor span { font-size: 13px; color: var(--ink-2); }
+
+    /* ── CLOSING ─────────────────────────────────────── */
+    .close { text-align: center; padding: 96px 0 72px; }
+    .close h2 { font-size: 40px; line-height: 1.08; font-weight: 700; letter-spacing: -0.035em; }
+    .close p { margin: 14px auto 0; max-width: 30ch; color: var(--ink-2); }
+    .close .row { margin-top: 26px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+    /* ── FOOTER ─────────────────────────────────────── */
+    footer { border-top: 1px solid var(--line); font-size: 12px; line-height: 1.33; color: var(--ink-2); padding: 18px 0 40px; }
+    footer details { border-bottom: 1px solid var(--hair); }
+    footer summary { list-style: none; cursor: pointer; padding: 12px 0; font-size: 14px; color: var(--ink); position: relative; }
+    footer summary::-webkit-details-marker { display: none; }
+    footer summary::after { content: "+"; position: absolute; right: 2px; top: 10px; font-size: 16px; color: var(--ink-2); transition: transform 0.3s var(--ease); }
+    footer details[open] summary::after { transform: rotate(45deg); }
+    footer ul { list-style: none; margin: 0; padding: 0 0 12px; display: grid; gap: 10px; }
+    footer ul a { font-size: 14px; color: var(--ink-2); }
+    footer .addr { margin-top: 18px; }
+    footer .copy { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--hair); }
+
+    /* ── REVEAL ─────────────────────────────────────── */
+    .js [data-reveal] { opacity: 0; transform: translateY(28px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
+    .js [data-reveal].in { opacity: 1; transform: none; }
+
+    /* ── WIDER SCREENS ─────────────────────────────── */
+    @media (min-width: 820px) {
+      :root { --gutter: 40px; }
+      .hero .wrap { display: grid; grid-template-columns: 1fr 1fr; align-items: end; }
+      .hero-copy h1 { font-size: 128px; }
+      .hero-copy h2 { font-size: 40px; }
+      .stage { height: 620px; grid-column: 1 / -1; }
+      .stage .kiosk { height: 580px; }
+      .chip.code { right: 22%; } .chip.paid { left: 22%; }
+      .sec-head { font-size: 40px; }
+      .prices { grid-template-columns: repeat(4, 1fr); }
+      .price.wide { grid-column: span 2; }
+      .sponsors { grid-template-columns: repeat(4, 1fr); }
+      .privacy { padding: 72px 64px; }
+      .privacy h2 { font-size: 64px; }
+      .moment h2 { font-size: 56px; }
+      footer .groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+      footer details { border: 0; }
+      footer summary { pointer-events: none; font-weight: 600; }
+      footer summary::after { display: none; }
     }
-    .faq details[open] summary::after { transform: translateY(-30%) rotate(225deg); }
-    .faq details p { margin: 0 0 20px; color: var(--sc-ink-soft); line-height: 1.6; max-width: 62ch; }
 
-    .partners { border-top: 1px solid var(--line); padding: clamp(40px, 6vw, 72px) 0; display: flex; align-items: center; gap: clamp(20px, 5vw, 56px); flex-wrap: wrap; }
-    .partners p { margin: 0; color: var(--sc-ink-soft); font-size: 15px; flex-basis: 100%; }
-    /* Partner marks in their own colours. */
-    .partners img { height: 56px; width: auto; object-fit: contain; border-radius: 10px; }
-
-    .foot { border-top: 1px solid var(--line); padding: 40px 0 max(32px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; font-size: 15px; }
-    .foot .wordmark { font-size: 22px; color: var(--sc-accent); }
-    .foot p { margin: 10px 0 0; color: var(--sc-ink-soft); line-height: 1.55; max-width: 36ch; }
-    .foot h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--sc-ink-soft); }
-    .foot ul { list-style: none; margin: 0; padding: 0; }
-    .foot li a { display: inline-flex; min-height: 36px; align-items: center; text-decoration: none; }
-    .foot li a:hover { color: var(--sc-accent); }
-    .foot small { grid-column: 1 / -1; color: var(--sc-ink-soft); padding-top: 20px; border-top: 1px solid var(--line); }
-
-    @media (max-width: 860px) {
-      .facts, .faq { grid-template-columns: 1fr; }
-      .steps { grid-template-columns: 1fr; gap: 28px; }
-      .foot { grid-template-columns: 1fr 1fr; }
-      .foot > div:first-child { grid-column: 1 / -1; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .chip { animation: none; }
+      .js [data-reveal] { opacity: 1; transform: none; transition: none; }
+      .moment { height: auto; }
+      .moment-pin { position: relative; height: auto; min-height: 100svh; }
+      .shred i { transform: scaleY(1); transition: none; }
+      .flip { transition: none; }
+      .ghost, .ghost .q, .ghost-floor, .mystery::after { animation: none; }
+      .g-sheet { transition: none; }
     }
   </style>
 </head>
 <body>
-  <a class="skip" href="#after">Skip to details</a>
+  <a class="skip" href="#main">Skip to content</a>
 
-  <main>
-    <!-- The story: a split stage. Left/top is your phone, right/bottom is the kiosk. -->
-    <section class="story is-static" id="story" data-sc-span="7" aria-label="How MIMO works">
-      <div class="stage" data-sc-stage>
-        <span class="ghost wordmark" aria-hidden="true">MIMO</span>
+  <header class="nav" id="nav">
+    <div class="wrap">
+      <a href="/" class="wordmark" aria-label="MIMO home">MIMO</a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="/find-machine">Kiosks</a>
+        <a href="#pricing">Pricing</a>
+        <a class="btn" href="/login">Print</a>
+      </nav>
+    </div>
+  </header>
 
-        <div class="kiosk-wrap">
-          <figure class="kiosk">
-            <picture>
-              <source media="(max-width: 860px)" srcset="/images/landing/kiosk-1300.webp">
-              <img src="/images/landing/kiosk-1923.webp" width="711" height="1923" alt="The MIMO printing kiosk: a white cabinet with a touch screen, a paper tray and a wooden base." fetchpriority="high" decoding="async">
-            </picture>
-            <div class="screen" aria-hidden="true">
-              <span class="screen__label">Enter your code</span>
-              <span class="screen__code">
-                <span><b style="--t:0.665">4</b></span><span><b style="--t:0.69">8</b></span><span><b style="--t:0.715">2</b></span><span><b style="--t:0.74">1</b></span>
-              </span>
-              <span class="screen__status">Printing</span>
-            </div>
-            <div class="slot" aria-hidden="true">
-              <div class="paper"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-            </div>
-          </figure>
+  <div class="ribbon">
+    From <span data-price="pricePerPageBW">₹2.80</span> a page.
+    <a class="link" href="#pricing">See pricing<span class="chev">›</span></a>
+  </div>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap">
+        <div class="hero-copy">
+          <h1 id="hero-title">Print.</h1>
         </div>
-
-        <div class="kcopy kcopy--hero" data-sc-cue="0 0.12 0">
-          <h2>Collect it at the kiosk.</h2>
-          <p>Four digits on the keypad and your pages come out.</p>
-        </div>
-        <div class="kcopy kcopy--peak" data-sc-cue="0.64 0.88">
-          <h2>Type 4821.</h2>
-          <p>That is the whole visit.</p>
-        </div>
-        <div class="kcopy kcopy--close" data-sc-cue="0.93 1 0.25 0">
-          <h2>Your campus printer.</h2>
-          <p>No queue, no pen drive, no cash.</p>
-          <a class="btn btn--light" href="/login">Start printing
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </a>
-        </div>
-
-        <div class="phone-side">
-          <div class="phone-side__inner">
-            <div class="bar">
-              <span class="wordmark" aria-label="MIMO">MIMO</span>
-              <span class="bar-links">
-                <a href="/find-machine">Find a kiosk</a>
-                <a href="/login" class="bar-cta">Start printing</a>
-              </span>
-            </div>
-            <div class="phone-body">
-              <div class="chapters">
-                <div class="chapter chapter--hero" data-sc-cue="0 0.12 0">
-                  <h1>Print from your phone.</h1>
-                  <p>Upload your file, pay by UPI and get a 4-digit code. Nothing to install.</p>
-                  <a class="btn" href="/login">Start printing
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                  </a>
-                </div>
-                <div class="chapter" data-sc-cue="0.1 0.3"><h2>Drop in your files.</h2><p>PDF, Word, PowerPoint, Excel, text or photos. Office files become PDFs for you.</p></div>
-                <div class="chapter" data-sc-cue="0.27 0.46"><h2>Choose how it prints.</h2><p>The machine, black and white or colour, one side or both, and how many copies.</p></div>
-                <div class="chapter" data-sc-cue="0.43 0.58"><h2>Pay with UPI.</h2><p>Google Pay, PhonePe, Paytm or a card, handled by Cashfree.</p></div>
-                <div class="chapter" data-sc-cue="0.55 0.97"><h2>Your code is ready.</h2><p>It stays valid for 24 hours. Walk over when you like.</p></div>
-              </div>
-
-              <div class="phone" aria-hidden="true">
-                <span class="phone__tag">Example</span>
-                <div class="scr" data-sc-cue="0 0.12 0">
-                  <h3>Hi, Ananya</h3>
-                  <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span>Choose files to print</div>
-                  <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/></svg></span>Blank A4 sheet</div>
-                  <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM4 10h16M4 16h16M10 4v16M16 4v16"/></svg></span>MIMO graph paper</div>
-                </div>
-                <div class="scr" data-sc-cue="0.1 0.3">
-                  <h3>Files</h3>
-                  <div class="row file" style="--t:0.14"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/></svg></span><span>DBMS_notes.pdf<small>12 pages</small></span></div>
-                  <div class="row file" style="--t:0.18"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/></svg></span><span>Lab_record.docx<small>4 pages</small></span></div>
-                  <div class="row file" style="--t:0.22"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/></svg></span><span>Timetable.jpg<small>1 page</small></span></div>
-                </div>
-                <div class="scr" data-sc-cue="0.27 0.46">
-                  <h3>Print settings</h3>
-                  <p class="step-lbl">Colour</p>
-                  <div class="seg"><span>B&amp;W</span><span>Colour</span></div>
-                  <p class="step-lbl">Sides</p>
-                  <div class="seg"><span>One</span><span>Both</span></div>
-                  <div class="total">Total <b>₹47.60</b></div>
-                </div>
-                <div class="scr" data-sc-cue="0.43 0.58">
-                  <h3>Checkout</h3>
-                  <div class="row">17 pages<small style="margin-left:auto">₹47.60</small></div>
-                  <div class="paid"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>Paid with UPI</div>
-                  <div class="total" style="margin-top:auto"></div>
-                  <div class="paybtn">Pay ₹47.60</div>
-                </div>
-                <div class="scr scr--code" data-sc-cue="0.55 0.97">
-                  <h3>You're all set</h3>
-                  <p class="bigcode">4821</p>
-                  <p class="step-lbl" style="text-align:center">Enter this on the MIMO keypad</p>
-                </div>
-              </div>
-            </div>
+        <div class="hero-copy">
+          <h2>The easiest way to print on campus.</h2>
+          <div class="links">
+            <a class="link" href="/login">Start printing<span class="chev">›</span></a>
+            <a class="link" href="/find-machine">Find a kiosk<span class="chev">›</span></a>
           </div>
         </div>
-
-        <div class="divider" aria-hidden="true">
-          <span class="divider__fill"></span>
-          <span class="divider__lbl divider__lbl--l">Your phone</span>
-          <span class="divider__lbl divider__lbl--r">The kiosk</span>
+        <div class="stage" aria-hidden="true">
+          <div class="floor"></div>
+          <img class="kiosk" id="kiosk" src="/images/landing/kiosk-1300.webp" alt="" width="481" height="1300" fetchpriority="high" />
+          <div class="chip code"><div>Your code<strong>4821</strong></div></div>
+          <div class="chip paid"><span class="tick">✓</span><div>Paid with UPI<strong>₹47.60</strong></div></div>
         </div>
       </div>
     </section>
 
-    <div class="after" id="after">
+    <!-- WHAT YOU CAN PRINT -->
+    <section class="sec" aria-labelledby="types-title">
       <div class="wrap">
-        <section class="facts" aria-labelledby="facts-h">
-          <div>
-            <h2 id="facts-h">Printing, finally fixed.</h2>
-            <p>No queue at the shop, no pen drive, no hunting for change. Your files are deleted right after they print.</p>
-          </div>
-          <dl class="figures">
-            <div><dd><span data-sc-count="0 1,600">1,600</span>+</dd><dt>Students printing</dt></div>
-            <div><dd><span data-sc-count="0 2">2</span></dd><dt>Campus kiosks</dt></div>
-          </dl>
-        </section>
-
-        <section class="steps" aria-label="Three steps" data-sc-in data-sc-stagger="80">
-          <div><span>Upload</span><h3>From any phone</h3><p>No app to install. Sign in with Google and add your files.</p></div>
-          <div><span>Pay</span><h3>Only for what you print</h3><p>Choose colour, sides and copies. The total updates as you go.</p></div>
-          <div><span>Collect</span><h3>At the kiosk</h3><p>Type your 4-digit code on the keypad and take your pages from the tray.</p></div>
-        </section>
-
-        <section class="faq" aria-labelledby="faq-h">
-          <h2 id="faq-h">Questions</h2>
-          <div>
-            <details>
-              <summary>Which files can I print?</summary>
-              <p>PDF, Word, PowerPoint, Excel, text files, JPG and PNG. PDFs give the most faithful result; other formats are converted to PDF before printing.</p>
-            </details>
-            <details>
-              <summary>How long is my print code valid?</summary>
-              <p>Your 4-digit code is valid for 24 hours. If you don't collect your prints within that window, your payment is refunded automatically.</p>
-            </details>
-            <details>
-              <summary>How can I pay?</summary>
-              <p>All major UPI apps (Google Pay, PhonePe, Paytm), debit and credit cards, and net banking. Payments are processed securely by Cashfree.</p>
-            </details>
-            <details>
-              <summary>Is my document private?</summary>
-              <p>Files are encrypted in transit and permanently deleted from our servers right after printing. We never store, read or share your documents.</p>
-            </details>
-          </div>
-        </section>
-
-        <section class="partners" aria-label="Supported by">
-          <p>Supported by</p>
-          <img src="/Brands/IMG_3075.PNG" alt="SUDOBOX" loading="lazy" decoding="async">
-          <img src="/Brands/logo1.png" alt="Vasavi Condiments" loading="lazy" decoding="async">
-          <img src="/Brands/IMG_3715.JPG.jpeg" alt="Raajply" loading="lazy" decoding="async">
-          <img src="/Brands/Vasavi.jpg" alt="REVA NEST" loading="lazy" decoding="async">
-        </section>
-
-        <footer class="foot">
-          <div>
-            <span class="wordmark">MIMO</span>
-            <p>VisionPrintt Technologies. REVA NEST, Rukmini Knowledge Park, Yelahanka, Bengaluru 560064.</p>
-          </div>
-          <div>
-            <h4>Product</h4>
-            <ul>
-              <li><a href="/login">Start printing</a></li>
-              <li><a href="/find-machine">Find a kiosk</a></li>
-              <li><a href="/blog">Blog and guides</a></li>
-              <li><a href="/about">About us</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4>Help</h4>
-            <ul>
-              <li><a href="/contact">Contact support</a></li>
-              <li><a href="/contact#report">Report an issue</a></li>
-              <li><a href="/refund-policy">Refund policy</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4>Legal</h4>
-            <ul>
-              <li><a href="/privacy">Privacy policy</a></li>
-              <li><a href="/terms">Terms of service</a></li>
-              <li><a href="/cookie-policy">Cookie policy</a></li>
-            </ul>
-          </div>
-          <small>© 2026 VASUDEVA VISHAL (VisionPrintt Technologies). All rights reserved.</small>
-        </footer>
+        <h2 class="sec-head" id="types-title" data-reveal>Bring any file. <span class="dim">Office files become PDFs for you.</span></h2>
       </div>
-    </div>
+      <div class="rail" role="list">
+        <div class="type" role="listitem"><div class="tile"><div class="sheet"><i></i><i></i><i></i><b style="--c:#c4453a">PDF</b></div></div><div class="label">PDF</div></div>
+        <div class="type" role="listitem"><div class="tile"><div class="sheet"><i></i><i></i><i></i><b style="--c:#2f5bb7">DOCX</b></div></div><div class="label">Word</div></div>
+        <div class="type" role="listitem"><div class="tile"><div class="sheet"><i></i><i></i><i></i><b style="--c:#c8612d">PPTX</b></div></div><div class="label">PowerPoint</div></div>
+        <div class="type" role="listitem"><div class="tile"><div class="sheet"><i></i><i></i><i></i><b style="--c:#1f7a4a">XLSX</b></div></div><div class="label">Excel</div></div>
+        <div class="type" role="listitem"><div class="tile"><div class="sheet"><i></i><i></i><i></i><b style="--c:#6e6e73">JPG</b></div></div><div class="label">Photos</div></div>
+        <div class="type" role="listitem"><div class="tile"><div class="sheet"><i></i><i></i><i></i><b style="--c:#6e6e73">TXT</b></div></div><div class="label">Text</div></div>
+        <div class="type" role="listitem"><div class="tile"><div class="sheet graph"><b style="--c:#1d1d1f">GRID</b></div></div><div class="label">Graph paper</div></div>
+        <div class="type" role="listitem"><div class="tile"><div class="sheet blank"><b style="--c:#1d1d1f">A4</b></div></div><div class="label">Blank A4</div></div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="sec" aria-labelledby="how-title" style="padding-top:34px">
+      <div class="wrap">
+        <h2 class="sec-head" id="how-title" data-reveal>How it works. <span class="dim">Four steps, no app to install.</span></h2>
+      </div>
+      <div class="rail" role="list">
+        <article class="step dark" role="listitem">
+          <p class="eyebrow">Step 1</p>
+          <h3>Upload from any phone.</h3>
+          <p class="sub">Sign in with Google and add your files. PDF, Word, PowerPoint, Excel, text or photos.</p>
+          <div class="vis files">
+            <div class="file"><span class="ext" style="--c:#c4453a">PDF</span>DBMS_notes.pdf<span class="meta">12 pages</span></div>
+            <div class="file"><span class="ext" style="--c:#2f5bb7">DOCX</span>Lab_record.docx<span class="meta">4 pages</span></div>
+            <div class="file"><span class="ext" style="--c:#6e6e73">JPG</span>Timetable.jpg<span class="meta">1 page</span></div>
+          </div>
+        </article>
+
+        <article class="step" role="listitem">
+          <p class="eyebrow">Step 2</p>
+          <h3>Choose how it prints.</h3>
+          <p class="sub">The machine, black and white or colour, one side or both, and how many copies.</p>
+          <div class="vis opts">
+            <div class="opt">Colour <span class="seg"><span class="on">B&amp;W</span><span>Colour</span></span></div>
+            <div class="opt">Sides <span class="seg"><span class="on">One</span><span>Both</span></span></div>
+            <div class="opt">Copies <span class="stepper"><span>–</span>1<span>+</span></span></div>
+            <div class="opt-total"><span>17 pages</span><span>₹47.60</span></div>
+          </div>
+        </article>
+
+        <article class="step dark" role="listitem">
+          <p class="eyebrow">Step 3</p>
+          <h3>Pay with UPI.</h3>
+          <p class="sub">Google Pay, PhonePe, Paytm or a card, handled securely by Cashfree.</p>
+          <div class="vis pay">
+            <div class="amt">₹47.60</div>
+            <div class="for">17 pages · Black and white</div>
+            <div class="done">✓ Paid with UPI</div>
+          </div>
+        </article>
+
+        <article class="step" role="listitem">
+          <p class="eyebrow">Step 4</p>
+          <h3>Collect at the kiosk.</h3>
+          <p class="sub">Your code stays valid for 24 hours. Walk over when you like.</p>
+          <div class="vis">
+            <div class="codebox"><span>4</span><span>8</span><span>2</span><span>1</span></div>
+            <p class="code-note">Enter this on the MIMO keypad</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- SIGNATURE MOMENT -->
+    <section class="moment" id="moment" aria-labelledby="moment-title">
+      <div class="moment-pin">
+        <p class="eyebrow">At the kiosk</p>
+        <h2 id="moment-title">Four digits.<br><span class="dim">That's it.</span></h2>
+        <div class="m-code" aria-hidden="true"><span>4</span><span>8</span><span>2</span><span>1</span></div>
+        <div class="m-keys" aria-hidden="true">
+          <span data-k="1">1</span><span data-k="2">2</span><span data-k="3">3</span>
+          <span data-k="4">4</span><span data-k="5">5</span><span data-k="6">6</span>
+          <span data-k="7">7</span><span data-k="8">8</span><span data-k="9">9</span>
+          <span>⌫</span><span data-k="0">0</span><span data-k="ok">✓</span>
+        </div>
+        <div class="m-tray" aria-hidden="true"><div class="m-slot"><div class="m-page"><i></i><i></i><i></i><i></i></div></div></div>
+        <p class="m-status" id="m-status">Type your code</p>
+      </div>
+    </section>
+
+    <!-- PRICING -->
+    <section class="sec" id="pricing" aria-labelledby="price-title">
+      <div class="wrap">
+        <h2 class="sec-head" id="price-title" data-reveal>Pricing. <span class="dim">Pay only for what you print.</span></h2>
+        <div class="prices" data-reveal>
+          <div class="price wide">
+            <div><div class="k">Black and white</div><div class="v" data-price="pricePerPageBW">₹2.80</div></div>
+            <div class="u">per page</div>
+          </div>
+          <div class="price"><div class="k">Both sides</div><div class="v" data-price="pricePerPageBWDuplex">₹3.30</div><div class="u">per page, B&amp;W</div></div>
+          <div class="price"><div class="k">Colour</div><div class="v" data-price="pricePerPageColor">₹10</div><div class="u">per page</div></div>
+          <div class="price"><div class="k">Graph paper</div><div class="v" data-price="pricePerPageGraph">₹2</div><div class="u">per sheet</div></div>
+          <div class="price"><div class="k">Blank A4</div><div class="v" data-price="pricePerPageA4">₹2.80</div><div class="u">per sheet</div></div>
+        </div>
+        <p class="price-note">The total updates as you choose. No queue, no pen drive, no hunting for change.</p>
+      </div>
+    </section>
+
+    <!-- Ad slot: hidden until ADS.enabled is set to true (see script below). -->
+    <div class="wrap"><aside class="ad-slot" id="ad-slot" aria-label="Advertisement" hidden><p class="ad-label">Advertisement</p></aside></div>
+
+    <!-- KIOSKS -->
+    <section class="sec" aria-labelledby="kiosk-title">
+      <div class="wrap">
+        <h2 class="sec-head" id="kiosk-title" data-reveal>Kiosks. <span class="dim">Find one on campus.</span></h2>
+      </div>
+      <div class="rail" role="list">
+        <article class="kiosk-card" role="listitem">
+          <img src="/images/machines/central-library-780.jpg" alt="MIMO 2.0 kiosk at the Central Library" loading="lazy" width="780" height="455" />
+          <div class="body">
+            <h3>MIMO 2.0</h3><p class="loc">Central Library</p>
+            <div class="pills"><span class="pill"><span class="dot"></span>Available</span><span class="pill">Colour and B&amp;W</span></div>
+          </div>
+        </article>
+        <article class="kiosk-card" role="listitem">
+          <img src="/images/machines/cv-raman-block-780.jpg" alt="MIMO 1.0 kiosk at CV Raman Block" loading="lazy" width="780" height="520" />
+          <div class="body">
+            <h3>MIMO 1.0</h3><p class="loc">CV Raman Block</p>
+            <div class="pills"><span class="pill"><span class="dot"></span>Available</span><span class="pill">B&amp;W</span></div>
+          </div>
+        </article>
+        <article class="kiosk-card guess" id="guess" role="listitem">
+          <div class="flip">
+            <!-- Front: the mystery machine -->
+            <div class="face front">
+              <div class="mystery" aria-hidden="true">
+                <div class="ghost"><span class="scr"></span><span class="q">?</span><span class="slot"></span></div>
+                <div class="ghost-floor"></div>
+              </div>
+              <div class="body">
+                <h3>The next MIMO</h3>
+                <p class="loc">Where should it go? You tell us.</p>
+                <button class="btn small" type="button" id="guess-open">Make a guess</button>
+              </div>
+            </div>
+
+            <!-- Back: the form, then the printed thank-you -->
+            <div class="face back">
+              <form class="guess-form" id="guess-form" novalidate>
+                <p class="eyebrow">Guess the next MIMO</p>
+                <h3>Where should we go next?</h3>
+                <label class="sr" for="guess-input">Campus or place name</label>
+                <input id="guess-input" name="place" type="text" maxlength="60" autocomplete="off" enterkeyhint="send" placeholder="Your college, hostel or block" />
+                <p class="guess-err" id="guess-err" role="alert"></p>
+                <div class="guess-actions">
+                  <button class="btn" type="submit">Send guess</button>
+                  <button class="link plain" type="button" id="guess-cancel">Cancel</button>
+                </div>
+              </form>
+
+              <div class="guess-done" id="guess-done" aria-live="polite">
+                <div class="g-tray" aria-hidden="true"><div class="g-slot"><div class="g-sheet"><span class="g-label">Next stop</span><strong id="guess-name"></strong><i></i><i></i></div></div></div>
+                <h3>Guess received.</h3>
+                <p class="loc">Thanks! More votes for a place bring MIMO there sooner.</p>
+                <button class="link plain" type="button" id="guess-again">Guess another place<span class="chev">›</span></button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+      <div class="wrap"><a class="link" href="/find-machine">See all kiosks<span class="chev">›</span></a></div>
+    </section>
+
+    <!-- PRIVACY -->
+    <section class="sec" aria-labelledby="privacy-title">
+      <div class="wrap">
+        <div class="privacy" id="privacy" data-reveal>
+          <p class="eyebrow">Privacy</p>
+          <h2 id="privacy-title">Printed.<br>Then deleted.</h2>
+          <p>Files are encrypted in transit and permanently deleted from our servers right after printing. We never store, read or share your documents.</p>
+          <div class="shred" aria-hidden="true">
+            <i style="--h:100%"></i><i style="--h:78%"></i><i style="--h:92%"></i><i style="--h:64%"></i><i style="--h:86%"></i><i style="--h:70%"></i><i style="--h:96%"></i><i style="--h:58%"></i><i style="--h:82%"></i><i style="--h:74%"></i>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="sec" aria-labelledby="faq-title">
+      <div class="wrap">
+        <h2 class="sec-head" id="faq-title" data-reveal>Questions. <span class="dim">Quick answers.</span></h2>
+        <div class="faq" data-reveal>
+          <details>
+            <summary>Which files can I print?</summary>
+            <p>PDF, Word, PowerPoint, Excel, text files, JPG and PNG. PDFs give the most faithful result; other formats are converted to PDF before printing.</p>
+          </details>
+          <details>
+            <summary>How long is my print code valid?</summary>
+            <p>Your 4-digit code is valid for 24 hours. If you don't collect your prints within that window, your payment is refunded automatically.</p>
+          </details>
+          <details>
+            <summary>How can I pay?</summary>
+            <p>All major UPI apps (Google Pay, PhonePe, Paytm), debit and credit cards, and net banking. Payments are processed securely by Cashfree.</p>
+          </details>
+          <details>
+            <summary>Is my document private?</summary>
+            <p>Files are encrypted in transit and permanently deleted from our servers right after printing. We never store, read or share your documents.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- SPONSORS -->
+    <section class="sec" aria-labelledby="sponsor-title">
+      <div class="wrap">
+        <h2 class="sec-head" id="sponsor-title" data-reveal>Supported by. <span class="dim">Partners who back MIMO.</span></h2>
+        <div class="sponsors" data-reveal>
+          <div class="sponsor"><img src="/images/landing/sponsors/sudobox.webp" alt="SUDOBOX" loading="lazy" /><span>SUDOBOX</span></div>
+          <div class="sponsor"><img src="/images/landing/sponsors/vasavi-condiments.webp" alt="Vasavi Condiments" loading="lazy" /><span>Vasavi Condiments</span></div>
+          <div class="sponsor"><img src="/images/landing/sponsors/raajply.webp" alt="Raajply" loading="lazy" /><span>Raajply</span></div>
+          <div class="sponsor"><img src="/images/landing/sponsors/reva-nest.webp" alt="REVA NEST" loading="lazy" /><span>REVA NEST</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CLOSING -->
+    <section class="close" aria-labelledby="close-title">
+      <div class="wrap">
+        <h2 id="close-title" data-reveal>Printing,<br>finally fixed.</h2>
+        <p>No queue at the shop, no pen drive, no hunting for change.</p>
+        <div class="row">
+          <a class="btn" href="/login">Start printing</a>
+          <a class="link" href="/find-machine">Find a kiosk<span class="chev">›</span></a>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <script defer src="/scrollcraft/scrollcraft.js"></script>
+  <footer>
+    <div class="wrap">
+      <div class="groups">
+        <details>
+          <summary>Product</summary>
+          <ul><li><a href="/login">Start printing</a></li><li><a href="/find-machine">Find a kiosk</a></li><li><a href="/blog">Blog and guides</a></li><li><a href="/about">About us</a></li></ul>
+        </details>
+        <details>
+          <summary>Help</summary>
+          <ul><li><a href="/contact">Contact support</a></li><li><a href="/contact">Report an issue</a></li><li><a href="/refund-policy">Refund policy</a></li></ul>
+        </details>
+        <details>
+          <summary>Legal</summary>
+          <ul><li><a href="/privacy">Privacy policy</a></li><li><a href="/terms">Terms of service</a></li><li><a href="/cookie-policy">Cookie policy</a></li></ul>
+        </details>
+      </div>
+      <p class="addr">VisionPrintt Technologies. REVA NEST, Rukmini Knowledge Park, Yelahanka, Bengaluru 560064.</p>
+      <p class="copy">© 2026 VASUDEVA VISHAL (VisionPrintt Technologies). All rights reserved.</p>
+    </div>
+  </footer>
+
   <script>
-    // Progressive enhancement: the page ships as a complete static composition. Only when motion is
-    // allowed and the engine loaded does the story become a pinned, scroll-driven stage.
-    window.addEventListener("DOMContentLoaded", function () {
-      if (!window.ScrollCraft) return;
-      var story = document.getElementById("story");
-      if (!ScrollCraft.reduce) {
-        story.classList.remove("is-static");
-        story.setAttribute("data-sc-act", "pin");
+  (function () {
+    // Ads: flip `enabled` to true and paste the AdSense slot id to show the ad block.
+    var ADS = { enabled: false, client: "ca-pub-6488030243565665", slot: "" };
+
+    var API = "https://api-upqxuj7evq-uc.a.run.app/api/settings";
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.documentElement.classList.add("js");
+
+    var nav = document.getElementById("nav");
+
+    // Reveal-on-scroll
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { rootMargin: "0px 0px -12% 0px" });
+    document.querySelectorAll("[data-reveal]").forEach(function (el) { io.observe(el); });
+
+    // Signature moment: scroll types 4-8-2-1, presses ✓, then a page comes out of the tray.
+    var moment = document.getElementById("moment");
+    var slots = moment.querySelectorAll(".m-code span");
+    var status = document.getElementById("m-status");
+    var digits = ["4", "8", "2", "1", "ok"];
+    var lastStep = -1;
+    function keyFor(d) { return moment.querySelector('[data-k="' + d + '"]'); }
+    function setStep(step) {
+      if (step === lastStep) return;
+      lastStep = step;
+      slots.forEach(function (s, i) { s.classList.toggle("on", i < Math.min(step, 4)); });
+      moment.querySelectorAll(".m-keys .press").forEach(function (k) { k.classList.remove("press"); });
+      if (step >= 1 && step <= 5) { var k = keyFor(digits[step - 1]); if (k) k.classList.add("press"); }
+      moment.classList.toggle("printed", step >= 6);
+      status.textContent = step >= 6 ? "Printed. Collect your pages." : step === 5 ? "Printing…" : "Type your code";
+    }
+
+    var kiosk = document.getElementById("kiosk");
+    var ticking = false;
+    function onScroll() {
+      ticking = false;
+      var y = window.scrollY, vh = window.innerHeight;
+      nav.classList.toggle("scrolled", y > 8);
+      if (!reduce) kiosk.style.transform = "translateY(" + Math.min(y * 0.12, 80) + "px) scale(" + (1 - Math.min(y / 4000, 0.06)) + ")";
+      var r = moment.getBoundingClientRect();
+      var total = moment.offsetHeight - vh;
+      var p = total > 0 ? Math.min(1, Math.max(0, -r.top / total)) : 1;
+      setStep(reduce ? 6 : Math.floor(p * 7.2));
+    }
+    window.addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
+    onScroll();
+
+    // "Guess the next MIMO": flip the card, collect a place name, print it on a sheet.
+    // Set SUGGEST.endpoint to a POST URL to also send guesses to a server; until then they stay on this phone.
+    var SUGGEST = { endpoint: "" };
+    var guess = document.getElementById("guess");
+    var form = document.getElementById("guess-form");
+    var input = document.getElementById("guess-input");
+    var err = document.getElementById("guess-err");
+    var nameOut = document.getElementById("guess-name");
+    function openGuess() {
+      guess.classList.remove("sent");
+      guess.classList.add("open");
+      setTimeout(function () { input.focus({ preventScroll: true }); }, reduce ? 0 : 650);
+    }
+    function closeGuess() { guess.classList.remove("open", "sent"); form.classList.remove("bad"); err.textContent = ""; }
+    function burst() {
+      if (reduce) return;
+      var colors = ["#1d1d1f", "#b25a1e", "#d2d2d7", "#ffffff", "#e0894c"];
+      for (var i = 0; i < 22; i++) {
+        var c = document.createElement("span");
+        c.className = "confetti";
+        var a = (Math.PI * 2 * i) / 22 + Math.random() * 0.4;
+        var d = 90 + Math.random() * 90;
+        c.style.setProperty("--x", Math.cos(a) * d + "px");
+        c.style.setProperty("--y", Math.sin(a) * d - 40 + "px");
+        c.style.setProperty("--r", Math.round(Math.random() * 540 - 270) + "deg");
+        c.style.background = colors[i % colors.length];
+        c.style.boxShadow = "0 0 0 1px rgba(0,0,0,0.06)";
+        guess.querySelector(".back").appendChild(c);
+        setTimeout(function (el) { el.remove(); }, 1400, c);
       }
-      ScrollCraft.mount(document.body);
+    }
+    document.getElementById("guess-open").addEventListener("click", openGuess);
+    document.getElementById("guess-cancel").addEventListener("click", closeGuess);
+    document.getElementById("guess-again").addEventListener("click", function () { input.value = ""; openGuess(); });
+    input.addEventListener("input", function () { form.classList.remove("bad"); err.textContent = ""; });
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var place = input.value.replace(/\s+/g, " ").trim();
+      if (place.length < 2) {
+        form.classList.remove("bad"); void form.offsetWidth; form.classList.add("bad");
+        err.textContent = "Type a campus or place name.";
+        return;
+      }
+      nameOut.textContent = place;
+      guess.classList.add("sent");
+      input.blur();
+      burst();
+      try {
+        var list = JSON.parse(localStorage.getItem("mimo_next_guesses") || "[]");
+        list.push({ place: place, at: new Date().toISOString() });
+        localStorage.setItem("mimo_next_guesses", JSON.stringify(list.slice(-20)));
+      } catch (x) {}
+      if (SUGGEST.endpoint) {
+        fetch(SUGGEST.endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ place: place, source: "landing" }) }).catch(function () {});
+      }
     });
+
+    // Live prices from the admin-configured rates (defaults already in the HTML).
+    fetch(API, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (rates) {
+      if (!rates) return;
+      document.querySelectorAll("[data-price]").forEach(function (el) {
+        var v = Number(rates[el.getAttribute("data-price")]);
+        if (v > 0) el.textContent = "₹" + (v % 1 ? v.toFixed(2) : String(v));
+      });
+    }).catch(function () {});
+
+    if (ADS.enabled && ADS.slot) {
+      var slot = document.getElementById("ad-slot");
+      slot.hidden = false;
+      var ins = document.createElement("ins");
+      ins.className = "adsbygoogle";
+      ins.style.display = "block";
+      ins.setAttribute("data-ad-client", ADS.client);
+      ins.setAttribute("data-ad-slot", ADS.slot);
+      ins.setAttribute("data-ad-format", "auto");
+      ins.setAttribute("data-full-width-responsive", "true");
+      slot.appendChild(ins);
+      var s = document.createElement("script");
+      s.async = true;
+      s.crossOrigin = "anonymous";
+      s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" + ADS.client;
+      s.onload = function () { (window.adsbygoogle = window.adsbygoogle || []).push({}); };
+      document.head.appendChild(s);
+    }
+  })();
   </script>
 </body>
 </html>
