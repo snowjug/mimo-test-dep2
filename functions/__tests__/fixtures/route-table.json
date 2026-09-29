@@ -49,6 +49,7 @@
   "POST /google-login",
   "POST /kiosk/print",
   "POST /kiosk/report-failure",
+  "POST /kiosk/report-problem",
   "POST /login",
   "POST /mark-printed",
   "POST /onboarding",
