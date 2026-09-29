@@ -22,22 +22,64 @@ const REPORTABLE_ISSUES = { blank: "Blank pages", missing: "Pages missing", fain
 const REPORT_WINDOW_MS = 30 * 60 * 1000;
 const toMillis = (t) => (t && t.toDate ? t.toDate().getTime() : t ? new Date(t).getTime() : 0);
 
-async function defaultSendIssueEmail({ printCode, kioskId, issue, jobs }) {
+const HISTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+// A customer who has already reported this many problems in 30 days is still recorded, but no longer emails the team.
+const MUTE_AFTER_REPORTS = 3;
+
+/**
+ * What the machine itself can say about a complaint. The printer's page counter proves how many sheets came out,
+ * so "pages missing" can be confirmed or contradicted; it cannot see ink, so blank/faint pages need the paper itself.
+ */
+function judgeReport(issue, job) {
+  const counted = job.printVerified === true ? Number(job.sheetsVerified) || 0 : null;
+  if (job.status === "failed" || job.status === "refunded" || job.refundStatus) {
+    return { verdict: "already_failed", note: "The printer had already reported this job as failed, so it was refunded automatically." };
+  }
+  if (issue === "missing") {
+    return counted !== null
+      ? { verdict: "contradicted", note: `The printer counted all ${counted} sheet(s) coming out. The claim of missing pages is not supported.` }
+      : { verdict: "unverified", note: "The printer could not confirm the sheet count for this job. Treat the claim as possible." };
+  }
+  return {
+    verdict: "needs_proof",
+    note: counted !== null
+      ? `The printer counted ${counted} sheet(s) coming out but cannot see ink. Ask to see the pages or a photo before refunding.`
+      : "The printer could not confirm the sheet count and cannot see ink. Ask to see the pages or a photo before refunding.",
+  };
+}
+
+async function defaultSendIssueEmail({ printCode, kioskId, issue, jobs, judgement, history }) {
   const lines = jobs.map((j) => {
     const copies = (j.printOptions && j.printOptions.copies) || j.copies || 1;
     const checked = j.printVerified === true ? `printer counted ${j.sheetsVerified} sheet(s)` : "not verified by the printer";
     return `- Job ${j.id}: ${j.pageCount || "?"} page(s) x ${copies} cop(ies), ${j.colorMode || "bw"}, status ${j.status}, ${checked}`;
   });
+  const historyLine = history
+    ? `Customer history (30 days): ${history.reports} earlier problem report(s) across ${history.prints} print(s).`
+    : "Customer history: unknown (guest print).";
   await getTransporter().sendMail({
     from: '"Mimo Printing" <visionprintt@gmail.com>',
     to: "visionprintt@gmail.com",
     subject: `MIMO Customer Reported a Print Problem - ${kioskId || "Unknown Kiosk"}`,
     text:
       "A customer reported a problem with their printout at the kiosk.\n\n" +
+      `Printer evidence: ${judgement.note}\n${historyLine}\n\n` +
       `Kiosk: ${kioskId || "Unknown"}\nPrint code: ${printCode}\nProblem: ${issue}\n\n` +
       `${lines.join("\n")}\n\n` +
       "Please check the printer and decide on a refund or reprint.",
   });
+}
+
+/** Earlier reports and prints by the same customer in the last 30 days (null for guest jobs). */
+async function customerHistory(db, userId, excludeIds) {
+  if (!userId) return null;
+  const snap = await db.collection("print_jobs").where("userId", "==", userId).limit(300).get();
+  const since = Date.now() - HISTORY_WINDOW_MS;
+  const recent = snap.docs
+    .filter((d) => !excludeIds.has(d.id))
+    .map((d) => d.data())
+    .filter((j) => toMillis(j.createdAt) >= since);
+  return { prints: recent.length, reports: recent.filter((j) => j.customerIssue && toMillis(j.customerIssue.reportedAt) >= since).length };
 }
 const {
   validateKioskPrintRequest,
@@ -490,17 +532,33 @@ function createKioskRouter(dependencies) {
 
       const fresh = jobs.filter((j) => !j.customerIssue);
       if (fresh.length) {
+        const judgement = judgeReport(issue, fresh[0]);
+        let history = null;
+        try {
+          history = await customerHistory(db, fresh[0].userId, new Set(jobs.map((j) => j.id)));
+        } catch (histErr) {
+          console.error("[REPORT-PROBLEM] History lookup failed:", histErr.message || histErr);
+        }
+        const muted = !!history && history.reports >= MUTE_AFTER_REPORTS;
         const report = {
           type: issue,
           label: REPORTABLE_ISSUES[issue],
           kioskId: kioskId || jobs[0].kioskId || null,
+          verdict: judgement.verdict,
+          evidence: judgement.note,
+          earlierReports: history ? history.reports : null,
+          muted,
           reportedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
         await Promise.all(fresh.map((j) => j.ref.update({ customerIssue: report })));
-        try {
-          await sendIssueEmail({ printCode: String(printCode), kioskId: report.kioskId, issue: report.label, jobs: fresh });
-        } catch (mailErr) {
-          console.error("[REPORT-PROBLEM] Email failed:", mailErr.message || mailErr);
+        if (muted) {
+          console.warn(`[REPORT-PROBLEM] ${fresh[0].userId} has ${history.reports} reports in 30 days; recorded without email.`);
+        } else {
+          try {
+            await sendIssueEmail({ printCode: String(printCode), kioskId: report.kioskId, issue: report.label, jobs: fresh, judgement, history });
+          } catch (mailErr) {
+            console.error("[REPORT-PROBLEM] Email failed:", mailErr.message || mailErr);
+          }
         }
       }
       return res.json({ received: true });
@@ -513,4 +571,4 @@ function createKioskRouter(dependencies) {
   return router;
 }
 
-module.exports = { createKioskRouter };
+module.exports = { createKioskRouter, judgeReport };

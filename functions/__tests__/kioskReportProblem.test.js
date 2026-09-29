@@ -9,7 +9,7 @@ const { createFakeFirestore } = require("./helpers/fakeFirestore");
 const fake = createFakeFirestore();
 fake.install();
 const { isColorJob } = require("../src/services/printJob.service");
-const { createKioskRouter } = require("../src/routes/kiosk.routes");
+const { createKioskRouter, judgeReport } = require("../src/routes/kiosk.routes");
 
 const emails = [];
 let failEmail = false;
@@ -24,7 +24,7 @@ function response() {
   return { code: 200, body: undefined, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, set() { return this; } };
 }
 const job = (over = {}) => ({
-  printCode: "4821", kioskId: "CV-001", status: "completed", pageCount: 3, copies: 4, colorMode: "bw",
+  printCode: "4821", kioskId: "CV-001", userId: "u1", status: "completed", pageCount: 3, copies: 4, colorMode: "bw",
   printVerified: true, sheetsVerified: 12, printedAt: new Date(), ...over,
 });
 const post = async (body) => { const res = response(); await reportProblem({ body }, res); return res; };
@@ -76,4 +76,40 @@ test("the report is still saved when the email cannot be sent", async () => {
   const res = await post({ printCode: "4821", kioskId: "CV-001", issue: "missing" });
   assert.deepStrictEqual(res.body, { received: true });
   assert.strictEqual(fake.data("print_jobs").j1.customerIssue.type, "missing");
+});
+
+test("the email carries what the printer proved", async () => {
+  fake.reset({ print_jobs: { j1: job() } });
+  await post({ printCode: "4821", kioskId: "CV-001", issue: "missing" });
+  assert.strictEqual(emails[0].judgement.verdict, "contradicted");
+  assert.match(emails[0].judgement.note, /counted all 12 sheet/);
+  assert.strictEqual(fake.data("print_jobs").j1.customerIssue.verdict, "contradicted");
+  assert.deepStrictEqual(emails[0].history, { prints: 0, reports: 0 });
+});
+
+test("verdicts: missing pages are checked against the counter, blank pages need the paper", () => {
+  assert.strictEqual(judgeReport("missing", { printVerified: true, sheetsVerified: 4 }).verdict, "contradicted");
+  assert.strictEqual(judgeReport("missing", {}).verdict, "unverified");
+  assert.strictEqual(judgeReport("blank", { printVerified: true, sheetsVerified: 4 }).verdict, "needs_proof");
+  assert.strictEqual(judgeReport("faint", {}).verdict, "needs_proof");
+  assert.strictEqual(judgeReport("blank", { status: "refunded" }).verdict, "already_failed");
+});
+
+test("a customer who keeps reporting is recorded but no longer emails the team", async () => {
+  const old = (id) => job({ printCode: "1111", createdAt: new Date(Date.now() - 86400000), customerIssue: { type: "blank", reportedAt: new Date(Date.now() - 86400000) } });
+  fake.reset({ print_jobs: { a: old(), b: old(), c: old(), j1: job({ createdAt: new Date() }) } });
+  const res = await post({ printCode: "4821", kioskId: "CV-001", issue: "blank" });
+  assert.deepStrictEqual(res.body, { received: true });
+  assert.strictEqual(emails.length, 0);
+  const saved = fake.data("print_jobs").j1.customerIssue;
+  assert.strictEqual(saved.muted, true);
+  assert.strictEqual(saved.earlierReports, 3);
+});
+
+test("two earlier reports still email, with the history in it", async () => {
+  const old = () => job({ printCode: "1111", createdAt: new Date(Date.now() - 86400000), customerIssue: { type: "blank", reportedAt: new Date(Date.now() - 86400000) } });
+  fake.reset({ print_jobs: { a: old(), b: old(), j1: job({ createdAt: new Date() }) } });
+  await post({ printCode: "4821", kioskId: "CV-001", issue: "blank" });
+  assert.strictEqual(emails.length, 1);
+  assert.deepStrictEqual(emails[0].history, { prints: 2, reports: 2 });
 });
