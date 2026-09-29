@@ -108,10 +108,22 @@ export interface JobRow {
   printerStatus: string | null;
   refundStatus: string | null;
   refundAmount: number | null;
+  userName?: string | null;
+  refund?: RefundInfo | null;
+  outcome?: JobOutcome;
   printVerified?: boolean;
   sheetsVerified?: number | null;
   timeline?: TimelineStep[];
   customerIssue?: CustomerIssue | null;
+}
+
+export type JobOutcome = 'printed' | 'failed' | 'refunded' | 'refund_pending' | 'printing' | 'waiting';
+
+export interface RefundInfo {
+  state: 'refunded' | 'pending';
+  amount: number | null;
+  at: string | null;
+  source: 'auto' | 'admin' | 'cashfree';
 }
 
 export interface TimelineStep {
@@ -152,6 +164,9 @@ export interface PrinterInfo {
   paperPct: number | null;
   tonerLevel: number | null;
   inkLevel: number | null;
+  paperTracked?: boolean;
+  paperRefilledAt?: string | null;
+  panelMessage?: string | null;
 }
 
 export interface KioskLive {
