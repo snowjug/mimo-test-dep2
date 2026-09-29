@@ -8,6 +8,7 @@
  * - GET  /kiosk/job-status
  * - POST /kiosk/print
  * - POST /kiosk/report-failure
+ * - POST /kiosk/report-problem   (customer says the printout was bad)
  */
 
 const express = require("express");
@@ -15,6 +16,29 @@ const { createLimiters } = require("../middleware/rateLimit");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
 const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
 const { unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
+const { getTransporter } = require("../services/email.service");
+
+const REPORTABLE_ISSUES = { blank: "Blank pages", missing: "Pages missing", faint: "Too faint or streaky", other: "Something else" };
+const REPORT_WINDOW_MS = 30 * 60 * 1000;
+const toMillis = (t) => (t && t.toDate ? t.toDate().getTime() : t ? new Date(t).getTime() : 0);
+
+async function defaultSendIssueEmail({ printCode, kioskId, issue, jobs }) {
+  const lines = jobs.map((j) => {
+    const copies = (j.printOptions && j.printOptions.copies) || j.copies || 1;
+    const checked = j.printVerified === true ? `printer counted ${j.sheetsVerified} sheet(s)` : "not verified by the printer";
+    return `- Job ${j.id}: ${j.pageCount || "?"} page(s) x ${copies} cop(ies), ${j.colorMode || "bw"}, status ${j.status}, ${checked}`;
+  });
+  await getTransporter().sendMail({
+    from: '"Mimo Printing" <visionprintt@gmail.com>',
+    to: "visionprintt@gmail.com",
+    subject: `MIMO Customer Reported a Print Problem - ${kioskId || "Unknown Kiosk"}`,
+    text:
+      "A customer reported a problem with their printout at the kiosk.\n\n" +
+      `Kiosk: ${kioskId || "Unknown"}\nPrint code: ${printCode}\nProblem: ${issue}\n\n` +
+      `${lines.join("\n")}\n\n` +
+      "Please check the printer and decide on a refund or reprint.",
+  });
+}
 const {
   validateKioskPrintRequest,
   validateKioskPrintResponse,
@@ -440,6 +464,49 @@ function createKioskRouter(dependencies) {
     } catch (err) {
       console.error("[AUTO-REFUND] Unexpected error:", err);
       res.status(500).json({ error: "Auto-refund processing failed" });
+    }
+  });
+
+  // ================= 4. KIOSK: CUSTOMER REPORTS A BAD PRINTOUT =================
+  // The Pi proves sheets came out (printer page counter) but cannot see ink on them. The summary screen asks "Did
+  // your pages print correctly?"; a "no" lands here. The order is flagged and the team is emailed once. There is no
+  // automatic refund: the team decides, so a false report cannot turn a good print into a free one.
+  const sendIssueEmail = dependencies.sendIssueEmail || defaultSendIssueEmail;
+  router.post("/report-problem", codeGuessLimiter, async (req, res) => {
+    try {
+      const { printCode, kioskId, issue } = req.body || {};
+      if (!/^\d{4}$/.test(String(printCode || "")) || !REPORTABLE_ISSUES[issue]) {
+        return res.status(400).json({ error: "printCode and a valid issue are required" });
+      }
+      const snapshot = await db.collection("print_jobs").where("printCode", "==", String(printCode)).get();
+      const now = Date.now();
+      const jobs = snapshot.docs
+        .map((d) => ({ ref: d.ref, id: d.id, ...d.data() }))
+        .filter((j) => (!kioskId || !j.kioskId || j.kioskId === kioskId))
+        .filter((j) => now - toMillis(j.printedAt || j.updatedAt || j.createdAt) < REPORT_WINDOW_MS);
+      if (!jobs.length) {
+        return res.status(404).json({ error: "No recent print found for this code" });
+      }
+
+      const fresh = jobs.filter((j) => !j.customerIssue);
+      if (fresh.length) {
+        const report = {
+          type: issue,
+          label: REPORTABLE_ISSUES[issue],
+          kioskId: kioskId || jobs[0].kioskId || null,
+          reportedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        await Promise.all(fresh.map((j) => j.ref.update({ customerIssue: report })));
+        try {
+          await sendIssueEmail({ printCode: String(printCode), kioskId: report.kioskId, issue: report.label, jobs: fresh });
+        } catch (mailErr) {
+          console.error("[REPORT-PROBLEM] Email failed:", mailErr.message || mailErr);
+        }
+      }
+      return res.json({ received: true });
+    } catch (err) {
+      console.error("[REPORT-PROBLEM] Unexpected error:", err);
+      return res.status(500).json({ error: "Could not record the report" });
     }
   });
 
