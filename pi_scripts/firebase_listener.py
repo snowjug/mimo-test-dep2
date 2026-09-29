@@ -774,6 +774,216 @@ def is_printer_online(printer_name):
     except Exception as e:
         print(f"⚠️ Printer status check failed: {e}")
         return False, f"Printer status check error: {e}"
+# ================= PRINTER SELF-REPORT (PJL over USB) =================
+# CUPS reports a job "completed" once the data has been handed to the printer; it cannot see paper. The Brother
+# lasers answer PJL status queries on USB interface 0 (bidirectional), so the listener reads their lifetime page
+# counter before and after a job and only reports "Printed" when the sheets really went through. The same reply
+# carries the front-panel message, which exposes toner/drum warnings. CUPS holds the device only while a job is
+# being sent, so queries run between jobs; if the device is busy or unreadable the check is skipped ("unknown").
+PJL_UEL = b"\x1b%-12345X"
+PJL_QUERY = PJL_UEL + b"@PJL\r\n@PJL INFO STATUS\r\n@PJL INFO PAGECOUNT\r\n" + PJL_UEL
+PJL_IFACE, PJL_EP_OUT, PJL_EP_IN = 0, 0x01, 0x82
+_pjl_lock = threading.Lock()
+# One B&W job at a time between "read counter" and "verified", so two jobs' sheets are never mixed up.
+_sheet_check_locks = {}
+# Latest supply state per printer ("ok" | "low" | "empty"), refreshed by the heartbeat and before each B&W job.
+printer_supply_state = {}
+HARDWARE_PRINTER_ID = {"CV-001": "CV-001", "SV-002": "SV-002-BW"}
+# Kill switch: set SHEET_CHECK=false in the service environment to go back to "completed when CUPS finishes".
+SHEET_CHECK_ENABLED = os.environ.get("SHEET_CHECK", "true").lower() == "true"
+SHEET_SLOT_WAIT_SEC = 120
+
+
+def _pjl_exchange(usb_id, query=PJL_QUERY, timeout_s=6.0):
+    """Send a PJL query to the USB printer `usb_id` ("vvvv:pppp") and return the reply text; raises on failure."""
+    import ctypes
+    import ctypes.util
+    lib = ctypes.CDLL(ctypes.util.find_library("usb-1.0") or "libusb-1.0.so.0")
+    lib.libusb_open_device_with_vid_pid.restype = ctypes.c_void_p
+    lib.libusb_open_device_with_vid_pid.argtypes = [ctypes.c_void_p, ctypes.c_uint16, ctypes.c_uint16]
+    for name in ("libusb_kernel_driver_active", "libusb_detach_kernel_driver", "libusb_attach_kernel_driver",
+                 "libusb_claim_interface", "libusb_release_interface"):
+        getattr(lib, name).argtypes = [ctypes.c_void_p, ctypes.c_int]
+    lib.libusb_set_interface_alt_setting.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+    lib.libusb_bulk_transfer.argtypes = [ctypes.c_void_p, ctypes.c_ubyte, ctypes.c_char_p, ctypes.c_int,
+                                         ctypes.POINTER(ctypes.c_int), ctypes.c_uint]
+    lib.libusb_close.argtypes = [ctypes.c_void_p]
+    vid, pid = (int(x, 16) for x in usb_id.split(":"))
+    ctx = ctypes.c_void_p()
+    if lib.libusb_init(ctypes.byref(ctx)) != 0:
+        raise RuntimeError("libusb_init failed")
+    handle = lib.libusb_open_device_with_vid_pid(ctx, vid, pid)
+    if not handle:
+        lib.libusb_exit(ctx)
+        raise RuntimeError("cannot open printer USB device (not present or no permission)")
+    reattach = False
+    try:
+        if lib.libusb_kernel_driver_active(handle, PJL_IFACE) == 1:
+            lib.libusb_detach_kernel_driver(handle, PJL_IFACE)
+            reattach = True
+        rc = lib.libusb_claim_interface(handle, PJL_IFACE)
+        if rc != 0:
+            raise RuntimeError(f"printer busy (claim {rc})")
+        try:
+            lib.libusb_set_interface_alt_setting(handle, PJL_IFACE, 0)
+            n = ctypes.c_int()
+            lib.libusb_bulk_transfer(handle, PJL_EP_OUT, query, len(query), ctypes.byref(n), 3000)
+            buf, reply, deadline = ctypes.create_string_buffer(4096), b"", time.time() + timeout_s
+            while time.time() < deadline:
+                rc = lib.libusb_bulk_transfer(handle, PJL_EP_IN, buf, 4096, ctypes.byref(n), 700)
+                if n.value:
+                    reply += buf.raw[: n.value]
+                if b"PAGECOUNT" in reply and reply.rstrip().endswith(b"\x0c"):
+                    break
+                if rc not in (0, -7):  # -7 = LIBUSB_ERROR_TIMEOUT, keep waiting
+                    break
+            return reply.decode("latin-1", "replace")
+        finally:
+            lib.libusb_release_interface(handle, PJL_IFACE)
+    finally:
+        if reattach:
+            lib.libusb_attach_kernel_driver(handle, PJL_IFACE)
+        lib.libusb_close(handle)
+        lib.libusb_exit(ctx)
+
+
+def parse_pjl_status(raw):
+    """Pull the page counter, status code, panel message and online flag out of a PJL INFO reply."""
+    import re
+    raw = raw or ""
+    def grab(pattern, cast=str):
+        m = re.search(pattern, raw)
+        return cast(m.group(1)) if m else None
+    online = grab(r"ONLINE=(\w+)")
+    return {
+        "pagecount": grab(r"PAGECOUNT\s*\r?\n?\s*(?:PAGECOUNT=)?(\d+)", int),
+        "status_code": grab(r"CODE=(\d+)", int),
+        "display": grab(r"DISPLAY=\"([^\"]*)\""),
+        "online": None if online is None else online.upper() == "TRUE",
+    }
+
+
+def classify_supply(display):
+    """
+    'empty' when the printer has stopped for toner/drum ("Replace Toner", "Replace Drum", "No Toner", "Drum Stop"),
+    'low' for warnings it still prints through ("Toner Low", "Drum End Soon"), else 'ok'.
+    """
+    import re
+    text = (display or "").lower()
+    if not re.search(r"toner|drum|cartridge", text):
+        return "ok"
+    if re.search(r"\blow\b|soon|near", text):
+        return "low"
+    if re.search(r"replace|ended|empty|no toner|stop|install|error|\bout\b", text):
+        return "empty"
+    return "low"
+
+
+def read_printer_status(printer_name):
+    """PJL status of a USB Brother printer, or None if it is not a Brother, busy, or did not answer."""
+    usb_id = PRINTER_USB_IDS.get(printer_name)
+    if not usb_id or not usb_id.startswith("04f9:"):
+        return None
+    with _pjl_lock:
+        try:
+            info = parse_pjl_status(_pjl_exchange(usb_id))
+        except Exception as e:
+            print(f"ℹ️ [PJL] {printer_name} status not available: {e}")
+            return None
+    if info.get("pagecount") is None:
+        return None
+    printer_supply_state[printer_name] = classify_supply(info.get("display"))
+    return info
+
+
+def expected_min_sheets(page_count, copies, double_sided):
+    """Fewest counter steps a correct job produces: sheets for duplex, pages otherwise."""
+    pages = max(1, int(page_count or 1))
+    per_copy = (pages + 1) // 2 if double_sided == "double" else pages
+    return per_copy * max(1, int(copies or 1))
+
+
+def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=None, clock=time):
+    """
+    After CUPS has handed the job over, poll the page counter until enough sheets came out.
+    Returns (verdict, printed): "ok" | "none" (nothing came out) | "short" (stopped early) | "unknown".
+    """
+    if count_before is None:
+        return "unknown", None
+    max_wait = max_wait or (45 + expected_min * 6)
+    start = clock.time()
+    last, last_change = None, start
+    while clock.time() - start < max_wait:
+        info = read_printer_status(printer_name)
+        if info:
+            count = info["pagecount"]
+            if last is None or count != last:
+                last, last_change = count, clock.time()
+            if count - count_before >= expected_min:
+                return "ok", count - count_before
+            stalled = clock.time() - last_change
+            if (count > count_before and stalled >= 25) or (count == count_before and stalled >= 60):
+                break
+        clock.sleep(2)
+    if last is None:
+        return "unknown", None
+    printed = last - count_before
+    return ("none" if printed <= 0 else "short"), printed
+
+
+def sheet_check_lock(printer_name):
+    return _sheet_check_locks.setdefault(printer_name, threading.Lock())
+
+
+def begin_sheet_check(printer_name):
+    """Take the printer's sheet-check slot and read the counter. Returns (held, count_before, info)."""
+    if not SHEET_CHECK_ENABLED or not PRINTER_USB_IDS.get(printer_name, "").startswith("04f9:"):
+        return False, None, None
+    # Normally the previous job on this printer finishes its check within a minute or two. Never hold a customer
+    # longer than that: past the wait, print without the check (the job is then marked printVerified: false).
+    if not sheet_check_lock(printer_name).acquire(timeout=SHEET_SLOT_WAIT_SEC):
+        print(f"⚠️ [SHEETS] Previous job on {printer_name} is still being checked; printing this one unverified.")
+        return False, None, None
+    info = read_printer_status(printer_name)
+    return True, (info["pagecount"] if info else None), info
+
+
+def is_color_queue(printer_name):
+    """True only for a real colour queue. CV-001 sets both names to its Brother (IS_MONOCHROME_ONLY)."""
+    return printer_name == COLOR_PRINTER_NAME and COLOR_PRINTER_NAME != BW_PRINTER_NAME
+
+
+def end_sheet_check(printer_name):
+    lock = _sheet_check_locks.get(printer_name)
+    if lock and lock.locked():
+        try:
+            lock.release()
+        except RuntimeError:
+            pass
+
+
+def publish_printer_health(printer_name, info):
+    """Write the printer's panel message and supply state to hardware/printers (drives the backend email alerts)."""
+    hw_id = HARDWARE_PRINTER_ID.get(KIOSK_ID)
+    if not hw_id or db is None or not info:
+        return
+    supply = classify_supply(info.get("display"))
+    try:
+        db.collection("hardware").document("printers").set({hw_id: {
+            "kioskId": KIOSK_ID,
+            "printerName": printer_name,
+            "panelMessage": info.get("display"),
+            "pageCount": info.get("pagecount"),
+            "supplyState": supply,
+            # The backend emails when tonerLevel drops to <= 20. PJL gives no percentage on these models, so the
+            # panel's own warning is mapped: ok -> 100, "Toner Low" -> 20, "Replace Toner/Drum" -> 0.
+            "tonerLevel": {"ok": 100, "low": 20, "empty": 0}[supply],
+            "healthCheckedAt": firestore.SERVER_TIMESTAMP,
+        }}, merge=True)
+    except Exception as e:
+        print(f"⚠️ [PJL] Could not publish printer health: {e}")
+
+
 def auto_heal_cups_queue(printer_name=BW_PRINTER_NAME, job_id=None):
     """
     Automatically clears stuck or errored jobs in CUPS and re-enables a paused/error print queue.
@@ -796,11 +1006,15 @@ def auto_heal_cups_queue(printer_name=BW_PRINTER_NAME, job_id=None):
     except Exception as e:
         print(f"⚠️ [AUTO-CLEARANCE] Error during queue healing: {e}")
 
-def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAME, page_count=1, copies=1):
+def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAME, page_count=1, copies=1,
+                      sheet_check=None):
     """
     Background thread: polls CUPS until 'job_id' disappears from the
     not-completed queue, then updates Firestore to completed.
     timeout: max seconds to wait (default 30 min).
+    sheet_check: {"count_before", "expected_min"} from print_file for Brother lasers; when given, the job is only
+    marked completed after the printer's own page counter shows the sheets came out. This thread owns the
+    printer's sheet-check slot and releases it when it returns.
     """
     import re
     start = time.time()
@@ -869,13 +1083,33 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             print(f"⏳ [SYNC] CUPS confirmed job {job_id}. Waiting {paper_exit_delay}s for Color final sheet physical ejection...")
                             time.sleep(paper_exit_delay)
 
+                        verified_fields = {}
+                        if sheet_check:
+                            expected = sheet_check["expected_min"]
+                            verdict, printed = verify_sheets_printed(printer_name, sheet_check["count_before"], expected)
+                            print(f"🔢 [SHEETS] {job_id}: {verdict} — page counter moved {printed} (needs at least {expected}).")
+                            if verdict in ("none", "short"):
+                                info = read_printer_status(printer_name)
+                                panel = (info or {}).get("display") or "no message"
+                                if info:
+                                    publish_printer_health(printer_name, info)
+                                if verdict == "none":
+                                    reason = f"The printer did not print any page (printer shows: {panel})"
+                                else:
+                                    reason = f"The printer stopped after {printed} of {expected} sheets (printer shows: {panel})"
+                                print(f"❌ [SHEETS] {reason}. Reporting failure for auto-refund.")
+                                report_print_failure(doc_ref, reason + ". You will be refunded.")
+                                return
+                            verified_fields = {"printVerified": verdict == "ok", "sheetsVerified": printed}
+
                         print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
                         safe_update(doc_ref, {
                             "status": "completed",
                             "isPrinted": True,
                             "printerStatus": "Printed",
                             "paperSheetsUsed": total_sheets,
-                            "printedAt": firestore.SERVER_TIMESTAMP
+                            "printedAt": firestore.SERVER_TIMESTAMP,
+                            **verified_fields,
                         })
                     else:
                         print(f"❌ [SYNC] CUPS job {job_id} ended in error. Reporting failure for auto-refund.")
@@ -890,6 +1124,8 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
         auto_heal_cups_queue(printer_name, job_id)
         report_print_failure(doc_ref, "Print timeout — no response from printer")
     finally:
+        if sheet_check:
+            end_sheet_check(printer_name)
         active_jobs.discard(doc_ref.id)
         print(f"ℹ️ [SYNC] Job {doc_ref.id} removed from active jobs list.")
 
@@ -901,6 +1137,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
     for physical completion and update Firestore (status sync with actual print).
     """
     import re, sys
+    held_sheet_slot = False
     try:
         # ── Validate files ──
         total_size = sum(os.path.getsize(p) for p in file_paths)
@@ -969,7 +1206,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         print(f"🖨️  Sending to CUPS [{printer_name}]: {[os.path.basename(f) for f in file_paths]} "
               f"({copies} copies, layout: {photo_layout or '1-up'}, sides: {double_sided})")
 
-        is_color = (printer_name == COLOR_PRINTER_NAME)
+        is_color = is_color_queue(printer_name)
         cmd = ["lp", "-d", printer_name, "-n", str(copies),
                "-o", "media=A4"]
 
@@ -1025,6 +1262,20 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
                 print(f"❌ Final pre-print check failed, not sending to CUPS: {gate_reason}")
                 return False
 
+        # ── Sheet check (Brother lasers): read the page counter first, and never print into a toner/drum stop ──
+        if doc_ref and not is_color:
+            held_sheet_slot, count_before, pjl_info = begin_sheet_check(printer_name)
+            if pjl_info and classify_supply(pjl_info.get("display")) == "empty":
+                panel = pjl_info.get("display")
+                print(f"❌ [SHEETS] {printer_name} shows '{panel}'. Not printing (it would come out blank).")
+                publish_printer_health(printer_name, pjl_info)
+                end_sheet_check(printer_name)
+                held_sheet_slot = False
+                report_print_failure(doc_ref, f"Printer needs new toner or drum ({panel}). You have not been charged for this print.")
+                return False
+            if held_sheet_slot:
+                print(f"🔢 [SHEETS] {printer_name} page counter before printing: {count_before}")
+
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=120)
         lp_output = result.stdout.strip()
         print(f"CUPS accepted: {lp_output}")
@@ -1033,21 +1284,34 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         match = re.search(r'request id is (\S+)', lp_output)
         if match and doc_ref:
             job_id = match.group(1)
+            stamp_job(doc_ref, ["sentToPrinterAt"])
             # Calculate dynamic timeout: 600s base + 360s per color page (or 30s per B&W page)
             page_count = sum(get_pdf_page_count(f) for f in file_paths if f.endswith(".pdf")) or 1
             cups_timeout = (600 + page_count * copies * (360 if is_color else 30))
             print(f"✅ CUPS job {job_id} queued. Spawning sync thread to track physical completion (timeout: {cups_timeout}s).")
             # Spawn background thread to wait for physical print and update Firestore
-            t = threading.Thread(target=wait_for_cups_job, args=(job_id, doc_ref, cups_timeout, printer_name, page_count, copies), daemon=True)
+            sheet_check = None
+            if held_sheet_slot:
+                sheet_check = {"count_before": count_before,
+                               "expected_min": expected_min_sheets(page_count, copies, double_sided)}
+            t = threading.Thread(target=wait_for_cups_job,
+                                 args=(job_id, doc_ref, cups_timeout, printer_name, page_count, copies, sheet_check),
+                                 daemon=True)
+            held_sheet_slot = False  # the tracking thread now owns (and releases) the slot
             t.start()
             # Return None to indicate 'async' — caller should NOT update Firestore immediately
             return None
         else:
             # No job ID extracted — fallback to immediate success
+            if held_sheet_slot:
+                end_sheet_check(printer_name)
+                held_sheet_slot = False
             print("⚠️ Could not extract CUPS job ID. Marking completed immediately.")
             return True
 
     except (subprocess.CalledProcessError, Exception) as e:
+        if held_sheet_slot:
+            end_sheet_check(printer_name)
         if os.environ.get("SIMULATE_DEV", "false").lower() == "true":
             print(f"⚠️ [DEV SIMULATION] Print execution error ({e}). Simulating successful print job over 6 seconds...")
             if doc_ref:
@@ -1132,6 +1396,13 @@ def safe_update(doc_ref, data):
             new_ref.update(data, timeout=10)
         except Exception as e2:
             print(f"❌ safe_update final failure: {e2}")
+
+def stamp_job(doc_ref, fields):
+    """Record a timeline moment on the job (admin history) without delaying the print."""
+    if doc_ref is None:
+        return
+    data = {k: firestore.SERVER_TIMESTAMP for k in fields}
+    threading.Thread(target=safe_update, args=(doc_ref, data), daemon=True).start()
 
 def report_print_failure(doc_ref, reason):
     """
@@ -1221,6 +1492,7 @@ def process_job(doc_snapshot):
     doc = doc_snapshot.to_dict()
     doc_id = doc_snapshot.id
     doc_ref = db.collection('print_jobs').document(doc_id)
+    stamp_job(doc_ref, ["piReceivedAt"])
 
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
@@ -1647,20 +1919,46 @@ def on_snapshot(col_snapshot, changes, read_time):
                 active_jobs.add(doc.id)
                 threading.Thread(target=process_job, args=(doc,), daemon=True).start()
 
+PRINTER_HEALTH_INTERVAL_SEC = 600
+
+
+def check_printer_health_when_idle():
+    """Read the B&W printer's panel message and counter between jobs and publish it (toner/drum alerts)."""
+    if active_jobs:
+        return False
+    queued = subprocess.run(["lpstat", "-o", BW_PRINTER_NAME], capture_output=True, text=True, timeout=5).stdout.strip()
+    if queued:
+        return False
+    info = read_printer_status(BW_PRINTER_NAME)
+    if not info:
+        return False
+    publish_printer_health(BW_PRINTER_NAME, info)
+    supply = classify_supply(info.get("display"))
+    if supply != "ok":
+        print(f"⚠️ [PJL] {BW_PRINTER_NAME} shows '{info.get('display')}' (supply: {supply}).")
+    return True
+
+
 def heartbeat_loop():
+    last_health = 0.0
     while True:
         try:
             bw_ok, _bw_reason = is_printer_online(BW_PRINTER_NAME)
             color_ok, _color_reason = is_printer_online(COLOR_PRINTER_NAME)
             status_bw = "Idle" if bw_ok else "Paused/Error"
             status_color = "Idle" if color_ok else "Paused/Error"
-                
+
             db.collection("system_status").document(KIOSK_ID).set({
                 "lastSeen": firestore.SERVER_TIMESTAMP,
                 "printerStatus": f"B&W: {status_bw} | Color: {status_color}"
             }, merge=True)
         except Exception as e:
             print(f"⚠️ Heartbeat failed: {e}")
+        try:
+            if time.time() - last_health >= PRINTER_HEALTH_INTERVAL_SEC and check_printer_health_when_idle():
+                last_health = time.time()
+        except Exception as e:
+            print(f"⚠️ Printer health check failed: {e}")
         time.sleep(120)
 
 def reset_printer_usb(printer_name):
@@ -1972,6 +2270,103 @@ def keep_warm_loop():
             pass
         time.sleep(600)
 
+# ── Remote restart (admin dashboard → "Restart Pi") ──
+# The backend writes kiosk_commands/{KIOSK_ID} = {action: "reboot", status: "pending", commandId, requestedAt}.
+# The Pi waits for the printer to go idle (at most RESTART_IDLE_WAIT_SEC), marks the command "rebooting", then reboots.
+# Only a fresh "pending" command does anything, and the status is moved off "pending" before the reboot (no reboot if
+# that write fails), so a Pi coming back up can never reboot again from the same command.
+RESTART_MAX_AGE_SEC = 15 * 60
+RESTART_IDLE_WAIT_SEC = 5 * 60
+REBOOT_COMMAND = ["sudo", "-n", "/sbin/reboot"]
+_restart_lock = threading.Lock()
+_restarts_started = set()
+
+
+def _command_ref():
+    return db.collection("kiosk_commands").document(KIOSK_ID)
+
+
+def printer_is_idle():
+    if active_jobs:
+        return False
+    try:
+        return not subprocess.run(["lpstat", "-o"], capture_output=True, text=True, timeout=5).stdout.strip()
+    except Exception:
+        return True
+
+
+def command_age_seconds(cmd, now=None):
+    requested = cmd.get("requestedAt")
+    if not requested:
+        return None
+    now = now or datetime.now(requested.tzinfo)
+    # A Pi clock slightly behind the server gives a small negative age: treat that as fresh.
+    return max(0.0, (now - requested).total_seconds())
+
+
+def handle_restart_command(cmd, ref=None, clock=time, idle=printer_is_idle, run=subprocess.run, now=None):
+    """Run one admin restart request. Returns what happened: ignored / expired / rebooting / failed."""
+    if not cmd or cmd.get("status") != "pending" or cmd.get("action") != "reboot":
+        return "ignored"
+    ref = ref or _command_ref()
+    age = command_age_seconds(cmd, now)
+    if age is None or age > RESTART_MAX_AGE_SEC:
+        safe_update(ref, {"status": "expired", "message": "The request was too old when the Pi saw it, so it did not restart.",
+                          "updatedAt": firestore.SERVER_TIMESTAMP})
+        return "expired"
+    command_id = cmd.get("commandId") or "unknown"
+    with _restart_lock:
+        if command_id in _restarts_started:
+            return "ignored"
+        _restarts_started.add(command_id)
+
+    print(f"🔁 [RESTART] Admin asked to reboot {KIOSK_ID} (command {command_id}).")
+    safe_update(ref, {"status": "waiting_idle", "message": "Waiting for the current print to finish.",
+                      "updatedAt": firestore.SERVER_TIMESTAMP})
+    deadline = clock.time() + RESTART_IDLE_WAIT_SEC
+    while not idle() and clock.time() < deadline:
+        clock.sleep(5)
+    message = "Restarting now." if idle() else "Printer still busy after 5 minutes; restarting anyway."
+    try:
+        ref.update({"status": "rebooting", "message": message, "rebootingAt": firestore.SERVER_TIMESTAMP,
+                    "updatedAt": firestore.SERVER_TIMESTAMP})
+    except Exception as e:
+        print(f"❌ [RESTART] Could not mark the command before rebooting, so not rebooting: {e}")
+        with _restart_lock:
+            _restarts_started.discard(command_id)
+        return "failed"
+    try:
+        result = run(REBOOT_COMMAND, capture_output=True, text=True, timeout=30)
+        ok, detail = result.returncode == 0, (result.stderr or result.stdout or "").strip()
+    except Exception as e:
+        ok, detail = False, str(e)
+    if not ok:
+        print(f"❌ [RESTART] Reboot command failed: {detail}")
+        safe_update(ref, {"status": "failed", "message": f"The Pi could not reboot: {detail[:200] or 'unknown error'}",
+                          "updatedAt": firestore.SERVER_TIMESTAMP})
+        return "failed"
+    return "rebooting"
+
+
+def finish_restart_after_boot(ref=None):
+    """On startup: a command left in "rebooting" means this boot is the restart the admin asked for."""
+    ref = ref or _command_ref()
+    try:
+        snap = ref.get()
+        if snap.exists and (snap.to_dict() or {}).get("status") == "rebooting":
+            ref.update({"status": "done", "message": "The Pi restarted and is back online.",
+                        "completedAt": firestore.SERVER_TIMESTAMP, "updatedAt": firestore.SERVER_TIMESTAMP})
+            print("✅ [RESTART] Back online after the admin's restart.")
+    except Exception as e:
+        print(f"⚠️ [RESTART] Could not close the restart command: {e}")
+
+
+def on_command_snapshot(doc_snapshots, changes, read_time):
+    for snap in doc_snapshots:
+        if snap.exists:
+            threading.Thread(target=handle_restart_command, args=(snap.to_dict(),), daemon=True).start()
+
+
 def startup_purge_cups():
     """Cancel all stale queued CUPS jobs on listener startup to prevent ghost prints when paper is refilled."""
     try:
@@ -2002,6 +2397,9 @@ if __name__ == "__main__":
 
     query_prefetch = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'paid')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
     query_prefetch_watch = query_prefetch.on_snapshot(on_prefetch_snapshot)
+
+    finish_restart_after_boot()
+    command_watch = _command_ref().on_snapshot(on_command_snapshot)
 
     try:
         while True:

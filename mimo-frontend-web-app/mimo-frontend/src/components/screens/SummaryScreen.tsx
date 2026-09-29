@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Check, ArrowDown } from '@phosphor-icons/react';
+import { Check, ArrowDown, WarningCircle } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
 import { DiyaRow, FestiveBackdrop, Toran, ZariBorder } from '../festive/NavaratriDecor';
 
@@ -41,23 +41,68 @@ interface SummaryScreenProps {
         mode: string;
     } | null;
     kioskId?: string | null;
+    printCode?: string;
 }
 
-export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId }) => {
+const BACKEND_URL = 'https://api-upqxuj7evq-uc.a.run.app';
+const DEMO_CODES = ['0000', '9999'];
+const AUTO_RESET_MS = 10000;
+// While the customer is choosing what went wrong they need longer than the normal 10s.
+const REPORT_RESET_MS = 30000;
+const ISSUES: { id: string; label: string }[] = [
+    { id: 'blank', label: 'Blank pages' },
+    { id: 'missing', label: 'Pages missing' },
+    { id: 'faint', label: 'Too faint or streaky' },
+    { id: 'other', label: 'Something else' },
+];
+type ReportState = 'ask' | 'choose' | 'sending' | 'sent' | 'failed';
+
+export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId, printCode }) => {
     const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
     const timeoutRef = useRef<number | null>(null);
     const [renderKey, setRenderKey] = useState(0);
+    const [report, setReport] = useState<ReportState>('ask');
+
+    const armReset = (ms: number) => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = window.setTimeout(() => {
+            timeoutRef.current = null;
+            onReset();
+        }, ms);
+    };
+
+    const sendReport = async (issue: string) => {
+        setReport('sending');
+        armReset(REPORT_RESET_MS);
+        if (!printCode || DEMO_CODES.includes(printCode)) {
+            setReport('sent');
+            armReset(AUTO_RESET_MS);
+            return;
+        }
+        try {
+            const res = await fetch(`${BACKEND_URL}/kiosk/report-problem`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ printCode, kioskId, issue }),
+            });
+            setReport(res.ok ? 'sent' : 'failed');
+        } catch {
+            setReport('failed');
+        }
+        armReset(AUTO_RESET_MS);
+    };
 
     useEffect(() => {
         let keyTimer: number | null = null;
         if (isActive) {
             keyTimer = window.setTimeout(() => {
+                setReport('ask');
                 setRenderKey(prev => prev + 1);
             }, 0);
             timeoutRef.current = window.setTimeout(() => {
                 onReset();
                 timeoutRef.current = null;
-            }, 10000);
+            }, AUTO_RESET_MS);
         } else {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
@@ -113,7 +158,11 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
             </motion.div>
 
             {/* Collection slot illustration */}
-            <div className="relative z-10 my-6 flex items-center justify-center">
+            <div
+                className={`relative z-10 my-6 flex items-center justify-center ${
+                    report === 'choose' || report === 'sending' ? 'hidden' : ''
+                }`}
+            >
                 <div className="relative h-[220px] w-[330px]">
                     {/* Slot bezel */}
                     <div
@@ -166,17 +215,91 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                     <ArrowDown size={22} weight="bold" className="animate-bounce text-gold-500" />
                 </div>
 
-                <button
-                    onClick={onReset}
-                    className={`flex items-center gap-3 rounded-full px-14 py-5 text-[19px] font-black uppercase tracking-[0.2em] shadow-xl transition-transform active:scale-95 ${
-                        isFestiveMode
-                            ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white'
-                            : 'bg-gradient-to-br from-gold-400 to-gold-600 text-ink-950'
-                    }`}
-                >
-                    Done
-                    <Check size={24} weight="bold" />
-                </button>
+                {report === 'ask' && (
+                    <div className="flex flex-col items-center gap-4">
+                        <p className={`text-[17px] font-bold ${isFestiveMode ? 'text-mahogany-700' : 'text-white/70'}`}>
+                            Did your pages print correctly?
+                        </p>
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={onReset}
+                                className={`flex items-center gap-3 rounded-full px-12 py-5 text-[19px] font-black uppercase tracking-[0.2em] shadow-xl transition-transform active:scale-95 ${
+                                    isFestiveMode
+                                        ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white'
+                                        : 'bg-gradient-to-br from-gold-400 to-gold-600 text-ink-950'
+                                }`}
+                            >
+                                Yes, done
+                                <Check size={24} weight="bold" />
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setReport('choose');
+                                    armReset(REPORT_RESET_MS);
+                                }}
+                                className={`flex items-center gap-2 rounded-full border-2 px-8 py-5 text-[16px] font-extrabold uppercase tracking-[0.12em] transition-transform active:scale-95 ${
+                                    isFestiveMode
+                                        ? 'border-mahogany-700/40 text-mahogany-800'
+                                        : 'border-white/25 text-white/85'
+                                }`}
+                            >
+                                <WarningCircle size={22} weight="bold" />
+                                Report a problem
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {(report === 'choose' || report === 'sending') && (
+                    <div className="flex flex-col items-center gap-4">
+                        <p className={`text-[17px] font-bold ${isFestiveMode ? 'text-mahogany-700' : 'text-white/80'}`}>
+                            What went wrong?
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                            {ISSUES.map((issue) => (
+                                <button
+                                    key={issue.id}
+                                    disabled={report === 'sending'}
+                                    onClick={() => sendReport(issue.id)}
+                                    className={`min-w-[250px] rounded-2xl border-2 px-6 py-4 text-[17px] font-extrabold transition-transform active:scale-95 disabled:opacity-50 ${
+                                        isFestiveMode
+                                            ? 'border-mahogany-700/30 bg-white/70 text-mahogany-800'
+                                            : 'border-white/15 bg-white/5 text-white'
+                                    }`}
+                                >
+                                    {issue.label}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={onReset}
+                            className={`text-[15px] font-bold underline underline-offset-4 ${isFestiveMode ? 'text-mahogany-700/70' : 'text-white/50'}`}
+                        >
+                            Never mind, everything is fine
+                        </button>
+                    </div>
+                )}
+
+                {(report === 'sent' || report === 'failed') && (
+                    <div className="flex max-w-[640px] flex-col items-center gap-4 text-center">
+                        <p className={`text-[20px] font-extrabold ${isFestiveMode ? 'text-mahogany-800' : 'text-white'}`}>
+                            {report === 'sent'
+                                ? 'Thank you. The MIMO team has been told. Please keep the pages, the team may ask to see them.'
+                                : `We could not send your report. Please tell the staff your code ${printCode ?? ''}.`}
+                        </p>
+                        <button
+                            onClick={onReset}
+                            className={`flex items-center gap-3 rounded-full px-12 py-4 text-[17px] font-black uppercase tracking-[0.2em] shadow-xl transition-transform active:scale-95 ${
+                                isFestiveMode
+                                    ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white'
+                                    : 'bg-gradient-to-br from-gold-400 to-gold-600 text-ink-950'
+                            }`}
+                        >
+                            Done
+                            <Check size={22} weight="bold" />
+                        </button>
+                    </div>
+                )}
 
                 {isFestiveMode && <DiyaRow count={9} size={30} gap={22} />}
             </div>
