@@ -350,6 +350,7 @@ function App() {
         onReset={handleReset}
         jobData={jobData}
         kioskId={dynamicKioskId}
+        printCode={code}
       />
 
       <SystemErrorScreen
