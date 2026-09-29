@@ -5,11 +5,24 @@
  */
 const { admin, db } = require("../config/firebase");
 const A = require("../services/analytics.service");
+const { resolveRefunds, cashfreeRefundFetcher } = require("../services/refundSync.service");
+
+// Cashfree refund lookups for the history (manual refunds made in the Cashfree app). Tests swap this out.
+let fetchCashfreeRefunds = (orderId) => {
+  const axios = require("axios");
+  const { CASHFREE_BASE_URL, cashfreeHeaders } = require("../config/env");
+  fetchCashfreeRefunds = cashfreeRefundFetcher({ axios, baseUrl: CASHFREE_BASE_URL, headers: cashfreeHeaders });
+  return fetchCashfreeRefunds(orderId);
+};
+const setCashfreeRefundFetcher = (fn) => { fetchCashfreeRefunds = fn; };
 
 const Timestamp = admin.firestore.Timestamp;
 const ONLINE_WINDOW_MS = 5 * 60 * 1000; // Pi heartbeat is every 30-120s
 const PAPER_LOW_PCT = 15;
 const TONER_LOW_PCT = 20;
+// Tray sizes: the Brother B&W trays hold 250 sheets; the Epson colour tray 100 (same as the low-paper alert trigger).
+const BW_PAPER_CAPACITY = 250;
+const COLOR_PAPER_CAPACITY = 100;
 
 const humanAgo = (sec) => (sec < 90 ? `${sec}s ago` : sec < 5400 ? `${Math.round(sec / 60)} min ago` : sec < 129600 ? `${Math.round(sec / 3600)} h ago` : `${Math.round(sec / 86400)} days ago`);
 
@@ -114,13 +127,24 @@ const getAdminJobs = async (req, res) => {
     const total = docs.length;
     docs = docs.slice(0, limit);
 
-    const users = await lookupUsers(docs.map((d) => d.userId));
+    const normalized = new Map(docs.map((d) => [d.id, A.normalizeJobs([d])[0]]));
+    const [users, refunds] = await Promise.all([
+      lookupUsers(docs.map((d) => d.userId)),
+      resolveRefunds({ db, jobs: docs.map((d) => ({ ...d, cost: normalized.get(d.id).cost })), fetchCashfreeRefunds }).catch((err) => {
+        console.error("[ADMIN-INSIGHTS] refund lookup failed:", err.message || err);
+        return new Map();
+      }),
+    ]);
     const jobs = docs.map((d) => {
-      const [n] = A.normalizeJobs([d]);
+      const n = normalized.get(d.id);
       const u = users.get(d.userId);
+      const refund = refunds.get(d.id) || null;
       return {
         id: d.id,
         createdAt: A.iso(n.createdAtMs),
+        userName: d.userName || d.name || u?.name || null,
+        refund,
+        outcome: jobOutcome(n.status, refund),
         userEmail: d.userEmail || u?.email || (d.source === "whatsapp" ? d.userId : null) || "Guest",
         userPhone: d.userPhone || d.phoneNumber || u?.phone || null,
         file: n.fileName || "Unknown file",
@@ -136,6 +160,15 @@ const getAdminJobs = async (req, res) => {
         printerStatus: n.printerStatus,
         refundStatus: n.refundStatus,
         refundAmount: d.refundAmount || null,
+        printVerified: d.printVerified === true,
+        sheetsVerified: d.sheetsVerified ?? null,
+        timeline: jobTimeline(d),
+        customerIssue: d.customerIssue ? {
+          label: d.customerIssue.label || d.customerIssue.type || null,
+          verdict: d.customerIssue.verdict || null,
+          evidence: d.customerIssue.evidence || null,
+          reportedAt: A.iso(A.toMillis(d.customerIssue.reportedAt)),
+        } : null,
       };
     });
     res.json({ range: { from: A.iso(range.from), to: A.iso(range.to) }, total, truncated: total > limit || snap.size >= A.MAX_DOCS_PER_COLLECTION, jobs, updatedAt: new Date().toISOString() });
@@ -143,6 +176,39 @@ const getAdminJobs = async (req, res) => {
     fail(res, err, "jobs");
   }
 };
+/**
+ * Every moment a job passed through, in order, for the admin history. Missing steps are left out. Server-side
+ * timestamps come from Firestore (same clock), so the gaps between them are real durations.
+ */
+const TIMELINE_STEPS = [
+  ["created", "Order created", (d) => d.createdAt],
+  ["paid", "Paid, code issued", (d) => d.codeCreatedAt || d.paymentTime],
+  ["codeEntered", "Code entered at kiosk", (d) => d.printStartedAt],
+  ["piReceived", "Pi received the job", (d) => d.piReceivedAt],
+  ["autoResumed", "Resumed after Pi reconnect", (d) => d.autoResumedAt],
+  ["sentToPrinter", "Sent to the printer", (d) => d.sentToPrinterAt],
+  ["printed", "Printed", (d) => d.printedAt],
+  ["failed", "Failed", (d) => d.failedAt],
+  ["refunded", "Refunded", (d) => d.refundedAt || d.refundDetails?.refundedAt],
+  ["reported", "Customer reported a problem", (d) => d.customerIssue?.reportedAt],
+];
+function jobTimeline(d) {
+  return TIMELINE_STEPS
+    .map(([key, label, pick]) => ({ key, label, ms: A.toMillis(pick(d)) }))
+    .filter((s) => Number.isFinite(s.ms) && s.ms > 0)
+    .sort((a, b) => a.ms - b.ms)
+    .map(({ key, label, ms }) => ({ key, label, at: A.iso(ms) }));
+}
+/** One word for the history's status column: refunded beats failed beats printed. */
+function jobOutcome(status, refund) {
+  const s = String(status || "").toLowerCase();
+  if (refund && refund.state === "refunded") return "refunded";
+  if (refund && refund.state === "pending") return "refund_pending";
+  if (s === "failed" || s === "refunded") return "failed";
+  if (["completed", "printed"].includes(s)) return "printed";
+  if (s === "printing") return "printing";
+  return "waiting";
+}
 const num0 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 // ─────────────────────────────── kiosk helpers ───────────────────────────────
@@ -150,11 +216,19 @@ const hardwareFor = (hardware, kioskId) =>
   Object.entries(hardware || {})
     .filter(([key, v]) => v && typeof v === "object" && (key === kioskId || key.startsWith(`${kioskId}-`)))
     .map(([key, p]) => {
-      const capacity = num0(p.paperCapacity) || 500;
-      const paperLevel = p.paperLevel === undefined ? null : num0(p.paperLevel);
+      const type = p.type || (key.toUpperCase().includes("COLOR") ? "color" : "bw");
+      const capacity = type === "color" ? num0(p.paperCapacity) || COLOR_PAPER_CAPACITY : BW_PAPER_CAPACITY;
+      let paperLevel = p.paperLevel === undefined ? null : num0(p.paperLevel);
+      // B&W: the Pi reports the printer's own page counter, so paper left = level at refill − sheets printed since.
+      const tracked = type !== "color" && paperLevel !== null && Number.isFinite(p.pageCount) && Number.isFinite(p.paperRefillPageCount);
+      if (tracked) paperLevel -= Math.max(0, p.pageCount - p.paperRefillPageCount);
+      if (paperLevel !== null) paperLevel = Math.max(0, Math.min(capacity, paperLevel));
       return {
         key,
-        type: p.type || (key.toUpperCase().includes("COLOR") ? "color" : "bw"),
+        type,
+        paperTracked: tracked,
+        paperRefilledAt: A.iso(A.toMillis(p.paperRefilledAt)),
+        panelMessage: p.panelMessage || null,
         status: p.status || null,
         paperLevel,
         paperCapacity: capacity,
@@ -164,13 +238,24 @@ const hardwareFor = (hardware, kioskId) =>
       };
     });
 
+/** Latest admin restart request for a kiosk, as the Kiosk Network page shows it. */
+const restartView = (c) => (c ? {
+  status: c.status || null,
+  message: c.message || null,
+  requestedAt: A.iso(A.toMillis(c.requestedAt)),
+  updatedAt: A.iso(A.toMillis(c.updatedAt)),
+  completedAt: A.iso(A.toMillis(c.completedAt)),
+} : null);
+
 async function loadKiosks(range) {
-  const [statusSnap, hwDoc, queuedSnap, win] = await Promise.all([
+  const [statusSnap, hwDoc, queuedSnap, win, commandSnap] = await Promise.all([
     db.collection("system_status").get(),
     db.collection("hardware").doc("printers").get(),
     db.collection("print_jobs").where("status", "in", A.QUEUED_JOB_STATUSES).limit(500).get(),
     A.loadWindow(db, Timestamp, range.from, range.to),
+    db.collection("kiosk_commands").get(),
   ]);
+  const commandById = new Map(commandSnap.docs.map((d) => [d.id, d.data()]));
   const hardware = hwDoc.exists ? hwDoc.data() : {};
   const statusById = new Map(statusSnap.docs.map((d) => [d.id, d.data()]));
 
@@ -209,6 +294,7 @@ async function loadKiosks(range) {
       printers: hardwareFor(hardware, id),
       queue: queue.get(id) || { paid: 0, printing: 0 },
       stats: { jobs: stats.jobs, completed: stats.completed, failed: stats.failed, pages: stats.pages, revenue: stats.revenue },
+      restart: restartView(commandById.get(id)),
     };
   });
   return kiosks;
@@ -283,6 +369,12 @@ const getAdminIncidents = async (req, res) => {
 };
 
 module.exports = {
+  jobTimeline,
+  jobOutcome,
+  hardwareFor,
+  setCashfreeRefundFetcher,
+  BW_PAPER_CAPACITY,
+  COLOR_PAPER_CAPACITY,
   getAdminAnalytics,
   getAdminTransactions,
   getAdminJobs,
