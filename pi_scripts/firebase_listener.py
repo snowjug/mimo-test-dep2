@@ -1284,6 +1284,7 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         match = re.search(r'request id is (\S+)', lp_output)
         if match and doc_ref:
             job_id = match.group(1)
+            stamp_job(doc_ref, ["sentToPrinterAt"])
             # Calculate dynamic timeout: 600s base + 360s per color page (or 30s per B&W page)
             page_count = sum(get_pdf_page_count(f) for f in file_paths if f.endswith(".pdf")) or 1
             cups_timeout = (600 + page_count * copies * (360 if is_color else 30))
@@ -1396,6 +1397,13 @@ def safe_update(doc_ref, data):
         except Exception as e2:
             print(f"❌ safe_update final failure: {e2}")
 
+def stamp_job(doc_ref, fields):
+    """Record a timeline moment on the job (admin history) without delaying the print."""
+    if doc_ref is None:
+        return
+    data = {k: firestore.SERVER_TIMESTAMP for k in fields}
+    threading.Thread(target=safe_update, args=(doc_ref, data), daemon=True).start()
+
 def report_print_failure(doc_ref, reason):
     """
     Calls backend /kiosk/report-failure to trigger auto-refund.
@@ -1484,6 +1492,7 @@ def process_job(doc_snapshot):
     doc = doc_snapshot.to_dict()
     doc_id = doc_snapshot.id
     doc_ref = db.collection('print_jobs').document(doc_id)
+    stamp_job(doc_ref, ["piReceivedAt"])
 
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
@@ -2261,6 +2270,103 @@ def keep_warm_loop():
             pass
         time.sleep(600)
 
+# ── Remote restart (admin dashboard → "Restart Pi") ──
+# The backend writes kiosk_commands/{KIOSK_ID} = {action: "reboot", status: "pending", commandId, requestedAt}.
+# The Pi waits for the printer to go idle (at most RESTART_IDLE_WAIT_SEC), marks the command "rebooting", then reboots.
+# Only a fresh "pending" command does anything, and the status is moved off "pending" before the reboot (no reboot if
+# that write fails), so a Pi coming back up can never reboot again from the same command.
+RESTART_MAX_AGE_SEC = 15 * 60
+RESTART_IDLE_WAIT_SEC = 5 * 60
+REBOOT_COMMAND = ["sudo", "-n", "/sbin/reboot"]
+_restart_lock = threading.Lock()
+_restarts_started = set()
+
+
+def _command_ref():
+    return db.collection("kiosk_commands").document(KIOSK_ID)
+
+
+def printer_is_idle():
+    if active_jobs:
+        return False
+    try:
+        return not subprocess.run(["lpstat", "-o"], capture_output=True, text=True, timeout=5).stdout.strip()
+    except Exception:
+        return True
+
+
+def command_age_seconds(cmd, now=None):
+    requested = cmd.get("requestedAt")
+    if not requested:
+        return None
+    now = now or datetime.now(requested.tzinfo)
+    # A Pi clock slightly behind the server gives a small negative age: treat that as fresh.
+    return max(0.0, (now - requested).total_seconds())
+
+
+def handle_restart_command(cmd, ref=None, clock=time, idle=printer_is_idle, run=subprocess.run, now=None):
+    """Run one admin restart request. Returns what happened: ignored / expired / rebooting / failed."""
+    if not cmd or cmd.get("status") != "pending" or cmd.get("action") != "reboot":
+        return "ignored"
+    ref = ref or _command_ref()
+    age = command_age_seconds(cmd, now)
+    if age is None or age > RESTART_MAX_AGE_SEC:
+        safe_update(ref, {"status": "expired", "message": "The request was too old when the Pi saw it, so it did not restart.",
+                          "updatedAt": firestore.SERVER_TIMESTAMP})
+        return "expired"
+    command_id = cmd.get("commandId") or "unknown"
+    with _restart_lock:
+        if command_id in _restarts_started:
+            return "ignored"
+        _restarts_started.add(command_id)
+
+    print(f"🔁 [RESTART] Admin asked to reboot {KIOSK_ID} (command {command_id}).")
+    safe_update(ref, {"status": "waiting_idle", "message": "Waiting for the current print to finish.",
+                      "updatedAt": firestore.SERVER_TIMESTAMP})
+    deadline = clock.time() + RESTART_IDLE_WAIT_SEC
+    while not idle() and clock.time() < deadline:
+        clock.sleep(5)
+    message = "Restarting now." if idle() else "Printer still busy after 5 minutes; restarting anyway."
+    try:
+        ref.update({"status": "rebooting", "message": message, "rebootingAt": firestore.SERVER_TIMESTAMP,
+                    "updatedAt": firestore.SERVER_TIMESTAMP})
+    except Exception as e:
+        print(f"❌ [RESTART] Could not mark the command before rebooting, so not rebooting: {e}")
+        with _restart_lock:
+            _restarts_started.discard(command_id)
+        return "failed"
+    try:
+        result = run(REBOOT_COMMAND, capture_output=True, text=True, timeout=30)
+        ok, detail = result.returncode == 0, (result.stderr or result.stdout or "").strip()
+    except Exception as e:
+        ok, detail = False, str(e)
+    if not ok:
+        print(f"❌ [RESTART] Reboot command failed: {detail}")
+        safe_update(ref, {"status": "failed", "message": f"The Pi could not reboot: {detail[:200] or 'unknown error'}",
+                          "updatedAt": firestore.SERVER_TIMESTAMP})
+        return "failed"
+    return "rebooting"
+
+
+def finish_restart_after_boot(ref=None):
+    """On startup: a command left in "rebooting" means this boot is the restart the admin asked for."""
+    ref = ref or _command_ref()
+    try:
+        snap = ref.get()
+        if snap.exists and (snap.to_dict() or {}).get("status") == "rebooting":
+            ref.update({"status": "done", "message": "The Pi restarted and is back online.",
+                        "completedAt": firestore.SERVER_TIMESTAMP, "updatedAt": firestore.SERVER_TIMESTAMP})
+            print("✅ [RESTART] Back online after the admin's restart.")
+    except Exception as e:
+        print(f"⚠️ [RESTART] Could not close the restart command: {e}")
+
+
+def on_command_snapshot(doc_snapshots, changes, read_time):
+    for snap in doc_snapshots:
+        if snap.exists:
+            threading.Thread(target=handle_restart_command, args=(snap.to_dict(),), daemon=True).start()
+
+
 def startup_purge_cups():
     """Cancel all stale queued CUPS jobs on listener startup to prevent ghost prints when paper is refilled."""
     try:
@@ -2291,6 +2397,9 @@ if __name__ == "__main__":
 
     query_prefetch = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'paid')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
     query_prefetch_watch = query_prefetch.on_snapshot(on_prefetch_snapshot)
+
+    finish_restart_after_boot()
+    command_watch = _command_ref().on_snapshot(on_command_snapshot)
 
     try:
         while True:
