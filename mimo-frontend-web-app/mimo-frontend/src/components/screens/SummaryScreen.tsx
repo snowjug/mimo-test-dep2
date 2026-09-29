@@ -284,7 +284,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                     <div className="flex max-w-[640px] flex-col items-center gap-4 text-center">
                         <p className={`text-[20px] font-extrabold ${isFestiveMode ? 'text-mahogany-800' : 'text-white'}`}>
                             {report === 'sent'
-                                ? 'Thank you. The MIMO team has been told and will sort this out.'
+                                ? 'Thank you. The MIMO team has been told. Please keep the pages, the team may ask to see them.'
                                 : `We could not send your report. Please tell the staff your code ${printCode ?? ''}.`}
                         </p>
                         <button
