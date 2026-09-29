@@ -8,6 +8,7 @@
  * - GET  /kiosk/job-status
  * - POST /kiosk/print
  * - POST /kiosk/report-failure
+ * - POST /kiosk/report-problem   (customer says the printout was bad)
  */
 
 const express = require("express");
@@ -15,6 +16,71 @@ const { createLimiters } = require("../middleware/rateLimit");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
 const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
 const { unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
+const { getTransporter } = require("../services/email.service");
+
+const REPORTABLE_ISSUES = { blank: "Blank pages", missing: "Pages missing", faint: "Too faint or streaky", other: "Something else" };
+const REPORT_WINDOW_MS = 30 * 60 * 1000;
+const toMillis = (t) => (t && t.toDate ? t.toDate().getTime() : t ? new Date(t).getTime() : 0);
+
+const HISTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+// A customer who has already reported this many problems in 30 days is still recorded, but no longer emails the team.
+const MUTE_AFTER_REPORTS = 3;
+
+/**
+ * What the machine itself can say about a complaint. The printer's page counter proves how many sheets came out,
+ * so "pages missing" can be confirmed or contradicted; it cannot see ink, so blank/faint pages need the paper itself.
+ */
+function judgeReport(issue, job) {
+  const counted = job.printVerified === true ? Number(job.sheetsVerified) || 0 : null;
+  if (job.status === "failed" || job.status === "refunded" || job.refundStatus) {
+    return { verdict: "already_failed", note: "The printer had already reported this job as failed, so it was refunded automatically." };
+  }
+  if (issue === "missing") {
+    return counted !== null
+      ? { verdict: "contradicted", note: `The printer counted all ${counted} sheet(s) coming out. The claim of missing pages is not supported.` }
+      : { verdict: "unverified", note: "The printer could not confirm the sheet count for this job. Treat the claim as possible." };
+  }
+  return {
+    verdict: "needs_proof",
+    note: counted !== null
+      ? `The printer counted ${counted} sheet(s) coming out but cannot see ink. Ask to see the pages or a photo before refunding.`
+      : "The printer could not confirm the sheet count and cannot see ink. Ask to see the pages or a photo before refunding.",
+  };
+}
+
+async function defaultSendIssueEmail({ printCode, kioskId, issue, jobs, judgement, history }) {
+  const lines = jobs.map((j) => {
+    const copies = (j.printOptions && j.printOptions.copies) || j.copies || 1;
+    const checked = j.printVerified === true ? `printer counted ${j.sheetsVerified} sheet(s)` : "not verified by the printer";
+    return `- Job ${j.id}: ${j.pageCount || "?"} page(s) x ${copies} cop(ies), ${j.colorMode || "bw"}, status ${j.status}, ${checked}`;
+  });
+  const historyLine = history
+    ? `Customer history (30 days): ${history.reports} earlier problem report(s) across ${history.prints} print(s).`
+    : "Customer history: unknown (guest print).";
+  await getTransporter().sendMail({
+    from: '"Mimo Printing" <visionprintt@gmail.com>',
+    to: "visionprintt@gmail.com",
+    subject: `MIMO Customer Reported a Print Problem - ${kioskId || "Unknown Kiosk"}`,
+    text:
+      "A customer reported a problem with their printout at the kiosk.\n\n" +
+      `Printer evidence: ${judgement.note}\n${historyLine}\n\n` +
+      `Kiosk: ${kioskId || "Unknown"}\nPrint code: ${printCode}\nProblem: ${issue}\n\n` +
+      `${lines.join("\n")}\n\n` +
+      "Please check the printer and decide on a refund or reprint.",
+  });
+}
+
+/** Earlier reports and prints by the same customer in the last 30 days (null for guest jobs). */
+async function customerHistory(db, userId, excludeIds) {
+  if (!userId) return null;
+  const snap = await db.collection("print_jobs").where("userId", "==", userId).limit(300).get();
+  const since = Date.now() - HISTORY_WINDOW_MS;
+  const recent = snap.docs
+    .filter((d) => !excludeIds.has(d.id))
+    .map((d) => d.data())
+    .filter((j) => toMillis(j.createdAt) >= since);
+  return { prints: recent.length, reports: recent.filter((j) => j.customerIssue && toMillis(j.customerIssue.reportedAt) >= since).length };
+}
 const {
   validateKioskPrintRequest,
   validateKioskPrintResponse,
@@ -66,6 +132,25 @@ function createKioskRouter(dependencies) {
         return Math.abs(t - latestTime) < 5000;
       });
 
+      // === 0. CALCULATE AGGREGATE SHEETS TELEMETRY ===
+      let totalSheets = 0;
+      let sheetsCompleted = 0;
+      currentSessionDocs.forEach(d => {
+        const pCount = d.pageCount || 1;
+        const copies = d.printOptions ? (d.printOptions.copies || 1) : (d.copies || 1);
+        const fallbackSheets = pCount * copies;
+        const docTotal = (d.totalSheets !== undefined && d.totalSheets !== null) ? Number(d.totalSheets) : fallbackSheets;
+        totalSheets += docTotal;
+
+        if (d.status === "completed" || d.status === "printed" || d.isPrinted === true) {
+          sheetsCompleted += docTotal;
+        } else if (d.sheetsCompleted !== undefined && d.sheetsCompleted !== null) {
+          sheetsCompleted += Math.min(docTotal, Number(d.sheetsCompleted));
+        }
+      });
+      totalSheets = Math.max(1, totalSheets);
+      sheetsCompleted = Math.min(totalSheets, Math.max(0, sheetsCompleted));
+
       // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
       // Only perform health checks if printing has not started yet.
       // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
@@ -76,7 +161,7 @@ function createKioskRouter(dependencies) {
 
       if (!hasStarted) {
         // Job is paid and waiting for user to enter 4-digit code at the kiosk.
-        const responsePayload = { status: "paid", isPrinted: false };
+        const responsePayload = { status: "paid", isPrinted: false, sheetsCompleted: 0, totalSheets };
         const contractCheck = validateKioskJobStatusResponse(responsePayload);
         if (!contractCheck.valid) {
           console.error("[SYNC CONTRACT ERROR]", contractCheck.error);
@@ -122,6 +207,8 @@ function createKioskRouter(dependencies) {
         const responsePayload = {
           status: "failed",
           isPrinted: false,
+          sheetsCompleted,
+          totalSheets,
           printerStatus: PRINT_TIMEOUT_MESSAGE
         };
         return res.json(responsePayload);
@@ -148,13 +235,15 @@ function createKioskRouter(dependencies) {
         const responsePayload = {
           status: "failed",
           isPrinted: false,
+          sheetsCompleted,
+          totalSheets,
           printerStatus: failedDoc ? (failedDoc.printerStatus || failedDoc.error || (failedDoc.status === "refunded" ? "Print refunded" : "Print failed")) : "Print failed"
         };
         return res.json(responsePayload);
       }
 
       if (allCompleted) {
-        const responsePayload = { status: "completed", isPrinted: true };
+        const responsePayload = { status: "completed", isPrinted: true, sheetsCompleted: totalSheets, totalSheets };
         const contractCheck = validateKioskJobStatusResponse(responsePayload);
         if (!contractCheck.valid) {
           console.error("[SYNC CONTRACT ERROR]", contractCheck.error);
@@ -163,7 +252,7 @@ function createKioskRouter(dependencies) {
       }
 
       if (anyPrinting) {
-        const responsePayload = { status: "printing", isPrinted: false };
+        const responsePayload = { status: "printing", isPrinted: false, sheetsCompleted, totalSheets };
         const contractCheck = validateKioskJobStatusResponse(responsePayload);
         if (!contractCheck.valid) {
           console.error("[SYNC CONTRACT ERROR]", contractCheck.error);
@@ -171,7 +260,7 @@ function createKioskRouter(dependencies) {
         return res.json(responsePayload);
       }
 
-      return res.json({ status: "paid", isPrinted: false });
+      return res.json({ status: "paid", isPrinted: false, sheetsCompleted: 0, totalSheets });
 
     } catch (err) {
       console.error("❌ KIOSK JOB STATUS ERROR:", err);
@@ -420,7 +509,66 @@ function createKioskRouter(dependencies) {
     }
   });
 
+  // ================= 4. KIOSK: CUSTOMER REPORTS A BAD PRINTOUT =================
+  // The Pi proves sheets came out (printer page counter) but cannot see ink on them. The summary screen asks "Did
+  // your pages print correctly?"; a "no" lands here. The order is flagged and the team is emailed once. There is no
+  // automatic refund: the team decides, so a false report cannot turn a good print into a free one.
+  const sendIssueEmail = dependencies.sendIssueEmail || defaultSendIssueEmail;
+  router.post("/report-problem", codeGuessLimiter, async (req, res) => {
+    try {
+      const { printCode, kioskId, issue } = req.body || {};
+      if (!/^\d{4}$/.test(String(printCode || "")) || !REPORTABLE_ISSUES[issue]) {
+        return res.status(400).json({ error: "printCode and a valid issue are required" });
+      }
+      const snapshot = await db.collection("print_jobs").where("printCode", "==", String(printCode)).get();
+      const now = Date.now();
+      const jobs = snapshot.docs
+        .map((d) => ({ ref: d.ref, id: d.id, ...d.data() }))
+        .filter((j) => (!kioskId || !j.kioskId || j.kioskId === kioskId))
+        .filter((j) => now - toMillis(j.printedAt || j.updatedAt || j.createdAt) < REPORT_WINDOW_MS);
+      if (!jobs.length) {
+        return res.status(404).json({ error: "No recent print found for this code" });
+      }
+
+      const fresh = jobs.filter((j) => !j.customerIssue);
+      if (fresh.length) {
+        const judgement = judgeReport(issue, fresh[0]);
+        let history = null;
+        try {
+          history = await customerHistory(db, fresh[0].userId, new Set(jobs.map((j) => j.id)));
+        } catch (histErr) {
+          console.error("[REPORT-PROBLEM] History lookup failed:", histErr.message || histErr);
+        }
+        const muted = !!history && history.reports >= MUTE_AFTER_REPORTS;
+        const report = {
+          type: issue,
+          label: REPORTABLE_ISSUES[issue],
+          kioskId: kioskId || jobs[0].kioskId || null,
+          verdict: judgement.verdict,
+          evidence: judgement.note,
+          earlierReports: history ? history.reports : null,
+          muted,
+          reportedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        await Promise.all(fresh.map((j) => j.ref.update({ customerIssue: report })));
+        if (muted) {
+          console.warn(`[REPORT-PROBLEM] ${fresh[0].userId} has ${history.reports} reports in 30 days; recorded without email.`);
+        } else {
+          try {
+            await sendIssueEmail({ printCode: String(printCode), kioskId: report.kioskId, issue: report.label, jobs: fresh, judgement, history });
+          } catch (mailErr) {
+            console.error("[REPORT-PROBLEM] Email failed:", mailErr.message || mailErr);
+          }
+        }
+      }
+      return res.json({ received: true });
+    } catch (err) {
+      console.error("[REPORT-PROBLEM] Unexpected error:", err);
+      return res.status(500).json({ error: "Could not record the report" });
+    }
+  });
+
   return router;
 }
 
-module.exports = { createKioskRouter };
+module.exports = { createKioskRouter, judgeReport };

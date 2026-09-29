@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Printer, Wifi, WifiOff, Loader2, PackagePlus, Droplets } from 'lucide-react';
+import { Printer, Wifi, WifiOff, Loader2, PackagePlus, Droplets, Power } from 'lucide-react';
 import api from '../../api';
 import { useRange } from '../../context/RangeContext';
 import { useLiveQuery, errorMessage } from '../../hooks/useLiveQuery';
@@ -10,7 +10,31 @@ import { ErrorBanner } from '../../components/insights/InsightBits';
 import { LevelBar } from '../../components/ui/shared';
 import { describeRange } from '../../lib/dateRange';
 import { inr, timeAgo } from '../../lib/format';
-import type { KioskLive, PrinterInfo } from '../../types/insights.types';
+import type { KioskLive, KioskRestart, PrinterInfo } from '../../types/insights.types';
+import { clockTime } from '../../lib/format';
+
+const RESTART_LABEL: Record<string, string> = {
+  pending: 'Restart requested',
+  waiting_idle: 'Waiting for the print to finish',
+  rebooting: 'Restarting…',
+  done: 'Restarted',
+  failed: 'Restart failed',
+  expired: 'Restart request expired',
+};
+const RESTART_RUNNING = ['pending', 'waiting_idle', 'rebooting'];
+
+const RestartStatus: React.FC<{ r: KioskRestart }> = ({ r }) => {
+  if (!r.status) return null;
+  const tone = r.status === 'done' ? 'text-emerald-600' : r.status === 'failed' || r.status === 'expired' ? 'text-rose-600' : 'text-amber-600';
+  return (
+    <p className={`mt-1 text-xs ${tone}`}>
+      {RESTART_RUNNING.includes(r.status) && <Loader2 size={11} className="inline animate-spin mr-1 -mt-0.5" />}
+      <span className="font-bold">{RESTART_LABEL[r.status] ?? r.status}</span>
+      {r.message && !['pending', 'waiting_idle'].includes(r.status) && <span className="text-[var(--text-2)]"> · {r.message}</span>}
+      <span className="text-[var(--text-3)]"> · {clockTime(r.completedAt || r.updatedAt || r.requestedAt)}</span>
+    </p>
+  );
+};
 
 /** Live machine status. Online = the Raspberry Pi sent a heartbeat in the last 5 minutes. */
 export const KiosksPage: React.FC = () => {
@@ -19,14 +43,37 @@ export const KiosksPage: React.FC = () => {
   const q = useLiveQuery(() => insights.kiosks(current()), [range], { live: true, intervalMs: 20000 });
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [confirmRestart, setConfirmRestart] = useState<KioskLive | null>(null);
+  const [restarting, setRestarting] = useState(false);
+
+  const requestRestart = async () => {
+    if (!confirmRestart) return;
+    setRestarting(true);
+    setActionError('');
+    try {
+      await api.post(`/admin/kiosks/${encodeURIComponent(confirmRestart.kioskId)}/restart`);
+      setConfirmRestart(null);
+      q.refresh();
+    } catch (err) {
+      setActionError(errorMessage(err));
+      setConfirmRestart(null);
+    } finally {
+      setRestarting(false);
+    }
+  };
 
   const restock = async (printer: PrinterInfo, what: 'paper' | 'supply') => {
     const id = `${printer.key}:${what}`;
     setBusy(id);
     setActionError('');
     try {
-      const patch = what === 'paper' ? { paperLevel: printer.paperCapacity } : printer.type === 'color' ? { inkLevel: 100 } : { tonerLevel: 100 };
-      await api.post('/admin/hardware', { updates: { [printer.key]: patch } });
+      if (what === 'paper') {
+        const kioskId = printer.key.split('-').slice(0, 2).join('-');
+        await api.post(`/admin/kiosks/${encodeURIComponent(kioskId)}/refill-paper`, { printerKey: printer.key });
+      } else {
+        const patch = printer.type === 'color' ? { inkLevel: 100 } : { tonerLevel: 100 };
+        await api.post('/admin/hardware', { updates: { [printer.key]: patch } });
+      }
       q.refresh();
     } catch (err) {
       setActionError(errorMessage(err));
@@ -40,7 +87,7 @@ export const KiosksPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-1)]">Kiosk Network</h1>
+            <h1 className="hidden lg:block text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-1)]">Kiosk Network</h1>
             {q.data && (
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${q.data.summary.offline === 0 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
                 {q.data.summary.online}/{q.data.summary.total} online
@@ -83,6 +130,17 @@ export const KiosksPage: React.FC = () => {
             <div className="mt-3 text-xs text-[var(--text-2)]">
               <p><span className="text-[var(--text-3)]">Last heartbeat:</span> {k.lastSeen ? `${timeAgo(k.lastSeen)} (${new Date(k.lastSeen).toLocaleTimeString()})` : 'never'}</p>
               {k.printerStatus && <p className="mt-0.5 break-words"><span className="text-[var(--text-3)]">Printer status:</span> {k.printerStatus}</p>}
+              {k.restart && <RestartStatus r={k.restart} />}
+            </div>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setConfirmRestart(k)}
+                disabled={!!k.restart?.status && RESTART_RUNNING.includes(k.restart.status)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border border-rose-500/30 text-rose-600 hover:bg-rose-500/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Power size={12} /> Restart Pi
+              </button>
             </div>
 
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -127,6 +185,32 @@ export const KiosksPage: React.FC = () => {
           </section>
         ))}
       </div>
+
+      {confirmRestart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn" role="dialog" aria-modal="true">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2">
+              <Power size={18} className="text-rose-500" />
+              <h3 className="font-bold text-base text-[var(--text-1)]">Restart {confirmRestart.name}?</h3>
+            </div>
+            <ul className="text-xs text-[var(--text-2)] space-y-1.5 list-disc pl-4">
+              <li>The Pi first waits for any print in progress to finish (up to 5 minutes), then reboots.</li>
+              <li>The kiosk is offline for about 1–2 minutes and comes back on its own.</li>
+              {!confirmRestart.online && <li className="text-amber-600 font-semibold">This kiosk is offline right now. It will only restart if it reconnects within 15 minutes.</li>}
+            </ul>
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-[var(--border)]">
+              <button type="button" onClick={() => setConfirmRestart(null)}
+                className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text-2)] hover:bg-[var(--surface-2)] cursor-pointer">
+                Cancel
+              </button>
+              <button type="button" onClick={requestRestart} disabled={restarting}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold cursor-pointer disabled:opacity-50">
+                {restarting ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />} Restart Pi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

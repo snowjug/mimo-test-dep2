@@ -22,7 +22,9 @@ export type ScreenState =
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const currentKioskId = urlParams.get("kioskId");
-  const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID;
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const defaultKioskFromHost = host.includes('mimo-2-0') || host.includes('mimo-kiosk-app') ? 'SV-002' : undefined;
+  const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID || defaultKioskFromHost;
   const isFestive = isFestivalActive();
   const isFestiveForKiosk = dynamicKioskId === 'CV-001' || (dynamicKioskId === 'SV-002' && isFestive);
 
@@ -233,7 +235,7 @@ function App() {
         }
       }, 300);
     });
-  }, [code, showToast, currentKioskId]);
+  }, [code, showToast, dynamicKioskId]);
 
   // ================= RESET =================
   const handleReset = useCallback(() => {
@@ -350,6 +352,7 @@ function App() {
         onReset={handleReset}
         jobData={jobData}
         kioskId={dynamicKioskId}
+        printCode={code}
       />
 
       <SystemErrorScreen
