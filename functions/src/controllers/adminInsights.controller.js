@@ -136,6 +136,15 @@ const getAdminJobs = async (req, res) => {
         printerStatus: n.printerStatus,
         refundStatus: n.refundStatus,
         refundAmount: d.refundAmount || null,
+        printVerified: d.printVerified === true,
+        sheetsVerified: d.sheetsVerified ?? null,
+        timeline: jobTimeline(d),
+        customerIssue: d.customerIssue ? {
+          label: d.customerIssue.label || d.customerIssue.type || null,
+          verdict: d.customerIssue.verdict || null,
+          evidence: d.customerIssue.evidence || null,
+          reportedAt: A.iso(A.toMillis(d.customerIssue.reportedAt)),
+        } : null,
       };
     });
     res.json({ range: { from: A.iso(range.from), to: A.iso(range.to) }, total, truncated: total > limit || snap.size >= A.MAX_DOCS_PER_COLLECTION, jobs, updatedAt: new Date().toISOString() });
@@ -143,6 +152,29 @@ const getAdminJobs = async (req, res) => {
     fail(res, err, "jobs");
   }
 };
+/**
+ * Every moment a job passed through, in order, for the admin history. Missing steps are left out. Server-side
+ * timestamps come from Firestore (same clock), so the gaps between them are real durations.
+ */
+const TIMELINE_STEPS = [
+  ["created", "Order created", (d) => d.createdAt],
+  ["paid", "Paid, code issued", (d) => d.codeCreatedAt || d.paymentTime],
+  ["codeEntered", "Code entered at kiosk", (d) => d.printStartedAt],
+  ["piReceived", "Pi received the job", (d) => d.piReceivedAt],
+  ["autoResumed", "Resumed after Pi reconnect", (d) => d.autoResumedAt],
+  ["sentToPrinter", "Sent to the printer", (d) => d.sentToPrinterAt],
+  ["printed", "Printed", (d) => d.printedAt],
+  ["failed", "Failed", (d) => d.failedAt],
+  ["refunded", "Refunded", (d) => d.refundedAt || d.refundDetails?.refundedAt],
+  ["reported", "Customer reported a problem", (d) => d.customerIssue?.reportedAt],
+];
+function jobTimeline(d) {
+  return TIMELINE_STEPS
+    .map(([key, label, pick]) => ({ key, label, ms: A.toMillis(pick(d)) }))
+    .filter((s) => Number.isFinite(s.ms) && s.ms > 0)
+    .sort((a, b) => a.ms - b.ms)
+    .map(({ key, label, ms }) => ({ key, label, at: A.iso(ms) }));
+}
 const num0 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 // ─────────────────────────────── kiosk helpers ───────────────────────────────
@@ -164,13 +196,24 @@ const hardwareFor = (hardware, kioskId) =>
       };
     });
 
+/** Latest admin restart request for a kiosk, as the Kiosk Network page shows it. */
+const restartView = (c) => (c ? {
+  status: c.status || null,
+  message: c.message || null,
+  requestedAt: A.iso(A.toMillis(c.requestedAt)),
+  updatedAt: A.iso(A.toMillis(c.updatedAt)),
+  completedAt: A.iso(A.toMillis(c.completedAt)),
+} : null);
+
 async function loadKiosks(range) {
-  const [statusSnap, hwDoc, queuedSnap, win] = await Promise.all([
+  const [statusSnap, hwDoc, queuedSnap, win, commandSnap] = await Promise.all([
     db.collection("system_status").get(),
     db.collection("hardware").doc("printers").get(),
     db.collection("print_jobs").where("status", "in", A.QUEUED_JOB_STATUSES).limit(500).get(),
     A.loadWindow(db, Timestamp, range.from, range.to),
+    db.collection("kiosk_commands").get(),
   ]);
+  const commandById = new Map(commandSnap.docs.map((d) => [d.id, d.data()]));
   const hardware = hwDoc.exists ? hwDoc.data() : {};
   const statusById = new Map(statusSnap.docs.map((d) => [d.id, d.data()]));
 
@@ -209,6 +252,7 @@ async function loadKiosks(range) {
       printers: hardwareFor(hardware, id),
       queue: queue.get(id) || { paid: 0, printing: 0 },
       stats: { jobs: stats.jobs, completed: stats.completed, failed: stats.failed, pages: stats.pages, revenue: stats.revenue },
+      restart: restartView(commandById.get(id)),
     };
   });
   return kiosks;
@@ -283,6 +327,7 @@ const getAdminIncidents = async (req, res) => {
 };
 
 module.exports = {
+  jobTimeline,
   getAdminAnalytics,
   getAdminTransactions,
   getAdminJobs,
