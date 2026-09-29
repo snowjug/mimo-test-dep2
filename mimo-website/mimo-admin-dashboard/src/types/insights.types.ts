@@ -108,6 +108,31 @@ export interface JobRow {
   printerStatus: string | null;
   refundStatus: string | null;
   refundAmount: number | null;
+  printVerified?: boolean;
+  sheetsVerified?: number | null;
+  timeline?: TimelineStep[];
+  customerIssue?: CustomerIssue | null;
+}
+
+export interface TimelineStep {
+  key: string;
+  label: string;
+  at: string;
+}
+
+export interface CustomerIssue {
+  label: string | null;
+  verdict: 'contradicted' | 'unverified' | 'needs_proof' | 'already_failed' | null;
+  evidence: string | null;
+  reportedAt: string | null;
+}
+
+export interface KioskRestart {
+  status: 'pending' | 'waiting_idle' | 'rebooting' | 'done' | 'failed' | 'expired' | null;
+  message: string | null;
+  requestedAt: string | null;
+  updatedAt: string | null;
+  completedAt: string | null;
 }
 
 export interface JobsResponse {
@@ -141,6 +166,7 @@ export interface KioskLive {
   printers: PrinterInfo[];
   queue: { paid: number; printing: number };
   stats: { jobs: number; completed: number; failed: number; pages: number; revenue: number };
+  restart?: KioskRestart | null;
 }
 
 export interface KiosksResponse {

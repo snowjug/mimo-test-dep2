@@ -16,6 +16,8 @@ import {
   Sparkles,
   Loader2,
   Download,
+  ChevronDown,
+  MessageSquareWarning,
 } from 'lucide-react';
 import api from '../../api';
 import { useTheme } from '../../context/ThemeContext';
@@ -26,6 +28,8 @@ import { DateRangePicker } from '../../components/ui/DateRangePicker';
 import { LiveIndicator } from '../../components/ui/LiveIndicator';
 import { ErrorBanner } from '../../components/insights/InsightBits';
 import { describeRange } from '../../lib/dateRange';
+import { clockTime, duration } from '../../lib/format';
+import type { CustomerIssue, TimelineStep } from '../../types/insights.types';
 
 interface PrintJobRecord {
   id: string;
@@ -42,7 +46,82 @@ interface PrintJobRecord {
   orderId: string | null;
   refundStatus: string | null;
   refundAmount?: number | null;
+  printerStatus?: string | null;
+  printVerified?: boolean;
+  sheetsVerified?: number | null;
+  timeline?: TimelineStep[];
+  customerIssue?: CustomerIssue | null;
 }
+
+const ms = (iso: string) => new Date(iso).getTime();
+// Steps the system is responsible for. A long gap before these points at the Pi, network or printer; the gap before
+// "Code entered" is just the customer walking to the kiosk, so it is never flagged.
+const SYSTEM_STEPS = new Set(['piReceived', 'sentToPrinter', 'printed', 'failed', 'autoResumed']);
+const SLOW_GAP_MS = 60 * 1000;
+const VERDICT_TEXT: Record<string, string> = {
+  contradicted: 'Printer evidence contradicts the claim',
+  unverified: 'Printer could not verify',
+  needs_proof: 'Needs the pages or a photo',
+  already_failed: 'Already refunded automatically',
+};
+
+/** Code entered at the kiosk → printed or failed: how long the customer stood waiting. */
+function printDuration(job: PrintJobRecord): number | null {
+  const steps = job.timeline ?? [];
+  const start = steps.find((st) => st.key === 'codeEntered') ?? steps.find((st) => st.key === 'piReceived');
+  const end = steps.find((st) => st.key === 'printed' || st.key === 'failed');
+  return start && end ? ms(end.at) - ms(start.at) : null;
+}
+
+const JobTimeline: React.FC<{ job: PrintJobRecord }> = ({ job }) => {
+  const steps = job.timeline ?? [];
+  return (
+    <div className="px-4 sm:px-6 py-4 bg-[var(--surface-2)]/40 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+      <div>
+        <p className="text-[11px] font-bold text-[var(--text-3)] mb-2">Timeline</p>
+        {steps.length === 0 ? (
+          <p className="text-xs text-[var(--text-3)]">No timing was recorded for this job.</p>
+        ) : (
+          <ol className="relative border-l border-[var(--border)] ml-1.5 space-y-2.5">
+            {steps.map((st, i) => {
+              const gap = i > 0 ? ms(st.at) - ms(steps[i - 1].at) : null;
+              const slow = gap !== null && SYSTEM_STEPS.has(st.key) && gap > SLOW_GAP_MS;
+              const bad = st.key === 'failed' || st.key === 'reported';
+              return (
+                <li key={st.key} className="pl-4 relative">
+                  <span className={`absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full ${bad ? 'bg-rose-500' : st.key === 'printed' ? 'bg-emerald-500' : 'bg-[var(--text-3)]'}`} />
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+                    <span className="font-mono tabular-nums text-[var(--text-2)]">{clockTime(st.at)}</span>
+                    <span className={`font-bold ${bad ? 'text-rose-600' : 'text-[var(--text-1)]'}`}>{st.label}</span>
+                    {gap !== null && (
+                      <span className={`tabular-nums text-[11px] ${slow ? 'font-bold text-amber-600' : 'text-[var(--text-3)]'}`}>
+                        +{duration(gap)}{slow ? ' · slow' : ''}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
+      <div className="space-y-2 text-xs">
+        <p className="text-[11px] font-bold text-[var(--text-3)]">Printer evidence</p>
+        <p className="text-[var(--text-1)]">
+          {job.printVerified ? `Printer counted ${job.sheetsVerified ?? '?'} sheet(s) coming out.` : 'Sheet count was not verified for this job.'}
+        </p>
+        {job.printerStatus && <p className="text-[var(--text-2)] break-words">Status: {job.printerStatus}</p>}
+        {job.customerIssue && (
+          <div className="mt-2 p-2.5 rounded-xl border border-rose-500/25 bg-rose-500/5">
+            <p className="font-bold text-rose-600">Customer reported: {job.customerIssue.label}</p>
+            {job.customerIssue.verdict && <p className="font-semibold text-[var(--text-1)] mt-0.5">{VERDICT_TEXT[job.customerIssue.verdict] ?? job.customerIssue.verdict}</p>}
+            {job.customerIssue.evidence && <p className="text-[var(--text-2)] mt-0.5">{job.customerIssue.evidence}</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const OperationsPage: React.FC = () => {
   const { isDark } = useTheme();
@@ -57,6 +136,7 @@ export const OperationsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [destinationFilter, setDestinationFilter] = useState('ALL');
   const [page, setPage] = useState(1);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const PAGE_SIZE = 10;
 
   // Refund Modal State
@@ -257,6 +337,7 @@ export const OperationsPage: React.FC = () => {
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]/50 text-[11px] font-bold text-[var(--text-3)]">
                 <th className="py-3 px-4 sm:px-6">Document</th>
+                <th className="py-3 px-4">Time</th>
                 <th className="py-3 px-4">Student</th>
                 <th className="py-3 px-4">Terminal</th>
                 <th className="py-3 px-4">Pages / Copies</th>
@@ -269,20 +350,24 @@ export const OperationsPage: React.FC = () => {
             <tbody className="divide-y divide-[var(--border)] text-xs sm:text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--text-3)]">
+                  <td colSpan={9} className="py-12 text-center text-[var(--text-3)]">
                     <RefreshCw className="animate-spin inline mr-2" size={16} />
                     Loading operations queue...
                   </td>
                 </tr>
               ) : paginatedJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--text-3)]">
+                  <td colSpan={9} className="py-12 text-center text-[var(--text-3)]">
                     No print operations found
                   </td>
                 </tr>
               ) : (
                 paginatedJobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-[var(--surface-2)]/50 transition-colors">
+                  <React.Fragment key={job.id}>
+                  <tr
+                    onClick={() => setExpanded(expanded === job.id ? null : job.id)}
+                    className={`hover:bg-[var(--surface-2)]/50 transition-colors cursor-pointer ${expanded === job.id ? 'bg-[var(--surface-2)]/40' : ''}`}
+                  >
                     {/* File / Doc */}
                     <td className="py-3.5 px-4 sm:px-6">
                       <div className="flex items-center gap-2.5">
@@ -296,6 +381,24 @@ export const OperationsPage: React.FC = () => {
                           </p>
                         </div>
                       </div>
+                    </td>
+
+                    {/* Time: when it was ordered, and how long the print took at the kiosk */}
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <ChevronDown size={13} className={`text-[var(--text-3)] transition-transform ${expanded === job.id ? 'rotate-180' : ''}`} />
+                        <span className="font-mono tabular-nums text-[var(--text-1)]">{clockTime(job.createdAt)}</span>
+                      </div>
+                      {printDuration(job) !== null && (
+                        <p className={`text-[10px] pl-5 tabular-nums ${printDuration(job)! > 3 * 60 * 1000 ? 'text-amber-600 font-bold' : 'text-[var(--text-3)]'}`}>
+                          printed in {duration(printDuration(job))}
+                        </p>
+                      )}
+                      {job.customerIssue && (
+                        <p className="text-[10px] pl-5 font-bold text-rose-600 inline-flex items-center gap-1">
+                          <MessageSquareWarning size={11} /> reported
+                        </p>
+                      )}
                     </td>
 
                     {/* Student User */}
@@ -350,7 +453,7 @@ export const OperationsPage: React.FC = () => {
                       {job.status !== 'refunded' && job.cost > 0 && job.orderId && (
                         <button
                           type="button"
-                          onClick={() => setRefundJob(job)}
+                          onClick={(e) => { e.stopPropagation(); setRefundJob(job); }}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
                         >
                           <RotateCcw size={12} />
@@ -359,6 +462,14 @@ export const OperationsPage: React.FC = () => {
                       )}
                     </td>
                   </tr>
+                  {expanded === job.id && (
+                    <tr>
+                      <td colSpan={9} className="p-0">
+                        <JobTimeline job={job} />
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
