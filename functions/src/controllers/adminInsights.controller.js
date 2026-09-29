@@ -5,11 +5,24 @@
  */
 const { admin, db } = require("../config/firebase");
 const A = require("../services/analytics.service");
+const { resolveRefunds, cashfreeRefundFetcher } = require("../services/refundSync.service");
+
+// Cashfree refund lookups for the history (manual refunds made in the Cashfree app). Tests swap this out.
+let fetchCashfreeRefunds = (orderId) => {
+  const axios = require("axios");
+  const { CASHFREE_BASE_URL, cashfreeHeaders } = require("../config/env");
+  fetchCashfreeRefunds = cashfreeRefundFetcher({ axios, baseUrl: CASHFREE_BASE_URL, headers: cashfreeHeaders });
+  return fetchCashfreeRefunds(orderId);
+};
+const setCashfreeRefundFetcher = (fn) => { fetchCashfreeRefunds = fn; };
 
 const Timestamp = admin.firestore.Timestamp;
 const ONLINE_WINDOW_MS = 5 * 60 * 1000; // Pi heartbeat is every 30-120s
 const PAPER_LOW_PCT = 15;
 const TONER_LOW_PCT = 20;
+// Tray sizes: the Brother B&W trays hold 250 sheets; the Epson colour tray 100 (same as the low-paper alert trigger).
+const BW_PAPER_CAPACITY = 250;
+const COLOR_PAPER_CAPACITY = 100;
 
 const humanAgo = (sec) => (sec < 90 ? `${sec}s ago` : sec < 5400 ? `${Math.round(sec / 60)} min ago` : sec < 129600 ? `${Math.round(sec / 3600)} h ago` : `${Math.round(sec / 86400)} days ago`);
 
@@ -114,13 +127,24 @@ const getAdminJobs = async (req, res) => {
     const total = docs.length;
     docs = docs.slice(0, limit);
 
-    const users = await lookupUsers(docs.map((d) => d.userId));
+    const normalized = new Map(docs.map((d) => [d.id, A.normalizeJobs([d])[0]]));
+    const [users, refunds] = await Promise.all([
+      lookupUsers(docs.map((d) => d.userId)),
+      resolveRefunds({ db, jobs: docs.map((d) => ({ ...d, cost: normalized.get(d.id).cost })), fetchCashfreeRefunds }).catch((err) => {
+        console.error("[ADMIN-INSIGHTS] refund lookup failed:", err.message || err);
+        return new Map();
+      }),
+    ]);
     const jobs = docs.map((d) => {
-      const [n] = A.normalizeJobs([d]);
+      const n = normalized.get(d.id);
       const u = users.get(d.userId);
+      const refund = refunds.get(d.id) || null;
       return {
         id: d.id,
         createdAt: A.iso(n.createdAtMs),
+        userName: d.userName || d.name || u?.name || null,
+        refund,
+        outcome: jobOutcome(n.status, refund),
         userEmail: d.userEmail || u?.email || (d.source === "whatsapp" ? d.userId : null) || "Guest",
         userPhone: d.userPhone || d.phoneNumber || u?.phone || null,
         file: n.fileName || "Unknown file",
@@ -175,6 +199,16 @@ function jobTimeline(d) {
     .sort((a, b) => a.ms - b.ms)
     .map(({ key, label, ms }) => ({ key, label, at: A.iso(ms) }));
 }
+/** One word for the history's status column: refunded beats failed beats printed. */
+function jobOutcome(status, refund) {
+  const s = String(status || "").toLowerCase();
+  if (refund && refund.state === "refunded") return "refunded";
+  if (refund && refund.state === "pending") return "refund_pending";
+  if (s === "failed" || s === "refunded") return "failed";
+  if (["completed", "printed"].includes(s)) return "printed";
+  if (s === "printing") return "printing";
+  return "waiting";
+}
 const num0 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 // ─────────────────────────────── kiosk helpers ───────────────────────────────
@@ -182,11 +216,19 @@ const hardwareFor = (hardware, kioskId) =>
   Object.entries(hardware || {})
     .filter(([key, v]) => v && typeof v === "object" && (key === kioskId || key.startsWith(`${kioskId}-`)))
     .map(([key, p]) => {
-      const capacity = num0(p.paperCapacity) || 500;
-      const paperLevel = p.paperLevel === undefined ? null : num0(p.paperLevel);
+      const type = p.type || (key.toUpperCase().includes("COLOR") ? "color" : "bw");
+      const capacity = type === "color" ? num0(p.paperCapacity) || COLOR_PAPER_CAPACITY : BW_PAPER_CAPACITY;
+      let paperLevel = p.paperLevel === undefined ? null : num0(p.paperLevel);
+      // B&W: the Pi reports the printer's own page counter, so paper left = level at refill − sheets printed since.
+      const tracked = type !== "color" && paperLevel !== null && Number.isFinite(p.pageCount) && Number.isFinite(p.paperRefillPageCount);
+      if (tracked) paperLevel -= Math.max(0, p.pageCount - p.paperRefillPageCount);
+      if (paperLevel !== null) paperLevel = Math.max(0, Math.min(capacity, paperLevel));
       return {
         key,
-        type: p.type || (key.toUpperCase().includes("COLOR") ? "color" : "bw"),
+        type,
+        paperTracked: tracked,
+        paperRefilledAt: A.iso(A.toMillis(p.paperRefilledAt)),
+        panelMessage: p.panelMessage || null,
         status: p.status || null,
         paperLevel,
         paperCapacity: capacity,
@@ -328,6 +370,11 @@ const getAdminIncidents = async (req, res) => {
 
 module.exports = {
   jobTimeline,
+  jobOutcome,
+  hardwareFor,
+  setCashfreeRefundFetcher,
+  BW_PAPER_CAPACITY,
+  COLOR_PAPER_CAPACITY,
   getAdminAnalytics,
   getAdminTransactions,
   getAdminJobs,

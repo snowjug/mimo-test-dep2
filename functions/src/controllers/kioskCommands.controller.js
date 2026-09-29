@@ -46,4 +46,37 @@ const postAdminKioskRestart = async (req, res) => {
   }
 };
 
-module.exports = { postAdminKioskRestart };
+/**
+ * "Paper refilled" for one printer tray. Sets the tray to full and remembers the printer's page counter at this
+ * moment, so paper left can be computed from real printed sheets afterwards (see hardwareFor in adminInsights).
+ */
+const postAdminRefillPaper = async (req, res) => {
+  try {
+    const { BW_PAPER_CAPACITY, COLOR_PAPER_CAPACITY } = require("./adminInsights.controller");
+    const kioskId = String(req.params.kioskId || "");
+    const printerKey = String((req.body && req.body.printerKey) || kioskId);
+    if (!A.KIOSK_ID_PATTERN.test(kioskId) || !(printerKey === kioskId || printerKey.startsWith(`${kioskId}-`))) {
+      return res.status(400).json({ error: "Unknown printer" });
+    }
+    const hwRef = db.collection("hardware").doc("printers");
+    const hw = await hwRef.get();
+    const printer = (hw.exists && hw.data()[printerKey]) || {};
+    const isColor = printer.type === "color" || printerKey.toUpperCase().includes("COLOR");
+    const capacity = isColor ? Number(printer.paperCapacity) || COLOR_PAPER_CAPACITY : BW_PAPER_CAPACITY;
+    const pageCount = Number.isFinite(printer.pageCount) ? printer.pageCount : null;
+    await hwRef.set({
+      [printerKey]: {
+        paperLevel: capacity,
+        paperCapacity: capacity,
+        paperRefillPageCount: pageCount,
+        paperRefilledAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    }, { merge: true });
+    return res.json({ printerKey, paperLevel: capacity, tracked: pageCount !== null });
+  } catch (err) {
+    console.error("[KIOSK-COMMAND] Paper refill failed:", err);
+    return res.status(500).json({ error: "Could not record the refill" });
+  }
+};
+
+module.exports = { postAdminKioskRestart, postAdminRefillPaper };

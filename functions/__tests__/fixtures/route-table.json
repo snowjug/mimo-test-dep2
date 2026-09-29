@@ -34,6 +34,7 @@
   "POST /admin/coupons",
   "POST /admin/coupons/bulk",
   "POST /admin/hardware",
+  "POST /admin/kiosks/:kioskId/refill-paper",
   "POST /admin/kiosks/:kioskId/restart",
   "POST /admin/login",
   "POST /admin/refund",
