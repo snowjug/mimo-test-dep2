@@ -66,6 +66,25 @@ function createKioskRouter(dependencies) {
         return Math.abs(t - latestTime) < 5000;
       });
 
+      // === 0. CALCULATE AGGREGATE SHEETS TELEMETRY ===
+      let totalSheets = 0;
+      let sheetsCompleted = 0;
+      currentSessionDocs.forEach(d => {
+        const pCount = d.pageCount || 1;
+        const copies = d.printOptions ? (d.printOptions.copies || 1) : (d.copies || 1);
+        const fallbackSheets = pCount * copies;
+        const docTotal = (d.totalSheets !== undefined && d.totalSheets !== null) ? Number(d.totalSheets) : fallbackSheets;
+        totalSheets += docTotal;
+
+        if (d.status === "completed" || d.status === "printed" || d.isPrinted === true) {
+          sheetsCompleted += docTotal;
+        } else if (d.sheetsCompleted !== undefined && d.sheetsCompleted !== null) {
+          sheetsCompleted += Math.min(docTotal, Number(d.sheetsCompleted));
+        }
+      });
+      totalSheets = Math.max(1, totalSheets);
+      sheetsCompleted = Math.min(totalSheets, Math.max(0, sheetsCompleted));
+
       // === 1. CHECK KIOSK STATUS & PRINTER HEALTH ===
       // Only perform health checks if printing has not started yet.
       // Once a job is already in progress or completed, kiosk status or temporary offline fluctuations should not fail it.
@@ -76,7 +95,7 @@ function createKioskRouter(dependencies) {
 
       if (!hasStarted) {
         // Job is paid and waiting for user to enter 4-digit code at the kiosk.
-        const responsePayload = { status: "paid", isPrinted: false };
+        const responsePayload = { status: "paid", isPrinted: false, sheetsCompleted: 0, totalSheets };
         const contractCheck = validateKioskJobStatusResponse(responsePayload);
         if (!contractCheck.valid) {
           console.error("[SYNC CONTRACT ERROR]", contractCheck.error);
@@ -122,6 +141,8 @@ function createKioskRouter(dependencies) {
         const responsePayload = {
           status: "failed",
           isPrinted: false,
+          sheetsCompleted,
+          totalSheets,
           printerStatus: PRINT_TIMEOUT_MESSAGE
         };
         return res.json(responsePayload);
@@ -148,13 +169,15 @@ function createKioskRouter(dependencies) {
         const responsePayload = {
           status: "failed",
           isPrinted: false,
+          sheetsCompleted,
+          totalSheets,
           printerStatus: failedDoc ? (failedDoc.printerStatus || failedDoc.error || (failedDoc.status === "refunded" ? "Print refunded" : "Print failed")) : "Print failed"
         };
         return res.json(responsePayload);
       }
 
       if (allCompleted) {
-        const responsePayload = { status: "completed", isPrinted: true };
+        const responsePayload = { status: "completed", isPrinted: true, sheetsCompleted: totalSheets, totalSheets };
         const contractCheck = validateKioskJobStatusResponse(responsePayload);
         if (!contractCheck.valid) {
           console.error("[SYNC CONTRACT ERROR]", contractCheck.error);
@@ -163,7 +186,7 @@ function createKioskRouter(dependencies) {
       }
 
       if (anyPrinting) {
-        const responsePayload = { status: "printing", isPrinted: false };
+        const responsePayload = { status: "printing", isPrinted: false, sheetsCompleted, totalSheets };
         const contractCheck = validateKioskJobStatusResponse(responsePayload);
         if (!contractCheck.valid) {
           console.error("[SYNC CONTRACT ERROR]", contractCheck.error);
@@ -171,7 +194,7 @@ function createKioskRouter(dependencies) {
         return res.json(responsePayload);
       }
 
-      return res.json({ status: "paid", isPrinted: false });
+      return res.json({ status: "paid", isPrinted: false, sheetsCompleted: 0, totalSheets });
 
     } catch (err) {
       console.error("❌ KIOSK JOB STATUS ERROR:", err);
