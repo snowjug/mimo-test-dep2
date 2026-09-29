@@ -67,8 +67,13 @@ export const KiosksPage: React.FC = () => {
     setBusy(id);
     setActionError('');
     try {
-      const patch = what === 'paper' ? { paperLevel: printer.paperCapacity } : printer.type === 'color' ? { inkLevel: 100 } : { tonerLevel: 100 };
-      await api.post('/admin/hardware', { updates: { [printer.key]: patch } });
+      if (what === 'paper') {
+        const kioskId = printer.key.split('-').slice(0, 2).join('-');
+        await api.post(`/admin/kiosks/${encodeURIComponent(kioskId)}/refill-paper`, { printerKey: printer.key });
+      } else {
+        const patch = printer.type === 'color' ? { inkLevel: 100 } : { tonerLevel: 100 };
+        await api.post('/admin/hardware', { updates: { [printer.key]: patch } });
+      }
       q.refresh();
     } catch (err) {
       setActionError(errorMessage(err));
@@ -82,7 +87,7 @@ export const KiosksPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-1)]">Kiosk Network</h1>
+            <h1 className="hidden lg:block text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-1)]">Kiosk Network</h1>
             {q.data && (
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${q.data.summary.offline === 0 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/30'}`}>
                 {q.data.summary.online}/{q.data.summary.total} online
