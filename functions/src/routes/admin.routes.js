@@ -26,6 +26,7 @@ router.get("/admin/transactions", adminAuthMiddleware, insights.getAdminTransact
 router.get("/admin/jobs", adminAuthMiddleware, insights.getAdminJobs);
 router.get("/admin/kiosks", adminAuthMiddleware, insights.getAdminKiosks);
 router.post("/admin/kiosks/:kioskId/restart", adminAuthMiddleware, kioskCommands.postAdminKioskRestart);
+router.post("/admin/kiosks/:kioskId/refill-paper", adminAuthMiddleware, kioskCommands.postAdminRefillPaper);
 router.get("/admin/incidents", adminAuthMiddleware, insights.getAdminIncidents);
 router.post("/admin/refund", adminAuthMiddleware, admin.postAdminRefund);
 router.get("/admin/refund-requests", adminAuthMiddleware, admin.getAdminRefundRequests);
