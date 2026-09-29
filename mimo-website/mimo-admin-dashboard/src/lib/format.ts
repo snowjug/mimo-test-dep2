@@ -25,3 +25,15 @@ export const tsToIso = (v: unknown): string | null => {
   const s = o._seconds ?? o.seconds;
   return typeof s === 'number' ? new Date(s * 1000).toISOString() : null;
 };
+
+/** 14:03:27 — seconds matter when tracing a print. */
+export const clockTime = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+/** 45s · 2m 05s · 1h 12m */
+export const duration = (ms: number | null | undefined) => {
+  if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return '—';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`;
+};

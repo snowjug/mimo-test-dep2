@@ -1,171 +1,195 @@
-import React from 'react';
-import { IndianRupee, Printer, CheckCircle2, ShoppingBag, ArrowUpRight, Cpu, Users, Undo2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronRight, Loader2, PackagePlus, Check, AlertTriangle } from 'lucide-react';
+import api from '../../api';
 import { useRange } from '../../context/RangeContext';
-import { useLiveQuery } from '../../hooks/useLiveQuery';
+import { useLiveQuery, errorMessage } from '../../hooks/useLiveQuery';
 import { insights } from '../../services/insights.service';
 import { DateRangePicker } from '../../components/ui/DateRangePicker';
 import { LiveIndicator } from '../../components/ui/LiveIndicator';
-import { Delta, ErrorBanner, PeriodComparison, TrendChart, TruncatedNote } from '../../components/insights/InsightBits';
+import { ErrorBanner } from '../../components/insights/InsightBits';
 import { describeRange } from '../../lib/dateRange';
-import { dateTime, inr, int, pct, timeAgo } from '../../lib/format';
-import { EmptyState, LevelBar } from '../../components/ui/shared';
+import { inr, int, timeAgo } from '../../lib/format';
+import { MachineBadge, PrintHistoryList } from '../../components/history/PrintHistory';
+import type { KioskLive, PrinterInfo } from '../../types/insights.types';
 
-const Card: React.FC<{ title?: string; subtitle?: string; action?: React.ReactNode; className?: string; children: React.ReactNode }> = ({ title, subtitle, action, className = '', children }) => (
-  <section className={`p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs ${className}`}>
-    {(title || action) && (
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          {title && <h2 className="text-sm font-bold text-[var(--text-1)]">{title}</h2>}
-          {subtitle && <p className="text-xs text-[var(--text-3)] mt-0.5">{subtitle}</p>}
-        </div>
-        {action}
-      </div>
-    )}
-    {children}
-  </section>
-);
+const GREETING_NAME = 'Vishal sir';
+const RECENT_PRINTS = 6;
+// Tray to refill when the Pi has not reported any printer for this kiosk yet.
+const DEFAULT_TRAY: Record<string, string> = { 'CV-001': 'CV-001', 'SV-002': 'SV-002-BW' };
+// Printer panel messages that are normal and not worth showing on the home page.
+const NORMAL_PANEL = /^(ready|sleep|deep sleep|printing|please wait|warming up|cooling down)$/i;
 
-const Kpi: React.FC<{ title: string; value: string; icon: React.ReactNode; tint: string; sub?: React.ReactNode; loading: boolean }> = ({ title, value, icon, tint, sub, loading }) => (
-  <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-    <div className="flex items-center justify-between mb-3">
-      <span className="text-xs font-bold text-[var(--text-2)]">{title}</span>
-      <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${tint}`}>{icon}</div>
-    </div>
-    {loading ? <div className="skeleton h-8 w-28" /> : <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)] tabular-nums">{value}</p>}
-    <div className="mt-1.5 min-h-[16px]">{!loading && sub}</div>
+/** Switch admin tab the same way the browser back button does (App listens to popstate). */
+const goTo = (tab: string) => {
+  window.history.pushState(null, '', `/admin/${tab}`);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+};
+
+const Stat: React.FC<{ label: string; value: string; sub?: string; tone?: string; loading: boolean }> = ({ label, value, sub, tone = 'text-[var(--text-1)]', loading }) => (
+  <div className="px-4 py-3.5 sm:px-5 sm:py-4">
+    <p className="text-[12px] font-medium text-[var(--text-3)]">{label}</p>
+    {loading ? <div className="skeleton mt-1.5 h-7 w-20" /> : <p className={`mt-0.5 text-[26px] font-bold leading-tight tabular-nums tracking-tight ${tone}`}>{value}</p>}
+    {!loading && sub && <p className="mt-0.5 truncate text-[11px] text-[var(--text-3)]">{sub}</p>}
   </div>
 );
 
-export const OverviewPage: React.FC = () => {
-  const { range, setRange, current, live } = useRange();
-  const analytics = useLiveQuery(() => insights.analytics(current()), [range], { live });
-  const kiosks = useLiveQuery(() => insights.kiosks(current()), [range], { live });
-  const jobs = useLiveQuery(() => insights.jobs(current(), { limit: 8 }), [range], { live });
+/** "Refill paper": the first tap arms it, a second tap within 4 s records it, so a stray tap on a phone does nothing. */
+const RefillButton: React.FC<{ kioskId: string; printerKey: string; onDone: () => void; onError: (m: string) => void }> = ({ kioskId, printerKey, onDone, onError }) => {
+  const [state, setState] = useState<'idle' | 'armed' | 'saving' | 'done'>('idle');
+  const timer = useRef<number | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  const a = analytics.data;
-  const cur = a?.current;
-  const prev = a?.previous?.summary;
-  const loading = analytics.loading;
+  const tap = async () => {
+    if (state === 'idle') {
+      setState('armed');
+      timer.current = window.setTimeout(() => setState('idle'), 4000);
+      return;
+    }
+    if (state !== 'armed') return;
+    if (timer.current) clearTimeout(timer.current);
+    setState('saving');
+    try {
+      await api.post(`/admin/kiosks/${encodeURIComponent(kioskId)}/refill-paper`, { printerKey });
+      setState('done');
+      onDone();
+      timer.current = window.setTimeout(() => setState('idle'), 2500);
+    } catch (err) {
+      setState('idle');
+      onError(errorMessage(err));
+    }
+  };
 
   return (
-    <div className="space-y-6 animate-fadeIn font-sans select-none">
-      <div className="flex flex-col gap-3">
-        <p className="text-[14px] text-[var(--text-2)]">Revenue, print volume and machine health, {describeRange(range).toLowerCase()}</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <LiveIndicator updatedAt={analytics.updatedAt} live={live} fetching={analytics.fetching} onRefresh={() => { analytics.refresh(); kiosks.refresh(); jobs.refresh(); }} />
-          <DateRangePicker value={range} onChange={setRange} tone="admin" />
+    <button
+      type="button"
+      onClick={tap}
+      disabled={state === 'saving'}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors active:scale-[0.98] ${
+        state === 'armed' ? 'bg-amber-500 text-white' : state === 'done' ? 'bg-emerald-500 text-white' : 'bg-[var(--surface-2)] text-[var(--text-1)] hover:bg-[var(--border)]'
+      }`}
+    >
+      {state === 'saving' ? <Loader2 size={13} className="animate-spin" /> : state === 'done' ? <Check size={13} /> : <PackagePlus size={13} />}
+      {state === 'armed' ? 'Tap again to confirm' : state === 'done' ? 'Refilled' : 'Refill paper'}
+    </button>
+  );
+};
+
+const PaperTray: React.FC<{ k: KioskLive; p: PrinterInfo | null; trayKey: string; onChanged: () => void; onError: (m: string) => void }> = ({ k, p, trayKey, onChanged, onError }) => {
+  const pct = p?.paperPct ?? null;
+  const bar = pct === null ? 'bg-[var(--border)]' : pct < 15 ? 'bg-rose-500' : pct < 25 ? 'bg-amber-500' : 'bg-emerald-500';
+  const label = p?.type === 'color' ? 'Colour tray' : k.kioskId === 'SV-002' ? 'B&W tray' : 'Paper';
+  return (
+    <div className="flex items-center gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex items-baseline justify-between gap-2 text-[12px]">
+          <span className="text-[var(--text-2)]">{label}</span>
+          <span className="font-semibold tabular-nums text-[var(--text-1)]">
+            {p && p.paperLevel !== null ? `${p.paperLevel} / ${p.paperCapacity}` : 'Not set'}
+          </span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
+          <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${pct ?? 0}%` }} />
         </div>
       </div>
-
-      {analytics.error && <ErrorBanner message={analytics.error} onRetry={analytics.refresh} />}
-      <TruncatedNote show={a?.truncated} />
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Kpi title="Revenue" loading={loading} value={cur ? inr(cur.revenue) : '—'} icon={<IndianRupee size={16} />} tint="bg-indigo-500/10 text-indigo-500"
-          sub={cur && <Delta current={cur.revenue} previous={prev?.revenue} />} />
-        <Kpi title="Orders" loading={loading} value={cur ? int(cur.orders) : '—'} icon={<ShoppingBag size={16} />} tint="bg-blue-500/10 text-blue-500"
-          sub={cur && <Delta current={cur.orders} previous={prev?.orders} />} />
-        <Kpi title="Pages printed" loading={loading} value={cur ? int(cur.pages) : '—'} icon={<Printer size={16} />} tint="bg-amber-500/10 text-amber-500"
-          sub={cur && <Delta current={cur.pages} previous={prev?.pages} />} />
-        <Kpi title="Print success rate" loading={loading} value={cur ? pct(cur.successRate) : '—'} icon={<CheckCircle2 size={16} />} tint="bg-emerald-500/10 text-emerald-500"
-          sub={cur && <span className="text-[11px] text-[var(--text-3)]">{cur.completedJobs} printed · {cur.failedJobs} failed</span>} />
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Kpi title="Net revenue" loading={loading} value={cur ? inr(cur.netRevenue) : '—'} icon={<IndianRupee size={16} />} tint="bg-violet-500/10 text-violet-500"
-          sub={cur && <span className="text-[11px] text-[var(--text-3)]">after {inr(cur.refundedAmount)} refunds</span>} />
-        <Kpi title="Avg order value" loading={loading} value={cur ? inr(cur.avgOrderValue) : '—'} icon={<ShoppingBag size={16} />} tint="bg-sky-500/10 text-sky-500"
-          sub={cur && <span className="text-[11px] text-[var(--text-3)]">{cur.freeOrders} free / coupon orders</span>} />
-        <Kpi title="New users" loading={loading} value={cur ? int(cur.newUsers) : '—'} icon={<Users size={16} />} tint="bg-pink-500/10 text-pink-500"
-          sub={cur && <Delta current={cur.newUsers} previous={prev?.newUsers} />} />
-        <Kpi title="Refunds" loading={loading} value={cur ? int(cur.refundCount) : '—'} icon={<Undo2 size={16} />} tint="bg-rose-500/10 text-rose-500"
-          sub={cur && <Delta current={cur.refundedAmount} previous={prev?.refundedAmount} goodWhenDown />} />
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="xl:col-span-2" title="Revenue & volume" subtitle={a ? `${a.range.granularity === 'hour' ? 'Hourly' : 'Daily'} · ${describeRange(range)}` : undefined}>
-          {a ? <TrendChart series={a.series} tone="admin" /> : <div className="skeleton h-[300px]" />}
-        </Card>
-
-        <Card title="Machines" subtitle="Live status from each kiosk's heartbeat"
-          action={<span className="text-[11px] font-bold text-[var(--text-3)]">{kiosks.data ? `${kiosks.data.summary.online}/${kiosks.data.summary.total} online` : ''}</span>}>
-          {kiosks.error && <ErrorBanner message={kiosks.error} onRetry={kiosks.refresh} />}
-          {kiosks.loading && <div className="space-y-3"><div className="skeleton h-24" /><div className="skeleton h-24" /></div>}
-          <div className="space-y-3">
-            {kiosks.data?.kiosks.map((k) => {
-              const paper = k.printers.find((p) => p.paperPct !== null);
-              return (
-                <div key={k.kioskId} className="p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/50">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${k.online ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-                      <span className="text-sm font-bold text-[var(--text-1)] truncate">{k.name} <span className="font-mono text-[11px] text-[var(--text-3)]">{k.kioskId}</span></span>
-                    </div>
-                    <span className={`text-[11px] font-bold ${k.online ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>{k.online ? 'Online' : 'Offline'}</span>
-                  </div>
-                  <p className="text-[11px] text-[var(--text-3)] mt-1 truncate" title={k.printerStatus || ''}>
-                    {k.printerStatus || (k.lastSeen ? `Last seen ${timeAgo(k.lastSeen)}` : 'No heartbeat received yet')}
-                  </p>
-                  {paper && <div className="mt-2"><LevelBar value={paper.paperPct ?? 0} label={`Paper · ${paper.paperLevel}/${paper.paperCapacity} sheets`} /></div>}
-                  <div className="mt-2 flex items-center gap-3 text-[11px] text-[var(--text-2)]">
-                    <span><b className="text-[var(--text-1)]">{k.stats.jobs}</b> jobs</span>
-                    <span><b className="text-[var(--text-1)]">{k.stats.pages}</b> pages</span>
-                    <span><b className="text-[var(--text-1)]">{inr(k.stats.revenue)}</b></span>
-                    {(k.queue.paid + k.queue.printing) > 0 && <span className="ml-auto text-amber-600 dark:text-amber-400 font-bold">{k.queue.printing} printing · {k.queue.paid} queued</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card title="Compared with the previous period" subtitle={a?.previous ? `${describeRange(range)} vs the ${Math.round((new Date(a.previous.to).getTime() - new Date(a.previous.from).getTime()) / 86400000) || 1}-day period before it` : undefined}>
-          {a ? <PeriodComparison current={a.current} previous={a.previous?.summary ?? null} tone="admin" /> : <div className="skeleton h-64" />}
-        </Card>
-
-        <Card className="xl:col-span-2" title="Recent print jobs" subtitle={jobs.data ? `Latest ${jobs.data.jobs.length} of ${jobs.data.total} in this period` : undefined}
-          action={<span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400"><Cpu size={12} /> Full list in Print Operations <ArrowUpRight size={12} /></span>}>
-          {jobs.error && <ErrorBanner message={jobs.error} onRetry={jobs.refresh} />}
-          {jobs.loading ? <div className="skeleton h-48" /> : jobs.data && jobs.data.jobs.length === 0 ? (
-            <EmptyState icon={<Printer size={20} />} title="No print jobs in this period" description="New jobs appear here automatically." />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="text-[10px] text-[var(--text-3)] border-b border-[var(--border)]">
-                    <th className="py-2 pr-3 font-bold">Document</th><th className="py-2 pr-3 font-bold">Customer</th><th className="py-2 pr-3 font-bold">Machine</th>
-                    <th className="py-2 pr-3 font-bold">Pages</th><th className="py-2 pr-3 font-bold">Amount</th><th className="py-2 pr-3 font-bold">Status</th><th className="py-2 font-bold text-right">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {jobs.data?.jobs.map((j) => (
-                    <tr key={j.id} className="border-b border-[var(--border)] last:border-0">
-                      <td className="py-2.5 pr-3 font-semibold text-[var(--text-1)] max-w-[180px] truncate" title={j.file}>{j.file}</td>
-                      <td className="py-2.5 pr-3 text-[var(--text-2)] max-w-[160px] truncate" title={j.userEmail}>{j.userEmail}</td>
-                      <td className="py-2.5 pr-3 font-mono text-[var(--text-2)]">{j.destination}</td>
-                      <td className="py-2.5 pr-3 tabular-nums text-[var(--text-2)]">{j.totalPages}</td>
-                      <td className="py-2.5 pr-3 tabular-nums font-semibold text-[var(--text-1)]">{inr(j.cost)}</td>
-                      <td className="py-2.5 pr-3"><StatusPill status={j.status} /></td>
-                      <td className="py-2.5 text-right text-[var(--text-3)] whitespace-nowrap">{dateTime(j.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </div>
+      <RefillButton kioskId={k.kioskId} printerKey={trayKey} onDone={onChanged} onError={onError} />
     </div>
   );
 };
 
-export const StatusPill: React.FC<{ status: string }> = ({ status }) => {
-  const s = status.toLowerCase();
-  const cls = ['completed', 'printed'].includes(s) ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-    : ['failed', 'refunded'].includes(s) ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-    : ['printing', 'paid'].includes(s) ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-    : 'bg-slate-500/10 text-slate-500';
-  return <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold capitalize ${cls}`}>{status}</span>;
+export const OverviewPage: React.FC = () => {
+  const { range, setRange, current, live } = useRange();
+  const analytics = useLiveQuery(() => insights.analytics(current(), false), [range], { live });
+  const kiosks = useLiveQuery(() => insights.kiosks(current()), [range], { live: true, intervalMs: 20000 });
+  const jobs = useLiveQuery(() => insights.jobs(current(), { limit: 1000 }), [range], { live });
+  const [actionError, setActionError] = useState('');
+
+  const cur = analytics.data?.current;
+  const list = jobs.data?.jobs ?? [];
+  const refunded = list.filter((j) => j.outcome === 'refunded');
+  const refundedAmount = refunded.reduce((s, j) => s + (j.refund?.amount ?? j.cost ?? 0), 0);
+  const printed = list.filter((j) => j.outcome === 'printed').length;
+  const failed = list.filter((j) => j.outcome === 'failed').length;
+
+  return (
+    <div className="space-y-5 animate-fadeIn font-sans sm:space-y-6">
+      {/* Greeting */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[13px] font-medium text-[var(--text-3)]">
+            {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+          <h1 className="text-[30px] font-bold leading-tight tracking-tight text-[var(--text-1)] sm:text-[36px]">Hello, {GREETING_NAME}</h1>
+          <p className="text-[14px] text-[var(--text-2)]">Here is MIMO {describeRange(range).toLowerCase()}.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <LiveIndicator updatedAt={jobs.updatedAt} live={live} fetching={jobs.fetching || analytics.fetching} onRefresh={() => { analytics.refresh(); kiosks.refresh(); jobs.refresh(); }} />
+          <DateRangePicker value={range} onChange={setRange} tone="admin" />
+        </div>
+      </div>
+
+      {(analytics.error || jobs.error) && <ErrorBanner message={analytics.error || jobs.error || ''} onRetry={() => { analytics.refresh(); jobs.refresh(); }} />}
+      {actionError && <ErrorBanner message={actionError} />}
+
+      {/* The four numbers that matter, one grouped card */}
+      <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] lg:grid-cols-4 [&>*]:border-[var(--border)] [&>*:nth-child(odd)]:border-r [&>*:nth-child(-n+2)]:border-b lg:[&>*]:border-b-0 lg:[&>*]:border-r lg:[&>*:last-child]:border-r-0">
+        <Stat label="Revenue" loading={analytics.loading} value={cur ? inr(cur.revenue) : '—'} sub={refundedAmount > 0 ? `${inr(refundedAmount)} refunded` : 'No refunds'} />
+        <Stat label="Pages printed" loading={analytics.loading} value={cur ? int(cur.pages) : '—'} sub={cur ? `${int(cur.bwPages)} B&W · ${int(cur.colorPages)} colour` : undefined} />
+        <Stat label="Prints" loading={jobs.loading} value={int(list.length)} sub={`${printed} printed · ${failed} failed`} />
+        <Stat label="Refunds" loading={jobs.loading} value={int(refunded.length)} sub={refunded.length ? inr(refundedAmount) : undefined} tone={refunded.length ? 'text-blue-600 dark:text-blue-400' : undefined} />
+      </div>
+
+      {/* Machines */}
+      <section>
+        <h2 className="mb-2 px-1 text-[13px] font-semibold uppercase tracking-wide text-[var(--text-3)]">Machines</h2>
+        {kiosks.error && <ErrorBanner message={kiosks.error} onRetry={kiosks.refresh} />}
+        <div className="grid gap-3 lg:grid-cols-2">
+          {kiosks.loading && <><div className="skeleton h-32 rounded-2xl" /><div className="skeleton h-32 rounded-2xl" /></>}
+          {kiosks.data?.kiosks.map((k) => {
+            const trays = k.printers.filter((p) => p.paperPct !== null || p.type === 'bw');
+            const panel = k.printers.map((p) => p.panelMessage).find((m) => m && !NORMAL_PANEL.test(m.trim()));
+            const supplyLow = k.printers.find((p) => (p.tonerLevel ?? p.inkLevel ?? 100) <= 20);
+            return (
+              <div key={k.kioskId} className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                <div className="flex items-center gap-3">
+                  <MachineBadge kioskId={k.kioskId} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-semibold text-[var(--text-1)]">{k.name}</p>
+                    <p className="text-[12px] text-[var(--text-3)]">
+                      {k.online ? `${k.stats.jobs} prints · ${inr(k.stats.revenue)}` : `Last seen ${timeAgo(k.lastSeen)}`}
+                    </p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold ${k.online ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
+                    <span className={`size-2 rounded-full ${k.online ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                    {k.online ? 'Online' : 'Offline'}
+                  </span>
+                </div>
+                {(panel || supplyLow) && (
+                  <p className="flex items-center gap-1.5 rounded-xl bg-amber-500/10 px-3 py-2 text-[12px] font-semibold text-amber-700 dark:text-amber-400">
+                    <AlertTriangle size={13} /> {panel ? `Printer shows: ${panel}` : `${supplyLow!.type === 'color' ? 'Ink' : 'Toner'} is low`}
+                  </p>
+                )}
+                {(trays.length ? trays : [null]).map((p) => (
+                  <PaperTray key={p?.key ?? 'default'} k={k} p={p} trayKey={p?.key ?? DEFAULT_TRAY[k.kioskId] ?? k.kioskId}
+                    onChanged={kiosks.refresh} onError={setActionError} />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Recent prints */}
+      <section>
+        <div className="mb-2 flex items-center justify-between px-1">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-3)]">Recent prints</h2>
+          <button type="button" onClick={() => goTo('operations')} className="inline-flex items-center text-[13px] font-semibold text-[var(--primary)]">
+            See all <ChevronRight size={15} />
+          </button>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+          {jobs.loading ? <div className="skeleton h-48" /> : <PrintHistoryList jobs={list.slice(0, RECENT_PRINTS)} emptyText="No prints yet" />}
+        </div>
+      </section>
+    </div>
+  );
 };
