@@ -108,6 +108,43 @@ export interface JobRow {
   printerStatus: string | null;
   refundStatus: string | null;
   refundAmount: number | null;
+  userName?: string | null;
+  refund?: RefundInfo | null;
+  outcome?: JobOutcome;
+  printVerified?: boolean;
+  sheetsVerified?: number | null;
+  timeline?: TimelineStep[];
+  customerIssue?: CustomerIssue | null;
+}
+
+export type JobOutcome = 'printed' | 'failed' | 'refunded' | 'refund_pending' | 'printing' | 'waiting';
+
+export interface RefundInfo {
+  state: 'refunded' | 'pending';
+  amount: number | null;
+  at: string | null;
+  source: 'auto' | 'admin' | 'cashfree';
+}
+
+export interface TimelineStep {
+  key: string;
+  label: string;
+  at: string;
+}
+
+export interface CustomerIssue {
+  label: string | null;
+  verdict: 'contradicted' | 'unverified' | 'needs_proof' | 'already_failed' | null;
+  evidence: string | null;
+  reportedAt: string | null;
+}
+
+export interface KioskRestart {
+  status: 'pending' | 'waiting_idle' | 'rebooting' | 'done' | 'failed' | 'expired' | null;
+  message: string | null;
+  requestedAt: string | null;
+  updatedAt: string | null;
+  completedAt: string | null;
 }
 
 export interface JobsResponse {
@@ -127,6 +164,9 @@ export interface PrinterInfo {
   paperPct: number | null;
   tonerLevel: number | null;
   inkLevel: number | null;
+  paperTracked?: boolean;
+  paperRefilledAt?: string | null;
+  panelMessage?: string | null;
 }
 
 export interface KioskLive {
@@ -141,6 +181,7 @@ export interface KioskLive {
   printers: PrinterInfo[];
   queue: { paid: number; printing: number };
   stats: { jobs: number; completed: number; failed: number; pages: number; revenue: number };
+  restart?: KioskRestart | null;
 }
 
 export interface KiosksResponse {
