@@ -11,7 +11,7 @@ export const MachineBadge: React.FC<{ kioskId: string; color?: boolean }> = ({ k
   return (
     <span
       title={`${kioskId}${color ? ' · colour' : ' · black & white'}`}
-      className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+      className={`inline-flex size-[26px] sm:size-7 shrink-0 items-center justify-center rounded-full text-[10px] sm:text-[11px] font-bold ${
         color ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
       }`}
     >
@@ -34,7 +34,7 @@ const OUTCOME: Record<JobOutcome, { label: string; cls: string; icon: React.Reac
 export const StatusIcon: React.FC<{ outcome?: JobOutcome }> = ({ outcome = 'waiting' }) => {
   const o = OUTCOME[outcome] ?? OUTCOME.waiting;
   return (
-    <span title={o.label} className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full ${o.cls}`}>
+    <span title={o.label} className={`inline-flex size-[26px] sm:size-7 shrink-0 items-center justify-center rounded-full ${o.cls}`}>
       {o.icon}
       <span className="sr-only">{o.label}</span>
     </span>
@@ -159,7 +159,7 @@ const JobDetails: React.FC<{ job: JobRow; onRefund?: (job: JobRow) => void }> = 
 };
 
 /* ── The list itself: Time · Name · Machine · Pages · Price · Status ── */
-const COLS = 'grid grid-cols-[52px_minmax(0,1fr)_28px_34px_54px_28px] sm:grid-cols-[88px_minmax(0,1fr)_64px_64px_84px_64px] items-center gap-2 sm:gap-4';
+const COLS = 'grid grid-cols-[46px_minmax(0,1fr)_26px_26px_52px_30px] sm:grid-cols-[88px_minmax(0,1fr)_64px_64px_84px_64px] items-center gap-1.5 sm:gap-4';
 const isToday = (iso: string | null) => !!iso && new Date(iso).toDateString() === new Date().toDateString();
 const shortTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '—';
@@ -172,13 +172,13 @@ export const PrintHistoryList: React.FC<{
   const [open, setOpen] = useState<string | null>(null);
   return (
     <div className="text-xs sm:text-sm">
-      <div aria-hidden="true" className={`${COLS} border-b border-[var(--border)] px-3 py-2.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-3)] sm:px-5 sm:text-[11px]`}>
+      <div aria-hidden="true" className={`${COLS} border-b border-[var(--border)] px-2.5 py-2.5 text-[9.5px] font-bold uppercase tracking-normal text-[var(--text-3)] sm:px-5 sm:text-[11px] sm:tracking-wide`}>
         <span>Time</span>
         <span>Name</span>
         <span className="text-center"><span className="sm:hidden">M/c</span><span className="hidden sm:inline">Machine</span></span>
-        <span className="text-right">Pages</span>
+        <span className="text-right"><span className="sm:hidden">Pgs</span><span className="hidden sm:inline">Pages</span></span>
         <span className="text-right">Price</span>
-        <span className="text-center">Status</span>
+        <span className="text-right sm:text-center">Status</span>
       </div>
       {jobs.length === 0 && <p className="px-5 py-10 text-center text-[var(--text-3)]">{emptyText}</p>}
       <ul className="divide-y divide-[var(--border)]">
@@ -191,16 +191,16 @@ export const PrintHistoryList: React.FC<{
                 type="button"
                 aria-expanded={expanded}
                 onClick={() => setOpen(expanded ? null : j.id)}
-                className={`${COLS} w-full px-3 py-3 text-left transition-colors hover:bg-[var(--surface-2)]/60 active:bg-[var(--surface-2)] sm:px-5 ${expanded ? 'bg-[var(--surface-2)]/50' : ''}`}
+                className={`${COLS} w-full px-2.5 py-3 text-left transition-colors hover:bg-[var(--surface-2)]/60 active:bg-[var(--surface-2)] sm:px-5 ${expanded ? 'bg-[var(--surface-2)]/50' : ''}`}
               >
                 <span className="min-w-0">
-                  <span className="block font-semibold tabular-nums text-[var(--text-1)]">{shortTime(j.createdAt)}</span>
+                  <span className="block text-[11.5px] font-semibold tabular-nums text-[var(--text-1)] sm:text-sm">{shortTime(j.createdAt)}</span>
                   {!isToday(j.createdAt) && j.createdAt && (
                     <span className="block text-[10px] text-[var(--text-3)]">{new Date(j.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
                   )}
                 </span>
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate font-semibold text-[var(--text-1)]" title={j.userEmail}>{displayName(j)}</span>
+                  <span className="line-clamp-2 break-words font-semibold leading-tight text-[var(--text-1)] sm:line-clamp-1" title={j.userEmail}>{displayName(j)}</span>
                   {j.customerIssue && <MessageSquareWarning size={13} className="shrink-0 text-rose-500" aria-label="Customer reported a problem" />}
                   {took !== null && took > 3 * 60 * 1000 && <span className="hidden shrink-0 text-[10px] font-bold text-amber-600 sm:inline">slow {duration(took)}</span>}
                   <ChevronDown size={13} className={`ml-auto hidden shrink-0 text-[var(--text-3)] transition-transform sm:block ${expanded ? 'rotate-180' : ''}`} />
@@ -208,7 +208,7 @@ export const PrintHistoryList: React.FC<{
                 <span className="flex justify-center"><MachineBadge kioskId={j.destination} color={j.colorMode === 'color'} /></span>
                 <span className="text-right font-semibold tabular-nums text-[var(--text-1)]">{j.totalPages || j.pageCount}</span>
                 <span className={`text-right font-semibold tabular-nums ${j.outcome === 'refunded' ? 'text-[var(--text-3)] line-through' : 'text-[var(--text-1)]'}`}>{inr(j.cost)}</span>
-                <span className="flex justify-center"><StatusIcon outcome={j.outcome} /></span>
+                <span className="flex justify-end sm:justify-center"><StatusIcon outcome={j.outcome} /></span>
               </button>
               {expanded && <JobDetails job={j} onRefund={onRefund} />}
             </li>
