@@ -1,5 +1,6 @@
 const { admin, db } = require("../config/firebase");
 const { getPDFDocument } = require("../services/pdf.service");
+const { degrees } = require("pdf-lib");
 
 async function createScannerSession(userId) {
   if (!userId) {
@@ -22,6 +23,56 @@ async function createScannerSession(userId) {
     sessionId: sessionRef.id,
     status: sessionData.status,
     pageCount: sessionData.pageCount,
+  };
+}
+
+async function getScannerSession(userId, sessionId) {
+  if (!userId) {
+    throw new Error("userId is required");
+  }
+
+  if (!sessionId) {
+    throw new Error("sessionId is required");
+  }
+
+  const sessionRef = db.collection("scanner_sessions").doc(sessionId);
+  const sessionSnapshot = await sessionRef.get();
+
+  if (!sessionSnapshot.exists) {
+    throw new Error("Scanner session not found");
+  }
+
+  const sessionData = sessionSnapshot.data();
+
+  if (sessionData.userId !== userId) {
+    throw new Error("Scanner session does not belong to this user");
+  }
+
+  if (sessionData.status !== "created") {
+    throw new Error("Scanner session is not available");
+  }
+
+  const pagesSnapshot = await sessionRef.collection("pages").get();
+  const pagesList = pagesSnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      pageId: doc.id,
+      pageNumber: data.pageNumber,
+      contentType: data.contentType,
+      storagePath: data.storagePath,
+      rotation: data.rotation ?? 0,
+    };
+  });
+
+  pagesList.sort((a, b) => (Number(a.pageNumber) || 0) - (Number(b.pageNumber) || 0));
+
+  return {
+    sessionId,
+    status: sessionData.status,
+    pageCount: pagesList.length,
+    pages: pagesList,
+    createdAt: sessionData.createdAt,
+    updatedAt: sessionData.updatedAt,
   };
 }
 
@@ -93,6 +144,7 @@ async function addScannerPage(userId, sessionId, pageNumber, fileData, mimeType)
     pageNumber,
     storagePath,
     contentType: resolvedContentType,
+    rotation: 0,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
@@ -113,6 +165,233 @@ async function addScannerPage(userId, sessionId, pageNumber, fileData, mimeType)
     storagePath,
     pageCount: pagesSnapshot.size,
     status: "uploaded",
+  };
+}
+
+async function deleteScannerPage(userId, sessionId, pageId) {
+  if (!userId) {
+    throw new Error("userId is required");
+  }
+
+  if (!sessionId) {
+    throw new Error("sessionId is required");
+  }
+
+  if (!pageId) {
+    throw new Error("pageId is required");
+  }
+
+  const sessionRef = db.collection("scanner_sessions").doc(sessionId);
+  const sessionSnapshot = await sessionRef.get();
+
+  if (!sessionSnapshot.exists) {
+    throw new Error("Scanner session not found");
+  }
+
+  const sessionData = sessionSnapshot.data();
+
+  if (sessionData.userId !== userId) {
+    throw new Error("Scanner session does not belong to this user");
+  }
+
+  if (sessionData.status !== "created") {
+    throw new Error("Scanner session is not available");
+  }
+
+  const pageRef = sessionRef.collection("pages").doc(pageId);
+  const pageSnapshot = await pageRef.get();
+
+  if (!pageSnapshot.exists) {
+    throw new Error("Page not found in this session");
+  }
+
+  const pageData = pageSnapshot.data();
+
+  if (pageData.storagePath && pageData.storagePath.startsWith(`scanner/${sessionId}/`)) {
+    try {
+      const bucket = admin.storage().bucket();
+      const fileRef = bucket.file(pageData.storagePath);
+      if (typeof fileRef.delete === "function") {
+        await fileRef.delete({ ignoreNotFound: true }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn(`[SCANNER SERVICE] Failed to delete storage file ${pageData.storagePath}:`, err.message);
+    }
+  }
+
+  await pageRef.delete();
+
+  const remainingPagesSnapshot = await sessionRef.collection("pages").get();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await sessionRef.update({
+    pageCount: remainingPagesSnapshot.size,
+    updatedAt: now,
+  });
+
+  return {
+    sessionId,
+    pageId,
+    pageCount: remainingPagesSnapshot.size,
+    status: "deleted",
+  };
+}
+
+async function reorderScannerPages(userId, sessionId, order) {
+  if (!userId) {
+    throw new Error("userId is required");
+  }
+
+  if (!sessionId) {
+    throw new Error("sessionId is required");
+  }
+
+  if (!Array.isArray(order) || order.length === 0) {
+    throw new Error("order must be a non-empty array of page IDs");
+  }
+
+  for (const id of order) {
+    if (typeof id !== "string" || !id.trim()) {
+      throw new Error("order must contain only valid string page IDs");
+    }
+  }
+
+  const uniqueIds = new Set(order);
+  if (uniqueIds.size !== order.length) {
+    throw new Error("order contains duplicate page IDs");
+  }
+
+  const sessionRef = db.collection("scanner_sessions").doc(sessionId);
+  const sessionSnapshot = await sessionRef.get();
+
+  if (!sessionSnapshot.exists) {
+    throw new Error("Scanner session not found");
+  }
+
+  const sessionData = sessionSnapshot.data();
+
+  if (sessionData.userId !== userId) {
+    throw new Error("Scanner session does not belong to this user");
+  }
+
+  if (sessionData.status !== "created") {
+    throw new Error("Scanner session is not available");
+  }
+
+  const pagesSnapshot = await sessionRef.collection("pages").get();
+
+  if (pagesSnapshot.empty || pagesSnapshot.size === 0) {
+    throw new Error("Scanner session has no uploaded pages");
+  }
+
+  if (pagesSnapshot.size !== order.length) {
+    throw new Error(`order must include all ${pagesSnapshot.size} pages in the session`);
+  }
+
+  const existingPageMap = new Map();
+  pagesSnapshot.docs.forEach((doc) => {
+    existingPageMap.set(doc.id, doc.ref);
+  });
+
+  for (const pageId of order) {
+    if (!existingPageMap.has(pageId)) {
+      throw new Error(`Page ${pageId} does not belong to this session`);
+    }
+  }
+
+  const batch = db.batch();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  order.forEach((pageId, index) => {
+    const newPageNumber = index + 1;
+    const pageRef = existingPageMap.get(pageId);
+    batch.update(pageRef, {
+      pageNumber: newPageNumber,
+      updatedAt: now,
+    });
+  });
+
+  batch.update(sessionRef, {
+    updatedAt: now,
+  });
+
+  await batch.commit();
+
+  return {
+    sessionId,
+    order,
+    pageCount: order.length,
+    status: "reordered",
+  };
+}
+
+async function updateScannerPage(userId, sessionId, pageId, updates) {
+  if (!userId) {
+    throw new Error("userId is required");
+  }
+
+  if (!sessionId) {
+    throw new Error("sessionId is required");
+  }
+
+  if (!pageId) {
+    throw new Error("pageId is required");
+  }
+
+  if (!updates || typeof updates !== "object") {
+    throw new Error("updates object is required");
+  }
+
+  const ALLOWED_ROTATIONS = new Set([0, 90, 180, 270]);
+  if (
+    typeof updates.rotation !== "number" ||
+    !ALLOWED_ROTATIONS.has(updates.rotation)
+  ) {
+    throw new Error("rotation must be one of: 0, 90, 180, 270");
+  }
+
+  const rotation = updates.rotation;
+
+  const sessionRef = db.collection("scanner_sessions").doc(sessionId);
+  const sessionSnapshot = await sessionRef.get();
+
+  if (!sessionSnapshot.exists) {
+    throw new Error("Scanner session not found");
+  }
+
+  const sessionData = sessionSnapshot.data();
+
+  if (sessionData.userId !== userId) {
+    throw new Error("Scanner session does not belong to this user");
+  }
+
+  if (sessionData.status !== "created") {
+    throw new Error("Scanner session is not available");
+  }
+
+  const pageRef = sessionRef.collection("pages").doc(pageId);
+  const pageSnapshot = await pageRef.get();
+
+  if (!pageSnapshot.exists) {
+    throw new Error("Page not found in this session");
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await pageRef.update({
+    rotation,
+    updatedAt: now,
+  });
+
+  await sessionRef.update({
+    updatedAt: now,
+  });
+
+  return {
+    sessionId,
+    pageId,
+    rotation,
+    status: "updated",
   };
 }
 
@@ -184,6 +463,11 @@ async function finalizeScannerSession(userId, sessionId) {
       width: embeddedImage.width,
       height: embeddedImage.height,
     });
+
+    const rotation = Number(p.rotation) || 0;
+    if (rotation && [90, 180, 270].includes(rotation)) {
+      page.setRotation(degrees(rotation));
+    }
   }
 
   const pdfBytes = await pdfDoc.save();
@@ -256,6 +540,10 @@ async function finalizeScannerSession(userId, sessionId) {
 
 module.exports = {
   createScannerSession,
+  getScannerSession,
   addScannerPage,
+  deleteScannerPage,
+  reorderScannerPages,
+  updateScannerPage,
   finalizeScannerSession,
 };

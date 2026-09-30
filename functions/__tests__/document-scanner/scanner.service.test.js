@@ -42,6 +42,9 @@ const mockBucket = {
       if (!file) throw new Error(`File not found: ${filePath}`);
       return [file.buffer];
     },
+    delete: async () => {
+      storageFiles.delete(filePath);
+    },
   }),
 };
 
@@ -107,6 +110,29 @@ function createMockDocRef(collName, docId) {
                 if (!pages.has(id)) pages.set(id, new Map());
                 pages.get(id).set(pageId, pageData);
               },
+              get: async () => {
+                const sessionPages = pages.get(id);
+                const exists = !!(sessionPages && sessionPages.has(pageId));
+                return {
+                  exists,
+                  id: pageId,
+                  data: () => (exists ? sessionPages.get(pageId) : null),
+                };
+              },
+              update: async (partial) => {
+                const sessionPages = pages.get(id);
+                if (!sessionPages || !sessionPages.has(pageId)) {
+                  throw new Error("Page document not found");
+                }
+                const current = sessionPages.get(pageId);
+                sessionPages.set(pageId, { ...current, ...partial });
+              },
+              delete: async () => {
+                const sessionPages = pages.get(id);
+                if (sessionPages) {
+                  sessionPages.delete(pageId);
+                }
+              },
             };
           },
           get: async () => {
@@ -116,6 +142,15 @@ function createMockDocRef(collName, docId) {
               size: sessionPages.size,
               docs: Array.from(sessionPages.entries()).map(([k, v]) => ({
                 id: k,
+                ref: {
+                  id: k,
+                  update: async (partial) => {
+                    const sp = pages.get(id);
+                    if (sp && sp.has(k)) {
+                      sp.set(k, { ...sp.get(k), ...partial });
+                    }
+                  },
+                },
                 data: () => v,
               })),
             };
@@ -185,7 +220,11 @@ require.cache[require.resolve("../../src/config/firebase")] = {
 
 const {
   createScannerSession,
+  getScannerSession,
   addScannerPage,
+  deleteScannerPage,
+  reorderScannerPages,
+  updateScannerPage,
   finalizeScannerSession,
 } = require("../../src/document-scanner/scanner.service");
 
@@ -214,6 +253,63 @@ test("createScannerSession rejects a missing userId", async () => {
     {
       message: "userId is required",
     }
+  );
+});
+
+// ================= GET SCANNER SESSION TESTS =================
+
+test("getScannerSession returns session with pages sorted by pageNumber", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 2, Buffer.from(MINIMAL_PNG), "image/png");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+
+  const retrieved = await getScannerSession("user-1", session.sessionId);
+  assert.equal(retrieved.sessionId, session.sessionId);
+  assert.equal(retrieved.status, "created");
+  assert.equal(retrieved.pageCount, 2);
+  assert.equal(retrieved.pages.length, 2);
+  assert.equal(retrieved.pages[0].pageNumber, 1);
+  assert.equal(retrieved.pages[0].pageId, "page-001");
+  assert.equal(retrieved.pages[0].rotation, 0);
+  assert.equal(retrieved.pages[1].pageNumber, 2);
+  assert.equal(retrieved.pages[1].pageId, "page-002");
+});
+
+test("getScannerSession handles empty session with 0 pages", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+
+  const retrieved = await getScannerSession("user-1", session.sessionId);
+  assert.equal(retrieved.sessionId, session.sessionId);
+  assert.equal(retrieved.pageCount, 0);
+  assert.deepEqual(retrieved.pages, []);
+});
+
+test("getScannerSession rejects nonexistent session", async () => {
+  resetStorage();
+  await assert.rejects(
+    () => getScannerSession("user-1", "nonexistent-session"),
+    { message: "Scanner session not found" }
+  );
+});
+
+test("getScannerSession rejects session belonging to another user", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await assert.rejects(
+    () => getScannerSession("intruder-user", session.sessionId),
+    { message: "Scanner session does not belong to this user" }
+  );
+});
+
+test("getScannerSession rejects completed session", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await mockDb.collection("scanner_sessions").doc(session.sessionId).update({ status: "completed" });
+  await assert.rejects(
+    () => getScannerSession("user-1", session.sessionId),
+    { message: "Scanner session is not available" }
   );
 });
 
@@ -333,6 +429,189 @@ test("addScannerPage rejects when session is not available/finalized", async () 
   );
 });
 
+// ================= DELETE SCANNER PAGE TESTS =================
+
+test("deleteScannerPage deletes page doc, storage file, and decrements pageCount", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+  await addScannerPage("user-1", session.sessionId, 2, Buffer.from(MINIMAL_PNG), "image/png");
+
+  assert.ok(storageFiles.has(`scanner/${session.sessionId}/page-001.jpg`));
+
+  const result = await deleteScannerPage("user-1", session.sessionId, "page-001");
+  assert.equal(result.sessionId, session.sessionId);
+  assert.equal(result.pageId, "page-001");
+  assert.equal(result.pageCount, 1);
+  assert.equal(result.status, "deleted");
+
+  assert.equal(storageFiles.has(`scanner/${session.sessionId}/page-001.jpg`), false);
+  const sessionDoc = sessions.get(session.sessionId);
+  assert.equal(sessionDoc.pageCount, 1);
+});
+
+test("deleteScannerPage on the last page sets pageCount to 0", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+
+  const result = await deleteScannerPage("user-1", session.sessionId, "page-001");
+  assert.equal(result.pageCount, 0);
+  const sessionDoc = sessions.get(session.sessionId);
+  assert.equal(sessionDoc.pageCount, 0);
+});
+
+test("deleteScannerPage rejects nonexistent page", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await assert.rejects(
+    () => deleteScannerPage("user-1", session.sessionId, "page-999"),
+    { message: "Page not found in this session" }
+  );
+});
+
+test("deleteScannerPage rejects when session belongs to another user", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+
+  await assert.rejects(
+    () => deleteScannerPage("intruder", session.sessionId, "page-001"),
+    { message: "Scanner session does not belong to this user" }
+  );
+});
+
+test("deleteScannerPage rejects on completed session", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+  await mockDb.collection("scanner_sessions").doc(session.sessionId).update({ status: "completed" });
+
+  await assert.rejects(
+    () => deleteScannerPage("user-1", session.sessionId, "page-001"),
+    { message: "Scanner session is not available" }
+  );
+});
+
+// ================= REORDER SCANNER PAGES TESTS =================
+
+test("reorderScannerPages updates pageNumbers atomically in order", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+  await addScannerPage("user-1", session.sessionId, 2, Buffer.from(MINIMAL_PNG), "image/png");
+  await addScannerPage("user-1", session.sessionId, 3, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+
+  const reorderResult = await reorderScannerPages("user-1", session.sessionId, ["page-003", "page-001", "page-002"]);
+  assert.equal(reorderResult.status, "reordered");
+  assert.equal(reorderResult.pageCount, 3);
+  assert.deepEqual(reorderResult.order, ["page-003", "page-001", "page-002"]);
+
+  const sessionPages = pages.get(session.sessionId);
+  assert.equal(sessionPages.get("page-003").pageNumber, 1);
+  assert.equal(sessionPages.get("page-001").pageNumber, 2);
+  assert.equal(sessionPages.get("page-002").pageNumber, 3);
+});
+
+test("reorderScannerPages rejects duplicate page IDs", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+  await addScannerPage("user-1", session.sessionId, 2, Buffer.from(MINIMAL_PNG), "image/png");
+
+  await assert.rejects(
+    () => reorderScannerPages("user-1", session.sessionId, ["page-001", "page-001"]),
+    { message: "order contains duplicate page IDs" }
+  );
+});
+
+test("reorderScannerPages rejects missing page IDs in order list", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+  await addScannerPage("user-1", session.sessionId, 2, Buffer.from(MINIMAL_PNG), "image/png");
+
+  await assert.rejects(
+    () => reorderScannerPages("user-1", session.sessionId, ["page-001"]),
+    { message: /order must include all/ }
+  );
+});
+
+test("reorderScannerPages rejects unknown page IDs", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+
+  await assert.rejects(
+    () => reorderScannerPages("user-1", session.sessionId, ["page-999"]),
+    { message: /does not belong to this session/ }
+  );
+});
+
+test("reorderScannerPages rejects session belonging to another user", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+
+  await assert.rejects(
+    () => reorderScannerPages("intruder", session.sessionId, ["page-001"]),
+    { message: "Scanner session does not belong to this user" }
+  );
+});
+
+test("reorderScannerPages rejects on completed session", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+  await mockDb.collection("scanner_sessions").doc(session.sessionId).update({ status: "completed" });
+
+  await assert.rejects(
+    () => reorderScannerPages("user-1", session.sessionId, ["page-001"]),
+    { message: "Scanner session is not available" }
+  );
+});
+
+// ================= UPDATE SCANNER PAGE (ROTATION) TESTS =================
+
+test("updateScannerPage updates rotation to 0, 90, 180, 270", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+
+  for (const rot of [90, 180, 270, 0]) {
+    const res = await updateScannerPage("user-1", session.sessionId, "page-001", { rotation: rot });
+    assert.equal(res.rotation, rot);
+    assert.equal(res.status, "updated");
+    const p = pages.get(session.sessionId).get("page-001");
+    assert.equal(p.rotation, rot);
+  }
+});
+
+test("updateScannerPage rejects invalid rotation values", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+
+  for (const invalidRot of [45, 100, -90, 360, "90", null]) {
+    await assert.rejects(
+      () => updateScannerPage("user-1", session.sessionId, "page-001", { rotation: invalidRot }),
+      { message: "rotation must be one of: 0, 90, 180, 270" }
+    );
+  }
+});
+
+test("updateScannerPage rejects completed session", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+  await mockDb.collection("scanner_sessions").doc(session.sessionId).update({ status: "completed" });
+
+  await assert.rejects(
+    () => updateScannerPage("user-1", session.sessionId, "page-001", { rotation: 90 }),
+    { message: "Scanner session is not available" }
+  );
+});
+
 // ================= FINALIZE SCANNER SESSION TESTS =================
 
 test("1. Successful one-page JPEG finalization compiles PDF and creates pending print job", async () => {
@@ -358,11 +637,12 @@ test("1. Successful one-page JPEG finalization compiles PDF and creates pending 
   });
 });
 
-test("2. Successful mixed JPEG + PNG finalization", async () => {
+test("2. Successful mixed JPEG + PNG finalization with rotation metadata", async () => {
   resetStorage();
   const session = await createScannerSession("user-1");
   await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
   await addScannerPage("user-1", session.sessionId, 2, Buffer.from(MINIMAL_PNG), "image/png");
+  await updateScannerPage("user-1", session.sessionId, "page-001", { rotation: 90 });
 
   const result = await finalizeScannerSession("user-1", session.sessionId);
 
