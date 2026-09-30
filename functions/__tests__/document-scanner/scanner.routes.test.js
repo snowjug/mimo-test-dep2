@@ -9,7 +9,11 @@ createFakeFirestore().install();
 const { authMiddleware } = require("../../src/middleware/auth");
 const {
   postCreateSession,
+  getSession,
   postAddPage,
+  deletePage,
+  postReorderPages,
+  patchPage,
   postFinalizeSession,
 } = require("../../src/document-scanner/scanner.controller");
 const router = require("../../src/document-scanner/scanner.routes");
@@ -26,79 +30,65 @@ test("1. POST /sessions route is registered", () => {
   assert.ok(route, "POST /sessions route must be registered");
   assert.equal(route.path, "/sessions");
   assert.equal(route.methods.post, true);
+  assert.equal(route.stack[0].handle, authMiddleware);
+  assert.equal(route.stack[1].handle, postCreateSession);
 });
 
-test("2. POST /sessions/:sessionId/pages route is registered", () => {
+test("2. GET /sessions/:sessionId route is registered", () => {
+  const route = getRouteLayer("/sessions/:sessionId", "get");
+  assert.ok(route, "GET /sessions/:sessionId route must be registered");
+  assert.equal(route.path, "/sessions/:sessionId");
+  assert.equal(route.methods.get, true);
+  assert.equal(route.stack[0].handle, authMiddleware);
+  assert.equal(route.stack[1].handle, getSession);
+});
+
+test("3. POST /sessions/:sessionId/pages route is registered", () => {
   const route = getRouteLayer("/sessions/:sessionId/pages", "post");
   assert.ok(route, "POST /sessions/:sessionId/pages route must be registered");
   assert.equal(route.path, "/sessions/:sessionId/pages");
   assert.equal(route.methods.post, true);
+  assert.equal(route.stack[0].handle, authMiddleware);
+  assert.equal(route.stack[1].handle, postAddPage);
 });
 
-test("3. POST /sessions/:sessionId/finalize route is registered", () => {
+test("4. DELETE /sessions/:sessionId/pages/:pageId route is registered", () => {
+  const route = getRouteLayer("/sessions/:sessionId/pages/:pageId", "delete");
+  assert.ok(route, "DELETE /sessions/:sessionId/pages/:pageId route must be registered");
+  assert.equal(route.path, "/sessions/:sessionId/pages/:pageId");
+  assert.equal(route.methods.delete, true);
+  assert.equal(route.stack[0].handle, authMiddleware);
+  assert.equal(route.stack[1].handle, deletePage);
+});
+
+test("5. PATCH /sessions/:sessionId/pages/:pageId route is registered", () => {
+  const route = getRouteLayer("/sessions/:sessionId/pages/:pageId", "patch");
+  assert.ok(route, "PATCH /sessions/:sessionId/pages/:pageId route must be registered");
+  assert.equal(route.path, "/sessions/:sessionId/pages/:pageId");
+  assert.equal(route.methods.patch, true);
+  assert.equal(route.stack[0].handle, authMiddleware);
+  assert.equal(route.stack[1].handle, patchPage);
+});
+
+test("6. POST /sessions/:sessionId/reorder route is registered", () => {
+  const route = getRouteLayer("/sessions/:sessionId/reorder", "post");
+  assert.ok(route, "POST /sessions/:sessionId/reorder route must be registered");
+  assert.equal(route.path, "/sessions/:sessionId/reorder");
+  assert.equal(route.methods.post, true);
+  assert.equal(route.stack[0].handle, authMiddleware);
+  assert.equal(route.stack[1].handle, postReorderPages);
+});
+
+test("7. POST /sessions/:sessionId/finalize route is registered", () => {
   const route = getRouteLayer("/sessions/:sessionId/finalize", "post");
   assert.ok(route, "POST /sessions/:sessionId/finalize route must be registered");
   assert.equal(route.path, "/sessions/:sessionId/finalize");
   assert.equal(route.methods.post, true);
+  assert.equal(route.stack[0].handle, authMiddleware);
+  assert.equal(route.stack[1].handle, postFinalizeSession);
 });
 
-test("4. POST /sessions places authMiddleware before postCreateSession", () => {
-  const route = getRouteLayer("/sessions", "post");
-  assert.ok(route, "POST /sessions route must exist");
-  assert.equal(route.stack.length, 2, "POST /sessions must have exactly 2 middleware/handlers");
-  assert.equal(
-    route.stack[0].handle,
-    authMiddleware,
-    "First middleware in chain must be authMiddleware"
-  );
-  assert.equal(
-    route.stack[1].handle,
-    postCreateSession,
-    "Second handler in chain must be postCreateSession"
-  );
-});
-
-test("5. POST /sessions/:sessionId/pages places authMiddleware before postAddPage", () => {
-  const route = getRouteLayer("/sessions/:sessionId/pages", "post");
-  assert.ok(route, "POST /sessions/:sessionId/pages route must exist");
-  assert.equal(
-    route.stack.length,
-    2,
-    "POST /sessions/:sessionId/pages must have exactly 2 middleware/handlers"
-  );
-  assert.equal(
-    route.stack[0].handle,
-    authMiddleware,
-    "First middleware in chain must be authMiddleware"
-  );
-  assert.equal(
-    route.stack[1].handle,
-    postAddPage,
-    "Second handler in chain must be postAddPage"
-  );
-});
-
-test("6. POST /sessions/:sessionId/finalize places authMiddleware before postFinalizeSession", () => {
-  const route = getRouteLayer("/sessions/:sessionId/finalize", "post");
-  assert.ok(route, "POST /sessions/:sessionId/finalize route must exist");
-  assert.equal(
-    route.stack.length,
-    2,
-    "POST /sessions/:sessionId/finalize must have exactly 2 middleware/handlers"
-  );
-  assert.equal(
-    route.stack[0].handle,
-    authMiddleware,
-    "First middleware in chain must be authMiddleware"
-  );
-  assert.equal(
-    route.stack[1].handle,
-    postFinalizeSession,
-    "Second handler in chain must be postFinalizeSession"
-  );
-});
-
-test("7. Router exposes only the expected scanner routes", () => {
+test("8. Router exposes only the expected scanner routes", () => {
   const registeredRoutes = router.stack
     .filter((l) => l.route)
     .map((l) => ({
@@ -108,7 +98,11 @@ test("7. Router exposes only the expected scanner routes", () => {
 
   assert.deepEqual(registeredRoutes, [
     { path: "/sessions", methods: ["post"] },
+    { path: "/sessions/:sessionId", methods: ["get"] },
     { path: "/sessions/:sessionId/pages", methods: ["post"] },
+    { path: "/sessions/:sessionId/pages/:pageId", methods: ["delete"] },
+    { path: "/sessions/:sessionId/pages/:pageId", methods: ["patch"] },
+    { path: "/sessions/:sessionId/reorder", methods: ["post"] },
     { path: "/sessions/:sessionId/finalize", methods: ["post"] },
   ]);
 });
