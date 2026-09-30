@@ -35,4 +35,7 @@ const kioskRouter = createKioskRouter({
 });
 app.use("/kiosk", kioskRouter);
 
+// ================= DOCUMENT SCANNER ROUTES =================
+app.use("/scanner", require("./document-scanner/scanner.routes"));
+
 module.exports = app;
