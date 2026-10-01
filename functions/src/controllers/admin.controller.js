@@ -46,21 +46,25 @@ const getAdminCoupons = async (req, res) => {
 
 const postAdminCoupons = async (req, res) => {
   try {
-    const { code, discountPercentage, expiryDate } = req.body;
-    if (!code || !discountPercentage) return res.status(400).json({ error: "Missing required fields" });
+    const { code, discountPercentage, expiryDate, isActive, maxUses } = req.body;
+    if (!code || discountPercentage === undefined) return res.status(400).json({ error: "Missing required fields" });
 
-    const couponRef = db.collection("coupons").doc(code.toUpperCase());
-    await couponRef.set({
-      code: code.toUpperCase(),
+    const couponRef = db.collection("coupons").doc(code.toUpperCase().trim());
+    const data = {
+      code: code.toUpperCase().trim(),
       discountPercentage: Number(discountPercentage),
-      isActive: true,
+      isActive: isActive !== undefined ? Boolean(isActive) : true,
       expiryDate: expiryDate ? new Date(expiryDate) : null,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    if (maxUses !== undefined && maxUses !== null && maxUses !== '') {
+      data.maxUses = Number(maxUses);
+    }
+    await couponRef.set(data, { merge: true });
 
-    res.json({ message: "Coupon created successfully" });
+    res.json({ message: "Coupon saved successfully" });
   } catch (err) {
-    res.status(500).json({ error: "Failed to create coupon" });
+    res.status(500).json({ error: "Failed to save coupon" });
   }
 };
 
@@ -435,22 +439,103 @@ const postAdminRefund = async (req, res) => {
 };
 
 // ================= ADMIN REFUND REQUESTS LIST =================
-// (ported from the legacy Express server; handler body unchanged)
-// ================= ADMIN REFUND REQUESTS LIST =================
-// Admin views all pending user refund requests.
+// Admin views all user refund requests and processed refunds.
 const getAdminRefundRequests = async (req, res) => {
   try {
-    const snap = await db.collection("refund_requests")
-      .orderBy("requestedAt", "desc")
-      .limit(50)
-      .get();
-    const requests = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    res.json({ requests });
+    const [reqSnap, refundsSnap, ordersSnap] = await Promise.all([
+      db.collection("refund_requests").limit(100).get().catch(() => ({ docs: [] })),
+      db.collection("refunds").limit(100).get().catch(() => ({ docs: [] })),
+      db.collection("orders").where("status", "==", "REFUNDED").limit(100).get().catch(() => ({ docs: [] })),
+    ]);
+
+    const seenOrders = new Set();
+    const requests = [];
+
+    // 1. Explicit refund requests from students / users
+    reqSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      const orderId = data.orderId || doc.id;
+      seenOrders.add(orderId);
+      const reqDate = data.requestedAt?.toDate ? data.requestedAt.toDate().toISOString() : data.requestedAt || data.createdAt || new Date().toISOString();
+      requests.push({
+        id: doc.id,
+        orderId: orderId,
+        userId: data.userId || null,
+        userEmail: data.userEmail || null,
+        amount: Number(data.amount || data.refundAmount || 0),
+        refundAmount: Number(data.refundAmount || data.amount || 0),
+        reason: data.reason || data.note || "Hardware paper jam / print error",
+        status: String(data.status || "pending").toLowerCase(),
+        requestedAt: reqDate,
+        createdAt: reqDate,
+      });
+    });
+
+    // 2. Processed refunds from `refunds` collection
+    refundsSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      const orderId = data.orderId || doc.id;
+      if (!seenOrders.has(orderId)) {
+        seenOrders.add(orderId);
+        const refDate = data.initiatedAt?.toDate ? data.initiatedAt.toDate().toISOString() : data.initiatedAt || new Date().toISOString();
+        requests.push({
+          id: doc.id,
+          orderId: orderId,
+          userId: data.userId || null,
+          userEmail: data.userEmail || null,
+          amount: Number(data.refundAmount || data.amount || data.originalAmount || 0),
+          refundAmount: Number(data.refundAmount || data.amount || 0),
+          reason: data.note || "Admin processed refund",
+          status: String(data.status || "processed").toLowerCase(),
+          requestedAt: refDate,
+          createdAt: refDate,
+        });
+      }
+    });
+
+    // 3. Orders marked REFUNDED
+    ordersSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      const orderId = data.orderId || doc.id;
+      if (!seenOrders.has(orderId)) {
+        seenOrders.add(orderId);
+        const ordDate = data.refundedAt?.toDate ? data.refundedAt.toDate().toISOString() : data.refundedAt || data.createdAt || new Date().toISOString();
+        requests.push({
+          id: doc.id,
+          orderId: orderId,
+          userId: data.userId || null,
+          userEmail: data.userEmail || null,
+          amount: Number(data.refundAmount || data.amount || 0),
+          refundAmount: Number(data.refundAmount || data.amount || 0),
+          reason: data.refundReason || data.reason || "Kiosk print failure",
+          status: "processed",
+          requestedAt: ordDate,
+          createdAt: ordDate,
+        });
+      }
+    });
+
+    // Sort descending by date
+    requests.sort((a, b) => new Date(b.requestedAt || b.createdAt).getTime() - new Date(a.requestedAt || a.createdAt).getTime());
+
+    const { from, to } = req.query;
+    let filteredRequests = requests;
+    if (from || to) {
+      const fromMs = from ? new Date(from).getTime() : 0;
+      const toMs = to ? new Date(to).getTime() : Infinity;
+      filteredRequests = requests.filter((r) => {
+        const t = new Date(r.requestedAt || r.createdAt).getTime();
+        return t >= fromMs && t < toMs;
+      });
+    }
+
+    res.json({ requests: filteredRequests, total: requests.length });
   } catch (err) {
     console.error("[ADMIN-REFUND-REQUESTS] Error:", err);
-    res.status(500).json({ error: "Failed to fetch refund requests" });
+    res.status(500).json({ error: "Failed to fetch refund requests", requests: [] });
   }
 };
+
 
 // ================= ADMIN USERS & CUSTOMER INTELLIGENCE =================
 const getAdminUsers = async (req, res) => {
@@ -504,7 +589,7 @@ const getAdminUsers = async (req, res) => {
         email: u.email || "No Email",
         mobileNumber: u.mobileNumber || u.phoneNumber || "—",
         googleUser: Boolean(u.googleUser),
-        mimoCoins: u.mimo_coins?.balance || 0,
+        mimoCoins: null,
         totalSpend: Number(stats.totalSpend.toFixed(2)),
         orderCount: stats.orderCount,
         pagesPrinted: stats.pagesPrinted,

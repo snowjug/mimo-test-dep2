@@ -55,8 +55,49 @@ const getApiScreensaver = async (req, res) => {
   }
 };
 
+const getApiStats = async (req, res) => {
+  try {
+    const pricingDoc = await db.collection("mimo_settings").doc("pricing").get();
+    if (pricingDoc.exists && pricingDoc.data().totalPagesPrinted && pricingDoc.data().totalStudents) {
+      const data = pricingDoc.data();
+      return res.json({
+        totalPagesPrinted: data.totalPagesPrinted,
+        totalStudents: data.totalStudents || data.totalUsers,
+        activeKiosks: 2
+      });
+    }
+
+    const [usersSnap, jobsSnap, metricsDoc] = await Promise.all([
+      db.collection("users").get(),
+      db.collection("print_jobs").get(),
+      db.collection("system").doc("metrics").get()
+    ]);
+
+    let totalPages = 0;
+    jobsSnap.forEach((d) => {
+      const data = d.data();
+      if (data.status === "paid" || data.status === "completed" || data.status === "printed") {
+        totalPages += (data.pageCount || 0) * (data.printOptions?.copies || 1);
+      }
+    });
+
+    if (metricsDoc.exists) {
+      totalPages += (metricsDoc.data().totalFreePagesPrinted || 0);
+    }
+
+    res.json({
+      totalPagesPrinted: totalPages,
+      totalStudents: usersSnap.size,
+      activeKiosks: 2
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch stats" });
+  }
+};
+
 module.exports = {
   getValidateCoupon,
   getApiSettings,
   getApiScreensaver,
+  getApiStats,
 };

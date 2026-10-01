@@ -96,6 +96,8 @@ export const Header: React.FC<HeaderProps> = ({
     kiosks: { label: 'Kiosk Network', desc: 'Autonomous edge machine health & status' },
     incidents: { label: 'Incident Management', desc: 'Hardware alerts & SLA failure tracking' },
     analytics: { label: 'Analytics & Reports', desc: 'Demand trends, utilization & performance' },
+    users: { label: 'Customer Intelligence', desc: 'User roster, print volume & spend tracking' },
+    coupons: { label: 'Coupon Codes', desc: 'Student discounts & promo vouchers' },
     finance: { label: 'MIMO Finance Center', desc: 'Revenue intelligence, refunds & tariffs' },
     configuration: { label: 'System Configuration', desc: 'Platform settings & hardware thresholds' },
   }[activeTab] || { label: 'Command Center', desc: 'MIMO Platform' };

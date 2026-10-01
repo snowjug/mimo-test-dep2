@@ -47,6 +47,9 @@ export default function App() {
             <Route path="/blank-pages" element={<BlankPages />} />
             <Route path="/direct-success" element={<DirectSuccess />} />
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/*" element={<AdminDashboard />} />
+            <Route path="/finance" element={<AdminDashboard />} />
+            <Route path="/finance/*" element={<AdminDashboard />} />
             <Route path="/text-editor" element={<TextEditor />} />
             <Route path="/find-machine" element={<FindMachine />} />
           </Routes>

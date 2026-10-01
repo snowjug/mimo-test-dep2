@@ -21,9 +21,9 @@ export const MachineBadge: React.FC<{ kioskId: string; color?: boolean }> = ({ k
   );
 };
 
-/* ── Status: printed ✓ grey · failed ✕ red · refunded ₹ blue ── */
+/* ── Status: printed ✓ green · failed ✕ red · refunded ₹ blue ── */
 const OUTCOME: Record<JobOutcome, { label: string; cls: string; icon: React.ReactNode }> = {
-  printed: { label: 'Printed', cls: 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200', icon: <Check size={14} strokeWidth={3} /> },
+  printed: { label: 'Printed', cls: 'bg-emerald-500 text-white', icon: <Check size={14} strokeWidth={3} /> },
   failed: { label: 'Failed', cls: 'bg-rose-500 text-white', icon: <X size={14} strokeWidth={3} /> },
   refunded: { label: 'Refunded', cls: 'bg-blue-500 text-white', icon: <IndianRupee size={13} strokeWidth={2.75} /> },
   refund_pending: { label: 'Refund processing', cls: 'border-2 border-blue-500 text-blue-500', icon: <IndianRupee size={12} strokeWidth={2.75} /> },
@@ -69,6 +69,18 @@ function printDuration(job: JobRow): number | null {
 const JobDetails: React.FC<{ job: JobRow; onRefund?: (job: JobRow) => void }> = ({ job, onRefund }) => {
   const steps = job.timeline ?? [];
   const canRefund = !!onRefund && job.outcome !== 'refunded' && job.outcome !== 'refund_pending' && job.cost > 0 && !!job.orderId;
+  const rawPages = job.pageCount || 1;
+  const totalPgs = job.totalPages || (rawPages * (job.copies || 1));
+  const sheets = job.sheets ?? (job.duplex ? Math.ceil(rawPages / 2) * (job.copies || 1) : totalPgs);
+  const gross = (job.originalCost && job.originalCost > job.cost)
+    ? job.originalCost
+    : ((job.discount && job.discount > 0)
+      ? job.cost + job.discount
+      : (job.couponCode && job.cost === 0
+        ? (sheets * (job.colorMode === 'color' ? 10 : 2.8))
+        : job.cost));
+  const hasCoupon = !!job.couponCode || gross > job.cost || (job.discount && job.discount > 0);
+
   return (
     <div className="grid gap-5 bg-[var(--surface-2)]/50 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
       <div className="min-w-0 space-y-4">
@@ -77,7 +89,7 @@ const JobDetails: React.FC<{ job: JobRow; onRefund?: (job: JobRow) => void }> = 
           <div className="min-w-0 text-xs">
             <p className="break-words font-bold text-[var(--text-1)]">{job.file}</p>
             <p className="text-[var(--text-3)]">
-              {job.pageCount} page{job.pageCount === 1 ? '' : 's'}{job.copies > 1 ? ` × ${job.copies} copies` : ''} · {job.colorMode === 'color' ? 'Colour' : 'B&W'}{job.duplex ? ' · double-sided' : ''}
+              {totalPgs} page{totalPgs === 1 ? '' : 's'}{job.duplex ? ` (${sheets} sheet${sheets === 1 ? '' : 's'} paper)` : ''}{job.copies > 1 ? ` × ${job.copies} copies` : ''} · {job.colorMode === 'color' ? 'Colour' : 'B&W'}{job.duplex ? ' · double-sided' : ' · single-sided'}
             </p>
             <p className="mt-1 break-all text-[var(--text-2)]">
               {[job.userEmail !== 'Guest' ? job.userEmail : null, job.userPhone].filter(Boolean).join(' · ') || 'Guest'}
@@ -120,10 +132,19 @@ const JobDetails: React.FC<{ job: JobRow; onRefund?: (job: JobRow) => void }> = 
         <div>
           <p className="text-[11px] font-bold text-[var(--text-3)]">Printer evidence</p>
           <p className="mt-1 text-[var(--text-1)]">
-            {job.printVerified ? `Printer counted ${job.sheetsVerified ?? '?'} sheet(s) coming out.` : 'Sheet count was not verified for this job.'}
+            {job.printVerified ? `Printer counted ${job.sheetsVerified ?? sheets} sheet(s) coming out.` : `Physical paper: ${sheets} sheet${sheets === 1 ? '' : 's'} (${totalPgs} doc pages).`}
           </p>
           {job.printerStatus && <p className="mt-0.5 break-words text-[var(--text-2)]">Status: {job.printerStatus}</p>}
         </div>
+
+        {hasCoupon && (
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-2.5">
+            <p className="font-bold text-emerald-600 dark:text-emerald-400">Coupon applied: {job.couponCode || 'PROMO'}</p>
+            <p className="mt-0.5 text-[var(--text-2)]">
+              Original price: <span className="line-through">{inr(gross)}</span> · Discount: -{inr(Math.max(0, gross - job.cost))} · Paid: <strong className="font-bold text-slate-900 dark:text-white">{inr(job.cost)}</strong>
+            </p>
+          </div>
+        )}
 
         {job.refund && (
           <div className="rounded-xl border border-blue-500/25 bg-blue-500/5 p-2.5">
@@ -159,7 +180,7 @@ const JobDetails: React.FC<{ job: JobRow; onRefund?: (job: JobRow) => void }> = 
 };
 
 /* ── The list itself: Time · Name · Machine · Pages · Price · Status ── */
-const COLS = 'grid grid-cols-[46px_minmax(0,1fr)_26px_26px_52px_30px] sm:grid-cols-[88px_minmax(0,1fr)_64px_64px_84px_64px] items-center gap-1.5 sm:gap-4';
+const COLS = 'grid grid-cols-[46px_minmax(0,1fr)_26px_36px_60px_30px] sm:grid-cols-[88px_minmax(0,1fr)_64px_74px_90px_64px] items-center gap-1.5 sm:gap-4';
 const isToday = (iso: string | null) => !!iso && new Date(iso).toDateString() === new Date().toDateString();
 const shortTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '—';
@@ -176,7 +197,7 @@ export const PrintHistoryList: React.FC<{
         <span>Time</span>
         <span>Name</span>
         <span className="text-center"><span className="sm:hidden">M/c</span><span className="hidden sm:inline">Machine</span></span>
-        <span className="text-right"><span className="sm:hidden">Pgs</span><span className="hidden sm:inline">Pages</span></span>
+        <span className="text-right" title="Physical sheets / Document pages"><span className="sm:hidden">Pgs</span><span className="hidden sm:inline">Pages</span></span>
         <span className="text-right">Price</span>
         <span className="text-right sm:text-center">Status</span>
       </div>
@@ -185,6 +206,18 @@ export const PrintHistoryList: React.FC<{
         {jobs.map((j) => {
           const expanded = open === j.id;
           const took = printDuration(j);
+          const rawPages = j.pageCount || 1;
+          const totalPgs = j.totalPages || (rawPages * (j.copies || 1));
+          const sheets = j.sheets ?? (j.duplex ? Math.ceil(rawPages / 2) * (j.copies || 1) : totalPgs);
+          const gross = (j.originalCost && j.originalCost > j.cost)
+            ? j.originalCost
+            : ((j.discount && j.discount > 0)
+              ? j.cost + j.discount
+              : (j.couponCode && j.cost === 0
+                ? (sheets * (j.colorMode === 'color' ? 10 : 2.8))
+                : j.cost));
+          const hasCoupon = !!j.couponCode || gross > j.cost || (j.discount && j.discount > 0);
+
           return (
             <li key={j.id}>
               <button
@@ -206,8 +239,26 @@ export const PrintHistoryList: React.FC<{
                   <ChevronDown size={13} className={`ml-auto hidden shrink-0 text-[var(--text-3)] transition-transform sm:block ${expanded ? 'rotate-180' : ''}`} />
                 </span>
                 <span className="flex justify-center"><MachineBadge kioskId={j.destination} color={j.colorMode === 'color'} /></span>
-                <span className="text-right font-semibold tabular-nums text-[var(--text-1)]">{j.totalPages || j.pageCount}</span>
-                <span className={`text-right font-semibold tabular-nums ${j.outcome === 'refunded' ? 'text-[var(--text-3)] line-through' : 'text-[var(--text-1)]'}`}>{inr(j.cost)}</span>
+                <span className="text-right font-semibold tabular-nums text-[var(--text-1)]">
+                  {j.duplex ? (
+                    <span title={`${totalPgs} document pages (${sheets} physical sheets double-sided)`} className="inline-flex items-baseline gap-0.5">
+                      <span>{sheets}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">({totalPgs}p)</span>
+                    </span>
+                  ) : (
+                    <span>{totalPgs}</span>
+                  )}
+                </span>
+                <span className="text-right tabular-nums">
+                  {hasCoupon ? (
+                    <span className="inline-block text-right">
+                      <span className="line-through text-slate-400 text-[10px] sm:text-[11px] block sm:inline sm:mr-1">{inr(gross)}</span>
+                      <span className={`font-bold ${j.cost === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-1)]'}`}>{inr(j.cost)}</span>
+                    </span>
+                  ) : (
+                    <span className={`font-semibold ${j.outcome === 'refunded' ? 'text-[var(--text-3)] line-through' : 'text-[var(--text-1)]'}`}>{inr(j.cost)}</span>
+                  )}
+                </span>
                 <span className="flex justify-end sm:justify-center"><StatusIcon outcome={j.outcome} /></span>
               </button>
               {expanded && <JobDetails job={j} onRefund={onRefund} />}

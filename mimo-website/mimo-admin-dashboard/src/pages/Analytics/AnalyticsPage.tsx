@@ -9,6 +9,7 @@ import { LiveIndicator } from '../../components/ui/LiveIndicator';
 import { Delta, ErrorBanner, PeriodComparison, TrendChart, TruncatedNote } from '../../components/insights/InsightBits';
 import { describeRange } from '../../lib/dateRange';
 import { inr, int, pct } from '../../lib/format';
+import { exportAnalyticsPdf } from '../../lib/pdfExport';
 import type { Analytics } from '../../types/insights.types';
 
 const COLORS = ['#093765', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#8FB3DC'];
@@ -21,17 +22,6 @@ const Card: React.FC<{ title: string; subtitle?: string; className?: string; chi
   </section>
 );
 const NoData: React.FC<{ text?: string }> = ({ text = 'No data in this period' }) => <p className="py-10 text-center text-xs font-semibold text-[var(--text-3)]">{text}</p>;
-
-const exportCsv = (a: Analytics) => {
-  const rows = [['Period', a.range.from, a.range.to], [], ['Bucket', 'Revenue', 'Refunds', 'Orders', 'Jobs', 'Pages', 'Failed'],
-    ...a.series.map((p) => [p.key, p.revenue, p.refunds, p.orders, p.jobs, p.pages, p.failed])];
-  const blob = new Blob([rows.map((r) => r.join(',')).join('\n')], { type: 'text/csv' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `mimo-analytics-${a.range.from.slice(0, 10)}_${a.range.to.slice(0, 10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-};
 
 export const AnalyticsPage: React.FC = () => {
   const { range, setRange, current, live } = useRange();
@@ -58,9 +48,9 @@ export const AnalyticsPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           <LiveIndicator updatedAt={q.updatedAt} live={live} fetching={q.fetching} onRefresh={q.refresh} />
           <DateRangePicker value={range} onChange={setRange} tone="admin" />
-          <button type="button" disabled={!a} onClick={() => a && exportCsv(a)}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-bold border border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)] cursor-pointer disabled:opacity-50">
-            <Download size={13} /> Export CSV
+          <button type="button" disabled={!a} onClick={() => a && exportAnalyticsPdf(a, describeRange(range))}
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold border border-[var(--border)] bg-[var(--surface)] text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-all cursor-pointer shadow-xs disabled:opacity-50">
+            <Download size={13} className="text-indigo-600 dark:text-indigo-400" /> Export PDF Report
           </button>
         </div>
       </div>

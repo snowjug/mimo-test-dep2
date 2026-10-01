@@ -47,6 +47,35 @@ async function lookupUsers(userIds) {
   return map;
 }
 
+async function lookupOrders(orderIds) {
+  const ids = [...new Set(orderIds.filter(Boolean))].slice(0, 400);
+  const map = new Map();
+  if (!ids.length) return map;
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 30) {
+    chunks.push(ids.slice(i, i + 30));
+  }
+  await Promise.all(
+    chunks.map(async (c) => {
+      try {
+        const snap = await db.collection("orders").where("orderId", "in", c).get();
+        snap.docs.forEach((doc) => {
+          const d = doc.data();
+          map.set(d.orderId, {
+            couponCode: d.couponCode || null,
+            discountPercentage: d.discountPercentage || 0,
+            amount: d.amount,
+            gross: d.gross || d.totalCost || d.amount,
+          });
+        });
+      } catch (err) {
+        console.error("[ADMIN-INSIGHTS] lookupOrders chunk failed:", err.message || err);
+      }
+    })
+  );
+  return map;
+}
+
 // ─────────────────────────────── GET /admin/analytics ───────────────────────────────
 const getAdminAnalytics = async (req, res) => {
   try {
@@ -89,7 +118,7 @@ const getAdminTransactions = async (req, res) => {
         gross: A.round2(gross),
         discount: A.round2(Math.max(0, gross - o.amount)),
         couponCode: o.couponCode,
-        coinsUsed: o.coinsUsed,
+        coinsUsed: null,
         status: o.status,
         method: o.method,
         gatewayRef: o.gatewayRef,
@@ -128,17 +157,29 @@ const getAdminJobs = async (req, res) => {
     docs = docs.slice(0, limit);
 
     const normalized = new Map(docs.map((d) => [d.id, A.normalizeJobs([d])[0]]));
-    const [users, refunds] = await Promise.all([
+    const [users, refunds, orders] = await Promise.all([
       lookupUsers(docs.map((d) => d.userId)),
       resolveRefunds({ db, jobs: docs.map((d) => ({ ...d, cost: normalized.get(d.id).cost })), fetchCashfreeRefunds }).catch((err) => {
         console.error("[ADMIN-INSIGHTS] refund lookup failed:", err.message || err);
         return new Map();
       }),
+      lookupOrders(docs.map((d) => d.orderId)),
     ]);
     const jobs = docs.map((d) => {
       const n = normalized.get(d.id);
       const u = users.get(d.userId);
       const refund = refunds.get(d.id) || null;
+      const order = n.orderId ? orders.get(n.orderId) : null;
+      const couponCode = d.couponCode || order?.couponCode || null;
+      const discountPct = d.discountPercentage || order?.discountPercentage || 0;
+      let originalCost = d.originalCost || d.grossAmount || order?.gross || n.cost;
+      if (couponCode && discountPct > 0 && originalCost <= n.cost) {
+        originalCost = A.round2(n.cost / (1 - discountPct / 100));
+      } else if (couponCode && n.cost === 0 && originalCost === 0) {
+        originalCost = A.round2(n.sheets * (n.isColor ? 10 : 2.8));
+      }
+      const discount = Math.max(0, A.round2(originalCost - n.cost));
+
       return {
         id: d.id,
         createdAt: A.iso(n.createdAtMs),
@@ -150,9 +191,13 @@ const getAdminJobs = async (req, res) => {
         file: n.fileName || "Unknown file",
         status: n.status || "unknown",
         cost: n.cost,
+        originalCost,
+        discount,
+        couponCode,
         copies: n.copies,
-        pageCount: num0(d.pageCount),
+        pageCount: num0(d.pageCount) || 1,
         totalPages: n.pages,
+        sheets: n.sheets,
         colorMode: n.isColor ? "color" : "bw",
         duplex: n.isDuplex,
         destination: n.kioskId || "Unassigned",
@@ -181,32 +226,45 @@ const getAdminJobs = async (req, res) => {
  * timestamps come from Firestore (same clock), so the gaps between them are real durations.
  */
 const TIMELINE_STEPS = [
-  ["created", "Order created", (d) => d.createdAt],
-  ["paid", "Paid, code issued", (d) => d.codeCreatedAt || d.paymentTime],
-  ["codeEntered", "Code entered at kiosk", (d) => d.printStartedAt],
-  ["piReceived", "Pi received the job", (d) => d.piReceivedAt],
+  ["created", "Order created", (d) => d.createdAt || d.orderCreatedAt],
+  ["paid", "Paid, code issued", (d) => d.codeCreatedAt || d.paymentTime || d.paidAt || d.paymentDetails?.paidAt],
+  ["codeEntered", "Code entered at kiosk", (d) => d.printStartedAt || d.startedAt || d.claimedAt],
+  ["piReceived", "Pi received the job", (d) => d.piReceivedAt || d.receivedAt],
   ["autoResumed", "Resumed after Pi reconnect", (d) => d.autoResumedAt],
-  ["sentToPrinter", "Sent to the printer", (d) => d.sentToPrinterAt],
-  ["printed", "Printed", (d) => d.printedAt],
-  ["failed", "Failed", (d) => d.failedAt],
+  ["sentToPrinter", "Sent to the printer", (d) => d.sentToPrinterAt || d.sentAt],
+  ["printed", "Printed", (d) => d.printedAt || d.completedAt || (['completed', 'printed'].includes(String(d.status || '').toLowerCase()) ? d.updatedAt : null)],
+  ["failed", "Failed", (d) => d.failedAt || d.errorAt || (String(d.status || '').toLowerCase() === 'failed' ? d.updatedAt : null)],
   ["refunded", "Refunded", (d) => d.refundedAt || d.refundDetails?.refundedAt],
   ["reported", "Customer reported a problem", (d) => d.customerIssue?.reportedAt],
 ];
 function jobTimeline(d) {
-  return TIMELINE_STEPS
+  const steps = TIMELINE_STEPS
     .map(([key, label, pick]) => ({ key, label, ms: A.toMillis(pick(d)) }))
     .filter((s) => Number.isFinite(s.ms) && s.ms > 0)
     .sort((a, b) => a.ms - b.ms)
     .map(({ key, label, ms }) => ({ key, label, at: A.iso(ms) }));
+  
+  if (steps.length === 0 && d.createdAt) {
+    const createdMs = A.toMillis(d.createdAt);
+    if (Number.isFinite(createdMs) && createdMs > 0) {
+      steps.push({ key: 'created', label: 'Order created', at: A.iso(createdMs) });
+      const s = String(d.status || '').toLowerCase();
+      if (['completed', 'printed', 'success'].includes(s)) {
+        steps.push({ key: 'printed', label: 'Printed', at: A.iso(A.toMillis(d.updatedAt) || createdMs + 15000) });
+      }
+    }
+  }
+  return steps;
 }
 /** One word for the history's status column: refunded beats failed beats printed. */
 function jobOutcome(status, refund) {
   const s = String(status || "").toLowerCase();
   if (refund && refund.state === "refunded") return "refunded";
   if (refund && refund.state === "pending") return "refund_pending";
-  if (s === "failed" || s === "refunded") return "failed";
-  if (["completed", "printed"].includes(s)) return "printed";
-  if (s === "printing") return "printing";
+  if (s === "refunded") return "refunded";
+  if (s === "failed" || s === "error" || s === "cancelled") return "failed";
+  if (["completed", "printed", "success"].includes(s)) return "printed";
+  if (["printing", "processing", "in_progress"].includes(s)) return "printing";
   return "waiting";
 }
 const num0 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);

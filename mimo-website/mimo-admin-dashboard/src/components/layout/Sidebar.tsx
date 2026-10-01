@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Users,
   BarChart2,
+  Ticket,
   IndianRupee,
   Settings,
   LogOut,
@@ -45,6 +46,7 @@ const NAV_CORE: NavItemDef[] = [
 const NAV_ANALYTICS: NavItemDef[] = [
   { id: 'analytics',  label: 'Analytics & Reports',  icon: BarChart2 },
   { id: 'users',      label: 'Customers',            icon: Users },
+  { id: 'coupons',    label: 'Coupon Codes',         icon: Ticket },
 ];
 
 const NAV_FINANCE: NavItemDef[] = [

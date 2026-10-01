@@ -71,7 +71,6 @@ export interface TransactionRow {
   gross: number;
   discount: number;
   couponCode: string | null;
-  coinsUsed: number;
   status: 'PAID' | 'REFUNDED' | 'FAILED' | 'PENDING' | 'INITIATED' | string;
   method: string;
   gatewayRef: string | number | null;
@@ -98,9 +97,13 @@ export interface JobRow {
   file: string;
   status: string;
   cost: number;
+  originalCost?: number;
+  discount?: number;
+  couponCode?: string | null;
   copies: number;
   pageCount: number;
   totalPages: number;
+  sheets?: number;
   colorMode: 'color' | 'bw';
   duplex: boolean;
   destination: string;

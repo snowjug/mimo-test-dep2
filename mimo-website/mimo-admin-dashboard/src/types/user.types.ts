@@ -4,7 +4,6 @@ export interface AdminUserItem {
   email: string;
   mobileNumber: string;
   googleUser: boolean;
-  mimoCoins: number;
   totalSpend: number;
   orderCount: number;
   pagesPrinted: number;

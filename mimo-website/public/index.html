@@ -118,32 +118,246 @@
     .ribbon { background: #fff; text-align: center; font-size: 14px; line-height: 1.43; padding: 12px var(--gutter); color: var(--ink); }
 
     /* ── HERO ─────────────────────────────────────────── */
-    .hero { padding: 40px 0 8px; overflow: hidden; }
-    .hero-copy h1 { font-size: 80px; line-height: 1; font-weight: 700; letter-spacing: -0.045em; }
-    .hero-copy h2 { margin-top: 18px; font-size: 28px; line-height: 1.14; font-weight: 600; letter-spacing: -0.028em; max-width: 13ch; }
-    .hero-copy .links { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; font-size: 17px; }
 
-    .stage { position: relative; height: 520px; margin-top: 8px; display: flex; justify-content: center; }
+    /* Load-in animation tokens */
+    @keyframes heroFadeUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes heroFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes heroStageReveal {
+      from { opacity: 0; transform: translateY(18px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-9px); }
+    }
+    @keyframes scrollBounce {
+      0%, 100% { transform: translateY(0) scaleX(1); opacity: 0.5; }
+      50%       { transform: translateY(6px) scaleX(0.8); opacity: 1; }
+    }
+    @keyframes ambientDrift {
+      0%   { transform: translate(-50%, -50%) scale(1)   rotate(0deg); }
+      50%  { transform: translate(-50%, -50%) scale(1.08) rotate(12deg); }
+      100% { transform: translate(-50%, -50%) scale(1)   rotate(0deg); }
+    }
+
+    /* Hero wrapper */
+    .hero {
+      position: relative;
+      padding: 52px 0 0;
+      overflow: hidden;
+      /* subtle warm-neutral ambient layer */
+      background:
+        radial-gradient(ellipse 70% 55% at 50% 100%, rgba(178,90,30,0.07) 0%, transparent 70%),
+        var(--bg);
+    }
+
+    /* Ambient light orb behind the machine */
+    .hero-glow {
+      position: absolute;
+      top: 32%; left: 50%;
+      width: 560px; height: 560px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(178,90,30,0.11) 0%, rgba(245,245,247,0) 68%);
+      filter: blur(40px);
+      pointer-events: none;
+      animation: ambientDrift 18s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    /* ── Left copy column ─── */
+    .hero-copy {
+      position: relative; z-index: 2;
+    }
+    .hero-head-block {
+      display: flex;
+      flex-direction: column;
+    }
+    .hero-eyebrow {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--accent);
+      margin: 0;
+      opacity: 0;
+      animation: heroFadeUp 0.4s var(--ease) 0.08s forwards;
+    }
+    .hero-copy h1 {
+      margin-top: 8px;
+      font-size: clamp(42px, 5.8vw, 76px);
+      line-height: 1.02; font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+      opacity: 0;
+      animation: heroFadeUp 0.45s var(--ease) 0.16s forwards;
+    }
+
+    /* Primary CTA */
+    .hero-cta-wrap {
+      margin-top: 28px;
+      display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
+      opacity: 0;
+      animation: heroFadeUp 0.45s var(--ease) 0.38s forwards;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 0 34px; min-height: 54px;
+      border-radius: 999px;
+      background: var(--ink); color: #fff;
+      font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.08);
+      transition:
+        transform  0.2s var(--ease),
+        box-shadow 0.2s var(--ease),
+        background 0.15s;
+      will-change: transform;
+    }
+    .btn-primary:hover {
+      background: #000;
+      transform: translateY(-2px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.24), 0 2px 6px rgba(0,0,0,0.12);
+    }
+    .btn-primary:active {
+      transform: translateY(0) scale(0.98);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.14);
+    }
+    .btn-primary .arrow {
+      display: inline-block;
+      font-size: 18px;
+      transition: transform 0.2s var(--ease);
+    }
+    .btn-primary:hover .arrow { transform: translateX(4px); }
+
+    /* Secondary link */
+    .hero-sec-link {
+      font-size: 15px; color: var(--link); font-weight: 500;
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 6px;
+      transition: opacity 0.15s;
+    }
+    .hero-sec-link .chev {
+      display: inline-block;
+      transition: transform 0.2s var(--ease);
+    }
+    .hero-sec-link:hover { text-decoration: underline; }
+    .hero-sec-link:hover .chev { transform: translateX(3px); }
+
+    /* ── Machine stage ─── */
+    .stage {
+      position: relative;
+      height: 480px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      opacity: 0;
+      animation: heroStageReveal 0.6s var(--ease) 0.24s forwards;
+    }
+
+    /* Floor realistic contact & ambient shadow layers */
     .stage .floor {
-      position: absolute; bottom: 20px; left: 50%; width: 220px; height: 26px; transform: translateX(-50%);
-      background: radial-gradient(closest-side, rgba(0, 0, 0, 0.22), transparent); filter: blur(4px);
+      position: absolute; bottom: 8px; left: 50%;
+      width: 260px; height: 32px;
+      transform: translateX(-50%);
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.08) 50%, transparent 75%);
+      filter: blur(8px);
+      pointer-events: none;
     }
-    .stage .kiosk { position: relative; height: 480px; width: auto; margin-top: 12px; will-change: transform; }
+    .stage .floor::after {
+      content: ''; position: absolute; bottom: 6px; left: 50%;
+      width: 160px; height: 10px;
+      transform: translateX(-50%);
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.15) 55%, transparent 80%);
+      filter: blur(3px);
+    }
+    /* Machine glow ring behind the kiosk */
+    .stage .machine-glow {
+      position: absolute; bottom: 40px; left: 50%;
+      width: 320px; height: 200px;
+      transform: translateX(-50%);
+      background: radial-gradient(ellipse, rgba(178,90,30,0.12) 0%, transparent 70%);
+      filter: blur(28px);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .stage .kiosk {
+      position: relative; z-index: 2;
+      height: 490px; width: auto;
+      will-change: transform;
+      filter: drop-shadow(0 20px 36px rgba(0,0,0,0.12)) drop-shadow(0 4px 8px rgba(0,0,0,0.04));
+      transition: filter 0.4s;
+    }
+
+    /* ── Glass floating chips ─── */
     .chip {
-      position: absolute; display: flex; align-items: center; gap: 10px;
-      background: rgba(255, 255, 255, 0.78);
-      -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
-      border: 1px solid rgba(255, 255, 255, 0.9);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
-      border-radius: 18px; padding: 10px 14px; font-size: 13px; line-height: 1.25;
-      animation: float 6s ease-in-out infinite;
+      position: absolute; z-index: 3;
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.80);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.95);
+      box-shadow:
+        0 12px 36px rgba(0,0,0,0.10),
+        0 2px 4px rgba(0,0,0,0.06),
+        inset 0 1px 0 rgba(255,255,255,0.9);
+      border-radius: 20px; padding: 11px 16px;
+      font-size: 13px; line-height: 1.3;
+      opacity: 0;
+      animation: float 7s ease-in-out infinite;
     }
-    .chip strong { display: block; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-    .chip .tick { width: 26px; height: 26px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; font-size: 14px; font-weight: 700; }
-    .chip.code { right: 4px; top: 118px; }
-    .chip.code strong { font-size: 22px; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; }
-    .chip.paid { left: 2px; top: 300px; animation-delay: -3s; }
-    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    .chip strong { display: block; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+    .chip .tick {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--ok); color: #fff;
+      display: grid; place-items: center;
+      font-size: 13px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .chip .chip-icon {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: var(--ink); color: #fff;
+      display: grid; place-items: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+
+    /* Chip positions & stagger */
+    .chip.chip-code  { right: 2px; top: 110px; animation-delay: 0s; }
+    .chip.chip-paid  { left: 0px;  top: 290px; animation-delay: -2.5s; }
+    .chip.chip-ready { right: 2px; bottom: 100px; animation-delay: -4.8s; }
+
+    .chip.chip-code strong  { font-size: 22px; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; }
+
+    /* Loaded state — chips become visible with stagger */
+    .hero-loaded .chip.chip-ready { animation: chipIn 0.6s var(--ease) 0.75s forwards, float 7s ease-in-out 1.35s infinite; }
+    .hero-loaded .chip.chip-paid  { animation: chipIn 0.6s var(--ease) 0.95s forwards, float 7s ease-in-out 1.55s infinite; animation-delay: 0.95s, 1.55s; }
+    .hero-loaded .chip.chip-code  { animation: chipIn 0.6s var(--ease) 1.15s forwards, float 7s ease-in-out 1.75s infinite; animation-delay: 1.15s, 1.75s; }
+
+    @keyframes chipIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0)    scale(1); }
+    }
+
+    /* ── Scroll indicator ─── */
+    .hero-scroll {
+      position: absolute; bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      color: var(--ink-3); font-size: 11px; letter-spacing: 0.06em;
+      text-transform: uppercase; font-weight: 600;
+      opacity: 0;
+      animation: heroFadeIn 0.5s ease 1.4s forwards;
+      pointer-events: none;
+    }
+    .hero-scroll-line {
+      width: 1.5px; height: 22px;
+      background: linear-gradient(var(--ink-3), transparent);
+      border-radius: 2px;
+      animation: scrollBounce 1.8s ease-in-out infinite 1.8s;
+    }
 
     /* ── SECTION HEADERS (Apple "The latest. Take a look…") ── */
     .sec { padding: 64px 0 0; }
@@ -252,15 +466,138 @@
     .m-status { margin-top: 8px; font-size: 15px; color: #86868b; min-height: 22px; transition: color 0.3s; }
     .moment.printed .m-status { color: #30d158; }
 
-    /* ── PRICING ─────────────────────────────────────── */
-    .prices { margin-top: 22px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    .price { background: var(--card); border-radius: 22px; padding: 20px 18px 22px; }
-    .price.wide { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; }
-    .price .k { font-size: 14px; color: var(--ink-2); }
-    .price .v { margin-top: 6px; font-size: 34px; font-weight: 700; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
-    .price.wide .v { font-size: 48px; }
-    .price .u { font-size: 13px; color: var(--ink-3); }
-    .price-note { margin-top: 14px; font-size: 14px; color: var(--ink-2); }
+    /* ── OUR STORY ──────────────────────────────────── */
+    .story-sec {
+      margin-top: 72px; padding: 96px 0 108px;
+      background: var(--night); color: #f5f5f7;
+      position: relative; overflow: hidden;
+    }
+    .story-sec::before {
+      content: ""; position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+      width: 700px; height: 400px;
+      background: radial-gradient(circle, rgba(178, 90, 30, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .story-header { text-align: center; max-width: 720px; margin: 0 auto 64px; }
+    .story-header .eyebrow { color: #e0894c; letter-spacing: 0.08em; }
+    .story-header h2 {
+      margin-top: 10px; font-size: clamp(34px, 5vw, 54px); line-height: 1.08;
+      font-weight: 700; letter-spacing: -0.035em;
+    }
+    .story-timeline { max-width: 740px; margin: 0 auto; position: relative; padding: 10px 0; }
+    .story-progress-bar {
+      position: absolute; left: 24px; top: 0; bottom: 0; width: 2px;
+      background: rgba(255,255,255,0.1); border-radius: 2px;
+    }
+    .story-progress-fill {
+      position: absolute; left: 0; top: 0; width: 100%; height: 0%;
+      background: linear-gradient(180deg, #e0894c, #ffffff); border-radius: 2px;
+      transition: height 0.12s ease-out;
+    }
+    .story-beat {
+      position: relative; padding-left: 64px; margin-bottom: 52px;
+      opacity: 0.28; filter: blur(0.5px); transform: translateY(16px);
+      transition: opacity 0.6s var(--ease), filter 0.6s var(--ease), transform 0.6s var(--ease);
+    }
+    .story-beat:last-child { margin-bottom: 0; }
+    .story-beat.active { opacity: 1; filter: blur(0); transform: translateY(0); }
+    .story-beat-node {
+      position: absolute; left: 24px; top: 8px; width: 16px; height: 16px;
+      border-radius: 50%; background: #1c1c1e; border: 2px solid rgba(255,255,255,0.3);
+      transform: translateX(-50%); transition: all 0.35s var(--ease); z-index: 2;
+    }
+    .story-beat.active .story-beat-node {
+      background: #e0894c; border-color: #fff;
+      box-shadow: 0 0 16px rgba(224,137,76,0.8);
+      transform: translateX(-50%) scale(1.2);
+    }
+    .story-beat-text {
+      font-size: clamp(19px, 3vw, 28px); line-height: 1.38; font-weight: 500;
+      letter-spacing: -0.02em; color: #8a8a8e;
+    }
+    .story-beat.active .story-beat-text { color: #ffffff; }
+    .story-signature {
+      margin-top: 64px; text-align: center; padding-top: 36px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .story-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 10px 22px; border-radius: 999px;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      font-size: 15px; font-weight: 600; color: #f5f5f7;
+    }
+    .story-badge .dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #30d158;
+      box-shadow: 0 0 10px #30d158; animation: pulseDot 2s infinite;
+    }
+    @keyframes pulseDot {
+      0% { box-shadow: 0 0 0 0 rgba(48,209,88,0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(48,209,88,0); }
+      100% { box-shadow: 0 0 0 0 rgba(48,209,88,0); }
+    }
+
+    /* ── MIMO IN NUMBERS ─────────────────────────────── */
+    .traction-sec { padding: 80px 0 72px; }
+    .traction-grid {
+      margin-top: 36px; display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
+    }
+    .traction-card {
+      background: var(--card); border-radius: var(--radius); padding: 28px 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.04);
+      display: flex; flex-direction: column; position: relative; overflow: hidden;
+      transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+    }
+    .traction-card:hover { transform: translateY(-4px); box-shadow: 0 14px 32px rgba(0,0,0,0.08); }
+    .traction-label {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--ink-2);
+    }
+    .traction-val {
+      margin-top: 10px; font-size: clamp(30px, 3.2vw, 46px); font-weight: 800;
+      letter-spacing: -0.035em; line-height: 1.05; font-variant-numeric: tabular-nums;
+      color: var(--ink); display: inline-flex; align-items: baseline; white-space: nowrap; flex-wrap: nowrap;
+    }
+    .traction-val .plus {
+      font-size: 0.65em; font-weight: 700; color: var(--accent);
+      margin-left: 2px; display: inline-block; line-height: 1; vertical-align: baseline;
+    }
+    .traction-sub { margin-top: 10px; font-size: 14px; line-height: 1.4; color: var(--ink-3); }
+    .traction-live {
+      margin-top: 20px; display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px; padding: 14px 20px; border-radius: 18px;
+      background: var(--card); border: 1px solid rgba(0,0,0,0.06); font-size: 13px; color: var(--ink-2);
+    }
+    .live-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ok); }
+    .live-badge .pulse {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--ok);
+      animation: pulseDot 2s infinite;
+    }
+
+    /* ── VISION & MISSION ────────────────────────────── */
+    .vm-grid { margin-top: 32px; display: grid; grid-template-columns: 1fr; gap: 18px; }
+    .vm-card {
+      border-radius: var(--radius); padding: 44px 30px 40px;
+      display: flex; flex-direction: column; justify-content: space-between;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.04); position: relative; overflow: hidden;
+    }
+    .vm-card.vision { background: var(--night); color: #f5f5f7; }
+    .vm-card.mission { background: var(--card); color: var(--ink); border: 1px solid rgba(0,0,0,0.06); }
+    .vm-card .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+    .vm-card.vision .eyebrow { color: #e0894c; }
+    .vm-card.mission .eyebrow { color: var(--accent); }
+    .vm-statement {
+      margin-top: 20px; font-size: clamp(22px, 3vw, 32px); line-height: 1.32;
+      font-weight: 700; letter-spacing: -0.03em;
+    }
+    .vm-card.vision .vm-statement { color: #ffffff; }
+    .vm-card.mission .vm-statement { color: var(--ink); }
+    .vm-tag {
+      margin-top: 32px; font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .vm-card.vision .vm-tag { color: #8a8a8e; }
+    .vm-card.mission .vm-tag { color: var(--ink-2); }
 
     /* ── KIOSKS ─────────────────────────────────────── */
     .kiosk-card { width: min(300px, 80vw); border-radius: var(--radius); background: var(--card); overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); }
@@ -387,18 +724,27 @@
     .js [data-reveal] { opacity: 0; transform: translateY(28px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
     .js [data-reveal].in { opacity: 1; transform: none; }
 
-    /* ── WIDER SCREENS ─────────────────────────────── */
+    /* ── WIDER SCREENS (Desktop) ─────────────────────────────── */
     @media (min-width: 820px) {
       :root { --gutter: 40px; }
-      .hero .wrap { display: grid; grid-template-columns: 1fr 1fr; align-items: end; }
-      .hero-copy h1 { font-size: 128px; }
-      .hero-copy h2 { font-size: 40px; }
-      .stage { height: 620px; grid-column: 1 / -1; }
-      .stage .kiosk { height: 580px; }
-      .chip.code { right: 22%; } .chip.paid { left: 22%; }
+
+      /* Desktop hero: two-column balanced layout — copy left, stage right */
+      .hero { padding: 0; min-height: calc(100vh - 80px); display: flex; flex-direction: column; justify-content: center; }
+      .hero .wrap { flex: 1; display: grid; grid-template-columns: 1.05fr 0.95fr; align-items: center; padding-top: 32px; padding-bottom: 40px; gap: 24px; }
+      .hero-copy { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+      .hero-head-block { display: block; }
+      .hero-copy h1 { font-size: clamp(52px, 5.5vw, 76px); }
+      .hero-cta-wrap { margin-top: 32px; align-items: flex-start; }
+      .stage { height: 100%; min-height: 560px; margin-top: 0; grid-column: auto; }
+      .stage .kiosk { height: 560px; }
+      .chip.chip-code  { right: -12px; top: 100px; }
+      .chip.chip-paid  { left:  -10px; top: 300px; }
+      .chip.chip-ready { right: -12px; bottom: 90px; }
+      .hero-glow { top: 50%; width: 700px; height: 700px; }
+      .hero-scroll { bottom: 24px; }
       .sec-head { font-size: 40px; }
-      .prices { grid-template-columns: repeat(4, 1fr); }
-      .price.wide { grid-column: span 2; }
+      .traction-grid { grid-template-columns: repeat(4, 1fr); }
+      .vm-grid { grid-template-columns: 1fr 1fr; }
       .sponsors { grid-template-columns: repeat(4, 1fr); }
       .privacy { padding: 72px 64px; }
       .privacy h2 { font-size: 64px; }
@@ -409,12 +755,119 @@
       footer summary::after { display: none; }
     }
 
+    /* ── MOBILE SCREENS (< 820px) ───────────────────────── */
+    @media (max-width: 819px) {
+      .hero {
+        padding-top: 20px;
+        padding-bottom: 36px;
+        min-height: auto;
+      }
+      .hero-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .hero-copy {
+        display: contents; /* Allows .hero-head-block to be top (order 1) and .hero-cta-wrap to be bottom (order 3) */
+      }
+      .hero-head-block {
+        order: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .hero-eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.16em;
+      }
+      .hero-copy h1 {
+        font-size: clamp(34px, 8.5vw, 44px);
+        margin-top: 6px;
+        max-width: 14ch;
+      }
+      .stage {
+        order: 2;
+        height: 390px;
+        margin: 14px 0 16px;
+        width: 100%;
+      }
+      .stage .kiosk {
+        height: 370px;
+      }
+      /* Floating glass chips on mobile: compact & elegantly framed around the kiosk */
+      .chip {
+        display: flex !important;
+        padding: 7px 11px;
+        border-radius: 14px;
+        font-size: 11px;
+        gap: 7px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+      }
+      .chip strong {
+        font-size: 13px;
+      }
+      .chip .tick, .chip .chip-icon {
+        width: 22px;
+        height: 22px;
+        font-size: 11px;
+      }
+      .chip.chip-code {
+        right: 6px;
+        top: 36px;
+      }
+      .chip.chip-code strong {
+        font-size: 16px;
+      }
+      .chip.chip-paid {
+        left: 6px;
+        top: 170px;
+      }
+      .chip.chip-ready {
+        right: 6px;
+        bottom: 50px;
+      }
+      .hero-cta-wrap {
+        order: 3;
+        width: 100%;
+        margin-top: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .btn-primary {
+        width: 100%;
+        max-width: 320px;
+        min-height: 52px;
+        font-size: 16px;
+      }
+      .hero-sec-link {
+        font-size: 14px;
+      }
+      .hero-scroll {
+        display: none;
+      }
+      .traction-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .traction-card {
+        padding: 22px 16px;
+      }
+      .traction-val {
+        font-size: clamp(24px, 5.8vw, 36px);
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .chip { animation: none; }
+      .chip, .hero-glow { animation: none !important; }
+      .hero-eyebrow, .hero-copy h1,
+      .hero-cta-wrap, .stage, .hero-scroll { animation: none !important; opacity: 1; }
+      .hero-loaded .chip { opacity: 1; }
       .js [data-reveal] { opacity: 1; transform: none; transition: none; }
-      .moment { height: auto; }
-      .moment-pin { position: relative; height: auto; min-height: 100svh; }
       .shred i { transform: scaleY(1); transition: none; }
       .flip { transition: none; }
       .ghost, .ghost .q, .ghost-floor, .mystery::after { animation: none; }
@@ -430,36 +883,70 @@
       <a href="/" class="wordmark" aria-label="MIMO home">MIMO</a>
       <nav class="nav-links" aria-label="Primary">
         <a href="/find-machine">Kiosks</a>
-        <a href="#pricing">Pricing</a>
+        <a href="#our-story">Our Story</a>
         <a class="btn" href="/login">Print</a>
       </nav>
     </div>
   </header>
 
   <div class="ribbon">
-    From <span data-price="pricePerPageBW">₹2.80</span> a page.
-    <a class="link" href="#pricing">See pricing<span class="chev">›</span></a>
+    Printing from <span data-price="pricePerPageBW">₹2.80</span> a page · No queue · No pen drive · Complete privacy
   </div>
 
   <main id="main">
     <!-- HERO -->
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="wrap">
+    <section class="hero" id="hero" aria-labelledby="hero-title">
+      <!-- Ambient glow layer -->
+      <div class="hero-glow" aria-hidden="true"></div>
+
+      <div class="wrap hero-wrap">
+        <!-- Copy & CTA block -->
         <div class="hero-copy">
-          <h1 id="hero-title">Print.</h1>
-        </div>
-        <div class="hero-copy">
-          <h2>The easiest way to print on campus.</h2>
-          <div class="links">
-            <a class="link" href="/login">Start printing<span class="chev">›</span></a>
-            <a class="link" href="/find-machine">Find a kiosk<span class="chev">›</span></a>
+          <div class="hero-head-block">
+            <p class="hero-eyebrow">MIMO</p>
+            <h1 id="hero-title">Print.<br>Made simple.</h1>
+          </div>
+          <div class="hero-cta-wrap">
+            <a class="btn-primary" href="/login">
+              Start Printing <span class="arrow">→</span>
+            </a>
+            <a class="hero-sec-link" href="/find-machine">
+              Find a kiosk <span class="chev">›</span>
+            </a>
           </div>
         </div>
+
+        <!-- Right (Desktop) / Center (Mobile): Machine stage -->
         <div class="stage" aria-hidden="true">
+          <!-- Ground shadow + warm glow -->
           <div class="floor"></div>
-          <img class="kiosk" id="kiosk" src="/images/landing/kiosk-1300.webp" alt="" width="481" height="1300" fetchpriority="high" />
-          <div class="chip code"><div>Your code<strong>4821</strong></div></div>
-          <div class="chip paid"><span class="tick">✓</span><div>Paid with UPI<strong>₹47.60</strong></div></div>
+          <div class="machine-glow"></div>
+
+          <!-- The MIMO machine — clean cutout asset -->
+          <img class="kiosk" id="kiosk"
+            src="/images/landing/kiosk-1300.webp"
+            alt="MIMO self-service printing kiosk"
+            width="480" height="1275"
+            fetchpriority="high" />
+
+          <!-- Glass floating status chips (Desktop) -->
+          <div class="chip chip-code">
+            <div>Pickup Code<strong>4821</strong></div>
+          </div>
+          <div class="chip chip-paid">
+            <span class="tick">✓</span>
+            <div>Paid with UPI<strong>₹47.60</strong></div>
+          </div>
+          <div class="chip chip-ready">
+            <span class="chip-icon">✓</span>
+            <div>Print Ready<strong>MIMO 2.0</strong></div>
+          </div>
+
+          <!-- Scroll cue -->
+          <div class="hero-scroll">
+            <div class="hero-scroll-line"></div>
+            <span>Scroll</span>
+          </div>
         </div>
       </div>
     </section>
@@ -533,38 +1020,91 @@
       </div>
     </section>
 
-    <!-- SIGNATURE MOMENT -->
-    <section class="moment" id="moment" aria-labelledby="moment-title">
-      <div class="moment-pin">
-        <p class="eyebrow">At the kiosk</p>
-        <h2 id="moment-title">Four digits.<br><span class="dim">That's it.</span></h2>
-        <div class="m-code" aria-hidden="true"><span>4</span><span>8</span><span>2</span><span>1</span></div>
-        <div class="m-keys" aria-hidden="true">
-          <span data-k="1">1</span><span data-k="2">2</span><span data-k="3">3</span>
-          <span data-k="4">4</span><span data-k="5">5</span><span data-k="6">6</span>
-          <span data-k="7">7</span><span data-k="8">8</span><span data-k="9">9</span>
-          <span>⌫</span><span data-k="0">0</span><span data-k="ok">✓</span>
+    <!-- OUR STORY -->
+    <section class="story-sec" id="our-story" aria-labelledby="story-title">
+      <div class="wrap">
+        <div class="story-header" data-reveal>
+          <p class="eyebrow">Our Story</p>
+          <h2 id="story-title">Built by students.<br>For students.</h2>
         </div>
-        <div class="m-tray" aria-hidden="true"><div class="m-slot"><div class="m-page"><i></i><i></i><i></i><i></i></div></div></div>
-        <p class="m-status" id="m-status">Type your code</p>
+        <div class="story-timeline">
+          <div class="story-progress-bar"><div class="story-progress-fill" id="story-fill"></div></div>
+          <div class="story-beat" data-story>
+            <div class="story-beat-node"></div>
+            <p class="story-beat-text">MIMO started with a simple observation: printing on campus shouldn't be this difficult.</p>
+          </div>
+          <div class="story-beat" data-story>
+            <div class="story-beat-node"></div>
+            <p class="story-beat-text">As students, we experienced the long queues, last-minute rushes, and inconvenience of getting documents printed when we needed them most.</p>
+          </div>
+          <div class="story-beat" data-story>
+            <div class="story-beat-node"></div>
+            <p class="story-beat-text">So we decided to build a better way. What started as an idea became MIMO — a self-service printing kiosk designed to make campus printing simple, quick, and accessible.</p>
+          </div>
+          <div class="story-beat" data-story>
+            <div class="story-beat-node"></div>
+            <p class="story-beat-text">We built, tested, and improved MIMO around real student needs — learning from every print, every user, and every challenge along the way.</p>
+          </div>
+          <div class="story-beat" data-story>
+            <div class="story-beat-node"></div>
+            <p class="story-beat-text">Today, we're continuing to build MIMO into more than just a printing kiosk — a smarter way to access everyday campus services.</p>
+          </div>
+        </div>
+        <div class="story-signature" data-reveal>
+          <div class="story-badge"><span class="dot"></span>Live on campus · 2 kiosks · Bengaluru</div>
+        </div>
       </div>
     </section>
 
-    <!-- PRICING -->
-    <section class="sec" id="pricing" aria-labelledby="price-title">
+    <!-- MIMO IN NUMBERS -->
+    <section class="sec traction-sec" aria-labelledby="traction-title">
       <div class="wrap">
-        <h2 class="sec-head" id="price-title" data-reveal>Pricing. <span class="dim">Pay only for what you print.</span></h2>
-        <div class="prices" data-reveal>
-          <div class="price wide">
-            <div><div class="k">Black and white</div><div class="v" data-price="pricePerPageBW">₹2.80</div></div>
-            <div class="u">per page</div>
+        <h2 class="sec-head" id="traction-title" data-reveal>MIMO in Numbers. <span class="dim">Real-world impact.</span></h2>
+        <div class="traction-grid" data-reveal>
+          <div class="traction-card">
+            <div class="traction-label">Pages printed</div>
+            <div class="traction-val"><span class="count-up" data-metric="totalPagesPrinted" data-target="10568">0</span><span class="plus">+</span></div>
+            <div class="traction-sub">Total pages printed across all sessions since day one.</div>
           </div>
-          <div class="price"><div class="k">Both sides</div><div class="v" data-price="pricePerPageBWDuplex">₹3.30</div><div class="u">per page, B&amp;W</div></div>
-          <div class="price"><div class="k">Colour</div><div class="v" data-price="pricePerPageColor">₹10</div><div class="u">per page</div></div>
-          <div class="price"><div class="k">Graph paper</div><div class="v" data-price="pricePerPageGraph">₹2</div><div class="u">per sheet</div></div>
-          <div class="price"><div class="k">Blank A4</div><div class="v" data-price="pricePerPageA4">₹2.80</div><div class="u">per sheet</div></div>
+          <div class="traction-card">
+            <div class="traction-label">Students printing</div>
+            <div class="traction-val"><span class="count-up" data-metric="totalStudents" data-target="1231">0</span><span class="plus">+</span></div>
+            <div class="traction-sub">Unique students served across both kiosks since launch.</div>
+          </div>
+          <div class="traction-card">
+            <div class="traction-label">Campus kiosks</div>
+            <div class="traction-val"><span class="count-up" data-target="2">0</span></div>
+            <div class="traction-sub">Live machines at REVA University — Central Library &amp; CV Raman Block.</div>
+          </div>
+          <div class="traction-card">
+            <div class="traction-label">Printing time</div>
+            <div class="traction-val">~<span class="count-up" data-target="20">0</span>s</div>
+            <div class="traction-sub">Estimated timing for printouts.</div>
+          </div>
         </div>
-        <p class="price-note">The total updates as you choose. No queue, no pen drive, no hunting for change.</p>
+        <div class="traction-live" data-reveal>
+          <span class="live-badge"><span class="pulse"></span>Kiosks online now</span>
+          <span>REVA University, Bengaluru · Serving students daily</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISION & MISSION -->
+    <section class="sec" aria-labelledby="vm-title">
+      <div class="wrap">
+        <h2 class="sec-head" id="vm-title" data-reveal>Vision &amp; Mission. <span class="dim">Where we're headed.</span></h2>
+        <div class="vm-grid" data-reveal>
+          <div class="vm-card vision">
+            <p class="eyebrow">Our Vision</p>
+            <p class="vm-statement">To make everyday campus services faster, simpler, and more accessible through smart, student-first technology.</p>
+            <p class="vm-tag">→ Beyond printing</p>
+          </div>
+          <div class="vm-card mission">
+            <p class="eyebrow">Our Mission</p>
+            <p class="vm-statement">To make printing frictionless by providing students with convenient, reliable, and affordable self-service printing — right where they need it.</p>
+            <p class="vm-tag">→ Student-first always</p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -728,6 +1268,36 @@
     var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     document.documentElement.classList.add("js");
 
+    // ── Hero: trigger chip load-in animations ──────────────────────────
+    setTimeout(function () {
+      var heroEl = document.getElementById("hero");
+      if (heroEl) heroEl.classList.add("hero-loaded");
+    }, 120);
+
+    // ── Mouse parallax on the kiosk machine (desktop only) ────────────
+    (function () {
+      var heroEl = document.getElementById("hero");
+      var kioskEl = document.getElementById("kiosk");
+      if (!heroEl || !kioskEl || reduce) return;
+      var cx = 0, cy = 0, tx = 0, ty = 0, rafId = null;
+      function lerp(a, b, t) { return a + (b - a) * t; }
+      function loop() {
+        cx = lerp(cx, tx, 0.06);
+        cy = lerp(cy, ty, 0.06);
+        kioskEl.style.transform = "translate(" + cx.toFixed(2) + "px," + cy.toFixed(2) + "px)";
+        rafId = requestAnimationFrame(loop);
+      }
+      heroEl.addEventListener("mousemove", function (e) {
+        var r = heroEl.getBoundingClientRect();
+        tx = ((e.clientX - r.left) / r.width  - 0.5) * -10;
+        ty = ((e.clientY - r.top)  / r.height - 0.5) * -6;
+        if (!rafId) loop();
+      }, { passive: true });
+      heroEl.addEventListener("mouseleave", function () {
+        tx = 0; ty = 0;
+      });
+    })();
+
     var nav = document.getElementById("nav");
 
     // Reveal-on-scroll
@@ -736,34 +1306,11 @@
     }, { rootMargin: "0px 0px -12% 0px" });
     document.querySelectorAll("[data-reveal]").forEach(function (el) { io.observe(el); });
 
-    // Signature moment: scroll types 4-8-2-1, presses ✓, then a page comes out of the tray.
-    var moment = document.getElementById("moment");
-    var slots = moment.querySelectorAll(".m-code span");
-    var status = document.getElementById("m-status");
-    var digits = ["4", "8", "2", "1", "ok"];
-    var lastStep = -1;
-    function keyFor(d) { return moment.querySelector('[data-k="' + d + '"]'); }
-    function setStep(step) {
-      if (step === lastStep) return;
-      lastStep = step;
-      slots.forEach(function (s, i) { s.classList.toggle("on", i < Math.min(step, 4)); });
-      moment.querySelectorAll(".m-keys .press").forEach(function (k) { k.classList.remove("press"); });
-      if (step >= 1 && step <= 5) { var k = keyFor(digits[step - 1]); if (k) k.classList.add("press"); }
-      moment.classList.toggle("printed", step >= 6);
-      status.textContent = step >= 6 ? "Printed. Collect your pages." : step === 5 ? "Printing…" : "Type your code";
-    }
-
-    var kiosk = document.getElementById("kiosk");
     var ticking = false;
     function onScroll() {
       ticking = false;
-      var y = window.scrollY, vh = window.innerHeight;
+      var y = window.scrollY;
       nav.classList.toggle("scrolled", y > 8);
-      if (!reduce) kiosk.style.transform = "translateY(" + Math.min(y * 0.12, 80) + "px) scale(" + (1 - Math.min(y / 4000, 0.06)) + ")";
-      var r = moment.getBoundingClientRect();
-      var total = moment.offsetHeight - vh;
-      var p = total > 0 ? Math.min(1, Math.max(0, -r.top / total)) : 1;
-      setStep(reduce ? 6 : Math.floor(p * 7.2));
     }
     window.addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
     onScroll();
@@ -825,13 +1372,70 @@
       }
     });
 
-    // Live prices from the admin-configured rates (defaults already in the HTML).
-    fetch(API, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (rates) {
-      if (!rates) return;
+    // ── OUR STORY: activate beats as they scroll into view ──────────
+    var beats = document.querySelectorAll("[data-story]");
+    var fill  = document.getElementById("story-fill");
+    var storyObs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        e.target.classList.toggle("active", e.isIntersecting);
+      });
+      // Progress bar: fraction of beats currently active
+      if (fill) {
+        var active = document.querySelectorAll("[data-story].active").length;
+        fill.style.height = (beats.length ? (active / beats.length * 100) : 0) + "%";
+      }
+    }, { rootMargin: "0px 0px -25% 0px", threshold: 0.25 });
+    beats.forEach(function (b) { storyObs.observe(b); });
+
+    // ── MIMO IN NUMBERS: count-up on viewport entry ──────────────────
+    function animateCount(el, target, duration) {
+      if (reduce) { el.textContent = target.toLocaleString("en-IN"); return; }
+      var startTime = null;
+      function step(ts) {
+        if (!startTime) startTime = ts;
+        var p = Math.min((ts - startTime) / duration, 1);
+        var ease = 1 - Math.pow(1 - p, 3); // cubic ease-out
+        el.textContent = Math.round(ease * target).toLocaleString("en-IN");
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    var countObs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        countObs.unobserve(e.target);
+        e.target.dataset.counted = "true";
+        var target = parseInt(e.target.getAttribute("data-target"), 10);
+        var dur = target > 10000 ? 2200 : target > 100 ? 1600 : 900;
+        animateCount(e.target, target, dur);
+      });
+    }, { rootMargin: "0px 0px -10% 0px", threshold: 0.3 });
+    document.querySelectorAll(".count-up").forEach(function (el) { countObs.observe(el); });
+
+    // Live prices & real traction metrics from backend on every reload
+    fetch(API, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+      if (!data) return;
       document.querySelectorAll("[data-price]").forEach(function (el) {
-        var v = Number(rates[el.getAttribute("data-price")]);
+        var v = Number(data[el.getAttribute("data-price")]);
         if (v > 0) el.textContent = "₹" + (v % 1 ? v.toFixed(2) : String(v));
       });
+      // Update real metrics from backend
+      if (data.totalPagesPrinted) {
+        var pEl = document.querySelector('[data-metric="totalPagesPrinted"]');
+        if (pEl) {
+          var pTarget = Number(data.totalPagesPrinted);
+          pEl.setAttribute("data-target", pTarget);
+          if (pEl.dataset.counted) animateCount(pEl, pTarget, 1000);
+        }
+      }
+      if (data.totalStudents || data.totalUsers) {
+        var sEl = document.querySelector('[data-metric="totalStudents"]');
+        var sTarget = Number(data.totalStudents || data.totalUsers);
+        if (sEl) {
+          sEl.setAttribute("data-target", sTarget);
+          if (sEl.dataset.counted) animateCount(sEl, sTarget, 1000);
+        }
+      }
     }).catch(function () {});
 
     if (ADS.enabled && ADS.slot) {
