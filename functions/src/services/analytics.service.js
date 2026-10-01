@@ -150,17 +150,25 @@ function normalizeJobs(jobDocs = []) {
     const copies = Math.max(1, num(opts.copies ?? d.copies) || 1);
     const status = String(d.status || "").toLowerCase();
     const colorMode = String(opts.colorMode || d.colorMode || (d.isColor ? "color" : "bw")).toLowerCase();
+    const isDuplex = opts.doubleSided === "double" || opts.duplex === true || d.duplex === true;
+    const pageCount = num(d.pageCount) || 1;
+    const totalPages = pageCount * copies;
+    const sheets = (isDuplex ? Math.ceil(pageCount / 2) : pageCount) * copies;
     return {
       id: d.id,
       userId: d.userId || null,
       orderId: d.orderId || null,
       status,
       kioskId: d.kioskId || d.printDestination || opts.directKioskId || null,
-      pages: num(d.pageCount) * copies,
+      pages: totalPages,
+      sheets,
       copies,
       isColor: colorMode === "color" || colorMode === "colour",
-      isDuplex: opts.doubleSided === "double" || opts.duplex === true,
+      isDuplex,
       cost: num(d.finalCost ?? d.totalCost),
+      originalCost: num(d.originalCost ?? d.grossAmount ?? d.finalCost ?? d.totalCost),
+      couponCode: d.couponCode || null,
+      discount: num(d.discount ?? d.discountAmount),
       createdAtMs: toMillis(d.createdAt),
       fileName: d.fileName || null,
       printerStatus: d.printerStatus || null,

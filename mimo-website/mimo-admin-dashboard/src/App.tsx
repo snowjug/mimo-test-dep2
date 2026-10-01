@@ -11,6 +11,7 @@ const KiosksPage = lazy(() => import('./pages/Kiosks/KiosksPage').then((m) => ({
 const IncidentsPage = lazy(() => import('./pages/Incidents/IncidentsPage').then((m) => ({ default: m.IncidentsPage })));
 const AnalyticsPage = lazy(() => import('./pages/Analytics/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
 const UsersPage = lazy(() => import('./pages/Users/UsersPage').then((m) => ({ default: m.UsersPage })));
+const CouponsPage = lazy(() => import('./pages/Coupons/CouponsPage').then((m) => ({ default: m.CouponsPage })));
 const FinancePage = lazy(() => import('./pages/Finance/FinancePage').then((m) => ({ default: m.FinancePage })));
 const ConfigurationPage = lazy(() => import('./pages/Configuration/ConfigurationPage').then((m) => ({ default: m.ConfigurationPage })));
 const FinanceApp = lazy(() => import('./pages/Finance/FinanceApp').then((m) => ({ default: m.FinanceApp })));
@@ -38,6 +39,7 @@ function DashboardApp() {
     if (path.includes('kiosk')) return 'kiosks';
     if (path.includes('incident')) return 'incidents';
     if (path.includes('user') || path.includes('customer')) return 'users';
+    if (path.includes('coupon')) return 'coupons';
     if (path.includes('analytic')) return 'analytics';
     if (path.includes('finance')) return 'finance';
     if (path.includes('config') || path.includes('setting')) return 'configuration';
@@ -103,7 +105,7 @@ function DashboardApp() {
     );
   }
 
-  // ── MAIN APPLICATION SHELL (7 EXACT PAGES) ─────────────────────────────────
+  // ── MAIN APPLICATION SHELL (8 PAGES) ─────────────────────────────────
   return (
     <AppShell
       activeTab={activeTab}
@@ -119,6 +121,7 @@ function DashboardApp() {
       {activeTab === 'incidents' && <IncidentsPage onNavigate={handleTabChange} />}
       {activeTab === 'analytics' && <AnalyticsPage />}
       {activeTab === 'users' && <UsersPage />}
+      {activeTab === 'coupons' && <CouponsPage />}
       {activeTab === 'finance' && <FinancePage />}
       {activeTab === 'configuration' && <ConfigurationPage />}
       </Suspense>
@@ -142,11 +145,13 @@ export default function RootApp() {
 
   if (isFinanceRoute) {
     return (
-      <RangeProvider>
-        <Suspense fallback={null}>
-          <FinanceApp />
-        </Suspense>
-      </RangeProvider>
+      <ThemeProvider>
+        <RangeProvider>
+          <Suspense fallback={null}>
+            <FinanceApp />
+          </Suspense>
+        </RangeProvider>
+      </ThemeProvider>
     );
   }
 
