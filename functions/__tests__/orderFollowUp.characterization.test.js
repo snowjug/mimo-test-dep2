@@ -35,6 +35,73 @@ test.describe("GET /validate-coupon/:code", () => {
   });
 });
 
+// ───────────────────────── GET /api/settings & /api/screensaver & /api/stats ─────────────────────────
+test.describe("GET /api/settings", () => {
+  test("returns default pricing when no settings document exists", async () => {
+    seed({});
+    const res = response();
+    await publicController.getApiSettings({}, res);
+    assert.strictEqual(res.body.pricePerPageBW, 2.80);
+    assert.strictEqual(res.body.pricePerPageColor, 10.00);
+  });
+
+  test("returns saved pricing from mimo_settings/pricing", async () => {
+    seed({ extra: { mimo_settings: { pricing: { pricePerPageBW: 3.00, pricePerPageColor: 12.00 } } } });
+    const res = response();
+    await publicController.getApiSettings({}, res);
+    assert.strictEqual(res.body.pricePerPageBW, 3.00);
+    assert.strictEqual(res.body.pricePerPageColor, 12.00);
+  });
+});
+
+test.describe("GET /api/screensaver", () => {
+  test("returns default screensaver settings when no doc exists", async () => {
+    seed({});
+    const res = response();
+    await publicController.getApiScreensaver({}, res);
+    assert.strictEqual(res.body.playSound, true);
+    assert.strictEqual(res.body.idleTimeoutSeconds, 60);
+  });
+
+  test("returns saved screensaver settings", async () => {
+    seed({ extra: { mimo_settings: { screensaver: { videos: ["/v1.mp4"], playSound: false, idleTimeoutSeconds: 30 } } } });
+    const res = response();
+    await publicController.getApiScreensaver({}, res);
+    assert.deepStrictEqual(res.body.videos, ["/v1.mp4"]);
+    assert.strictEqual(res.body.playSound, false);
+  });
+});
+
+test.describe("GET /api/stats", () => {
+  test("returns stats from pricing doc if available", async () => {
+    seed({ extra: { mimo_settings: { pricing: { totalPagesPrinted: 5000, totalStudents: 350 } } } });
+    const res = response();
+    await publicController.getApiStats({}, res);
+    assert.strictEqual(res.body.totalPagesPrinted, 5000);
+    assert.strictEqual(res.body.totalStudents, 350);
+    assert.strictEqual(res.body.activeKiosks, 2);
+  });
+
+  test("computes stats from print_jobs, users, and system metrics when pricing doc missing stats", async () => {
+    seed({
+      jobs: {
+        j1: { status: "completed", pageCount: 10, printOptions: { copies: 2 } },
+        j2: { status: "printed", pageCount: 5, printOptions: { copies: 1 } },
+        j3: { status: "failed", pageCount: 20 }
+      },
+      user: { email: "u1@example.com" },
+      extra: {
+        system: { metrics: { totalFreePagesPrinted: 50 } }
+      }
+    });
+    const res = response();
+    await publicController.getApiStats({}, res);
+    assert.strictEqual(res.body.totalPagesPrinted, 75);
+    assert.strictEqual(res.body.totalStudents, 1);
+    assert.strictEqual(res.body.activeKiosks, 2);
+  });
+});
+
 // ───────────────────────── verification twice + print code ─────────────────────────
 test.describe("GET /verify-payment twice (duplicate verification)", () => {
   // Wire the internal HTTP call to the REAL payment-success handler, so verify -> payment-success runs end to end.
