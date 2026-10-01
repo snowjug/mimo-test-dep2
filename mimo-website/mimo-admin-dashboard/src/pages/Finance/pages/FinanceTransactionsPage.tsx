@@ -96,49 +96,55 @@ export const FinanceTransactionsPage: React.FC<FinanceTransactionsPageProps> = (
         <button type="button" onClick={exportCsv} disabled={rows.length === 0} className="px-4 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200/80 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-50"><Download className="w-3.5 h-3.5" /> Export CSV</button>
       </div>
 
-      <div className="bg-white border border-[#E4E7EB] rounded-2xl shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#F3F4F6]">
-              <tr className="text-slate-400 font-bold text-[10px]">
-                <th className="whitespace-nowrap py-3 px-4">Order</th>
-                <th className="whitespace-nowrap py-3 px-4">Customer</th>
+            <thead className="bg-[#F3F4F6] dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+              <tr className="text-slate-400 font-bold text-[10px] uppercase">
+                <th className="whitespace-nowrap py-3 px-4">Order ID</th>
+                <th className="whitespace-nowrap py-3 px-4">Customer Name</th>
                 <th className="whitespace-nowrap py-3 px-4">Machine</th>
                 <th className="whitespace-nowrap py-3 px-4">Method</th>
                 <th className="whitespace-nowrap py-3 px-4">Gross</th>
                 <th className="whitespace-nowrap py-3 px-4">Discount</th>
                 <th className="whitespace-nowrap py-3 px-4"><button type="button" onClick={() => toggleSort('amount')} className="inline-flex items-center gap-1 cursor-pointer">Paid <ArrowUpDown className="w-3 h-3" /></button></th>
                 <th className="whitespace-nowrap py-3 px-4">Status</th>
-                <th className="whitespace-nowrap py-3 px-4"><button type="button" onClick={() => toggleSort('createdAt')} className="inline-flex items-center gap-1 cursor-pointer">Created <ArrowUpDown className="w-3 h-3" /></button></th>
-                <th className="py-3 px-4" />
+                <th className="whitespace-nowrap py-3 px-4"><button type="button" onClick={() => toggleSort('createdAt')} className="inline-flex items-center gap-1 cursor-pointer">Time & Date <ArrowUpDown className="w-3 h-3" /></button></th>
+                <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
-              {loading && Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={10} className="p-4"><div className="h-5 bg-slate-50 rounded animate-pulse" /></td></tr>)}
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {loading && Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={10} className="p-4"><div className="h-5 bg-slate-50 dark:bg-slate-800 rounded animate-pulse" /></td></tr>)}
               {!loading && visible.length === 0 && <tr><td colSpan={10} className="py-14 text-center text-xs font-semibold text-slate-400">No transactions match in {describeRange(range).toLowerCase()}.</td></tr>}
               {visible.map((t) => (
-                <tr key={t.id} className="hover:bg-[#F3F4F6]">
-                  <td className="whitespace-nowrap py-3 px-4 font-mono font-bold text-[#093765]">{t.orderId}</td>
-                  <td className="py-3 px-4 text-slate-700 font-semibold truncate max-w-[200px]" title={t.userEmail || ''}>{t.userEmail || t.userName || '—'}</td>
-                  <td className="whitespace-nowrap py-3 px-4 font-mono text-slate-600">{t.kioskId || '—'}</td>
-                  <td className="whitespace-nowrap py-3 px-4 text-slate-600 font-semibold">{t.method}</td>
-                  <td className="whitespace-nowrap py-3 px-4 font-mono text-slate-600">{inr(t.gross)}</td>
+                <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <td className="whitespace-nowrap py-3 px-4 font-mono font-bold text-[#093765] dark:text-indigo-400">{t.orderId}</td>
+                  <td className="py-3 px-4 max-w-[200px]">
+                    <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{t.userName || t.userEmail || 'Student'}</p>
+                    {t.userEmail && t.userName && <p className="text-[11px] text-slate-400 truncate">{t.userEmail}</p>}
+                  </td>
+                  <td className="whitespace-nowrap py-3 px-4 font-mono text-slate-600 dark:text-slate-400">{t.kioskId || '—'}</td>
+                  <td className="whitespace-nowrap py-3 px-4 text-slate-600 dark:text-slate-300 font-semibold">{t.method}</td>
+                  <td className="whitespace-nowrap py-3 px-4 font-mono text-slate-600 dark:text-slate-400">{inr(t.gross)}</td>
                   <td className="whitespace-nowrap py-3 px-4 font-mono text-slate-500">{t.discount > 0 ? `-${inr(t.discount)}` : '—'}</td>
-                  <td className="whitespace-nowrap py-3 px-4 font-mono font-black text-slate-900">{inr(t.amount)}</td>
+                  <td className="whitespace-nowrap py-3 px-4 font-mono font-black text-slate-900 dark:text-white">{inr(t.amount)}</td>
                   <td className="py-3 px-4"><StatusBadge status={t.status} /></td>
-                  <td className="whitespace-nowrap py-3 px-4 text-slate-400 text-[11px] font-medium">{dateTime(t.createdAt)}</td>
-                  <td className="py-3 px-4 text-right"><button type="button" onClick={() => setSelected(t)} className="text-slate-400 hover:text-[#093765] cursor-pointer" title="Details"><Eye className="w-4 h-4" /></button></td>
+                  <td className="whitespace-nowrap py-3 px-4 font-mono text-[11px]">
+                    <span className="font-bold text-slate-700 dark:text-slate-300 block">{t.createdAt ? new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</span>
+                    <span className="text-[10px] text-slate-400">{dateTime(t.createdAt)}</span>
+                  </td>
+                  <td className="py-3 px-4 text-right"><button type="button" onClick={() => setSelected(t)} className="text-slate-400 hover:text-[#093765] dark:hover:text-indigo-400 cursor-pointer p-1" title="Details"><Eye className="w-4 h-4" /></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
           <span>Showing {rows.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, rows.length)} of {rows.length}</span>
           <div className="flex items-center gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="p-1.5 rounded-lg border border-[#E4E7EB] disabled:opacity-40 cursor-pointer"><ChevronLeft className="w-4 h-4" /></button>
-            <span className="font-bold text-[#093765]">{page} / {pages}</span>
-            <button type="button" disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="p-1.5 rounded-lg border border-[#E4E7EB] disabled:opacity-40 cursor-pointer"><ChevronRight className="w-4 h-4" /></button>
+            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"><ChevronLeft className="w-4 h-4" /></button>
+            <span className="font-bold text-[#093765] dark:text-indigo-400">{page} / {pages}</span>
+            <button type="button" disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
       </div>

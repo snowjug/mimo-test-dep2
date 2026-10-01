@@ -6,7 +6,6 @@ import {
   IndianRupee,
   Search,
   RefreshCw,
-  Coins,
   FileText,
   Calendar,
   Phone,
@@ -25,6 +24,7 @@ import {
 import { usersService } from '../../services/users.service';
 import { AdminUserItem, AdminUserMetrics } from '../../types/user.types';
 import { useTheme } from '../../context/ThemeContext';
+import { exportUsersPdf } from '../../lib/pdfExport';
 
 export const UsersPage: React.FC = () => {
   const { isDark } = useTheme();
@@ -86,26 +86,10 @@ export const UsersPage: React.FC = () => {
     return list;
   }, [users, search, filterType, sortBy]);
 
-  const exportCSV = () => {
-    const headers = ['Username', 'Email', 'Phone', 'Total Spend (INR)', 'Orders', 'Pages', 'MIMO Coins', 'Joined At'];
-    const rows = filteredUsers.map((u) => [
-      `"${u.username}"`,
-      `"${u.email}"`,
-      `"${u.mobileNumber}"`,
-      u.totalSpend,
-      u.orderCount,
-      u.pagesPrinted,
-      u.mimoCoins,
-      `"${new Date(u.joinedAt).toLocaleDateString()}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `mimo_users_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleExportPdf = () => {
+    if (filteredUsers.length > 0) {
+      exportUsersPdf(filteredUsers);
+    }
   };
 
   return (
@@ -130,11 +114,12 @@ export const UsersPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={exportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-all cursor-pointer shadow-xs"
+            onClick={handleExportPdf}
+            disabled={filteredUsers.length === 0}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-[var(--border)] bg-[var(--surface)] text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
           >
-            <Download size={14} />
-            Export CSV
+            <Download size={14} className="text-indigo-600 dark:text-indigo-400" />
+            Export PDF Report
           </button>
           <button
             type="button"
@@ -280,21 +265,20 @@ export const UsersPage: React.FC = () => {
                 <th className="py-3 px-4">Orders</th>
                 <th className="py-3 px-4">Pages Printed</th>
                 <th className="py-3 px-4">Total Spend</th>
-                <th className="py-3 px-4">MIMO Coins</th>
                 <th className="py-3 px-4 sm:px-6 text-right">Joined</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)] text-xs sm:text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--text-3)]">
+                  <td colSpan={7} className="py-12 text-center text-[var(--text-3)]">
                     <RefreshCw className="animate-spin inline mr-2" size={18} />
                     Loading user intelligence...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--text-3)]">
+                  <td colSpan={7} className="py-12 text-center text-[var(--text-3)]">
                     No users matching criteria
                   </td>
                 </tr>
@@ -356,14 +340,6 @@ export const UsersPage: React.FC = () => {
                       ₹{u.totalSpend.toFixed(2)}
                     </td>
 
-                    {/* MIMO Coins */}
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center gap-1 font-bold text-amber-500">
-                        <Coins size={13} />
-                        {u.mimoCoins}
-                      </span>
-                    </td>
-
                     {/* Joined Date */}
                     <td className="py-3.5 px-4 sm:px-6 text-right text-[11px] text-[var(--text-3)] font-medium">
                       {u.joinedAt ? new Date(u.joinedAt).toLocaleDateString() : '—'}
@@ -399,7 +375,7 @@ export const UsersPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
                 <span className="text-[10px] font-bold text-[var(--text-3)] uppercase">Total Spend</span>
                 <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
@@ -407,21 +383,15 @@ export const UsersPage: React.FC = () => {
                 </p>
               </div>
               <div className="p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
-                <span className="text-[10px] font-bold text-[var(--text-3)] uppercase">Orders Completed</span>
+                <span className="text-[10px] font-bold text-[var(--text-3)] uppercase">Orders</span>
                 <p className="text-xl font-black text-[var(--text-1)] mt-0.5">
                   {selectedUser.orderCount}
                 </p>
               </div>
               <div className="p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
-                <span className="text-[10px] font-bold text-[var(--text-3)] uppercase">Pages Printed</span>
+                <span className="text-[10px] font-bold text-[var(--text-3)] uppercase">Pages</span>
                 <p className="text-xl font-black text-[var(--text-1)] mt-0.5">
                   {selectedUser.pagesPrinted}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
-                <span className="text-[10px] font-bold text-[var(--text-3)] uppercase">MIMO Coins</span>
-                <p className="text-xl font-black text-amber-500 mt-0.5">
-                  {selectedUser.mimoCoins}
                 </p>
               </div>
             </div>

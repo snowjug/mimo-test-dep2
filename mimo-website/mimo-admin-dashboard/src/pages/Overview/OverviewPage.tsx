@@ -105,21 +105,26 @@ export const OverviewPage: React.FC = () => {
 
   const cur = analytics.data?.current;
   const list = jobs.data?.jobs ?? [];
-  const refunded = list.filter((j) => j.outcome === 'refunded');
-  const refundedAmount = refunded.reduce((s, j) => s + (j.refund?.amount ?? j.cost ?? 0), 0);
+  const refundedJobs = list.filter((j) => j.outcome === 'refunded' || j.status === 'refunded');
+  const refundCount = Math.max(cur?.refundCount ?? 0, refundedJobs.length);
+  const refundedAmount = Math.max(
+    cur?.refundedAmount ?? 0,
+    refundedJobs.reduce((s, j) => s + (j.refund?.amount ?? j.cost ?? 0), 0)
+  );
   const printed = list.filter((j) => j.outcome === 'printed').length;
   const failed = list.filter((j) => j.outcome === 'failed').length;
 
   return (
     <div className="space-y-5 animate-fadeIn font-sans sm:space-y-6">
-      {/* Greeting */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      {/* Clean Professional Greeting Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
         <div>
-          <p className="text-[13px] font-medium text-[var(--text-3)]">
-            {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Hello, {GREETING_NAME}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Network revenue &amp; operational performance
           </p>
-          <h1 className="text-[30px] font-bold leading-tight tracking-tight text-[var(--text-1)] sm:text-[36px]">Hello, {GREETING_NAME}</h1>
-          <p className="text-[14px] text-[var(--text-2)]">Here is MIMO {describeRange(range).toLowerCase()}.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LiveIndicator updatedAt={jobs.updatedAt} live={live} fetching={jobs.fetching || analytics.fetching} onRefresh={() => { analytics.refresh(); kiosks.refresh(); jobs.refresh(); }} />
@@ -135,7 +140,7 @@ export const OverviewPage: React.FC = () => {
         <Stat label="Revenue" loading={analytics.loading} value={cur ? inr(cur.revenue) : '—'} sub={refundedAmount > 0 ? `${inr(refundedAmount)} refunded` : 'No refunds'} />
         <Stat label="Pages printed" loading={analytics.loading} value={cur ? int(cur.pages) : '—'} sub={cur ? `${int(cur.bwPages)} B&W · ${int(cur.colorPages)} colour` : undefined} />
         <Stat label="Prints" loading={jobs.loading} value={int(list.length)} sub={`${printed} printed · ${failed} failed`} />
-        <Stat label="Refunds" loading={jobs.loading} value={int(refunded.length)} sub={refunded.length ? inr(refundedAmount) : undefined} tone={refunded.length ? 'text-blue-600 dark:text-blue-400' : undefined} />
+        <Stat label="Refunds" loading={jobs.loading && analytics.loading} value={cur || list.length ? inr(refundedAmount) : '—'} sub={refundCount > 0 ? `${refundCount} refund${refundCount === 1 ? '' : 's'}` : 'No refunds'} tone={refundedAmount > 0 ? 'text-blue-600 dark:text-blue-400' : undefined} />
       </div>
 
       {/* Machines */}
@@ -145,7 +150,12 @@ export const OverviewPage: React.FC = () => {
         <div className="grid gap-3 lg:grid-cols-2">
           {kiosks.loading && <><div className="skeleton h-32 rounded-2xl" /><div className="skeleton h-32 rounded-2xl" /></>}
           {kiosks.data?.kiosks.map((k) => {
-            const trays = k.printers.filter((p) => p.paperPct !== null || p.type === 'bw');
+            const trays = k.printers.filter((p) => {
+              if (k.kioskId === 'SV-002' && (p.paperCapacity === 500 || p.key === 'SV-002' || p.printerId === 'SV-002')) {
+                return false;
+              }
+              return p.paperPct !== null || p.type === 'bw' || p.type === 'color';
+            });
             const panel = k.printers.map((p) => p.panelMessage).find((m) => m && !NORMAL_PANEL.test(m.trim()));
             const supplyLow = k.printers.find((p) => (p.tonerLevel ?? p.inkLevel ?? 100) <= 20);
             return (

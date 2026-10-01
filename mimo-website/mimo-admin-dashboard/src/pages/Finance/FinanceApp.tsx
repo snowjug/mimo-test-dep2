@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { useRange } from '../../context/RangeContext';
+import { toApiRange } from '../../lib/dateRange';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
 import { insights } from '../../services/insights.service';
 import { FinanceLayout } from './layout/FinanceLayout';
@@ -34,7 +35,7 @@ const tabFromPath = (): FinanceTab => {
  * and /admin/users (wallet page only); empty periods show zeros and failures show an error banner.
  */
 export const FinanceApp: React.FC = () => {
-  const [token, setToken] = useState<string>(() => localStorage.getItem('financeToken') || '');
+  const [token, setToken] = useState<string>(() => localStorage.getItem('financeToken') || localStorage.getItem('adminToken') || '');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<FinanceTab>(tabFromPath);
@@ -57,9 +58,9 @@ export const FinanceApp: React.FC = () => {
   const analytics = useLiveQuery(() => (signedIn ? insights.analytics(current()) : Promise.resolve(null)), [range, signedIn], { live: live && signedIn });
   const transactions = useLiveQuery(() => (signedIn ? insights.transactions(current(), { limit: 1000 }) : Promise.resolve(null)), [range, signedIn], { live: live && signedIn });
   const refunds = useLiveQuery(
-    () => (signedIn ? api.get<{ requests: any[] }>('/admin/refund-requests').then((r) => r.data.requests) : Promise.resolve(null)),
-    [signedIn],
-    { live: signedIn, intervalMs: 30000 }
+    () => (signedIn ? api.get<{ requests: any[] }>('/admin/refund-requests', { params: toApiRange(current()) }).then((r) => r.data.requests) : Promise.resolve(null)),
+    [range, signedIn],
+    { live: live && signedIn, intervalMs: 30000 }
   );
   // Heavy (scans users, orders and jobs), so only while the Wallet page is open and refreshed manually.
   const wantUsers = signedIn && activeTab === 'wallet';
@@ -87,6 +88,7 @@ export const FinanceApp: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('financeToken');
+    localStorage.removeItem('adminToken');
     setToken('');
   };
 
