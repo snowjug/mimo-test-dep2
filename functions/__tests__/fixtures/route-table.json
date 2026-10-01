@@ -17,6 +17,7 @@
   "GET /admin/users",
   "GET /api/screensaver",
   "GET /api/settings",
+  "GET /api/stats",
   "GET /generate-print-code",
   "GET /kiosk/job-status",
   "GET /mimo/coins",
