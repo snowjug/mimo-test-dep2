@@ -86,17 +86,19 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ variant, onLogin, loadin
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+        <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-4">
           <div className="space-y-1.5">
-            <label htmlFor="staff-email" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            <label htmlFor="staff-username" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
               Username or Email
             </label>
             <div className="relative">
               <input
-                id="staff-email"
+                id="staff-username"
+                name="username"
                 type="text"
                 autoCapitalize="none"
                 autoCorrect="off"
+                spellCheck={false}
                 autoComplete="username"
                 required
                 value={email}
