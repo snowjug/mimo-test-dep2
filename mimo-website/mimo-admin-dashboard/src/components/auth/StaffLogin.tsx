@@ -14,7 +14,7 @@ const COPY = {
     portal: 'Admin',
     title: 'Sign in to Admin',
     subtitle: 'Kiosks, print operations and fleet management.',
-    placeholder: 'admin@mimo.in',
+    placeholder: 'mimo.admin',
     switchLabel: 'Need Finance Portal?',
     switchText: 'Go to Finance',
     switchHref: '/finance',
@@ -23,7 +23,7 @@ const COPY = {
     portal: 'Finance',
     title: 'Sign in to Finance',
     subtitle: 'Payments, refunds, pricing, settlements and P&L.',
-    placeholder: 'finance@mimo.ac.in',
+    placeholder: 'mimo.finance',
     switchLabel: 'Need Admin Portal?',
     switchText: 'Go to Admin',
     switchHref: '/admin',
@@ -89,13 +89,14 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ variant, onLogin, loadin
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
           <div className="space-y-1.5">
             <label htmlFor="staff-email" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Email
+              Username or Email
             </label>
             <div className="relative">
               <input
                 id="staff-email"
-                type="email"
-                inputMode="email"
+                type="text"
+                autoCapitalize="none"
+                autoCorrect="off"
                 autoComplete="username"
                 required
                 value={email}
