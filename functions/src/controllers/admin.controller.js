@@ -6,7 +6,7 @@ const { claimRefund, releaseRefund, refundIdFor, REFUND_BLOCKED_MESSAGES } = req
 
 // ================= ADMIN AUTH =================
 const postAdminLogin = (req, res) => {
-  const { email, password } = req.body;
+  const { email, username, password } = req.body;
 
   // Defensively strip quotes and whitespace from both env vars and user input
   const envAdminEmail    = (process.env.ADMIN_EMAIL    || "").replace(/^"|"$/g, '').trim();
@@ -14,22 +14,32 @@ const postAdminLogin = (req, res) => {
   const envFinanceEmail    = (process.env.FINANCE_EMAIL    || "").replace(/^"|"$/g, '').trim();
   const envFinancePassword = (process.env.FINANCE_PASSWORD || "").replace(/^"|"$/g, '').trim();
 
-  const reqEmail    = (email    || "").trim();
-  const reqPassword = (password || "").trim();
+  const reqIdentifier = (email || username || "").trim();
+  const reqPassword   = (password || "").trim();
 
   // Admin credentials
-  if (envAdminEmail && envAdminPassword && reqEmail === envAdminEmail && reqPassword === envAdminPassword) {
-    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqEmail }, SECRET_KEY, { expiresIn: "24h" });
+  if (
+    envAdminEmail &&
+    envAdminPassword &&
+    reqIdentifier.toLowerCase() === envAdminEmail.toLowerCase() &&
+    reqPassword === envAdminPassword
+  ) {
+    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, SECRET_KEY, { expiresIn: "24h" });
     return res.json({ token, role: "admin", message: "Admin Login Successful" });
   }
 
   // Finance credentials
-  if (envFinanceEmail && envFinancePassword && reqEmail === envFinanceEmail && reqPassword === envFinancePassword) {
-    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqEmail }, SECRET_KEY, { expiresIn: "24h" });
+  if (
+    envFinanceEmail &&
+    envFinancePassword &&
+    reqIdentifier.toLowerCase() === envFinanceEmail.toLowerCase() &&
+    reqPassword === envFinancePassword
+  ) {
+    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, SECRET_KEY, { expiresIn: "24h" });
     return res.json({ token, role: "finance", message: "Finance Login Successful" });
   }
 
-  console.log(`[AUTH FAILED] Attempted: '${reqEmail}' / '${reqPassword}' against Admin: '${envAdminEmail}' / Finance: '${envFinanceEmail}'`);
+  console.log(`[AUTH FAILED] Attempted: '${reqIdentifier}' / '${reqPassword}' against Admin: '${envAdminEmail}' / Finance: '${envFinanceEmail}'`);
   return res.status(401).json({ error: "Invalid credentials" });
 };
 
