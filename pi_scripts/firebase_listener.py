@@ -1333,6 +1333,10 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             report_print_failure(doc_ref, f"Print command execution error: {e}")
         return False
 
+DOWNLOAD_ATTEMPTS = 3
+DOWNLOAD_RETRY_DELAYS_SEC = (2, 5)
+
+
 def download_file(file_url, file_name, dest_dir=None, temp_prefix=None):
     """Download file from Firebase Storage or a signed URL. Uses GCS SDK for fastest transfer.
 
@@ -1364,17 +1368,32 @@ def download_file(file_url, file_name, dest_dir=None, temp_prefix=None):
                 path = file_url.split(f"/{bucket.name}/")[1].split("?")[0]
                 blob_path = urllib.parse.unquote(path)
 
-        if blob_path:
-            # Direct GCS SDK download — fastest, no HTTP overhead
-            blob = bucket.blob(blob_path)
-            blob.download_to_filename(local_path)
-        else:
-            # Fallback: HTTP download with large chunk size for speed
-            response = requests.get(file_url, stream=True, timeout=180)
-            response.raise_for_status()
-            with open(local_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
-                    f.write(chunk)
+        # A single network blip used to fail the whole job (and refund it). Retry a few times with a short wait; each
+        # attempt overwrites the same temp file, so a partial attempt never leaks into the result.
+        last_error = None
+        for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+            try:
+                if blob_path:
+                    # Direct GCS SDK download — fastest, no HTTP overhead
+                    blob = bucket.blob(blob_path)
+                    blob.download_to_filename(local_path)
+                else:
+                    # Fallback: HTTP download with large chunk size for speed
+                    response = requests.get(file_url, stream=True, timeout=180)
+                    response.raise_for_status()
+                    with open(local_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
+                            f.write(chunk)
+                last_error = None
+                break
+            except Exception as attempt_err:
+                last_error = attempt_err
+                if attempt < DOWNLOAD_ATTEMPTS:
+                    wait = DOWNLOAD_RETRY_DELAYS_SEC[attempt - 1]
+                    print(f"⚠️ Download attempt {attempt}/{DOWNLOAD_ATTEMPTS} failed ({attempt_err}); retrying in {wait}s")
+                    time.sleep(wait)
+        if last_error is not None:
+            raise last_error
 
         size_kb = os.path.getsize(local_path) / 1024
         print(f"✅ Downloaded {size_kb:.0f} KB → {local_path}")
