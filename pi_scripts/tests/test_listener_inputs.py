@@ -57,7 +57,8 @@ def _load_listener():
     spec = importlib.util.spec_from_file_location("firebase_listener_under_test", LISTENER_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # __name__ != "__main__": no Firebase, threads, watchers or CUPS purge
-    module.SHEET_CHECK_ENABLED = False  # these tests cover inputs; the printer page-counter check has its own tests
+    module.SHEET_CHECK_ENABLED = False
+    module.DOWNLOAD_RETRY_DELAYS_SEC = (0, 0)  # retries still happen, without real waits in the suite  # these tests cover inputs; the printer page-counter check has its own tests
     return module
 
 
@@ -561,10 +562,14 @@ class PrefetchTests(ListenerTestCase):
         files = [entry("uploads/p0.pdf"), entry("uploads/p1.pdf"), entry("uploads/p2.pdf")]
         snap = FakeSnapshot("job11", {"files": files, "status": "paid"})
 
-        listener.prefetch_job(snap)  # must not raise, must not report
+        with mock.patch("time.sleep"):  # the transient failure is retried; don't wait for real
+            listener.prefetch_job(snap)  # must not raise, must not report
 
-        self.assertEqual(self.bucket.downloads, ["uploads/p0.pdf", "uploads/p1.pdf", "uploads/p2.pdf"],
-                         "a failed entry must not stop the remaining entries")
+        # A transient failure is retried a bounded number of times before the entry is given up. Healthy entries are
+        # fetched once, and a failed entry must not stop the remaining entries.
+        self.assertEqual(self.bucket.downloads.count("uploads/p0.pdf"), 1)
+        self.assertEqual(self.bucket.downloads.count("uploads/p2.pdf"), 1)
+        self.assertEqual(self.bucket.downloads.count("uploads/p1.pdf"), listener.DOWNLOAD_ATTEMPTS)
         self.assertTrue(listener.validate_pdf_strict(self.cache_path("job11", 0, "p0.pdf"))[0])
         self.assertFalse(os.path.exists(self.cache_path("job11", 1, "p1.pdf")), "failed download must not be published")
         self.assertFalse(os.path.exists(self.cache_path("job11", 2, "p2.pdf")), "invalid download must not be published")

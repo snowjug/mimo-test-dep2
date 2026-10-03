@@ -4,6 +4,9 @@ const { admin, db } = require("../config/firebase");
 const { getPDFDocument } = require("../services/pdf.service");
 const { isStoragePathReferencedByOtherActiveJob } = require("../services/storage.service");
 
+// Smallest size a real uploaded document can have. Anything smaller with an unrecognised type is not a document.
+const MIN_REAL_FILE_BYTES = 256;
+
 // ================= FINAL UPLOAD (Serverless with Verified Office Conversion) =================
 const postFinalizeUpload = async (req, res) => {
   try {
@@ -69,6 +72,15 @@ const postFinalizeUpload = async (req, res) => {
           });
         }
       } else {
+        // Not a PDF, image or office document. The only files that reach here are unrecognised ones, and the observed
+        // failures in this branch were 66-byte text blobs (a link dragged onto the drop zone instead of a file). A real
+        // document is never this small, so refuse it now, before a payable job exists, instead of letting it fail at the kiosk.
+        const reportedSize = Number(f.size);
+        if (Number.isFinite(reportedSize) && reportedSize < MIN_REAL_FILE_BYTES) {
+          return res.status(400).json({
+            error: `"${f.name}" doesn't look like a real document. If you shared a link, download the actual file first and upload that.`,
+          });
+        }
         // Unsupported non-office format: default to 1 or valid client count
         const rawCount = Number(f.pageCount);
         const isValidCount = Number.isInteger(rawCount) && rawCount > 0 && Number.isFinite(rawCount);
