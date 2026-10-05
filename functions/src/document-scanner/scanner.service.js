@@ -450,10 +450,11 @@ async function finalizeScannerSession(userId, sessionId) {
     const [imageBuffer] = await bucket.file(p.storagePath).download();
     const mime = (p.contentType || "").toLowerCase();
     let embeddedImage;
+    const imageBytes = new Uint8Array(imageBuffer);
     if (mime === "image/jpeg" || mime === "image/jpg") {
-      embeddedImage = await pdfDoc.embedJpg(imageBuffer);
+      embeddedImage = await pdfDoc.embedJpg(imageBytes);
     } else if (mime === "image/png") {
-      embeddedImage = await pdfDoc.embedPng(imageBuffer);
+      embeddedImage = await pdfDoc.embedPng(imageBytes);
     }
 
     const page = pdfDoc.addPage([embeddedImage.width, embeddedImage.height]);
