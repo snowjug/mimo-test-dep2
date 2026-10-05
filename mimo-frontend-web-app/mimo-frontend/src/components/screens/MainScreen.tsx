@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { ArrowRight, Check, CaretRight } from '@phosphor-icons/react';
 import { DiyaRow, FestiveBackdrop, Kalash, Lotus, Mandala, OrnamentDivider, Toran, ZariBorder } from '../festive/NavaratriDecor';
 import { isFestivalActive } from '../../config/festivalConfig';
+import { MimoCharacter3D } from '../3d/MimoCharacter3D';
 
 interface MainScreenProps {
     onNext: () => void;
@@ -218,13 +219,24 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
 
                 <Toran />
 
-                <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pt-[112px]">
+                <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pt-[60px]">
                     <motion.section
                         initial={isActive ? { opacity: 0, y: 22 } : false}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                         className="flex flex-col items-center text-center"
                     >
+                        {!isSV002 && (
+                            <div className="mb-1 flex items-center justify-center">
+                                <MimoCharacter3D
+                                    size="sm"
+                                    isFestive={true}
+                                    isInteracting={isDragging || dragX > 20 || isUnlocked}
+                                    isActive={isActive}
+                                />
+                            </div>
+                        )}
+
                         <div className="flex items-center gap-4">
                             <Lotus size={26} />
                             <p lang="hi" className="font-deva text-[36px] leading-[1.2] text-mahogany-600">
@@ -281,29 +293,40 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                 style={{ background: 'radial-gradient(closest-side, rgba(217,165,68,0.16), transparent)' }}
             />
 
-            <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pb-16">
+            <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pb-8">
                 <motion.section
                     initial={isActive ? { opacity: 0, y: 22 } : false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                     className="flex flex-col items-center text-center"
                 >
-                    <p className="mb-4 text-[15px] font-bold uppercase tracking-[0.5em] text-white/50">Welcome to</p>
+                    {!isSV002 && (
+                        <div className="mb-2 flex items-center justify-center">
+                            <MimoCharacter3D
+                                size="md"
+                                isFestive={false}
+                                isInteracting={isDragging || dragX > 20 || isUnlocked}
+                                isActive={isActive}
+                            />
+                        </div>
+                    )}
+
+                    <p className="mb-2 text-[15px] font-bold uppercase tracking-[0.5em] text-white/50">Welcome to</p>
 
                     <div className="relative flex items-baseline justify-center leading-none">
-                        <h1 className="bg-gradient-to-b from-gold-200 via-gold-400 to-gold-600 bg-clip-text font-sans text-[150px] font-black tracking-tight text-transparent">
+                        <h1 className="bg-gradient-to-b from-gold-200 via-gold-400 to-gold-600 bg-clip-text font-sans text-[130px] font-black tracking-tight text-transparent">
                             MIMO
                         </h1>
-                        <span className="bg-gradient-to-b from-gold-200 via-gold-400 to-gold-600 bg-clip-text pb-6 pl-2 font-sans text-[52px] font-extrabold text-transparent">
+                        <span className="bg-gradient-to-b from-gold-200 via-gold-400 to-gold-600 bg-clip-text pb-6 pl-2 font-sans text-[48px] font-extrabold text-transparent">
                             {isSV002 ? '2.0' : '1.0'}
                         </span>
                     </div>
 
-                    <h2 className="mt-2 text-[42px] font-medium text-white/90">
+                    <h2 className="mt-2 text-[38px] font-medium text-white/90">
                         Self-Service <span className="text-gold-400">Printing Kiosk</span>
                     </h2>
 
-                    <p className="mt-4 text-[19px] font-medium text-white/50">Fast, secure document printing via Mimo code.</p>
+                    <p className="mt-3 text-[18px] font-medium text-white/50">Fast, secure document printing via Mimo code.</p>
                 </motion.section>
             </main>
 
