@@ -10,6 +10,7 @@ import { Payment } from "./pages/payment";
 import { PrintCode } from "./pages/print-code";
 import { OnboardingName } from "./pages/onboarding-name";
 import { TextEditor } from "./pages/text-editor";
+import { DocumentScanner } from "./pages/document-scanner";
 
 export const router = createBrowserRouter([
   {
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
       { path: "payment", Component: Payment },
       { path: "print-code", Component: PrintCode },
       { path: "text-editor", Component: TextEditor },
+      { path: "document-scanner", Component: DocumentScanner },
     ],
   },
 ]);

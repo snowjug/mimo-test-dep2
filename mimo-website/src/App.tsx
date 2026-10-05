@@ -20,6 +20,7 @@ const DirectSuccess = lazy(() => import("./app/pages/direct-success").then((m) =
 const AdminDashboard = lazy(() => import("./app/pages/mimo-admin-dashboard"));
 const TextEditor = lazy(() => import("./app/pages/text-editor").then((m) => ({ default: m.TextEditor })));
 const FindMachine = lazy(() => import("./app/pages/find-machine").then((m) => ({ default: m.FindMachine })));
+const DocumentScanner = lazy(() => import("./app/pages/document-scanner").then((m) => ({ default: m.DocumentScanner })));
 
 export default function App() {
   // Silent background ping to wake up the Firebase Cloud Function (Cold Start bypass)
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="/finance/*" element={<AdminDashboard />} />
             <Route path="/text-editor" element={<TextEditor />} />
             <Route path="/find-machine" element={<FindMachine />} />
+            <Route path="/document-scanner" element={<DocumentScanner />} />
           </Routes>
         </Suspense>
       </div>

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MimoHeader } from "../components/mimo-header";
 import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
-import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, MapPin } from "lucide-react";
+import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, MapPin, Camera } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { HackathonBanner } from "../components/HackathonBanner";
@@ -1037,6 +1037,13 @@ export function UploadFile() {
             detail="Write or paste text, then print it"
             chevron
             onClick={() => navigate("/text-editor")}
+          />
+          <Row
+            icon={<Camera className="size-5" strokeWidth={1.75} />}
+            label="Scan a document"
+            detail="Capture with your camera, crop and print"
+            chevron
+            onClick={() => navigate("/document-scanner")}
           />
         </Group>
       )}

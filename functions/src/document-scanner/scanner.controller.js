@@ -15,7 +15,7 @@ const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 function parseScannerPageUpload(req) {
   return new Promise((resolve, reject) => {
     const contentType = req.headers["content-type"] || "";
-    if (!contentType.startsWith("multipart/form-data") || !req.rawBody) {
+    if (!contentType.startsWith("multipart/form-data")) {
       return resolve(null);
     }
 
@@ -55,7 +55,16 @@ function parseScannerPageUpload(req) {
       resolve({ file, fields });
     });
 
-    bb.end(req.rawBody);
+    if (req.rawBody && (Buffer.isBuffer(req.rawBody) || typeof req.rawBody === "string")) {
+      bb.end(req.rawBody);
+    } else if (typeof req.pipe === "function") {
+      if (typeof req.on === "function") {
+        req.on("error", reject);
+      }
+      req.pipe(bb);
+    } else {
+      resolve(null);
+    }
   });
 }
 
