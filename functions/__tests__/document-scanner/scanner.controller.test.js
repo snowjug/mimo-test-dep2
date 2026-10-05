@@ -797,3 +797,57 @@ test("33. Returns 500 when unexpected error occurs in postFinalizeSession", asyn
   assert.equal(res.statusCode, 500);
   assert.deepEqual(res.body, { error: "GCS connection timeout" });
 });
+
+test("34. Regression: Successfully parses multipart upload via stream piping when req.rawBody is undefined", async () => {
+  const { Readable } = require("stream");
+  let passedArgs = null;
+  mockAddScannerPageHandler = async (userId, sessionId, pageNumber, fileBuffer, mimeType) => {
+    passedArgs = { userId, sessionId, pageNumber, fileBuffer, mimeType };
+    return {
+      sessionId,
+      pageNumber,
+      pageId: "page-stream-001",
+      storagePath: `scanner/${sessionId}/page-stream-001.jpg`,
+      pageCount: 1,
+      status: "uploaded",
+    };
+  };
+
+  const imageBuffer = Buffer.from("test-stream-binary-data");
+  const { rawBody, headers } = buildMultipartBody({
+    fields: { pageNumber: "1" },
+    file: {
+      fieldName: "page",
+      filename: "page1.jpg",
+      mimeType: "image/jpeg",
+      content: imageBuffer,
+    },
+  });
+
+  // Create stream mock without req.rawBody (simulating standard Express stream)
+  const reqStream = Readable.from(rawBody);
+  reqStream.headers = headers;
+  reqStream.user = { userId: "user-stream-test" };
+  reqStream.params = { sessionId: "session-stream-1" };
+  // Explicitly ensure req.rawBody is undefined
+  reqStream.rawBody = undefined;
+
+  const res = createMockResponse();
+
+  await postAddPage(reqStream, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(passedArgs.userId, "user-stream-test");
+  assert.equal(passedArgs.sessionId, "session-stream-1");
+  assert.equal(passedArgs.pageNumber, 1);
+  assert.deepEqual(passedArgs.fileBuffer, imageBuffer);
+  assert.equal(passedArgs.mimeType, "image/jpeg");
+  assert.deepEqual(res.body, {
+    sessionId: "session-stream-1",
+    pageNumber: 1,
+    pageId: "page-stream-001",
+    storagePath: "scanner/session-stream-1/page-stream-001.jpg",
+    pageCount: 1,
+    status: "uploaded",
+  });
+});
