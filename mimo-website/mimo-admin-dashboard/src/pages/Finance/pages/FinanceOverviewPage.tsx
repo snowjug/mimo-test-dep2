@@ -178,10 +178,11 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
     });
   }, [a]);
 
-  // Monthly Progression (Launch to Present)
+  // Monthly Progression (Launch Month 1 to Present)
   const monthlyProgression = useMemo(() => {
     return [
-      { month: 'May (Launch)', Revenue: 295.90, NetRevenue: 295.90, Pages: 168, Orders: 55 },
+      { month: 'Apr (Launch)', Revenue: 120.00, NetRevenue: 120.00, Pages: 65, Orders: 22 },
+      { month: 'May 2026', Revenue: 295.90, NetRevenue: 295.90, Pages: 168, Orders: 55 },
       { month: 'Jun 2026', Revenue: 480.50, NetRevenue: 480.50, Pages: 240, Orders: 82 },
       { month: 'Jul 2026', Revenue: 620.00, NetRevenue: 620.00, Pages: 310, Orders: 95 },
       { month: 'Aug 2026', Revenue: 890.70, NetRevenue: 860.70, Pages: 385, Orders: 110 },
@@ -275,13 +276,13 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-stretch sm:self-auto">
           <LiveIndicator updatedAt={updatedAt} live={live} tone="finance" />
           <button
             type="button"
             onClick={exportSummaryCsv}
             disabled={!a}
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+            className="flex-1 sm:flex-initial flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
           >
             <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
             <span>CSV</span>
@@ -290,10 +291,10 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
             type="button"
             onClick={handleExportPdf}
             disabled={!a}
-            className="flex h-9 items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 text-xs font-bold shadow-md shadow-indigo-600/25 transition-all cursor-pointer disabled:opacity-50 active:scale-95"
+            className="flex-1 sm:flex-initial flex h-9 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 text-xs font-bold shadow-md shadow-indigo-600/25 transition-all cursor-pointer disabled:opacity-50 active:scale-95"
           >
             <Download className="h-3.5 w-3.5" />
-            <span>Export Statement</span>
+            <span>Export</span>
           </button>
         </div>
       </div>
@@ -302,150 +303,150 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
       <TruncatedNote show={a?.truncated} />
 
       {/* ── SECTION 1: EXECUTIVE FINANCIAL MATRIX (6 Cards) ────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
         {/* Gross Billings */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-bold uppercase">Gross Billings</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase">Gross Billings</span>
             <IndianRupee className="w-4 h-4 text-indigo-500" />
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+          <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white truncate">
             {cur ? inr(totalGross) : '—'}
           </p>
-          <span className="text-[10px] text-slate-500 mt-1 block">
-            {cur ? `${cur.orders} orders collected` : 'Loading...'}
+          <span className="text-[10px] text-slate-500 mt-1 block truncate">
+            {cur ? `${cur.orders} orders` : 'Loading...'}
           </span>
         </div>
 
         {/* Refunds Deducted */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-bold uppercase">Refunds Deducted</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase">Refunds</span>
             <RotateCcw className="w-4 h-4 text-rose-500" />
           </div>
-          <p className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">
+          <p className="text-lg sm:text-2xl font-black text-rose-600 dark:text-rose-400 truncate">
             {cur ? inr(totalRefunded) : '—'}
           </p>
-          <span className="text-[10px] text-rose-500/80 font-semibold mt-1 block">
-            {totalGross > 0 ? `${((totalRefunded / totalGross) * 100).toFixed(1)}% of gross` : '0% loss rate'}
+          <span className="text-[10px] text-rose-500/80 font-semibold mt-1 block truncate">
+            {totalGross > 0 ? `${((totalRefunded / totalGross) * 100).toFixed(1)}% loss` : '0% loss'}
           </span>
         </div>
 
         {/* Net Realized Revenue */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs ring-1 ring-emerald-500/20">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs ring-1 ring-emerald-500/20">
           <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Net Revenue</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Net Revenue</span>
             <TrendingUp className="w-4 h-4 text-emerald-500" />
           </div>
-          <p className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
+          <p className="text-lg sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate">
             {cur ? inr(netRevenue) : '—'}
           </p>
-          <span className="text-[10px] text-emerald-600/80 font-semibold mt-1 block">
-            Gross minus refunds
+          <span className="text-[10px] text-emerald-600/80 font-semibold mt-1 block truncate">
+            In bank
           </span>
         </div>
 
         {/* Estimated Gross Margin */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-bold uppercase">Gross Margin</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase">Gross Margin</span>
             <Award className="w-4 h-4 text-amber-500" />
           </div>
-          <p className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">
+          <p className="text-lg sm:text-2xl font-black text-amber-600 dark:text-amber-400 truncate">
             {grossMarginPct.toFixed(1)}%
           </p>
-          <span className="text-[10px] text-slate-500 mt-1 block">
+          <span className="text-[10px] text-slate-500 mt-1 block truncate">
             ~{inr(grossProfit)} profit
           </span>
         </div>
 
         {/* Average Order Value */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-bold uppercase">Avg Order (AOV)</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase">Avg Order</span>
             <ShoppingBag className="w-4 h-4 text-blue-500" />
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+          <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white truncate">
             {cur ? inr(cur.avgOrderValue) : '—'}
           </p>
-          <span className="text-[10px] text-slate-500 mt-1 block">
-            Across active checkouts
+          <span className="text-[10px] text-slate-500 mt-1 block truncate">
+            Per checkout
           </span>
         </div>
 
         {/* Payment Collection Rate */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-bold uppercase">Success Rate</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase">Success Rate</span>
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+          <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white truncate">
             {cur && cur.orders + cur.failedPayments > 0
               ? `${Math.round((cur.orders / (cur.orders + cur.failedPayments)) * 100)}%`
               : '98.5%'}
           </p>
-          <span className="text-[10px] text-slate-500 mt-1 block">
-            {cur?.failedPayments || 0} failed attempts
+          <span className="text-[10px] text-slate-500 mt-1 block truncate">
+            {cur?.failedPayments || 0} failed
           </span>
         </div>
       </div>
 
       {/* ── SECTION 2: LAUNCH MONTH (DAY 1) VS CURRENT BENCHMARK ──── */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white shadow-xl relative overflow-hidden">
+      <div className="p-4 sm:p-6 rounded-3xl bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-amber-300">
-                <Sparkles size={20} />
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-amber-300 shrink-0">
+                <Sparkles size={18} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-base sm:text-lg text-white">
+                  <h3 className="font-extrabold text-sm sm:text-lg text-white">
                     Launch Month (May 2026) vs Today Benchmark
                   </h3>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">
-                    {launchBenchmark.revMultiplier}x Multiplier
+                  <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 shrink-0">
+                    {launchBenchmark.revMultiplier}x
                   </span>
                 </div>
                 <p className="text-xs text-slate-300">
-                  Comparing current performance against the 1st working month of MIMO operations.
+                  Comparing current performance against 1st working month of MIMO.
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+            <div className="text-left sm:text-right">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
                 Total Revenue Expansion
               </span>
-              <span className="text-xl font-black text-emerald-400 flex items-center justify-end gap-1">
+              <span className="text-lg sm:text-xl font-black text-emerald-400 flex items-center sm:justify-end gap-1">
                 <ArrowUpRight size={18} />
                 +{launchBenchmark.revGrowthPct}%
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Month 1 Revenue</span>
-              <p className="text-xl font-black text-white mt-1">{inr(launchBenchmark.lRev)}</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mt-4">
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">M1 Revenue</span>
+              <p className="text-lg sm:text-xl font-black text-white mt-1">{inr(launchBenchmark.lRev)}</p>
               <span className="text-[10px] text-slate-400 mt-0.5 block">Baseline in May 2026</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Period Revenue</span>
-              <p className="text-xl font-black text-emerald-400 mt-1">{inr(totalGross)}</p>
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Revenue</span>
+              <p className="text-lg sm:text-xl font-black text-emerald-400 mt-1">{inr(totalGross)}</p>
               <span className="text-[10px] text-emerald-300/80 font-bold mt-0.5 block">+{launchBenchmark.revGrowthPct}% Growth</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Print Volume Scaled</span>
-              <p className="text-xl font-black text-white mt-1">{int(cur?.pages ?? 0)} pgs</p>
-              <span className="text-[10px] text-indigo-300 font-bold mt-0.5 block">vs {launchBenchmark.lPages} pgs in M1</span>
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Print Volume</span>
+              <p className="text-lg sm:text-xl font-black text-white mt-1">{int(cur?.pages ?? 0)} pgs</p>
+              <span className="text-[10px] text-indigo-300 font-bold mt-0.5 block">vs {launchBenchmark.lPages} in M1</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Order Frequency</span>
-              <p className="text-xl font-black text-white mt-1">{cur?.orders ?? 0} orders</p>
+              <p className="text-lg sm:text-xl font-black text-white mt-1">{cur?.orders ?? 0} orders</p>
               <span className="text-[10px] text-amber-300 font-bold mt-0.5 block">vs {launchBenchmark.lOrders} in M1</span>
             </div>
           </div>
@@ -453,9 +454,9 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
       </div>
 
       {/* ── SECTION 3: MULTI-GRAPH INTELLIGENCE SUITE ──────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 sm:gap-6 min-w-0">
         {/* Main Composite Chart with View Switcher */}
-        <div className="xl:col-span-2 p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+        <div className="xl:col-span-2 p-4 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4 min-w-0 overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
@@ -474,39 +475,39 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-start sm:self-auto">
+            <div className="grid grid-cols-3 sm:flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setActiveChartTab('waterfall')}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center ${
                   activeChartTab === 'waterfall'
                     ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Net Revenue
+                Net Rev
               </button>
               <button
                 type="button"
                 onClick={() => setActiveChartTab('monthly')}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center ${
                   activeChartTab === 'monthly'
                     ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                MoM Growth
+                MoM
               </button>
               <button
                 type="button"
                 onClick={() => setActiveChartTab('hourly')}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center ${
                   activeChartTab === 'hourly'
                     ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Peak Hours
+                Peak
               </button>
             </div>
           </div>

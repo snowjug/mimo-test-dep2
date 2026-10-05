@@ -310,10 +310,11 @@ export const FinancePage: React.FC = () => {
     });
   }, [analytics]);
 
-  // Monthly Progression
+  // Monthly Progression (From Month 1 Launch)
   const monthlyProgression = useMemo(() => {
     return [
-      { month: 'May (M1)', Revenue: 295.90, NetRevenue: 295.90, Pages: 168 },
+      { month: 'Apr (M1)', Revenue: 120.00, NetRevenue: 120.00, Pages: 65 },
+      { month: 'May (M2)', Revenue: 295.90, NetRevenue: 295.90, Pages: 168 },
       { month: 'Jun 2026', Revenue: 480.50, NetRevenue: 480.50, Pages: 240 },
       { month: 'Jul 2026', Revenue: 620.00, NetRevenue: 620.00, Pages: 310 },
       { month: 'Aug 2026', Revenue: 890.70, NetRevenue: 860.70, Pages: 385 },

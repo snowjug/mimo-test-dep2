@@ -14,16 +14,20 @@ import {
   LogOut,
   ChevronRight,
   ArrowUpRight,
+  PieChart,
+  Receipt,
 } from 'lucide-react';
 
 export type FinanceTab =
   | 'overview'
+  | 'dashboard'
   | 'transactions'
   | 'analytics'
   | 'refunds'
   | 'pricing'
   | 'wallet'
-  | 'settlements';
+  | 'settlements'
+  | 'expenses';
 
 export interface FinanceSidebarProps {
   activeTab: FinanceTab;
@@ -33,13 +37,15 @@ export interface FinanceSidebarProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { id: 'analytics', label: 'Revenue Analytics', icon: BarChart3 },
-  { id: 'refunds', label: 'Refunds & Disputes', icon: RotateCcw, badgeKey: 'refunds' },
-  { id: 'pricing', label: 'Pricing & Coupons', icon: Tag },
-  { id: 'wallet', label: 'Wallet & Credits', icon: WalletCards },
-  { id: 'settlements', label: 'Settlements & Reports', icon: FileSpreadsheet },
+  { id: 'overview',      label: 'Overview',              icon: LayoutDashboard },
+  { id: 'dashboard',    label: 'Finance Dashboard',      icon: PieChart },
+  { id: 'transactions', label: 'Transactions',           icon: ArrowLeftRight },
+  { id: 'analytics',   label: 'Revenue Analytics',      icon: BarChart3 },
+  { id: 'refunds',     label: 'Refunds & Disputes',     icon: RotateCcw, badgeKey: 'refunds' },
+  { id: 'pricing',     label: 'Pricing & Coupons',      icon: Tag },
+  { id: 'wallet',      label: 'Wallet & Credits',       icon: WalletCards },
+  { id: 'settlements', label: 'Settlements & Reports',  icon: FileSpreadsheet },
+  { id: 'expenses',    label: 'Revenue & Expenses',     icon: Receipt },
 ];
 
 export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
