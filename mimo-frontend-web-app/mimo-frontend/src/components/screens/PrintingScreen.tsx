@@ -13,6 +13,7 @@ interface PrintingScreenProps {
   onError?: (errorMsg?: string) => void;
   pages?: number;
   copies?: number;
+  doubleSided?: boolean | string;
   printCode?: string;       // ← needed to poll real status
   manualProgress?: number;  // ← optional override for testing
   colorMode?: 'color' | 'bw';
@@ -38,13 +39,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   onError,
   pages = 1,
   copies = 1,
+  doubleSided = false,
   printCode,
   manualProgress,
   colorMode = 'bw',
   kioskId,
 }) => {
   const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
-  const [progress, setProgress]         = useState(1);
+  const [progress, setProgress]         = useState(0);
   const [typedTitle, setTypedTitle]     = useState('');
   const [typedSub, setTypedSub]         = useState('');
   const [printDone, setPrintDone]       = useState(false);   // true once Pi confirms
@@ -54,13 +56,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const [collectCountdown, setCollectCountdown] = useState(0);
   const collectTimerRef = useRef<number | null>(null);
 
-  const progressRef         = useRef(1);   // mirror of progress for closures
+  const progressRef         = useRef(0);   // mirror of progress for closures
   const tickTimerRef        = useRef<number | null>(null);
   const pollTimerRef        = useRef<number | null>(null);
   const completionTimerRef  = useRef<number | null>(null);
   const isCompletingRef     = useRef(false);
   const stallTimerRef       = useRef<number | null>(null);   // stall detector
-  const lastProgressRef     = useRef(1);                    // last recorded progress for stall check
+  const lastProgressRef     = useRef(0);                    // last recorded progress for stall check
   const startTimeRef        = useRef(Date.now());           // when the print screen was activated
   const lastSuccessfulPollTimeRef = useRef(Date.now());     // when we last successfully polled the backend
 
@@ -176,28 +178,29 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           clearAllTimers();
           if (onError) onError(errMsg);
         } else if (data.status === 'printing') {
-          const total = Number(data.totalSheets) || Math.max(1, pages * copies);
+          const isDuplex = doubleSided === true || doubleSided === 'double' || data.double_sided === 'double' || data.doubleSided === true;
+          const fallbackSheets = (isDuplex ? Math.ceil(pages / 2) : pages) * copies;
+          const total = Number(data.totalSheets) || Math.max(1, fallbackSheets);
           const completed = Number(data.sheetsCompleted) || 0;
 
-          if (completed === 0) {
-            const initialWarmup = Math.min(15, Math.max(5, Math.round(10 / total)));
-            if (initialWarmup > progressRef.current) {
-              progressRef.current = initialWarmup;
-              setProgress(initialWarmup);
-            }
-            setStatusMsg('Warming up printer…');
+          if (total === 1) {
+            // Single-sheet job: keep progress at 0% until hardware verification confirms completion
+            progressRef.current = 0;
+            setProgress(0);
+            setStatusMsg('Printing document…');
           } else {
-            const sheetPercent = Math.round((completed / total) * 100);
-            // Strictly cap at 98% during printing — 100% only on CUPS completion
-            const cappedPercent = Math.min(98, Math.max(progressRef.current, sheetPercent));
-            progressRef.current = cappedPercent;
-            setProgress(cappedPercent);
-
-            setStatusMsg(
-              total === 1
-                ? 'Printing document…'
-                : `Printing sheet ${completed} of ${total}…`
-            );
+            // Multi-sheet job: advances ONLY when hardware confirms completed sheets, capped below 100%
+            if (completed === 0) {
+              progressRef.current = 0;
+              setProgress(0);
+              setStatusMsg('Warming up printer…');
+            } else {
+              const sheetPercent = Math.min(95, Math.round((completed / total) * 95));
+              const targetPercent = Math.max(progressRef.current, sheetPercent);
+              progressRef.current = targetPercent;
+              setProgress(targetPercent);
+              setStatusMsg(`Printing sheet ${completed} of ${total}…`);
+            }
           }
 
           schedulePoll(300);
@@ -265,9 +268,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   useEffect(() => {
     if (!isActive) {
       clearAllTimers();
-      setProgress(1);
-      progressRef.current = 1;
-      lastProgressRef.current = 1;
+      setProgress(0);
+      progressRef.current = 0;
+      lastProgressRef.current = 0;
       startTimeRef.current = Date.now();
       lastSuccessfulPollTimeRef.current = Date.now();
       setTypedTitle('');
@@ -280,10 +283,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       return;
     }
 
-    // Explicitly start at 1% on screen activation
-    setProgress(1);
-    progressRef.current = 1;
-    lastProgressRef.current = 1;
+    // Explicitly start at 0% on screen activation
+    setProgress(0);
+    progressRef.current = 0;
+    lastProgressRef.current = 0;
     setTypedTitle('');
     setTypedSub('');
     startTimeRef.current = Date.now();
