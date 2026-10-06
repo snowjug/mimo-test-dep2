@@ -13,16 +13,20 @@ import { FinanceRefundsPage } from './pages/FinanceRefundsPage';
 import { FinancePricingPage } from './pages/FinancePricingPage';
 import { FinanceWalletPage } from './pages/FinanceWalletPage';
 import { FinanceSettlementsPage } from './pages/FinanceSettlementsPage';
+import { FinanceDashboardPage } from './pages/FinanceDashboardPage';
+import { FinanceExpensesPage } from './pages/FinanceExpensesPage';
 import { FinanceLoginPage } from '../../components/auth/FinanceLoginPage';
 import type { AdminUsersResponse } from '../../types/user.types';
 
 const TAB_PATHS: [string, FinanceTab][] = [
+  ['/finance/dashboard',   'dashboard'],
   ['/finance/transaction', 'transactions'],
-  ['/finance/analytic', 'analytics'],
-  ['/finance/refund', 'refunds'],
-  ['/finance/pricing', 'pricing'],
-  ['/finance/wallet', 'wallet'],
+  ['/finance/analytic',   'analytics'],
+  ['/finance/refund',     'refunds'],
+  ['/finance/pricing',    'pricing'],
+  ['/finance/wallet',     'wallet'],
   ['/finance/settlement', 'settlements'],
+  ['/finance/expense',    'expenses'],
 ];
 const tabFromPath = (): FinanceTab => {
   const path = window.location.pathname.toLowerCase();
@@ -107,6 +111,14 @@ export const FinanceApp: React.FC = () => {
       onSearchChange={setGlobalSearch}
       pendingRefundsCount={pendingRefunds}
     >
+      {activeTab === 'dashboard' && (
+        <FinanceDashboardPage
+          analytics={analytics.data}
+          loading={analytics.loading}
+          error={analytics.error}
+          onRefresh={refreshAll}
+        />
+      )}
       {activeTab === 'overview' && (
         <FinanceOverviewPage
           analytics={analytics.data}
@@ -143,6 +155,7 @@ export const FinanceApp: React.FC = () => {
       {activeTab === 'settlements' && (
         <FinanceSettlementsPage analytics={analytics.data} transactions={transactions.data?.transactions ?? []} loading={analytics.loading} error={analytics.error} />
       )}
+      {activeTab === 'expenses' && <FinanceExpensesPage />}
     </FinanceLayout>
   );
 };
