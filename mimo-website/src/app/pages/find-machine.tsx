@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { MapPin, Printer } from "lucide-react";
+import { MapPin, Navigation, Printer } from "lucide-react";
 import { AppBar, Screen, StatusPill } from "../components/mimo/ui";
 
 interface MachineLocation {
@@ -10,7 +10,13 @@ interface MachineLocation {
   image: string | null;
   colour: boolean;
   isAvailable: boolean;
+  latitude?: number;
+  longitude?: number;
 }
+
+/** Google Maps walking directions to the kiosk. No origin: Google Maps starts from the user's current location. */
+const directionsUrl = (latitude: number, longitude: number) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=walking`;
 
 const machines: MachineLocation[] = [
   {
@@ -21,6 +27,8 @@ const machines: MachineLocation[] = [
     image: "/images/machines/cv-raman-block-780.jpg",
     colour: false,
     isAvailable: true,
+    latitude: 13.116712,
+    longitude: 77.634768,
   },
   {
     id: "2.0",
@@ -30,6 +38,8 @@ const machines: MachineLocation[] = [
     image: "/images/machines/central-library-780.jpg",
     colour: true,
     isAvailable: true,
+    latitude: 13.1147477,
+    longitude: 77.635318,
   },
   {
     id: "3.0",
@@ -98,6 +108,19 @@ export function FindMachine() {
                 </div>
                 <StatusPill tone={m.colour ? "brand" : "neutral"}>{m.colour ? "Colour and B&W" : "B&W"}</StatusPill>
               </div>
+              {m.latitude !== undefined && m.longitude !== undefined && (
+                <div className="px-4 pb-4">
+                  <a
+                    href={directionsUrl(m.latitude, m.longitude)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Get directions to ${m.name} at the ${m.location} in Google Maps`}
+                    className="press inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-brand px-5 text-[16px] font-semibold text-on-brand hover:bg-brand-press"
+                  >
+                    <Navigation className="size-5" strokeWidth={2} /> Get Directions
+                  </a>
+                </div>
+              )}
             </article>
           ))}
         </div>
