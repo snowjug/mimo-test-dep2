@@ -28,6 +28,7 @@ COLOR_PRINTER_NAME = os.environ.get("COLOR_PRINTER_NAME", "Epson_L3250")
 KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
 TEMP_DIR = "/tmp/mimo_prints"
 PRE_FETCH_DIR = "/tmp/mimo_pre_fetch"
+EXIT_CLEARANCE_DELAY = float(os.environ.get("EXIT_CLEARANCE_DELAY", "1.5"))
 # Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
 IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
 
@@ -712,19 +713,6 @@ print(f'Merged {{len(images)}} image(s) into PDF: {rasterized_pdf}')
     return pdf_path
 
 
-LPSTAT_TIMEOUT_SEC = 8
-
-
-def _lpstat_p(printer_name):
-    """lpstat -p can be slow while CUPS is busy. One slow answer used to be reported as a printer error and refunded
-    the customer, so a timeout is retried once before it counts as a failure."""
-    try:
-        return subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=LPSTAT_TIMEOUT_SEC)
-    except subprocess.TimeoutExpired:
-        print(f"⚠️ lpstat -p {printer_name} was slow (>{LPSTAT_TIMEOUT_SEC}s); retrying once")
-        return subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=LPSTAT_TIMEOUT_SEC)
-
-
 def is_printer_online(printer_name):
     """Check if the CUPS printer queue is enabled, accepting jobs, physically connected via USB/network, and free of hardware errors (out-of-paper, jam, door-open)."""
     usb_id = PRINTER_USB_IDS.get(printer_name)
@@ -746,7 +734,7 @@ def is_printer_online(printer_name):
     try:
         # Check lpstat -p (without -l) for LIVE printer status & active hardware error states.
         # Note: Do NOT use -l because lpstat -l -p prints static PPD capability strings like 'Alerts: media-empty-error'.
-        res_p = _lpstat_p(printer_name)
+        res_p = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=3)
         p_out = res_p.stdout.lower()
 
         # Parse live error states from lpstat -p output
@@ -916,31 +904,45 @@ def expected_min_sheets(page_count, copies, double_sided):
     return per_copy * max(1, int(copies or 1))
 
 
-def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=None, clock=time):
+def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=None, clock=time, doc_ref=None):
     """
     After CUPS has handed the job over, poll the page counter until enough sheets came out.
     Returns (verdict, printed): "ok" | "none" (nothing came out) | "short" (stopped early) | "unknown".
     """
     if count_before is None:
         return "unknown", None
-    max_wait = max_wait or (45 + expected_min * 6)
+    expected = max(1, int(expected_min or 1))
+    max_wait = max_wait or (45 + expected * 6)
     start = clock.time()
-    last, last_change = None, start
+    last, last_change, last_reported = None, start, 0
     while clock.time() - start < max_wait:
         info = read_printer_status(printer_name)
         if info:
-            count = info["pagecount"]
-            if last is None or count != last:
-                last, last_change = count, clock.time()
-            if count - count_before >= expected_min:
-                return "ok", count - count_before
-            stalled = clock.time() - last_change
-            if (count > count_before and stalled >= 25) or (count == count_before and stalled >= 60):
-                break
+            count = info.get("pagecount")
+            if count is not None:
+                if last is None or count != last:
+                    last, last_change = count, clock.time()
+                    
+                    # Monotonic intermediate progress streaming (strictly capped at expected - 1)
+                    if count >= count_before:
+                        sheets_done = min(expected - 1, max(0, count - count_before))
+                        if sheets_done > last_reported and doc_ref:
+                            last_reported = sheets_done
+                            safe_update(doc_ref, {"sheetsCompleted": sheets_done})
+                            print(f"📊 [PROGRESS] Hardware sheet progress: {sheets_done}/{expected}")
+
+                if count - count_before >= expected:
+                    # Physical exit buffer: trailing-edge clearance only on verified success
+                    if EXIT_CLEARANCE_DELAY > 0:
+                        clock.sleep(EXIT_CLEARANCE_DELAY)
+                    return "ok", count - count_before
+                stalled = clock.time() - last_change
+                if (count > count_before and stalled >= 25) or (count == count_before and stalled >= 60):
+                    break
         clock.sleep(1.0)
     if last is None:
         return "unknown", None
-    printed = last - count_before
+    printed = max(0, last - count_before)
     return ("none" if printed <= 0 else "short"), printed
 
 
@@ -1099,7 +1101,7 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                         verified_fields = {}
                         if sheet_check:
                             expected = sheet_check["expected_min"]
-                            verdict, printed = verify_sheets_printed(printer_name, sheet_check["count_before"], expected)
+                            verdict, printed = verify_sheets_printed(printer_name, sheet_check["count_before"], expected, doc_ref=doc_ref)
                             print(f"🔢 [SHEETS] {job_id}: {verdict} — page counter moved {printed} (needs at least {expected}).")
                             if verdict in ("none", "short"):
                                 info = read_printer_status(printer_name)
@@ -1120,6 +1122,7 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             "status": "completed",
                             "isPrinted": True,
                             "printerStatus": "Printed",
+                            "sheetsCompleted": total_sheets,
                             "paperSheetsUsed": total_sheets,
                             "printedAt": firestore.SERVER_TIMESTAMP,
                             **verified_fields,
@@ -1297,16 +1300,21 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         match = re.search(r'request id is (\S+)', lp_output)
         if match and doc_ref:
             job_id = match.group(1)
-            stamp_job(doc_ref, ["sentToPrinterAt"])
             # Calculate dynamic timeout: 600s base + 360s per color page (or 30s per B&W page)
             page_count = sum(get_pdf_page_count(f) for f in file_paths if f.endswith(".pdf")) or 1
-            cups_timeout = (600 + page_count * copies * (360 if is_color else 30))
-            print(f"✅ CUPS job {job_id} queued. Spawning sync thread to track physical completion (timeout: {cups_timeout}s).")
+            total_sheets = expected_min_sheets(page_count, copies, double_sided)
+            cups_timeout = (600 + total_sheets * (360 if is_color else 30))
+            print(f"✅ CUPS job {job_id} queued ({total_sheets} physical sheet(s)). Spawning sync thread to track physical completion (timeout: {cups_timeout}s).")
+            safe_update(doc_ref, {
+                "totalSheets": total_sheets,
+                "sheetsCompleted": 0,
+                "status": "printing"
+            })
             # Spawn background thread to wait for physical print and update Firestore
             sheet_check = None
             if held_sheet_slot:
                 sheet_check = {"count_before": count_before,
-                               "expected_min": expected_min_sheets(page_count, copies, double_sided)}
+                               "expected_min": total_sheets}
             t = threading.Thread(target=wait_for_cups_job,
                                  args=(job_id, doc_ref, cups_timeout, printer_name, page_count, copies, sheet_check),
                                  daemon=True)
@@ -1346,10 +1354,6 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             report_print_failure(doc_ref, f"Print command execution error: {e}")
         return False
 
-DOWNLOAD_ATTEMPTS = 3
-DOWNLOAD_RETRY_DELAYS_SEC = (2, 5)
-
-
 def download_file(file_url, file_name, dest_dir=None, temp_prefix=None):
     """Download file from Firebase Storage or a signed URL. Uses GCS SDK for fastest transfer.
 
@@ -1381,32 +1385,17 @@ def download_file(file_url, file_name, dest_dir=None, temp_prefix=None):
                 path = file_url.split(f"/{bucket.name}/")[1].split("?")[0]
                 blob_path = urllib.parse.unquote(path)
 
-        # A single network blip used to fail the whole job (and refund it). Retry a few times with a short wait; each
-        # attempt overwrites the same temp file, so a partial attempt never leaks into the result.
-        last_error = None
-        for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
-            try:
-                if blob_path:
-                    # Direct GCS SDK download — fastest, no HTTP overhead
-                    blob = bucket.blob(blob_path)
-                    blob.download_to_filename(local_path)
-                else:
-                    # Fallback: HTTP download with large chunk size for speed
-                    response = requests.get(file_url, stream=True, timeout=180)
-                    response.raise_for_status()
-                    with open(local_path, 'wb') as f:
-                        for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
-                            f.write(chunk)
-                last_error = None
-                break
-            except Exception as attempt_err:
-                last_error = attempt_err
-                if attempt < DOWNLOAD_ATTEMPTS:
-                    wait = DOWNLOAD_RETRY_DELAYS_SEC[attempt - 1]
-                    print(f"⚠️ Download attempt {attempt}/{DOWNLOAD_ATTEMPTS} failed ({attempt_err}); retrying in {wait}s")
-                    time.sleep(wait)
-        if last_error is not None:
-            raise last_error
+        if blob_path:
+            # Direct GCS SDK download — fastest, no HTTP overhead
+            blob = bucket.blob(blob_path)
+            blob.download_to_filename(local_path)
+        else:
+            # Fallback: HTTP download with large chunk size for speed
+            response = requests.get(file_url, stream=True, timeout=180)
+            response.raise_for_status()
+            with open(local_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
+                    f.write(chunk)
 
         size_kb = os.path.getsize(local_path) / 1024
         print(f"✅ Downloaded {size_kb:.0f} KB → {local_path}")
@@ -1428,13 +1417,6 @@ def safe_update(doc_ref, data):
             new_ref.update(data, timeout=10)
         except Exception as e2:
             print(f"❌ safe_update final failure: {e2}")
-
-def stamp_job(doc_ref, fields):
-    """Record a timeline moment on the job (admin history) without delaying the print."""
-    if doc_ref is None:
-        return
-    data = {k: firestore.SERVER_TIMESTAMP for k in fields}
-    threading.Thread(target=safe_update, args=(doc_ref, data), daemon=True).start()
 
 def report_print_failure(doc_ref, reason):
     """
@@ -1524,7 +1506,6 @@ def process_job(doc_snapshot):
     doc = doc_snapshot.to_dict()
     doc_id = doc_snapshot.id
     doc_ref = db.collection('print_jobs').document(doc_id)
-    stamp_job(doc_ref, ["piReceivedAt"])
 
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
@@ -2302,103 +2283,6 @@ def keep_warm_loop():
             pass
         time.sleep(600)
 
-# ── Remote restart (admin dashboard → "Restart Pi") ──
-# The backend writes kiosk_commands/{KIOSK_ID} = {action: "reboot", status: "pending", commandId, requestedAt}.
-# The Pi waits for the printer to go idle (at most RESTART_IDLE_WAIT_SEC), marks the command "rebooting", then reboots.
-# Only a fresh "pending" command does anything, and the status is moved off "pending" before the reboot (no reboot if
-# that write fails), so a Pi coming back up can never reboot again from the same command.
-RESTART_MAX_AGE_SEC = 15 * 60
-RESTART_IDLE_WAIT_SEC = 5 * 60
-REBOOT_COMMAND = ["sudo", "-n", "/sbin/reboot"]
-_restart_lock = threading.Lock()
-_restarts_started = set()
-
-
-def _command_ref():
-    return db.collection("kiosk_commands").document(KIOSK_ID)
-
-
-def printer_is_idle():
-    if active_jobs:
-        return False
-    try:
-        return not subprocess.run(["lpstat", "-o"], capture_output=True, text=True, timeout=5).stdout.strip()
-    except Exception:
-        return True
-
-
-def command_age_seconds(cmd, now=None):
-    requested = cmd.get("requestedAt")
-    if not requested:
-        return None
-    now = now or datetime.now(requested.tzinfo)
-    # A Pi clock slightly behind the server gives a small negative age: treat that as fresh.
-    return max(0.0, (now - requested).total_seconds())
-
-
-def handle_restart_command(cmd, ref=None, clock=time, idle=printer_is_idle, run=subprocess.run, now=None):
-    """Run one admin restart request. Returns what happened: ignored / expired / rebooting / failed."""
-    if not cmd or cmd.get("status") != "pending" or cmd.get("action") != "reboot":
-        return "ignored"
-    ref = ref or _command_ref()
-    age = command_age_seconds(cmd, now)
-    if age is None or age > RESTART_MAX_AGE_SEC:
-        safe_update(ref, {"status": "expired", "message": "The request was too old when the Pi saw it, so it did not restart.",
-                          "updatedAt": firestore.SERVER_TIMESTAMP})
-        return "expired"
-    command_id = cmd.get("commandId") or "unknown"
-    with _restart_lock:
-        if command_id in _restarts_started:
-            return "ignored"
-        _restarts_started.add(command_id)
-
-    print(f"🔁 [RESTART] Admin asked to reboot {KIOSK_ID} (command {command_id}).")
-    safe_update(ref, {"status": "waiting_idle", "message": "Waiting for the current print to finish.",
-                      "updatedAt": firestore.SERVER_TIMESTAMP})
-    deadline = clock.time() + RESTART_IDLE_WAIT_SEC
-    while not idle() and clock.time() < deadline:
-        clock.sleep(5)
-    message = "Restarting now." if idle() else "Printer still busy after 5 minutes; restarting anyway."
-    try:
-        ref.update({"status": "rebooting", "message": message, "rebootingAt": firestore.SERVER_TIMESTAMP,
-                    "updatedAt": firestore.SERVER_TIMESTAMP})
-    except Exception as e:
-        print(f"❌ [RESTART] Could not mark the command before rebooting, so not rebooting: {e}")
-        with _restart_lock:
-            _restarts_started.discard(command_id)
-        return "failed"
-    try:
-        result = run(REBOOT_COMMAND, capture_output=True, text=True, timeout=30)
-        ok, detail = result.returncode == 0, (result.stderr or result.stdout or "").strip()
-    except Exception as e:
-        ok, detail = False, str(e)
-    if not ok:
-        print(f"❌ [RESTART] Reboot command failed: {detail}")
-        safe_update(ref, {"status": "failed", "message": f"The Pi could not reboot: {detail[:200] or 'unknown error'}",
-                          "updatedAt": firestore.SERVER_TIMESTAMP})
-        return "failed"
-    return "rebooting"
-
-
-def finish_restart_after_boot(ref=None):
-    """On startup: a command left in "rebooting" means this boot is the restart the admin asked for."""
-    ref = ref or _command_ref()
-    try:
-        snap = ref.get()
-        if snap.exists and (snap.to_dict() or {}).get("status") == "rebooting":
-            ref.update({"status": "done", "message": "The Pi restarted and is back online.",
-                        "completedAt": firestore.SERVER_TIMESTAMP, "updatedAt": firestore.SERVER_TIMESTAMP})
-            print("✅ [RESTART] Back online after the admin's restart.")
-    except Exception as e:
-        print(f"⚠️ [RESTART] Could not close the restart command: {e}")
-
-
-def on_command_snapshot(doc_snapshots, changes, read_time):
-    for snap in doc_snapshots:
-        if snap.exists:
-            threading.Thread(target=handle_restart_command, args=(snap.to_dict(),), daemon=True).start()
-
-
 def startup_purge_cups():
     """Cancel all stale queued CUPS jobs on listener startup to prevent ghost prints when paper is refilled."""
     try:
@@ -2429,9 +2313,6 @@ if __name__ == "__main__":
 
     query_prefetch = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'paid')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
     query_prefetch_watch = query_prefetch.on_snapshot(on_prefetch_snapshot)
-
-    finish_restart_after_boot()
-    command_watch = _command_ref().on_snapshot(on_command_snapshot)
 
     try:
         while True:
