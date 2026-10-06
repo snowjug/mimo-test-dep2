@@ -239,6 +239,15 @@ def convert_to_pdf(input_path):
         print(f"❌ Conversion failed: {e}")
         return None
 
+def _flatten_to_rgb(img):
+    """RGB copy of img with any transparency composited onto white, so transparent pixels print white."""
+    from PIL import Image
+    if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+        rgba = img.convert("RGBA")
+        white = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+        return Image.alpha_composite(white, rgba).convert("RGB")
+    return img.convert("RGB")
+
 def process_image_fill(input_path, photo_layout=None, is_color=False):
     try:
         from PIL import Image
@@ -246,7 +255,7 @@ def process_image_fill(input_path, photo_layout=None, is_color=False):
         
         with Image.open(input_path) as img:
             if img.mode != 'RGB':
-                img = img.convert('RGB')
+                img = _flatten_to_rgb(img)
                 
             original_w, original_h = img.size
             if original_w > original_h:
@@ -293,7 +302,7 @@ def process_image_custom(input_path, scale_pct, is_color=False):
         
         with Image.open(input_path) as img:
             if img.mode != 'RGB':
-                img = img.convert('RGB')
+                img = _flatten_to_rgb(img)
                 
             # A4 at target DPI
             canvas_w = int(8.27 * dpi)
@@ -335,13 +344,16 @@ def process_image_custom(input_path, scale_pct, is_color=False):
 
 def slice_pdf_pages(input_pdf, page_range):
     """Extract specific pages from a PDF using Ghostscript.
-    
-    Supports complex ranges like: '1-3,5,7-9'
+
+    Supports complex ranges like: '1-3,5,7-9'. Returns the sliced PDF path, or None on any failure
+    (unusable range, a page that cannot be extracted, invalid output, or wrong page count). The caller
+    must fail the job; the unsliced original is never substituted.
     """
+    output_pdf = os.path.splitext(input_pdf)[0] + f"_sliced_{int(time.time())}.pdf"
+    temp_pages = []
     try:
-        output_pdf = os.path.splitext(input_pdf)[0] + f"_sliced_{int(time.time())}.pdf"
         print(f"✂️  Slicing PDF pages [{page_range}] from {input_pdf}...")
-        
+
         # Parse the complex range into individual page numbers
         pages = []
         for part in str(page_range).split(","):
@@ -363,15 +375,14 @@ def slice_pdf_pages(input_pdf, page_range):
                     pages.append(int(part))
                 except ValueError:
                     continue
-        
+
         if not pages:
-            print("⚠️ No valid pages in range, returning original")
-            return input_pdf
-        
+            print("❌ Page range has no valid pages; cannot slice")
+            return None
+
         pages = sorted(set(pages))
-        
+
         # Extract each page individually and merge
-        temp_pages = []
         for page_num in pages:
             temp_page = os.path.join(TEMP_DIR, f"page_{page_num}_{int(time.time()*1000)}.pdf")
             cmd = [
@@ -381,34 +392,33 @@ def slice_pdf_pages(input_pdf, page_range):
                 f"-sOutputFile={temp_page}", input_pdf
             ]
             result = subprocess.run(cmd, capture_output=True, timeout=30)
-            if result.returncode == 0 and os.path.exists(temp_page):
-                temp_pages.append(temp_page)
-        
-        if not temp_pages:
-            print("⚠️ Ghostscript failed to extract any pages")
-            return input_pdf
-        
+            if result.returncode != 0 or not os.path.exists(temp_page):
+                print(f"❌ Ghostscript could not extract page {page_num}")
+                return None
+            temp_pages.append(temp_page)
+
         if len(temp_pages) == 1:
             os.rename(temp_pages[0], output_pdf)
         else:
             merge_cmd = ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
                         ] + GS_BW_COMPRESS + [f"-sOutputFile={output_pdf}"] + temp_pages
             subprocess.run(merge_cmd, check=True, timeout=60)
-            for tp in temp_pages:
-                try:
-                    os.remove(tp)
-                except:
-                    pass
-        
-        if os.path.exists(output_pdf):
-            print(f"✅ Sliced {len(pages)} pages successfully: {output_pdf}")
-            return output_pdf
-        else:
-            return input_pdf
-            
+
+        ok, sliced_pages, reason = validate_pdf_strict(output_pdf)
+        if not ok or sliced_pages != len(pages):
+            print(f"❌ Sliced PDF invalid or wrong page count: {reason} (pages={sliced_pages}, expected={len(pages)})")
+            _safe_remove(output_pdf)
+            return None
+        print(f"✅ Sliced {len(pages)} pages successfully: {output_pdf}")
+        return output_pdf
+
     except Exception as e:
         print(f"❌ Page slicing failed: {e}")
-        return input_pdf
+        _safe_remove(output_pdf)
+        return None
+    finally:
+        for tp in temp_pages:
+            _safe_remove(tp)
 
 def convert_image_to_pdf_fit(input_path, is_color=False):
     """Convert an image to PDF for 'fit' mode so CUPS number-up works reliably.
@@ -423,7 +433,7 @@ def convert_image_to_pdf_fit(input_path, is_color=False):
         pdf_path = os.path.splitext(input_path)[0] + "_fit.pdf"
         with Image.open(input_path) as img:
             if img.mode != 'RGB':
-                img = img.convert('RGB')
+                img = _flatten_to_rgb(img)
             # A4 dimensions at target DPI
             a4_portrait_w = int(8.27 * dpi)   # ~1240 @ 150dpi, ~2480 @ 300dpi
             a4_portrait_h = int(11.69 * dpi)  # ~1754 @ 150dpi, ~3508 @ 300dpi
@@ -1222,6 +1232,9 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
             sliced_paths = []
             for p in file_paths:
                 sliced = slice_pdf_pages(p, page_range)
+                if not sliced:
+                    print("❌ Page range could not be applied; not sending to CUPS")
+                    return False
                 sliced_paths.append(sliced)
             file_paths = sliced_paths
 
@@ -1697,11 +1710,13 @@ def process_job(doc_snapshot):
 
             if f_page_range and f_final.lower().endswith(".pdf"):
                 sliced = slice_pdf_pages(f_final, f_page_range)
-                if sliced:
-                    if sliced != f_final:
-                        artifact_paths.append(sliced)
-                    f_final = sliced
-                    any_file_sliced = True
+                if not sliced:
+                    report_print_failure(doc_ref, f"Could not apply the page range to {entry_name}")
+                    return
+                if sliced != f_final:
+                    artifact_paths.append(sliced)
+                f_final = sliced
+                any_file_sliced = True
 
             final_paths.append(f_final)
 
@@ -1771,38 +1786,43 @@ def process_job(doc_snapshot):
         # ── Duplex: duplicate single-page PDFs to enable 2-sided printing with multiple copies ──
         # Brother duplex requires at least 2 pages per copy to pair front/back correctly.
         if double_sided == "double":
-            total_pages = 0
-            try:
-                if len(final_paths) == 1:
-                    pi_info = subprocess.run(["pdfinfo", final_paths[0]], capture_output=True, text=True, timeout=10)
-                    for line in pi_info.stdout.split("\n"):
-                        if "Pages:" in line:
-                            total_pages = int(line.split(":")[1].strip())
-            except Exception as e:
-                print(f"⚠️ Failed to check pages for duplex: {e}")
+            if len(final_paths) != 1:
+                report_print_failure(doc_ref, "Duplex printing requires a single PDF")
+                return
+            pages_ok, total_pages, pages_reason = validate_pdf_strict(final_paths[0])
+            if not pages_ok:
+                report_print_failure(doc_ref, f"Could not determine the page count for duplex printing: {pages_reason}")
+                return
 
             if total_pages == 1:
                 # Single-page doc: duplicate 2x so each copy has page+back for 2-sided
                 print(f"📄 Duplex: Duplicating single-page PDF 2× to pair front/back...")
                 dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_duplex.pdf")
+                dup_ok = False
                 try:
                     subprocess.run(
                         ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
                         ] + (GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS) + [f"-sOutputFile={dup_pdf}"] + [final_paths[0]] * 2,
                         check=True, timeout=60
                     )
-                    if os.path.exists(dup_pdf):
-                        final_paths = [dup_pdf]
-                        # copies stays as-is -> CUPS sends N copies of the 2-page PDF = N duplex sheets
-                        print(f"✅ Duplex duplication done: {dup_pdf} (CUPS will send {copies} copies)")
+                    dup_valid, dup_pages, _dup_reason = validate_pdf_strict(dup_pdf)
+                    dup_ok = dup_valid and dup_pages == 2
                 except Exception as dup_err:
                     print(f"❌ Failed to duplicate for duplex: {dup_err}")
+                if not dup_ok:
+                    _safe_remove(dup_pdf)
+                    report_print_failure(doc_ref, "Could not prepare the duplex copy of the document")
+                    return
+                final_paths = [dup_pdf]
+                # copies stays as-is -> CUPS sends N copies of the 2-page PDF = N duplex sheets
+                print(f"✅ Duplex duplication done: {dup_pdf} (CUPS will send {copies} copies)")
             elif total_pages > 1 and copies > 1:
                 # Multi-page doc: lp -n <copies> handles it correctly
                 print(f"📄 Duplex multi-page ({total_pages} pages, {copies} copies) — sending as-is to CUPS.")
 
         # ── Color PDF Normalization ──
-        # Explicitly set MediaBox to exactly A4 (595x842) for Epson L3250
+        # Explicitly set MediaBox to exactly A4 (595x842) for Epson L3250.
+        # Fails closed: a failed or mismatched normalization stops the job; the original is never substituted.
         if is_color:
             normalized_paths = []
             for fp in final_paths:
@@ -1817,13 +1837,17 @@ def process_job(doc_snapshot):
                             ] + GS_COLOR_COMPRESS + [f"-sOutputFile={norm_pdf}", fp],
                             check=True, timeout=60
                         )
-                        if os.path.exists(norm_pdf):
-                            normalized_paths.append(norm_pdf)
-                        else:
-                            normalized_paths.append(fp)
+                        norm_ok, norm_pages, norm_reason = validate_pdf_strict(norm_pdf)
+                        src_ok, src_pages, _src_reason = validate_pdf_strict(fp)
+                        if not (norm_ok and src_ok and norm_pages == src_pages):
+                            print(f"❌ Normalized PDF invalid: {norm_reason} (pages={norm_pages}, expected={src_pages})")
+                            raise ValueError("normalized PDF invalid or page count mismatch")
                     except Exception as e:
-                        print(f"⚠️ Color normalization failed for {fp}: {e}")
-                        normalized_paths.append(fp)
+                        print(f"❌ Color normalization failed for {fp}: {e}")
+                        _safe_remove(norm_pdf)
+                        report_print_failure(doc_ref, "Color normalization failed")
+                        return
+                    normalized_paths.append(norm_pdf)
                 else:
                     normalized_paths.append(fp)
             final_paths = normalized_paths
