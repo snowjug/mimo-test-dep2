@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Loader2, PackagePlus, Check, AlertTriangle } from 'lucide-react';
 import api from '../../api';
 import { useRange } from '../../context/RangeContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useLiveQuery, errorMessage } from '../../hooks/useLiveQuery';
 import { insights } from '../../services/insights.service';
 import { DateRangePicker } from '../../components/ui/DateRangePicker';
@@ -11,8 +12,6 @@ import { describeRange } from '../../lib/dateRange';
 import { inr, int, timeAgo } from '../../lib/format';
 import { MachineBadge, PrintHistoryList } from '../../components/history/PrintHistory';
 import type { KioskLive, PrinterInfo } from '../../types/insights.types';
-
-const GREETING_NAME = 'Vishal sir';
 const RECENT_PRINTS = 6;
 // Tray to refill when the Pi has not reported any printer for this kiosk yet.
 const DEFAULT_TRAY: Record<string, string> = { 'CV-001': 'CV-001', 'SV-002': 'SV-002-BW' };
@@ -97,6 +96,7 @@ const PaperTray: React.FC<{ k: KioskLive; p: PrinterInfo | null; trayKey: string
 };
 
 export const OverviewPage: React.FC = () => {
+  const { isDark } = useTheme();
   const { range, setRange, current, live } = useRange();
   const analytics = useLiveQuery(() => insights.analytics(current(), false), [range], { live });
   const kiosks = useLiveQuery(() => insights.kiosks(current()), [range], { live: true, intervalMs: 20000 });
@@ -120,7 +120,7 @@ export const OverviewPage: React.FC = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Hello, {GREETING_NAME}
+            Hello, {isDark ? 'Ankit' : 'Vishal'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             Network revenue &amp; operational performance
