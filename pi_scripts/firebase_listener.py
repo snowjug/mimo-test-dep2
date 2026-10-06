@@ -937,7 +937,7 @@ def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=Non
             stalled = clock.time() - last_change
             if (count > count_before and stalled >= 25) or (count == count_before and stalled >= 60):
                 break
-        clock.sleep(2)
+        clock.sleep(1.0)
     if last is None:
         return "unknown", None
     printed = last - count_before
