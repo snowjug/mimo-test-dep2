@@ -454,7 +454,14 @@ def impose_nup(input_pdf, output_pdf, layout_num):
     Impose N-up pages onto an A4 canvas using Ghostscript + Pillow.
     Works on both Pi nodes (neither has PyPDF2 installed).
     GS rasterizes each PDF page → PNG; Pillow composites them onto A4 canvas.
+
+    Fails closed: an unknown source page count, any page that fails to rasterize, or an invalid/
+    incomplete output PDF all make this return False with no partial artifact left at output_pdf.
+    There is no fallback to a guessed page count and no partial page set is ever assembled.
     """
+    page_imgs = []
+    output_sheets = []
+    pending_img = None
     try:
         from PIL import Image
         import math
@@ -485,15 +492,11 @@ def impose_nup(input_pdf, output_pdf, layout_num):
         cell_w = canvas_w_px // cols
         cell_h = canvas_h_px // rows
 
-        # Get total page count via pdfinfo (or GS fallback)
-        total_pages = 1
-        try:
-            pi_res = subprocess.run(["pdfinfo", input_pdf], capture_output=True, text=True, timeout=10)
-            for line in pi_res.stdout.split("\n"):
-                if "Pages:" in line:
-                    total_pages = int(line.split(":")[1].strip())
-        except Exception:
-            pass
+        # Source page count must be known before anything else — no guessing on pdfinfo failure.
+        pages_ok, total_pages, pages_reason = validate_pdf_strict(input_pdf)
+        if not pages_ok:
+            print(f"❌ impose_nup: cannot determine source page count: {pages_reason}")
+            return False
         print(f"📄 impose_nup: {total_pages} source pages → {n}-up layout ({cols}×{rows})")
 
         # Rasterize each PDF page to a temp PNG at 150 DPI (fast, good quality)
@@ -504,12 +507,12 @@ def impose_nup(input_pdf, output_pdf, layout_num):
         canvas_w_s = int(canvas_w_px * scale_factor)
         canvas_h_s = int(canvas_h_px * scale_factor)
 
-        page_imgs = []
         # If single-page source, replicate it n times (e.g. photo printing)
         pages_to_render = list(range(1, total_pages + 1)) if total_pages > 1 else [1] * n
         
         for pg in pages_to_render:
             tmp_img = os.path.join(TEMP_DIR, f"_nup_pg{pg}_{int(time.time()*1000)}.png")
+            pending_img = tmp_img  # cleaned in finally if Ghostscript fails before it is collected
             gs_cmd = [
                 "gs", "-dNOPAUSE", "-dBATCH", "-q",
                 "-sDEVICE=png16m", f"-r{DPI}",
@@ -519,15 +522,17 @@ def impose_nup(input_pdf, output_pdf, layout_num):
             result = subprocess.run(gs_cmd, capture_output=True, timeout=30)
             if result.returncode == 0 and os.path.exists(tmp_img):
                 page_imgs.append(tmp_img)
+                pending_img = None
             else:
-                print(f"⚠️ GS rasterize failed for page {pg}: {result.stderr.decode()[:100]}")
+                print(f"❌ impose_nup: GS rasterize failed for page {pg}: {result.stderr.decode()[:100]}")
+                return False  # fail closed: never assemble output from a partial page set
 
-        if not page_imgs:
-            print("❌ impose_nup: no pages could be rasterized")
+        # Defensive completeness invariant: every expected source page must have rasterized.
+        if len(page_imgs) != len(pages_to_render):
+            print(f"❌ impose_nup: rasterized {len(page_imgs)} of {len(pages_to_render)} expected pages")
             return False
 
         # Build output PDF — one canvas sheet per N pages
-        output_sheets = []
         idx = 0
         while idx < len(page_imgs):
             canvas_img = Image.new("RGB", (canvas_w_s, canvas_h_s), (255, 255, 255))
@@ -566,7 +571,8 @@ def impose_nup(input_pdf, output_pdf, layout_num):
             output_sheets.append(sheet_path)
 
         # Merge all sheets into final output PDF
-        if len(output_sheets) == 1:
+        expected_sheets = len(output_sheets)
+        if expected_sheets == 1:
             os.rename(output_sheets[0], output_pdf)
         else:
             merge_cmd = [
@@ -574,25 +580,28 @@ def impose_nup(input_pdf, output_pdf, layout_num):
                 "-sDEVICE=pdfwrite"
             ] + GS_BW_COMPRESS + [f"-sOutputFile={output_pdf}"] + output_sheets
             subprocess.run(merge_cmd, check=True, timeout=120)
-            for s in output_sheets:
-                try:
-                    os.remove(s)
-                except Exception:
-                    pass
 
-        # Clean up temp page images
-        for p in page_imgs:
-            try:
-                os.remove(p)
-            except Exception:
-                pass
+        # The output artifact must be a strictly valid PDF with exactly the expected sheet count
+        # before it is accepted — a partial/corrupt N-up PDF never proceeds to the next stage.
+        out_ok, out_pages, out_reason = validate_pdf_strict(output_pdf)
+        if not out_ok or out_pages != expected_sheets:
+            print(f"❌ impose_nup: output validation failed ({out_reason}, pages={out_pages}, expected={expected_sheets})")
+            _safe_remove(output_pdf)
+            return False
 
-        print(f"✅ impose_nup: successfully created {len(output_sheets)}-sheet {n}-up PDF → {output_pdf}")
+        print(f"✅ impose_nup: successfully created {expected_sheets}-sheet {n}-up PDF → {output_pdf}")
         return True
 
     except Exception as e:
         print(f"❌ impose_nup (GS+Pillow) failed: {e}")
+        _safe_remove(output_pdf)
         return False
+    finally:
+        _safe_remove(pending_img)
+        for p in page_imgs:
+            _safe_remove(p)
+        for s in output_sheets:
+            _safe_remove(s)  # no-op for the one renamed into output_pdf on success
 
 def fast_compress_pdf(input_pdf, is_color=False, size_threshold_kb=512):
     """
@@ -1730,6 +1739,9 @@ def process_job(doc_snapshot):
             pdf_paths = [merged_pdf]
 
         # ── N-up layout imposition ──
+        # Fails closed: if the custom N-up transformation fails, the job fails here. It never falls
+        # back to CUPS `number-up`, which is a different rendering path and not guaranteed to be
+        # semantically identical to the requested layout.
         was_imposed = False
         if photo_layout and str(photo_layout) in ["2", "4", "6", "9"]:
             print(f"🖼️ N-up: generating {photo_layout}-per-page layout...")
@@ -1741,47 +1753,13 @@ def process_job(doc_snapshot):
 
             imposed_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_imposed_layout.pdf")
 
-            try:
-                success_nup = impose_nup(merged_pdf, imposed_pdf, photo_layout)
-                if success_nup and os.path.exists(imposed_pdf):
-                    final_paths = [imposed_pdf]
-                    photo_layout = None  # Cleared — CUPS must NOT impose again
-                    was_imposed = True
-                    print(f"✅ N-up imposition succeeded: {imposed_pdf}")
-                else:
-                    raise Exception("impose_nup returned False")
-            except Exception as jam_err:
-                print(f"⚠️ N-up imposition failed, falling back to CUPS number-up: {jam_err}")
-                try:
-                    layout_num = int(photo_layout)
-                    total_p = 1
-                    try:
-                        p_info = subprocess.run(["pdfinfo", merged_pdf], capture_output=True, text=True)
-                        for line in p_info.stdout.split('\n'):
-                            if "Pages:" in line:
-                                try:
-                                    total_p = int(line.split(":")[1].strip())
-                                except:
-                                    pass
-                    except Exception as pdfinfo_err:
-                        print(f"⚠️ pdfinfo failed ({pdfinfo_err}), assuming 1 page.")
-
-                    if total_p == 1:
-                        dup_pdf = os.path.join(TEMP_DIR, f"{int(time.time())}_dup_layout.pdf")
-                        subprocess.run(
-                            ["gs", "-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"
-                            ] + (GS_COLOR_COMPRESS if is_color else GS_BW_COMPRESS) + [f"-sOutputFile={dup_pdf}"] + [merged_pdf] * layout_num,
-                            check=True
-                        )
-                        final_paths = [dup_pdf]
-                    else:
-                        final_paths = [merged_pdf]
-                    # Keep photo_layout set so CUPS uses number-up
-                    was_imposed = True  # Prevent pdf_paths override below
-                    print(f"✅ N-up fallback prepared (CUPS number-up will be used)")
-                except Exception as fallback_err:
-                    print(f"❌ N-up fallback failed: {fallback_err}")
-                    raise Exception("Layout generation failed entirely.")
+            if not impose_nup(merged_pdf, imposed_pdf, photo_layout):
+                report_print_failure(doc_ref, f"N-up layout generation failed for {photo_layout}-per-page layout")
+                return
+            final_paths = [imposed_pdf]
+            photo_layout = None  # Cleared — CUPS must NOT impose again
+            was_imposed = True
+            print(f"✅ N-up imposition succeeded: {imposed_pdf}")
 
         # ── Ensure final_paths is in sync with pdf_paths only if N-up was NOT applied ──
         # was_imposed prevents the bug where photo_layout=None (cleared on success) causes
