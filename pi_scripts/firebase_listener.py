@@ -712,6 +712,19 @@ print(f'Merged {{len(images)}} image(s) into PDF: {rasterized_pdf}')
     return pdf_path
 
 
+LPSTAT_TIMEOUT_SEC = 8
+
+
+def _lpstat_p(printer_name):
+    """lpstat -p can be slow while CUPS is busy. One slow answer used to be reported as a printer error and refunded
+    the customer, so a timeout is retried once before it counts as a failure."""
+    try:
+        return subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=LPSTAT_TIMEOUT_SEC)
+    except subprocess.TimeoutExpired:
+        print(f"⚠️ lpstat -p {printer_name} was slow (>{LPSTAT_TIMEOUT_SEC}s); retrying once")
+        return subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=LPSTAT_TIMEOUT_SEC)
+
+
 def is_printer_online(printer_name):
     """Check if the CUPS printer queue is enabled, accepting jobs, physically connected via USB/network, and free of hardware errors (out-of-paper, jam, door-open)."""
     usb_id = PRINTER_USB_IDS.get(printer_name)
@@ -733,7 +746,7 @@ def is_printer_online(printer_name):
     try:
         # Check lpstat -p (without -l) for LIVE printer status & active hardware error states.
         # Note: Do NOT use -l because lpstat -l -p prints static PPD capability strings like 'Alerts: media-empty-error'.
-        res_p = subprocess.run(["lpstat", "-p", printer_name], capture_output=True, text=True, timeout=3)
+        res_p = _lpstat_p(printer_name)
         p_out = res_p.stdout.lower()
 
         # Parse live error states from lpstat -p output
