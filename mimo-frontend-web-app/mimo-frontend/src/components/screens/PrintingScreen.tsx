@@ -120,28 +120,20 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     tickTimerRef.current = null;
     stallTimerRef.current = null;
 
-    // Smooth final transition: 98% (or current) → 99% → 100%
-    const currentProgress = progressRef.current;
-    if (currentProgress < 99) {
-      progressRef.current = 99;
-      setProgress(99);
-    }
+    // Immediate 100% completion upon hardware verification confirmation
+    progressRef.current = 100;
+    setProgress(100);
+    setStatusMsg('Print Completed ✅');
 
-    window.setTimeout(() => {
-      progressRef.current = 100;
-      setProgress(100);
-      setStatusMsg('Print Completed ✅');
-
-      // Hold for 1.0 second before transitioning to summary screen
-      completionTimerRef.current = window.setTimeout(() => {
-        onComplete();
-      }, 1000);
-    }, 90);
+    // 400ms celebration hold before transitioning to summary screen
+    completionTimerRef.current = window.setTimeout(() => {
+      onComplete();
+    }, 400);
   }, [onComplete]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
-  const schedulePoll = useCallback((delayMs = 250) => {
+  const schedulePoll = useCallback((delayMs = 200) => {
     if (!printCode || printCode === '0000' || !isActive) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
@@ -183,37 +175,44 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           const total = Number(data.totalSheets) || Math.max(1, fallbackSheets);
           const completed = Number(data.sheetsCompleted) || 0;
 
+          // Velocity-matched smooth progress: approaches but never exceeds 98%
+          const isColor = colorMode === 'color';
+          const expectedSec = (isColor ? 15 + total * 8 : 12 + total * 2.0);
+          const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
+          const timePercent = Math.min(98, Math.round((elapsedSec / expectedSec) * 98));
+
+          let targetPercent = timePercent;
+          if (completed > 0) {
+            const hardwarePercent = Math.min(95, Math.round((completed / total) * 95));
+            targetPercent = Math.max(targetPercent, hardwarePercent);
+          }
+          targetPercent = Math.min(98, Math.max(progressRef.current, targetPercent));
+
+          progressRef.current = targetPercent;
+          setProgress(targetPercent);
+
           if (total === 1) {
-            // Single-sheet job: keep progress at 0% until hardware verification confirms completion
-            progressRef.current = 0;
-            setProgress(0);
-            setStatusMsg('Printing document…');
+            setStatusMsg(targetPercent < 20 ? 'Warming up printer…' : 'Printing document…');
           } else {
-            // Multi-sheet job: advances ONLY when hardware confirms completed sheets, capped below 100%
-            if (completed === 0) {
-              progressRef.current = 0;
-              setProgress(0);
-              setStatusMsg('Warming up printer…');
-            } else {
-              const sheetPercent = Math.min(95, Math.round((completed / total) * 95));
-              const targetPercent = Math.max(progressRef.current, sheetPercent);
-              progressRef.current = targetPercent;
-              setProgress(targetPercent);
+            if (completed > 0) {
               setStatusMsg(`Printing sheet ${completed} of ${total}…`);
+            } else {
+              const estSheet = Math.min(total, Math.max(1, Math.ceil((targetPercent / 98) * total)));
+              setStatusMsg(targetPercent < 15 ? 'Warming up printer…' : `Printing sheet ${estSheet} of ${total}…`);
             }
           }
 
-          schedulePoll(300);
+          schedulePoll(200);
         } else {
           // Status 'paid' or waiting for start
           setStatusMsg('Warming up printer…');
-          schedulePoll(400);
+          schedulePoll(300);
         }
       } catch {
         window.clearTimeout(timeoutId);
         // Network hiccup — retry in 2 s without failing immediately if transient
         if (isActive && !isCompletingRef.current) {
-          pollTimerRef.current = window.setTimeout(() => schedulePoll(250), 2000);
+          pollTimerRef.current = window.setTimeout(() => schedulePoll(200), 2000);
         }
       }
     }, delayMs);
