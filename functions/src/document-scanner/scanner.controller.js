@@ -317,7 +317,9 @@ const postFinalizeSession = async (req, res) => {
       err.message.includes("not available") ||
       err.message.includes("no uploaded pages") ||
       err.message.includes("metadata") ||
-      err.message.includes("unsupported")
+      err.message.includes("unsupported") ||
+      err.message.includes("500 KB") ||
+      err.message.includes("exceeds maximum allowed size")
     ) {
       return res.status(400).json({ error: err.message });
     }

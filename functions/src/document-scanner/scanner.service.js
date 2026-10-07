@@ -475,6 +475,11 @@ async function finalizeScannerSession(userId, sessionId) {
   const pdfBuffer = Buffer.from(pdfBytes);
   const pageCount = pdfDoc.getPageCount();
 
+  const MAX_PDF_SIZE_BYTES = 500 * 1024; // 500 KB hard limit
+  if (pdfBuffer.length > MAX_PDF_SIZE_BYTES) {
+    throw new Error(`Scanned document PDF size (${(pdfBuffer.length / 1024).toFixed(1)} KB) exceeds maximum allowed size of 500 KB`);
+  }
+
   const finalPdfStoragePath = `scanner/${sessionId}/scanned_document.pdf`;
   const finalPdfFile = bucket.file(finalPdfStoragePath);
 
