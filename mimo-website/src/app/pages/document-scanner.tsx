@@ -1,35 +1,38 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { MimoHeader } from "../components/mimo-header";
 import {
-  ArrowLeft,
+  ActionBar,
+  ActionBarSpacer,
+  AppBar,
+  EmptyState,
+  Group,
+  PrimaryButton,
+  Row,
+  Screen,
+  SecondaryButton,
+  Segmented,
+  StatusPill,
+  TextButton,
+} from "../components/mimo/ui";
+import {
   Camera,
   Upload,
   Trash2,
   AlertCircle,
   RefreshCw,
-  Eye,
-  FileText,
   Sparkles,
-  Layers,
   X,
   RotateCw,
   RotateCcw,
   Check,
   Undo,
   Sliders,
-  Sun,
-  Contrast,
-  Image as ImageIcon,
-  ArrowRight,
   Printer,
   Loader2,
-  CheckCircle2,
-  Maximize2,
   Scan,
+  Plus,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
@@ -814,7 +817,10 @@ export function DocumentScanner() {
       const finalizeRes = await api.post(`/scanner/sessions/${targetSid}/finalize`);
       const { jobId, pageCount, fileName } = finalizeRes.data;
 
-      // Store in sessionStorage for print options flow
+      // Start a fresh checkout, same hand-off as the upload screen
+      ["printCode", "printOptions", "printStatus", "uploadedImages", "totalPages"].forEach((k) =>
+        sessionStorage.removeItem(k)
+      );
       sessionStorage.setItem(
         "printFiles",
         JSON.stringify([
@@ -828,6 +834,7 @@ export function DocumentScanner() {
         ])
       );
       sessionStorage.setItem("uploadTotalPages", String(pageCount || pages.length));
+      sessionStorage.setItem("uploadAmount", String((pageCount || pages.length) * 2));
 
       toast.success("Document compiled into ready-to-print PDF!");
       navigate("/print-options");
@@ -841,808 +848,446 @@ export function DocumentScanner() {
     }
   };
 
+  const filterLabel = (f: EnhancementMode) =>
+    f === "bw" ? "Black & white" : f === "enhanced" ? "Enhanced" : f === "grayscale" ? "Grayscale" : "Original colour";
+
+  const iconBtn =
+    "press flex size-9 items-center justify-center rounded-full text-ink-2 transition-colors active:bg-surface-3 disabled:opacity-30";
+
+  const cornerKeys: (keyof DocumentCorners)[] = ["topLeft", "topRight", "bottomRight", "bottomLeft"];
+
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-50/50 px-2 pt-0 pb-4 sm:px-4 sm:pt-0 sm:pb-6">
-      <div className="mx-auto max-w-5xl space-y-3 sm:space-y-4">
-        {/* Global font import */}
-        <style>
-          {`
-            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
-          `}
-        </style>
+    <>
+      <AppBar
+        title="Scan a document"
+        backTo="/upload"
+        trailing={
+          pages.length > 0 ? (
+            <StatusPill tone="brand">
+              {pages.length} {pages.length === 1 ? "page" : "pages"}
+            </StatusPill>
+          ) : undefined
+        }
+      />
 
-        {/* MIMO Global Header */}
-        <MimoHeader />
+      <Screen>
+        {/* Camera viewport with live corner detection */}
+        <div className="relative mt-2 aspect-[4/3] w-full overflow-hidden rounded-[20px] bg-black">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`h-full w-full object-cover transition-opacity duration-300 ${
+              cameraError || isCameraLoading ? "opacity-0" : "opacity-100"
+            }`}
+          />
 
-        {/* Header Bar */}
-        <div className="flex items-center justify-between py-1">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate("/")}
-              className="text-[#093765] hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center p-1.5 rounded-xl hover:bg-slate-200/50 -ml-1"
-              aria-label="Back to dashboard"
-            >
-              <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
-            </button>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#093765] to-blue-600 bg-clip-text text-transparent tracking-tight leading-tight flex items-center gap-2">
-                Document Scanner
-                {isOpenCvReady && (
-                  <span className="hidden sm:inline-flex text-[10px] uppercase tracking-wider font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-300">
-                    AI Auto-Crop
-                  </span>
-                )}
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                Auto-detects paper, rectifies perspective &amp; enhances text for printing
-              </p>
-            </div>
-          </div>
+          {/* Hidden canvas for full-frame capture */}
+          <canvas ref={canvasRef} className="hidden" />
 
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className="px-3 py-1 bg-white border-blue-200 text-[#093765] font-bold text-xs sm:text-sm shadow-2xs flex items-center gap-1.5"
-            >
-              <Layers className="w-3.5 h-3.5 text-blue-600" />
-              {pages.length} {pages.length === 1 ? "Page" : "Pages"}
-            </Badge>
-
-            {pages.length > 0 && (
-              <Button
-                type="button"
-                onClick={handleFinalizeAndProceed}
-                disabled={isFinalizing}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 rounded-xl shadow-md cursor-pointer transition-all active:scale-95"
-              >
-                {isFinalizing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                    Compiling...
-                  </>
-                ) : (
-                  <>
-                    <Printer className="w-4 h-4 mr-1.5" />
-                    Compile &amp; Print
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Main Scanner Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-          {/* Left Column: Camera Viewport with Live Corner Detection Overlay */}
-          <div className="lg:col-span-7 space-y-3">
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-xl overflow-hidden">
-              <CardContent className="p-3 sm:p-4 space-y-3">
-                {/* Camera Viewport Box */}
-                <div className="relative aspect-[4/3] w-full bg-slate-950 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center border border-slate-800">
-                  {/* Active Video Stream */}
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className={`w-full h-full object-cover transition-opacity duration-300 ${
-                      cameraError || isCameraLoading ? "opacity-0" : "opacity-100"
-                    }`}
-                  />
-
-                  {/* Hidden Canvas for Full Frame Capture */}
-                  <canvas ref={canvasRef} className="hidden" />
-
-                  {/* Shutter Flash Animation */}
-                  <div
-                    className={`absolute inset-0 bg-white pointer-events-none z-30 transition-opacity duration-200 ${
-                      isShutterFlashing ? "opacity-90" : "opacity-0"
-                    }`}
-                  />
-
-                  {/* Dynamic SVG Live Corner Detection Overlay */}
-                  {!cameraError && !isCameraLoading && (
-                    <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
-                      <svg
-                        className="w-full h-full"
-                        viewBox="0 0 100 100"
-                        preserveAspectRatio="none"
-                      >
-                        {/* 4-Corner Polygon */}
-                        <polygon
-                          points={`${detectedCorners.topLeft.x * 100},${detectedCorners.topLeft.y * 100} ${detectedCorners.topRight.x * 100},${detectedCorners.topRight.y * 100} ${detectedCorners.bottomRight.x * 100},${detectedCorners.bottomRight.y * 100} ${detectedCorners.bottomLeft.x * 100},${detectedCorners.bottomLeft.y * 100}`}
-                          className={`transition-all duration-100 ${
-                            isDocDetected
-                              ? "fill-emerald-500/20 stroke-emerald-400 stroke-[1.2]"
-                              : "fill-blue-500/10 stroke-white/60 stroke-[1] stroke-dasharray-[2,2]"
-                          }`}
-                        />
-
-                        {/* 4 Corner Pins */}
-                        {isDocDetected && (
-                          <>
-                            <circle
-                              cx={detectedCorners.topLeft.x * 100}
-                              cy={detectedCorners.topLeft.y * 100}
-                              r="2.2"
-                              className="fill-white stroke-emerald-500 stroke-[0.8]"
-                            />
-                            <circle
-                              cx={detectedCorners.topRight.x * 100}
-                              cy={detectedCorners.topRight.y * 100}
-                              r="2.2"
-                              className="fill-white stroke-emerald-500 stroke-[0.8]"
-                            />
-                            <circle
-                              cx={detectedCorners.bottomRight.x * 100}
-                              cy={detectedCorners.bottomRight.y * 100}
-                              r="2.2"
-                              className="fill-white stroke-emerald-500 stroke-[0.8]"
-                            />
-                            <circle
-                              cx={detectedCorners.bottomLeft.x * 100}
-                              cy={detectedCorners.bottomLeft.y * 100}
-                              r="2.2"
-                              className="fill-white stroke-emerald-500 stroke-[0.8]"
-                            />
-                          </>
-                        )}
-                      </svg>
-
-                      {/* Header Badge Overlay */}
-                      <div className="absolute top-3 inset-x-3 flex justify-between items-center z-30">
-                        <div
-                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold backdrop-blur-md transition-all shadow-md ${
-                            !isAutoCaptureEnabled
-                              ? "bg-slate-900/80 text-slate-200 border border-slate-700"
-                              : autoCaptureStatus === "steady"
-                              ? "bg-emerald-600/90 text-white border border-emerald-400 shadow-emerald-500/30 scale-105"
-                              : autoCaptureStatus === "detected"
-                              ? "bg-amber-600/90 text-white border border-amber-400 shadow-amber-500/30"
-                              : autoCaptureStatus === "cooldown"
-                              ? "bg-blue-600/80 text-white border border-blue-400"
-                              : "bg-black/60 text-white/90 border border-white/20"
-                          }`}
-                        >
-                          {isAutoCaptureEnabled ? (
-                            <>
-                              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-                              <span>{autoCaptureMessage}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Camera className="w-3.5 h-3.5 text-blue-400" />
-                              <span>Manual Mode: Tap Capture</span>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Progress Indicator */}
-                        {isAutoCaptureEnabled && autoCaptureStatus === "steady" && (
-                          <div className="flex items-center gap-1.5 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full text-emerald-400 font-mono text-[10px] sm:text-xs font-bold border border-emerald-500/40">
-                            <span>{Math.round(autoCaptureProgress * 100)}%</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Bottom Status Bar */}
-                      <div className="absolute bottom-3 left-3 flex items-center gap-2">
-                        <span className="text-[10px] sm:text-xs font-mono text-white/80 bg-black/60 px-2.5 py-1 rounded-lg backdrop-blur-xs">
-                          {isDocDetected ? "Document Locked" : "Searching for Document..."}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Loading State */}
-                  {isCameraLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 text-white gap-3 p-4">
-                      <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
-                      <p className="text-sm font-medium text-slate-200">Initializing camera &amp; CV engine...</p>
-                    </div>
-                  )}
-
-                  {/* Error State */}
-                  {cameraError && !isCameraLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center space-y-4">
-                      <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-                        <AlertCircle className="w-6 h-6" />
-                      </div>
-                      <div className="max-w-xs space-y-1">
-                        <p className="font-bold text-sm sm:text-base text-slate-100">Camera Unavailable</p>
-                        <p className="text-xs text-slate-400">{cameraError}</p>
-                      </div>
-                      <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={startCamera}
-                          className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs cursor-pointer"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                          Retry Camera
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="bg-blue-600 hover:bg-blue-500 text-white text-xs cursor-pointer"
-                        >
-                          <Upload className="w-3.5 h-3.5 mr-1.5" />
-                          Choose Photos
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Mode Toggle & Shutter Actions */}
-                <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsAutoCaptureEnabled((v) => !v)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-2xs ${
-                        isAutoCaptureEnabled
-                          ? "bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100"
-                          : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
-                      }`}
-                    >
-                      <Sparkles className={`w-3.5 h-3.5 ${isAutoCaptureEnabled ? "text-amber-600" : "text-slate-400"}`} />
-                      <span>Auto Capture: {isAutoCaptureEnabled ? "ON" : "OFF"}</span>
-                    </button>
-                  </div>
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    {isDocDetected ? "Document in focus" : "Point camera at document"}
-                  </span>
-                </div>
-
-                {/* Shutter Bar & WhatsApp-Style Controls */}
-                {pages.length > 0 && isCaptureLocked ? (
-                  <div className="space-y-2 pt-1 px-1">
-                    <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-10 bg-slate-900 rounded-md overflow-hidden border border-emerald-400 shrink-0 shadow-2xs">
-                          <img src={pages[pages.length - 1].dataUrl} alt="Last scan" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-xs font-bold text-emerald-900">Page {pages.length} Captured</p>
-                          <p className="text-[10px] text-emerald-700">Auto-capture locked for this page</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleRetakeCurrentPage}
-                          className="h-8 text-xs font-bold border-amber-300 text-amber-800 hover:bg-amber-100 bg-white cursor-pointer"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                          Retake
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleStartEdit(pages[pages.length - 1])}
-                          className="h-8 text-xs font-bold border-blue-300 text-blue-800 hover:bg-blue-100 bg-white cursor-pointer"
-                        >
-                          <Sliders className="w-3.5 h-3.5 mr-1" />
-                          Pins
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex-1 rounded-xl border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs sm:text-sm h-11 cursor-pointer"
-                      >
-                        <Upload className="w-4 h-4 mr-1.5 text-blue-600" />
-                        Import
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleAddNewPage}
-                        className="flex-[2] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm h-11 shadow-md cursor-pointer active:scale-[0.98]"
-                      >
-                        <Sparkles className="w-4 h-4 mr-1.5" />
-                        + Add Next Page (Page {pages.length + 1})
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-3 pt-1 px-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex-1 rounded-xl border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs sm:text-sm h-11 cursor-pointer transition-all shadow-2xs"
-                    >
-                      <Upload className="w-4 h-4 mr-1.5 text-blue-600" />
-                      Import Photo
-                    </Button>
-
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-
-                    <Button
-                      type="button"
-                      disabled={!!cameraError || isCameraLoading}
-                      onClick={() => handleCapture({ isAuto: false })}
-                      className="flex-[1.5] rounded-xl bg-gradient-to-r from-[#093765] via-blue-700 to-blue-600 hover:from-[#072d54] hover:to-blue-700 text-white font-extrabold text-sm sm:text-base h-11 cursor-pointer transition-all shadow-md active:scale-[0.98] disabled:opacity-50"
-                    >
-                      <Camera className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                      {pages.length > 0 ? `Scan Page ${pages.length + 1}` : "Scan Document"}
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column: Scanned Pages Gallery & Order Controls */}
-          <div className="lg:col-span-5 space-y-3">
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-xl">
-              <CardContent className="p-3 sm:p-4 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-[#093765]" />
-                    <h2 className="font-extrabold text-sm sm:text-base text-slate-800">
-                      Scanned Pages ({pages.length})
-                    </h2>
-                  </div>
-
-                  {pages.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClearAll}
-                      className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer p-1 rounded-md hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Clear All
-                    </button>
-                  )}
-                </div>
-
-                {/* Empty State */}
-                {pages.length === 0 ? (
-                  <div className="py-12 px-4 text-center space-y-3 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                    <div className="w-12 h-12 mx-auto rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
-                      <Scan className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1 max-w-xs mx-auto">
-                      <p className="font-bold text-xs sm:text-sm text-slate-700">No pages scanned yet</p>
-                      <p className="text-[11px] sm:text-xs text-slate-400">
-                        Point camera at physical paper to auto-capture, or import photos from your device
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  /* Pages Thumbnails List */
-                  <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
-                    {pages.map((page, index) => (
-                      <div
-                        key={page.id}
-                        className="group relative flex items-center justify-between p-2 sm:p-2.5 bg-slate-50/80 hover:bg-blue-50/50 border border-slate-200/80 rounded-xl transition-all shadow-2xs"
-                      >
-                        <div
-                          className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-                          onClick={() => setSelectedPreview(page)}
-                        >
-                          <div className="relative w-12 h-16 sm:w-14 sm:h-18 bg-slate-900 rounded-lg overflow-hidden border border-slate-200 shrink-0 shadow-2xs">
-                            <img
-                              src={page.dataUrl}
-                              alt={`Page ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute top-1 left-1 bg-black/70 text-white font-mono text-[9px] px-1.5 py-0.5 rounded-sm font-bold">
-                              {index + 1}
-                            </div>
-                            {page.isUploading && (
-                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <Loader2 className="w-4 h-4 text-white animate-spin" />
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">
-                              Page {index + 1}
-                            </p>
-                            <p className="text-[10px] text-slate-400">
-                              {page.filter === "bw"
-                                ? "B&W Document"
-                                : page.filter === "enhanced"
-                                ? "Enhanced Magic"
-                                : page.filter === "grayscale"
-                                ? "Grayscale"
-                                : "Original Color"}
-                            </p>
-                            <span className="inline-block mt-0.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                              Rectified A4
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Page Actions: Reorder, Edit, Delete */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          {/* Reorder Up/Left */}
-                          {index > 0 && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleMovePage(index, "left", e)}
-                              className="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-white transition-colors cursor-pointer"
-                              title="Move up"
-                            >
-                              <ArrowLeft className="w-3.5 h-3.5 rotate-90" />
-                            </button>
-                          )}
-
-                          {/* Reorder Down/Right */}
-                          {index < pages.length - 1 && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleMovePage(index, "right", e)}
-                              className="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-white transition-colors cursor-pointer"
-                              title="Move down"
-                            >
-                              <ArrowLeft className="w-3.5 h-3.5 -rotate-90" />
-                            </button>
-                          )}
-
-                          {/* Edit 4-Corners & Filters */}
-                          <button
-                            type="button"
-                            onClick={(e) => handleStartEdit(page, e)}
-                            className="p-1.5 text-blue-600 hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
-                            title="Edit corners & filters"
-                          >
-                            <Sliders className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* Delete */}
-                          <button
-                            type="button"
-                            onClick={(e) => handleRemovePage(page.id, e)}
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            title="Delete page"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Finalize Button */}
-                {pages.length > 0 && (
-                  <Button
-                    type="button"
-                    onClick={handleFinalizeAndProceed}
-                    disabled={isFinalizing}
-                    className="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm h-11 rounded-xl shadow-lg cursor-pointer transition-all active:scale-[0.99]"
-                  >
-                    {isFinalizing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Compiling Document into PDF...
-                      </>
-                    ) : (
-                      <>
-                        <Printer className="w-4 h-4 mr-2" />
-                        Compile {pages.length} {pages.length === 1 ? "Page" : "Pages"} &amp; Print
-                      </>
-                    )}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* ================= MODAL 1: PREVIEW FULL IMAGE ================= */}
-        {selectedPreview && (
+          {/* Shutter flash */}
           <div
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6"
-            onClick={() => setSelectedPreview(null)}
-          >
-            <div
-              className="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl space-y-3 p-4 animate-in fade-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <h3 className="font-extrabold text-sm sm:text-base text-slate-800">
-                  {selectedPreview.name || "Scanned Document Preview"}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPreview(null)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+            className={`pointer-events-none absolute inset-0 z-30 bg-white transition-opacity duration-200 ${
+              isShutterFlashing ? "opacity-90" : "opacity-0"
+            }`}
+          />
 
-              <div className="max-h-[70vh] overflow-auto flex items-center justify-center bg-slate-900 rounded-xl p-2">
-                <img
-                  src={selectedPreview.dataUrl}
-                  alt="Scanned page full view"
-                  className="max-h-[65vh] object-contain rounded shadow-lg"
+          {!cameraError && !isCameraLoading && (
+            <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+              <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polygon
+                  points={cornerKeys.map((k) => `${detectedCorners[k].x * 100},${detectedCorners[k].y * 100}`).join(" ")}
+                  className={`transition-all duration-100 ${
+                    isDocDetected
+                      ? "fill-emerald-500/20 stroke-emerald-400 stroke-[1.2]"
+                      : "fill-white/5 stroke-white/60 stroke-[1]"
+                  }`}
                 />
-              </div>
+                {isDocDetected &&
+                  cornerKeys.map((k) => (
+                    <circle
+                      key={k}
+                      cx={detectedCorners[k].x * 100}
+                      cy={detectedCorners[k].y * 100}
+                      r="2.2"
+                      className="fill-white stroke-emerald-500 stroke-[0.8]"
+                    />
+                  ))}
+              </svg>
 
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const target = selectedPreview;
-                    setSelectedPreview(null);
-                    handleStartEdit(target);
-                  }}
-                  className="text-xs font-bold cursor-pointer"
-                >
-                  <Sliders className="w-3.5 h-3.5 mr-1.5" />
-                  Adjust Corners &amp; Filters
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setSelectedPreview(null)}
-                  className="bg-[#093765] hover:bg-blue-700 text-white text-xs font-bold cursor-pointer"
-                >
-                  Done
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================= MODAL 2: INTERACTIVE 4-CORNER PIN & ENHANCEMENT EDIT MODAL ================= */}
-        {editingPage && (
-          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-            <div className="relative max-w-3xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl p-3 sm:p-5 space-y-3 my-auto animate-in fade-in zoom-in-95 duration-200">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Sliders className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-extrabold text-sm sm:text-base text-slate-800">
-                    Adjust 4 Document Corners &amp; Filters
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditingPage(null)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Instruction banner */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-2 sm:p-2.5 flex items-center justify-between text-xs text-blue-800">
-                <span className="font-medium">
-                  Drag the 4 corner circles to align precisely with the paper edges.
-                </span>
-                <button
-                  type="button"
-                  onClick={handleAutoDetectCorners}
-                  className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg text-blue-700 font-bold hover:bg-blue-100 text-[11px] cursor-pointer shrink-0 ml-2"
-                >
-                  <Sparkles className="w-3 h-3 inline mr-1 text-amber-500" />
-                  Auto-Detect
-                </button>
-              </div>
-
-              {/* Interactive 4-Corner Viewport */}
-              <div
-                ref={editContainerRef}
-                className="relative aspect-[4/3] w-full max-h-[50vh] bg-slate-950 rounded-xl overflow-hidden shadow-inner flex items-center justify-center select-none"
-              >
-                {/* Full Uncropped Source Frame */}
-                <img
-                  src={editingPage.originalDataUrl || editingPage.dataUrl}
-                  alt="Original Capture Frame"
-                  className="w-full h-full object-contain pointer-events-none"
-                />
-
-                {/* SVG Polygon & Corner Handles Overlay */}
-                <svg
-                  className="absolute inset-0 w-full h-full"
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                >
-                  {/* Connecting Quadrilateral Polygon */}
-                  <polygon
-                    points={`${editCorners.topLeft.x * 100},${editCorners.topLeft.y * 100} ${editCorners.topRight.x * 100},${editCorners.topRight.y * 100} ${editCorners.bottomRight.x * 100},${editCorners.bottomRight.y * 100} ${editCorners.bottomLeft.x * 100},${editCorners.bottomLeft.y * 100}`}
-                    className="fill-blue-500/25 stroke-blue-400 stroke-[1.2]"
-                  />
-                </svg>
-
-                {/* Top-Left Corner Pin */}
+              {/* Status pill */}
+              <div className="absolute inset-x-3 top-3 z-30 flex items-center justify-between">
                 <div
-                  onMouseDown={(e) => handleCornerPointerDown("topLeft", e)}
-                  onTouchStart={(e) => handleCornerPointerDown("topLeft", e)}
-                  style={{
-                    left: `${editCorners.topLeft.x * 100}%`,
-                    top: `${editCorners.topLeft.y * 100}%`,
-                  }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-white border-3 border-blue-600 rounded-full shadow-xl cursor-grab active:cursor-grabbing flex items-center justify-center z-30 hover:scale-125 transition-transform"
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold text-white backdrop-blur-md transition-colors ${
+                    !isAutoCaptureEnabled
+                      ? "bg-black/60"
+                      : autoCaptureStatus === "steady"
+                      ? "bg-emerald-600/90"
+                      : autoCaptureStatus === "detected"
+                      ? "bg-amber-600/90"
+                      : "bg-black/60"
+                  }`}
                 >
-                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />
-                </div>
-
-                {/* Top-Right Corner Pin */}
-                <div
-                  onMouseDown={(e) => handleCornerPointerDown("topRight", e)}
-                  onTouchStart={(e) => handleCornerPointerDown("topRight", e)}
-                  style={{
-                    left: `${editCorners.topRight.x * 100}%`,
-                    top: `${editCorners.topRight.y * 100}%`,
-                  }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-white border-3 border-blue-600 rounded-full shadow-xl cursor-grab active:cursor-grabbing flex items-center justify-center z-30 hover:scale-125 transition-transform"
-                >
-                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />
-                </div>
-
-                {/* Bottom-Right Corner Pin */}
-                <div
-                  onMouseDown={(e) => handleCornerPointerDown("bottomRight", e)}
-                  onTouchStart={(e) => handleCornerPointerDown("bottomRight", e)}
-                  style={{
-                    left: `${editCorners.bottomRight.x * 100}%`,
-                    top: `${editCorners.bottomRight.y * 100}%`,
-                  }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-white border-3 border-blue-600 rounded-full shadow-xl cursor-grab active:cursor-grabbing flex items-center justify-center z-30 hover:scale-125 transition-transform"
-                >
-                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />
-                </div>
-
-                {/* Bottom-Left Corner Pin */}
-                <div
-                  onMouseDown={(e) => handleCornerPointerDown("bottomLeft", e)}
-                  onTouchStart={(e) => handleCornerPointerDown("bottomLeft", e)}
-                  style={{
-                    left: `${editCorners.bottomLeft.x * 100}%`,
-                    top: `${editCorners.bottomLeft.y * 100}%`,
-                  }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-white border-3 border-blue-600 rounded-full shadow-xl cursor-grab active:cursor-grabbing flex items-center justify-center z-30 hover:scale-125 transition-transform"
-                >
-                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />
-                </div>
-              </div>
-
-              {/* Controls Toolbar: Filters & Rotation */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                {/* Enhancement Filters */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                    Document Filter
-                  </label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {[
-                      { id: "enhanced", label: "Magic", icon: Sparkles },
-                      { id: "bw", label: "B&W", icon: Contrast },
-                      { id: "original", label: "Color", icon: ImageIcon },
-                      { id: "grayscale", label: "Gray", icon: Sun },
-                    ].map((f) => {
-                      const Icon = f.icon;
-                      const isActive = editFilter === f.id;
-                      return (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => setEditFilter(f.id as EnhancementMode)}
-                          className={`py-1.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                            isActive
-                              ? "bg-blue-600 text-white shadow-md"
-                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                          }`}
-                        >
-                          <Icon className="w-3.5 h-3.5" />
-                          <span>{f.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Aspect Ratio & Rotation */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                    Layout &amp; Orientation
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setEditAspectRatio("a4")}
-                      className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        editAspectRatio === "a4"
-                          ? "bg-[#093765] text-white shadow-md"
-                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                      }`}
-                    >
-                      A4 Standard
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditAspectRatio("free")}
-                      className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        editAspectRatio === "free"
-                          ? "bg-[#093765] text-white shadow-md"
-                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                      }`}
-                    >
-                      Free Ratio
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRotateCW}
-                      className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl cursor-pointer"
-                      title="Rotate 90° Clockwise"
-                    >
-                      <RotateCw className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResetCorners}
-                      className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl cursor-pointer"
-                      title="Reset Corners"
-                    >
-                      <Undo className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditingPage(null)}
-                  className="text-xs font-bold cursor-pointer"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={isProcessingEdit}
-                  onClick={handleSaveEdits}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-4 h-9 rounded-xl shadow-md cursor-pointer transition-all"
-                >
-                  {isProcessingEdit ? (
+                  {isAutoCaptureEnabled ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      Straightening...
+                      <Sparkles className="size-3.5" />
+                      <span>{autoCaptureMessage}</span>
                     </>
                   ) : (
                     <>
-                      <Check className="w-3.5 h-3.5 mr-1.5" />
-                      Save &amp; Straighten
+                      <Camera className="size-3.5" />
+                      <span>Manual: tap Capture</span>
                     </>
                   )}
-                </Button>
+                </div>
+                {isAutoCaptureEnabled && autoCaptureStatus === "steady" && (
+                  <span className="rounded-full bg-black/60 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-emerald-300 backdrop-blur-md">
+                    {Math.round(autoCaptureProgress * 100)}%
+                  </span>
+                )}
               </div>
             </div>
+          )}
+
+          {isCameraLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 p-4 text-white">
+              <Loader2 className="size-7 animate-spin" />
+              <p className="text-[14px] text-white/80">Starting camera…</p>
+            </div>
+          )}
+
+          {cameraError && !isCameraLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black p-6 text-center text-white">
+              <AlertCircle className="size-8 text-amber-400" />
+              <div className="max-w-xs space-y-1">
+                <p className="text-[16px] font-semibold">Camera unavailable</p>
+                <p className="text-[13px] text-white/70">{cameraError}</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="press inline-flex h-10 items-center gap-1.5 rounded-full bg-white/15 px-4 text-[14px] font-medium"
+                >
+                  <RefreshCw className="size-4" />
+                  Try again
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="press inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-[14px] font-semibold text-black"
+                >
+                  <Upload className="size-4" />
+                  Choose photos
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* Capture mode */}
+        <Segmented
+          className="mt-4"
+          label="Capture mode"
+          value={isAutoCaptureEnabled ? "auto" : "manual"}
+          onChange={(v) => setIsAutoCaptureEnabled(v === "auto")}
+          options={[
+            { value: "auto", label: "Auto capture" },
+            { value: "manual", label: "Manual" },
+          ]}
+        />
+
+        {/* Capture controls */}
+        {pages.length > 0 && isCaptureLocked ? (
+          <Group className="mt-4">
+            <Row
+              icon={
+                <span className="block h-10 w-8 overflow-hidden rounded-md bg-black">
+                  <img src={pages[pages.length - 1].dataUrl} alt="Last scan" className="h-full w-full object-cover" />
+                </span>
+              }
+              label={`Page ${pages.length} captured`}
+              detail="Auto capture paused for this page"
+              trailing={
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={handleRetakeCurrentPage} className={iconBtn} aria-label="Retake page">
+                    <RotateCcw className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStartEdit(pages[pages.length - 1])}
+                    className={iconBtn}
+                    aria-label="Adjust corners"
+                  >
+                    <Sliders className="size-4" />
+                  </button>
+                </div>
+              }
+            />
+          </Group>
+        ) : null}
+
+        <div className="mt-3 grid grid-cols-[1fr_1.5fr] gap-2">
+          <SecondaryButton type="button" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="size-4" />
+            Import
+          </SecondaryButton>
+          {pages.length > 0 && isCaptureLocked ? (
+            <PrimaryButton type="button" onClick={handleAddNewPage}>
+              <Plus className="size-5" />
+              Next page
+            </PrimaryButton>
+          ) : (
+            <PrimaryButton
+              type="button"
+              disabled={!!cameraError || isCameraLoading}
+              onClick={() => handleCapture({ isAuto: false })}
+            >
+              <Camera className="size-5" />
+              {pages.length > 0 ? `Capture page ${pages.length + 1}` : "Capture"}
+            </PrimaryButton>
+          )}
+        </div>
+
+        {/* Scanned pages */}
+        <Group
+          title={pages.length > 0 ? `Scanned pages (${pages.length})` : "Scanned pages"}
+          footer={pages.length > 0 ? "Tap a page to preview it. Pages print in this order." : undefined}
+        >
+          {pages.length === 0 ? (
+            <EmptyState
+              icon={<Scan className="size-8" strokeWidth={1.5} />}
+              title="No pages yet"
+              body="Point your camera at a page, or import photos from your phone."
+            />
+          ) : (
+            pages.map((page, index) => (
+              <div
+                key={page.id}
+                className="flex min-h-[72px] items-center gap-3 border-t border-hairline px-4 py-2.5 first:border-t-0"
+              >
+                <button
+                  type="button"
+                  onClick={() => setSelectedPreview(page)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <span className="relative block h-14 w-10 shrink-0 overflow-hidden rounded-md bg-black">
+                    <img src={page.dataUrl} alt={`Page ${index + 1}`} className="h-full w-full object-cover" />
+                    {page.isUploading && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/50">
+                        <Loader2 className="size-4 animate-spin text-white" />
+                      </span>
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[16px] text-ink">Page {index + 1}</span>
+                    <span className="mt-0.5 block text-[13px] text-ink-3">{filterLabel(page.filter)}</span>
+                  </span>
+                </button>
+                <div className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    onClick={(e) => handleMovePage(index, "left", e)}
+                    disabled={index === 0}
+                    className={iconBtn}
+                    aria-label="Move up"
+                  >
+                    <ChevronUp className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleMovePage(index, "right", e)}
+                    disabled={index === pages.length - 1}
+                    className={iconBtn}
+                    aria-label="Move down"
+                  >
+                    <ChevronDown className="size-4" />
+                  </button>
+                  <button type="button" onClick={(e) => handleStartEdit(page, e)} className={iconBtn} aria-label="Adjust corners and filter">
+                    <Sliders className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleRemovePage(page.id, e)}
+                    className={`${iconBtn} text-danger`}
+                    aria-label="Delete page"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </Group>
+
+        {pages.length > 0 && (
+          <div className="mt-2 flex justify-center">
+            <TextButton onClick={handleClearAll} className="text-danger">
+              <Trash2 className="size-4" />
+              Clear all pages
+            </TextButton>
           </div>
         )}
-      </div>
-    </div>
+
+        {pages.length > 0 && <ActionBarSpacer size={110} />}
+      </Screen>
+
+      {pages.length > 0 && (
+        <ActionBar>
+          <PrimaryButton type="button" onClick={handleFinalizeAndProceed} loading={isFinalizing}>
+            <Printer className="size-5" />
+            Continue with {pages.length} {pages.length === 1 ? "page" : "pages"}
+          </PrimaryButton>
+        </ActionBar>
+      )}
+
+      {/* ================= PREVIEW MODAL ================= */}
+      {selectedPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm"
+          onClick={() => setSelectedPreview(null)}
+        >
+          <div
+            className="w-full max-w-[440px] space-y-3 rounded-[20px] bg-surface p-4 animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="truncate text-[17px] font-semibold text-ink">{selectedPreview.name || "Preview"}</h3>
+              <button type="button" onClick={() => setSelectedPreview(null)} className={iconBtn} aria-label="Close">
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="flex max-h-[65vh] items-center justify-center overflow-auto rounded-[14px] bg-black p-2">
+              <img src={selectedPreview.dataUrl} alt="Scanned page" className="max-h-[60vh] object-contain" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <SecondaryButton
+                type="button"
+                onClick={() => {
+                  const target = selectedPreview;
+                  setSelectedPreview(null);
+                  handleStartEdit(target);
+                }}
+              >
+                <Sliders className="size-4" />
+                Adjust
+              </SecondaryButton>
+              <PrimaryButton type="button" onClick={() => setSelectedPreview(null)}>
+                Done
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= CORNER & FILTER EDIT MODAL ================= */}
+      {editingPage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/85 p-2 backdrop-blur-md">
+          <div className="my-auto w-full max-w-[440px] space-y-4 rounded-[20px] bg-surface p-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[17px] font-semibold text-ink">Adjust page</h3>
+              <button type="button" onClick={() => setEditingPage(null)} className={iconBtn} aria-label="Close">
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[13px] text-ink-3">Drag the four corners to the edges of the paper.</p>
+              <TextButton onClick={handleAutoDetectCorners} className="shrink-0 text-[14px]">
+                <Sparkles className="size-4" />
+                Auto-detect
+              </TextButton>
+            </div>
+
+            <div
+              ref={editContainerRef}
+              className="relative flex aspect-[4/3] max-h-[50vh] w-full select-none items-center justify-center overflow-hidden rounded-[14px] bg-black"
+            >
+              <img
+                src={editingPage.originalDataUrl || editingPage.dataUrl}
+                alt="Original capture"
+                className="pointer-events-none h-full w-full object-contain"
+              />
+              <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polygon
+                  points={cornerKeys.map((k) => `${editCorners[k].x * 100},${editCorners[k].y * 100}`).join(" ")}
+                  className="fill-sky-400/25 stroke-sky-300 stroke-[1.2]"
+                />
+              </svg>
+              {cornerKeys.map((k) => (
+                <div
+                  key={k}
+                  onMouseDown={(e) => handleCornerPointerDown(k, e)}
+                  onTouchStart={(e) => handleCornerPointerDown(k, e)}
+                  style={{ left: `${editCorners[k].x * 100}%`, top: `${editCorners[k].y * 100}%` }}
+                  className={`absolute z-30 flex size-8 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full border-[3px] border-sky-500 bg-white shadow-xl transition-transform active:cursor-grabbing ${
+                    activeCornerKey === k ? "scale-125" : ""
+                  }`}
+                >
+                  <div className="size-1.5 rounded-full bg-sky-600" />
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <p className="px-1 text-[13px] font-medium text-ink-3">Filter</p>
+              <Segmented
+                label="Filter"
+                value={editFilter}
+                onChange={(v) => setEditFilter(v)}
+                options={[
+                  { value: "enhanced" as EnhancementMode, label: "Enhanced" },
+                  { value: "bw" as EnhancementMode, label: "B&W" },
+                  { value: "grayscale" as EnhancementMode, label: "Gray" },
+                  { value: "original" as EnhancementMode, label: "Colour" },
+                ]}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <p className="px-1 text-[13px] font-medium text-ink-3">Shape</p>
+              <div className="flex items-center gap-2">
+                <Segmented
+                  className="flex-1"
+                  label="Shape"
+                  value={editAspectRatio === "a4" ? "a4" : "free"}
+                  onChange={(v) => setEditAspectRatio(v)}
+                  options={[
+                    { value: "a4" as AspectRatioMode, label: "A4" },
+                    { value: "free" as AspectRatioMode, label: "Free" },
+                  ]}
+                />
+                <button type="button" onClick={handleRotateCW} className={`${iconBtn} bg-surface-2`} aria-label="Rotate 90° clockwise">
+                  <RotateCw className="size-4" />
+                </button>
+                <button type="button" onClick={handleResetCorners} className={`${iconBtn} bg-surface-2`} aria-label="Reset corners">
+                  <Undo className="size-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <SecondaryButton type="button" onClick={() => setEditingPage(null)}>
+                Cancel
+              </SecondaryButton>
+              <PrimaryButton type="button" onClick={handleSaveEdits} loading={isProcessingEdit}>
+                <Check className="size-5" />
+                Save
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
