@@ -1,15 +1,19 @@
 /**
- * MIMO Document Scanner - Lightweight Canvas-Based Auto Capture Engine
+ * MIMO Document Scanner - Advanced Auto Capture Engine
  *
- * Performs 100% on-device client-side document detection, contrast analysis,
- * and temporal motion stability measurement without any external computer vision dependencies.
+ * Combines Computer Vision quadrilateral document corner detection with
+ * temporal motion stability measurement, exposure analysis, and strict
+ * single-capture state locking to prevent duplicate page scans.
  */
+
+import { DocumentCorners, DocumentDetectionResult } from "./scanner-cv-engine";
 
 export type AutoCaptureStatus =
   | "searching"   // Scanning for document inside alignment guide
   | "detected"    // Document detected in frame, waiting for stability
   | "steady"      // Document held steady, countdown progressing
-  | "capturing"   // Triggering automatic shutter
+  | "capturing"   // Triggering automatic shutter (single event)
+  | "locked"      // Capture locked: page captured, waiting for user to add next page
   | "cooldown";   // Brief cooldown after successful capture
 
 export interface AutoCaptureAnalysis {
@@ -24,11 +28,11 @@ export interface AutoCaptureAnalysis {
 }
 
 export interface AutoCaptureConfig {
-  sampleFps?: number;           // Target sampling FPS (default: 10 FPS)
-  stabilityDurationMs?: number; // Required steady time in ms (default: 800ms)
-  motionThreshold?: number;     // Maximum pixel delta to consider steady (default: 4.5)
-  minLuminance?: number;        // Minimum acceptable brightness (default: 38)
-  maxLuminance?: number;        // Maximum acceptable brightness (default: 238)
+  sampleFps?: number;           // Target sampling FPS (default: 12 FPS)
+  stabilityDurationMs?: number; // Required steady time in ms (default: 750ms)
+  motionThreshold?: number;     // Maximum pixel delta to consider steady (default: 5.0)
+  minLuminance?: number;        // Minimum acceptable brightness (default: 35)
+  maxLuminance?: number;        // Maximum acceptable brightness (default: 242)
   minEdgeContrast?: number;     // Minimum edge/contrast variance (default: 8.0)
   cooldownMs?: number;          // Cooldown after capture before next scan (default: 1800ms)
 }
@@ -40,16 +44,19 @@ export class ScannerAutoCaptureEngine {
   private prevSample: Uint8Array | null = null;
   private steadyStartTime: number | null = null;
   private lastCaptureTime: number = 0;
-  private lastProcessTime: number = 0;
-  private isProcessing: boolean = false;
+
+  // Single-capture lock & document signature state
+  private isLocked: boolean = false;
+  private isArmed: boolean = true;
+  private lastCapturedCorners: DocumentCorners | null = null;
 
   constructor(config?: AutoCaptureConfig) {
     this.config = {
-      sampleFps: config?.sampleFps ?? 10,
-      stabilityDurationMs: config?.stabilityDurationMs ?? 800,
-      motionThreshold: config?.motionThreshold ?? 4.5,
-      minLuminance: config?.minLuminance ?? 38,
-      maxLuminance: config?.maxLuminance ?? 238,
+      sampleFps: config?.sampleFps ?? 12,
+      stabilityDurationMs: config?.stabilityDurationMs ?? 750,
+      motionThreshold: config?.motionThreshold ?? 5.0,
+      minLuminance: config?.minLuminance ?? 35,
+      maxLuminance: config?.maxLuminance ?? 242,
       minEdgeContrast: config?.minEdgeContrast ?? 8.0,
       cooldownMs: config?.cooldownMs ?? 1800,
     };
@@ -62,7 +69,7 @@ export class ScannerAutoCaptureEngine {
   }
 
   /**
-   * Reset the stability counter and historical samples (e.g. after manual capture or page shift)
+   * Reset the stability counter and historical samples
    */
   public resetStability() {
     this.steadyStartTime = null;
@@ -70,7 +77,29 @@ export class ScannerAutoCaptureEngine {
   }
 
   /**
-   * Notify the engine that a capture occurred to initiate cooldown period
+   * Lock auto-capture after a successful document capture to prevent duplicate scans
+   */
+  public lockCapture(corners?: DocumentCorners) {
+    this.isLocked = true;
+    this.isArmed = false;
+    this.lastCapturedCorners = corners || null;
+    this.lastCaptureTime = Date.now();
+    this.resetStability();
+  }
+
+  /**
+   * Re-arm the scanner for the next page (e.g., when user taps "Add Page" or "Retake")
+   */
+  public reArm() {
+    this.isLocked = false;
+    this.isArmed = true;
+    this.lastCapturedCorners = null;
+    this.lastCaptureTime = 0;
+    this.resetStability();
+  }
+
+  /**
+   * Legacy cooldown trigger
    */
   public triggerCooldown() {
     this.lastCaptureTime = Date.now();
@@ -78,12 +107,60 @@ export class ScannerAutoCaptureEngine {
   }
 
   /**
-   * Analyze the current video frame against the alignment guide
+   * Check if candidate corners belong to the same physical document as the previous capture
    */
-  public analyzeFrame(video: HTMLVideoElement, guideNormalizedRect = { x: 0.1, y: 0.08, width: 0.8, height: 0.84 }): AutoCaptureAnalysis {
+  public isSameDocumentAsLastCapture(corners: DocumentCorners): boolean {
+    if (!this.lastCapturedCorners) return false;
+    const l = this.lastCapturedCorners;
+    const c = corners;
+
+    // Centroid distance
+    const lcx = (l.topLeft.x + l.topRight.x + l.bottomRight.x + l.bottomLeft.x) / 4;
+    const lcy = (l.topLeft.y + l.topRight.y + l.bottomRight.y + l.bottomLeft.y) / 4;
+    const ccx = (c.topLeft.x + c.topRight.x + c.bottomRight.x + c.bottomLeft.x) / 4;
+    const ccy = (c.topLeft.y + c.topRight.y + c.bottomRight.y + c.bottomLeft.y) / 4;
+    const dist = Math.hypot(lcx - ccx, lcy - ccy);
+
+    // Max corner displacement
+    const maxCornerDelta = Math.max(
+      Math.hypot(l.topLeft.x - c.topLeft.x, l.topLeft.y - c.topLeft.y),
+      Math.hypot(l.topRight.x - c.topRight.x, l.topRight.y - c.topRight.y),
+      Math.hypot(l.bottomRight.x - c.bottomRight.x, l.bottomRight.y - c.bottomRight.y),
+      Math.hypot(l.bottomLeft.x - c.bottomLeft.x, l.bottomLeft.y - c.bottomLeft.y)
+    );
+
+    // If centroid shifted less than 12% and corners shifted less than 20%, it is the exact same document
+    return dist < 0.12 && maxCornerDelta < 0.20;
+  }
+
+  /**
+   * Analyze the current video frame against detected document corners or fallback guide
+   */
+  public analyzeFrame(
+    video: HTMLVideoElement,
+    cvResult?: DocumentDetectionResult,
+    guideNormalizedRect = { x: 0.1, y: 0.08, width: 0.8, height: 0.84 }
+  ): AutoCaptureAnalysis {
     const now = Date.now();
 
-    // Check cooldown
+    // 1. If currently locked, prevent any auto-capture from triggering
+    if (this.isLocked || !this.isArmed) {
+      const isSame = cvResult?.hasDocument && this.isSameDocumentAsLastCapture(cvResult.corners);
+      return {
+        status: "locked",
+        isDocumentDetected: !!cvResult?.hasDocument,
+        isSteady: false,
+        motionScore: 0,
+        meanLuminance: 128,
+        edgeContrast: 0,
+        stabilityProgress: 0,
+        message: isSame
+          ? "Page captured! Tap + to scan next page"
+          : "Scanner ready — tap + to scan next page",
+      };
+    }
+
+    // 2. Check cooldown
     if (now - this.lastCaptureTime < this.config.cooldownMs) {
       const remaining = Math.ceil((this.config.cooldownMs - (now - this.lastCaptureTime)) / 1000);
       return {
@@ -94,7 +171,7 @@ export class ScannerAutoCaptureEngine {
         meanLuminance: 128,
         edgeContrast: 0,
         stabilityProgress: 0,
-        message: `Page captured! Ready in ${remaining}s...`,
+        message: `Next scan in ${remaining}s...`,
       };
     }
 
@@ -119,13 +196,13 @@ export class ScannerAutoCaptureEngine {
     const imgData = this.offscreenCtx.getImageData(0, 0, sw, sh);
     const data = imgData.data;
 
-    // 1. Calculate Guide Bounding Box in downsampled pixels
+    // Calculate Guide Bounding Box in downsampled pixels
     const gx = Math.floor(guideNormalizedRect.x * sw);
     const gy = Math.floor(guideNormalizedRect.y * sh);
     const gw = Math.floor(guideNormalizedRect.width * sw);
     const gh = Math.floor(guideNormalizedRect.height * sh);
 
-    // 2. Sample Grid Luminance & Motion Difference (32x24 grid = 768 samples)
+    // Sample Grid Luminance & Motion Difference (32x24 grid = 768 samples)
     const gridCols = 32;
     const gridRows = 24;
     const currentSample = new Uint8Array(gridCols * gridRows);
@@ -150,7 +227,6 @@ export class ScannerAutoCaptureEngine {
           guideSampleCount++;
         } else {
           outerLuminance += lum;
-          outerSampleCount++;
         }
       }
     }
@@ -158,7 +234,7 @@ export class ScannerAutoCaptureEngine {
     const meanLuminance = guideSampleCount > 0 ? totalGuideLuminance / guideSampleCount : 128;
     const meanOuterLuminance = outerSampleCount > 0 ? outerLuminance / outerSampleCount : 128;
 
-    // 3. Motion Detection (Sum of Absolute Differences against previous sample)
+    // Motion Detection (Sum of Absolute Differences against previous sample)
     let motionScore = 0;
     if (this.prevSample) {
       let totalDiff = 0;
@@ -169,34 +245,21 @@ export class ScannerAutoCaptureEngine {
     }
     this.prevSample = currentSample;
 
-    // 4. Edge / Contrast Analysis across guide borders
-    // Sample gradient step across inner guide perimeter vs outer margin
+    // Edge / Contrast Analysis
     const edgeContrast = Math.abs(meanLuminance - meanOuterLuminance);
-
-    // Check exposure validity
     const isExposureValid = meanLuminance >= this.config.minLuminance && meanLuminance <= this.config.maxLuminance;
 
-    // Quadrant content check (ensures document is centered across all 4 corners)
-    const q1Lum = this.sampleRegionLuminance(data, sw, gx + 10, gy + 10, Math.floor(gw / 3), Math.floor(gh / 3));
-    const q2Lum = this.sampleRegionLuminance(data, sw, gx + gw - Math.floor(gw / 3) - 10, gy + 10, Math.floor(gw / 3), Math.floor(gh / 3));
-    const q3Lum = this.sampleRegionLuminance(data, sw, gx + 10, gy + gh - Math.floor(gh / 3) - 10, Math.floor(gw / 3), Math.floor(gh / 3));
-    const q4Lum = this.sampleRegionLuminance(data, sw, gx + gw - Math.floor(gw / 3) - 10, gy + gh - Math.floor(gh / 3) - 10, Math.floor(gw / 3), Math.floor(gh / 3));
+    // Determine document detection (either from CV or luminance edge heuristic)
+    const isCVDetected = !!(cvResult && cvResult.hasDocument && !cvResult.isFallback && cvResult.areaPercent >= 0.08 && cvResult.areaPercent <= 0.98);
+    const isHeuristicDetected = isExposureValid && edgeContrast >= this.config.minEdgeContrast;
+    const isDocumentDetected = isCVDetected || isHeuristicDetected;
 
-    const maxQDiff = Math.max(
-      Math.abs(q1Lum - q2Lum),
-      Math.abs(q2Lum - q3Lum),
-      Math.abs(q3Lum - q4Lum),
-      Math.abs(q4Lum - q1Lum)
-    );
-
-    // Document is considered present if exposure is valid and contrast/uniformity conditions are met
-    const isDocumentDetected = isExposureValid && (edgeContrast >= this.config.minEdgeContrast || maxQDiff < 75);
     const isSteady = isDocumentDetected && motionScore < this.config.motionThreshold;
 
-    // 5. Evaluate Stability Progression
+    // Evaluate Stability Progression
     let stabilityProgress = 0;
     let status: AutoCaptureStatus = "searching";
-    let message = "Align document inside frame";
+    let message = isCVDetected ? "Document detected - hold steady" : "Align document inside frame";
 
     if (!isExposureValid) {
       this.steadyStartTime = null;
@@ -207,12 +270,10 @@ export class ScannerAutoCaptureEngine {
       status = "searching";
       message = "Align document inside frame";
     } else if (!isSteady) {
-      // Document is in frame but camera/document is moving
       this.steadyStartTime = null;
       status = "detected";
-      message = "Hold steady...";
+      message = isCVDetected ? "Paper detected! Hold steady..." : "Hold camera steady...";
     } else {
-      // Document is in frame AND steady
       if (this.steadyStartTime === null) {
         this.steadyStartTime = now;
       }
@@ -221,11 +282,14 @@ export class ScannerAutoCaptureEngine {
       stabilityProgress = Math.min(1.0, elapsedSteady / this.config.stabilityDurationMs);
 
       if (stabilityProgress >= 1.0) {
+        // Trigger single capture event and lock immediate repetition
         status = "capturing";
         message = "Capturing document...";
+        this.isLocked = true;
+        this.steadyStartTime = null;
       } else {
         status = "steady";
-        message = "Hold steady...";
+        message = isCVDetected ? "Perfect! Holding steady..." : "Hold steady...";
       }
     }
 
@@ -239,19 +303,5 @@ export class ScannerAutoCaptureEngine {
       stabilityProgress,
       message,
     };
-  }
-
-  private sampleRegionLuminance(data: Uint8ClampedArray, sw: number, rx: number, ry: number, rw: number, rh: number): number {
-    let sum = 0;
-    let count = 0;
-    const step = 4;
-    for (let y = Math.max(0, ry); y < Math.min(240, ry + rh); y += step) {
-      for (let x = Math.max(0, rx); x < Math.min(320, rx + rw); x += step) {
-        const idx = (y * sw + x) * 4;
-        sum += 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-        count++;
-      }
-    }
-    return count > 0 ? sum / count : 128;
   }
 }

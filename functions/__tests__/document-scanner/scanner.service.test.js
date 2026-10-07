@@ -829,7 +829,60 @@ test("14. No printCode or payment fields are created on the pending print_jobs d
   assert.equal(job.paymentStatus, undefined);
 });
 
+test("15. Final PDF size <= 500 KB is enforced and validated", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  await addScannerPage("user-1", session.sessionId, 1, Buffer.from(MINIMAL_JPEG), "image/jpeg");
+
+  const result = await finalizeScannerSession("user-1", session.sessionId);
+  const job = printJobs.get(result.jobId);
+
+  assert.ok(job.size <= 500 * 1024, `PDF size (${job.size} bytes) must be <= 500 KB`);
+});
+
+test("16. Rejects finalization when compiled PDF exceeds 500 KB", async () => {
+  resetStorage();
+  const session = await createScannerSession("user-1");
+  // Mock adding pages with a large image that forces PDF > 500 KB
+  const largeFakePage = Buffer.alloc(600 * 1024);
+  // Pre-seed a page in Firestore & storage
+  const sessionPages = pages.get(session.sessionId);
+  sessionPages.set("page-001", {
+    pageNumber: 1,
+    storagePath: `scanner/${session.sessionId}/page-001.jpg`,
+    contentType: "image/jpeg",
+  });
+  storageFiles.set(`scanner/${session.sessionId}/page-001.jpg`, {
+    buffer: Buffer.from(MINIMAL_JPEG),
+  });
+
+  // Temporarily override pdfDoc.save to return > 500KB bytes
+  const { getPDFDocument } = require("../../src/services/pdf.service");
+  const PDFDocument = getPDFDocument();
+  const originalCreate = PDFDocument.create;
+
+  PDFDocument.create = async () => {
+    const doc = await originalCreate.call(PDFDocument);
+    const originalSave = doc.save;
+    doc.save = async () => {
+      // Return 520 KB buffer
+      return new Uint8Array(520 * 1024);
+    };
+    return doc;
+  };
+
+  try {
+    await assert.rejects(
+      () => finalizeScannerSession("user-1", session.sessionId),
+      { message: /exceeds maximum allowed size of 500 KB/ }
+    );
+  } finally {
+    PDFDocument.create = originalCreate;
+  }
+});
+
 if (originalFirebase) {
   require.cache[require.resolve("../../src/config/firebase")] =
     originalFirebase;
 }
+
