@@ -1,34 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import { Check, ArrowDown, WarningCircle } from '@phosphor-icons/react';
-import { isFestivalActive } from '../../config/festivalConfig';
-import { DiyaRow, FestiveBackdrop, Toran, ZariBorder } from '../festive/NavaratriDecor';
-
-const DandiyaSticks: React.FC = () => (
-    <svg width="130" height="130" viewBox="0 0 130 130" className="pointer-events-none absolute -right-6 top-2">
-        <defs>
-            <linearGradient id="dandiyaGold" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#FFF3C4" />
-                <stop offset="35%" stopColor="#F0C878" />
-                <stop offset="70%" stopColor="#D9A544" />
-                <stop offset="100%" stopColor="#8A6425" />
-            </linearGradient>
-        </defs>
-        <ellipse cx="65" cy="98" rx="30" ry="6" fill="rgba(74,20,32,0.14)" />
-        {[45, -45].map((deg) => (
-            <g key={deg} transform={`rotate(${deg} 65 62)`}>
-                <rect x="14" y="57" width="102" height="9" rx="4.5" fill="url(#dandiyaGold)" stroke="#7A1230" strokeWidth="0.5" />
-                <rect x="30" y="57" width="4" height="9" fill="#7A1230" opacity="0.35" />
-                <rect x="92" y="57" width="4" height="9" fill="#7A1230" opacity="0.35" />
-                <circle cx="14" cy="61.5" r="7.5" fill="url(#dandiyaGold)" />
-                <circle cx="116" cy="61.5" r="7.5" fill="url(#dandiyaGold)" />
-                <path d="M14 69 L10 82 M14 69 L14 83 M14 69 L18 82" stroke="#9B1B3E" strokeWidth="1.4" strokeLinecap="round" />
-                <path d="M116 69 L112 82 M116 69 L116 83 M116 69 L120 82" stroke="#9B1B3E" strokeWidth="1.4" strokeLinecap="round" />
-            </g>
-        ))}
-        <circle cx="65" cy="62" r="6" fill="#FFF3C4" stroke="#8A6425" strokeWidth="1" />
-    </svg>
-);
 
 interface SummaryScreenProps {
     isActive: boolean;
@@ -41,68 +11,24 @@ interface SummaryScreenProps {
         mode: string;
     } | null;
     kioskId?: string | null;
-    printCode?: string;
 }
 
-const BACKEND_URL = 'https://api-upqxuj7evq-uc.a.run.app';
-const DEMO_CODES = ['0000', '9999'];
-const AUTO_RESET_MS = 10000;
-// While the customer is choosing what went wrong they need longer than the normal 10s.
-const REPORT_RESET_MS = 30000;
-const ISSUES: { id: string; label: string }[] = [
-    { id: 'blank', label: 'Blank pages' },
-    { id: 'missing', label: 'Pages missing' },
-    { id: 'faint', label: 'Too faint or streaky' },
-    { id: 'other', label: 'Something else' },
-];
-type ReportState = 'ask' | 'choose' | 'sending' | 'sent' | 'failed';
-
-export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId, printCode }) => {
-    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId }) => {
+    const isCV001 = kioskId === 'CV-001';
+    const isSV002 = kioskId === 'SV-002';
     const timeoutRef = useRef<number | null>(null);
     const [renderKey, setRenderKey] = useState(0);
-    const [report, setReport] = useState<ReportState>('ask');
-
-    const armReset = (ms: number) => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        timeoutRef.current = window.setTimeout(() => {
-            timeoutRef.current = null;
-            onReset();
-        }, ms);
-    };
-
-    const sendReport = async (issue: string) => {
-        setReport('sending');
-        armReset(REPORT_RESET_MS);
-        if (!printCode || DEMO_CODES.includes(printCode)) {
-            setReport('sent');
-            armReset(AUTO_RESET_MS);
-            return;
-        }
-        try {
-            const res = await fetch(`${BACKEND_URL}/kiosk/report-problem`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ printCode, kioskId, issue }),
-            });
-            setReport(res.ok ? 'sent' : 'failed');
-        } catch {
-            setReport('failed');
-        }
-        armReset(AUTO_RESET_MS);
-    };
 
     useEffect(() => {
         let keyTimer: number | null = null;
         if (isActive) {
             keyTimer = window.setTimeout(() => {
-                setReport('ask');
                 setRenderKey(prev => prev + 1);
             }, 0);
             timeoutRef.current = window.setTimeout(() => {
                 onReset();
                 timeoutRef.current = null;
-            }, AUTO_RESET_MS);
+            }, 10000);
         } else {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
@@ -120,204 +46,243 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
 
     return (
         <div
+            className={`screen summary-wrapper ${isActive ? 'visible' : ''}`}
             key={renderKey}
-            className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col items-center justify-center overflow-hidden px-20 pb-24 ${
-                isFestiveMode ? 'bg-parchment-100' : 'bg-[#FAFAF8]'
-            }`}
-            style={{ display: isActive ? 'flex' : 'none' }}
+            style={{
+                display: isActive ? 'flex' : 'none',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                width: '100%',
+                overflow: 'hidden',
+                position: 'relative',
+                padding: '0 80px 100px 80px' // Added bottom padding for the button
+            }}
         >
-            <div
-                className="pointer-events-none absolute left-1/2 top-1/2 h-[560px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[150px]"
-                style={{
-                    background: isFestiveMode
-                        ? 'radial-gradient(closest-side, rgba(201,151,62,0.16), transparent)'
-                        : 'radial-gradient(closest-side, rgba(217,165,68,0.12), transparent)',
-                }}
-            />
+            {/* Botanical background */}
+            <div className="kiosk-bg" />
+            <div className="ambient-glow glow-1" />
+            <div className="ambient-glow glow-2" />
 
-            {isFestiveMode && (
-                <>
-                    <FestiveBackdrop />
-                    <Toran compact />
-                    <ZariBorder />
-                </>
-            )}
+            {/* NEW Global Top Header: Conversational Success */}
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                marginTop: '35px',
+                marginBottom: '10px',
+                animation: isActive ? 'fadeInUp 0.8s ease-out forwards' : 'none',
+                opacity: 0,
+                transform: 'translateY(-40px)'
+            }}>
 
-            <motion.div
-                initial={isActive ? { opacity: 0, y: -30 } : false}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                className="relative z-10 mb-2 mt-9 text-center"
-            >
-                <h1 className={`text-[46px] font-black tracking-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
-                    <span className={isFestiveMode ? 'text-gold-600' : 'text-gold-600'}>
-                        {jobData?.userName?.split(' ')[0] || 'DEMO'}
-                    </span>
-                    , your documents are ready.
-                </h1>
-            </motion.div>
-
-            {/* Collection slot illustration */}
-            <div
-                className={`relative z-10 my-6 flex items-center justify-center ${
-                    report === 'choose' || report === 'sending' ? 'hidden' : ''
-                }`}
-            >
-                <div className="relative h-[220px] w-[330px]">
-                    {/* Slot bezel */}
-                    <div
-                        className={`absolute inset-x-0 top-0 h-[150px] overflow-hidden rounded-2xl border ${
-                            isFestiveMode
-                                ? 'border-gold-600/30 bg-white'
-                                : 'border-gold-600/30 bg-white shadow-[inset_0_4px_14px_rgba(0,0,0,0.06),0_10px_30px_rgba(74,45,20,0.08)]'
-                        }`}
-                    >
-                        {/* Void */}
-                        <div
-                            className={`absolute inset-x-0 top-0 h-[100px] ${
-                                isFestiveMode
-                                    ? 'bg-gradient-to-b from-black/70 to-black/25'
-                                    : 'bg-gradient-to-b from-[#E2DDD5] to-[#F5F2EC]'
-                            }`}
-                        />
-
-                        {/* Sliding paper */}
-                        <div
-                            className="absolute left-1/2 top-2 w-[150px] -translate-x-1/2 rounded-md bg-white px-5 py-6 shadow-xl border border-gold-600/15"
-                            style={{ animation: isActive ? 'kiosk-paper-dispense 6s ease-in-out infinite' : 'none' }}
-                        >
-                            <span
-                                className={`mb-3 flex h-9 w-9 items-center justify-center rounded-full ${
-                                    isFestiveMode ? 'bg-gold-500/15 text-gold-600' : 'bg-gold-500/15 text-gold-600'
-                                }`}
-                            >
-                                <Check size={18} weight="bold" />
-                            </span>
-                            <div className="mb-2 h-2 w-[90%] rounded-full bg-slate-200" />
-                            <div className="mb-2 h-2 w-[70%] rounded-full bg-slate-200" />
-                            <div className="h-2 w-[55%] rounded-full bg-slate-200" />
-                        </div>
-                    </div>
-
-                    {/* Base shelf */}
-                    <div
-                        className={`absolute inset-x-3 top-[142px] h-3 rounded-full ${
-                            isFestiveMode ? 'bg-gold-600/25' : 'bg-gold-600/30'
-                        }`}
-                    />
-
-                    {isFestiveMode && <DandiyaSticks />}
+                <div style={{ fontSize: '48px', fontWeight: 900, color: isSV002 ? 'var(--text-primary)' : '#ffffff', letterSpacing: '-1px', textShadow: isSV002 ? 'none' : '0 10px 30px rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <span style={{ color: isSV002 ? 'var(--gold-accent)' : '#ffffff', textDecoration: isSV002 ? 'none' : 'underline', textDecorationColor: isCV001 ? '#00e5ff' : '#E8B86D', textUnderlineOffset: '6px', textTransform: 'uppercase' }}>{jobData?.userName?.split(' ')[0] || 'John'}</span>, your documents are ready.
                 </div>
             </div>
 
-            {/* Bottom cue + button */}
-            <div className="relative z-10 flex flex-col items-center gap-7">
-                <div
-                    className={`flex items-center gap-4 text-[19px] font-extrabold uppercase tracking-[0.1em] ${
-                        isFestiveMode ? 'text-mahogany-700' : 'text-[#1A1714]'
-                    }`}
-                >
-                    <ArrowDown size={22} weight="bold" className="animate-bounce text-gold-600" />
+            {/* Middle Section: Centered Animation */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                width: '100%',
+                alignItems: 'center',
+                transform: 'translateY(-50px)' // Shifted slightly more upwards
+            }}>
+
+                {/* ── RIGHT: Collection Guide Animation ── */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', transform: 'scale(0.95)', transformOrigin: 'center' }}>
+                    <div style={{
+                        position: 'relative', width: '380px', height: '350px',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        marginTop: '20px'
+                    }}>
+                        {/* 1. Slit Interior (Dark Void) */}
+                        <div style={{
+                            position: 'absolute', top: '55px', width: '330px', height: '90px',
+                            background: 'linear-gradient(180deg, #020202 0%, #1a1a1a 100%)',
+                            boxShadow: 'inset 0 10px 20px rgba(0,0,0,1)',
+                            zIndex: 1,
+                            borderRadius: '2px',
+                            overflow: 'hidden'
+                        }}>
+                            {/* The white flat bottom shelf inside the slit */}
+                            <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '14px', background: '#f1f5f9', borderTop: '2px solid #94a3b8' }}></div>
+                            <div style={{ position: 'absolute', bottom: '14px', width: '100%', height: '15px', background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)' }}></div>
+                        </div>
+
+                        {/* 2. Wooden Frame (using natural wood block colors from realistic reference) */}
+                        {/* Top piece */}
+                        <div style={{
+                            position: 'absolute', top: '30px', left: '0px', width: '380px', height: '25px',
+                            background: '#daba94', zIndex: 10,
+                            boxShadow: '0 5px 15px rgba(0,0,0,0.6)', borderRadius: '3px 3px 0 0',
+                            borderBottom: '1px solid #9a7b50'
+                        }}></div>
+                        {/* Bottom piece */}
+                        <div style={{
+                            position: 'absolute', top: '145px', left: '0px', width: '380px', height: '25px',
+                            background: '#ceaa7b', zIndex: 2,
+                            boxShadow: '0 15px 30px rgba(0,0,0,0.8)', borderRadius: '0 0 3px 3px',
+                            borderTop: '1px solid #8e6c40'
+                        }}></div>
+                        {/* Left piece */}
+                        <div style={{
+                            position: 'absolute', top: '55px', left: '0px', width: '25px', height: '90px',
+                            background: '#d1a870', zIndex: 10,
+                            boxShadow: '4px 0 15px rgba(0,0,0,0.7)',
+                            borderRight: '1px solid #9a7b50'
+                        }}></div>
+                        {/* Right piece */}
+                        <div style={{
+                            position: 'absolute', top: '55px', left: '355px', width: '25px', height: '90px',
+                            background: '#d1a870', zIndex: 10,
+                            boxShadow: '-4px 0 15px rgba(0,0,0,0.7)',
+                            borderLeft: '1px solid #9a7b50'
+                        }}></div>
+
+                        {/* 3. Paper Clipping Wrapper */}
+                        <div style={{
+                            position: 'absolute', top: '55px', left: '0', width: '380px', height: '350px',
+                            overflow: 'hidden', zIndex: 5, pointerEvents: 'none',
+                        }}>
+                            {/* The Animated Paper */}
+                            <div style={{
+                                width: '250px', height: '300px', background: '#ffffff',
+                                margin: '0 auto', 
+                                borderRadius: '2px', 
+                                boxShadow: '0 20px 40px rgba(0,0,0,0.5)', 
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px',
+                                animation: isActive ? 'paperDispenseHand 6s ease-in-out infinite' : 'none',
+                                transformOrigin: 'top center'
+                            }}>
+                                 <div style={{ width: '55px', height: '55px', borderRadius: '50%', background: isCV001 ? 'rgba(0,180,216,0.15)' : 'rgba(232,184,109,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', border: isCV001 ? '2px solid rgba(0,229,255,0.45)' : '2px solid rgba(232,184,109,0.45)', color: isCV001 ? '#00b4d8' : '#C8860A' }}>
+                                      <span className="material-symbols-outlined" style={{ fontSize: '36px', fontWeight: 800 }}>check</span>
+                                 </div>
+                                 <div style={{ width: '90%', height: '10px', background: '#cbd5e1', borderRadius: '5px', marginBottom: '18px' }}></div>
+                                 <div style={{ width: '75%', height: '10px', background: '#cbd5e1', borderRadius: '5px', marginBottom: '18px' }}></div>
+                                 <div style={{ width: '60%', height: '10px', background: '#cbd5e1', borderRadius: '5px' }}></div>
+                                 <div style={{ width: '100%', marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '0 10px', paddingBottom: '10px' }}>
+                                     <div style={{ width: '45px', height: '45px', border: '3px dashed #94a3b8', borderRadius: '6px' }}></div>
+                                     <div style={{ width: '80px', height: '8px', background: '#e2e8f0', borderRadius: '4px' }}></div>
+                                 </div>
+                            </div>
+                        </div>
+
+                        {/* 4. Hand Graphic */}
+                        <div style={{
+                            position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+                            zIndex: 20, pointerEvents: 'none'
+                        }}>
+                            <div style={{
+                                position: 'absolute', top: '0', left: '50%',
+                                animation: isActive ? 'handGrabAction 6s cubic-bezier(0.4, 0, 0.2, 1) infinite' : 'none',
+                                transformOrigin: 'top center'
+                            }}>
+                                <span className="material-symbols-outlined" style={{ 
+                                    fontSize: '150px', 
+                                    color: '#dea370', 
+                                    /* Use the solid variation of the icon for realistic volume */
+                                    fontVariationSettings: '"FILL" 1, "wght" 400',
+                                    filter: 'drop-shadow(0 20px 25px rgba(0,0,0,0.7))',
+                                }}>
+                                    back_hand
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Bottom-Centered Done Button & Message Area */}
+            <div style={{
+                position: 'absolute',
+                bottom: '85px',
+                left: '0',
+                right: '0',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '24px', // Decreased space between elements
+                zIndex: 100
+            }}>
+                <div style={{
+                    fontSize: '22px',
+                    fontWeight: 900,
+                    color: isSV002 ? 'var(--text-primary)' : 'rgba(255,255,255,0.90)',
+                    letterSpacing: '2px',
+                    textTransform: 'uppercase',
+                    animation: isActive ? 'fadeInUp 1s ease-out 0.3s forwards' : 'none',
+                    opacity: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    textShadow: isSV002 ? 'none' : '0 2px 12px rgba(0,0,0,0.25)'
+                }}>
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
                     Please collect your documents from below
-                    <ArrowDown size={22} weight="bold" className="animate-bounce text-gold-600" />
+                    <span className="material-symbols-outlined" style={{ animation: 'bounce 2s infinite', color: isSV002 ? 'var(--gold-accent)' : isCV001 ? '#80efff' : '#E8B86D' }}>south</span>
                 </div>
 
-                {report === 'ask' && (
-                    <div className="flex flex-col items-center gap-4">
-                        <p className={`text-[17px] font-bold ${isFestiveMode ? 'text-mahogany-700' : 'text-[#5C544B]'}`}>
-                            Did your pages print correctly?
-                        </p>
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={onReset}
-                                className={`flex items-center gap-3 rounded-full px-12 py-5 text-[19px] font-black uppercase tracking-[0.2em] shadow-xl transition-transform active:scale-95 ${
-                                    isFestiveMode
-                                        ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white'
-                                        : 'bg-gradient-to-br from-gold-400 via-gold-500 to-gold-600 text-white shadow-[0_8px_24px_rgba(200,134,10,0.35)] ring-1 ring-gold-300/70'
-                                }`}
-                            >
-                                Yes, done
-                                <Check size={24} weight="bold" />
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setReport('choose');
-                                    armReset(REPORT_RESET_MS);
-                                }}
-                                className={`flex items-center gap-2 rounded-full border-2 px-8 py-5 text-[16px] font-extrabold uppercase tracking-[0.12em] transition-transform active:scale-95 ${
-                                    isFestiveMode
-                                        ? 'border-mahogany-700/40 text-mahogany-800'
-                                        : 'border-gold-600/35 bg-white text-[#1A1714] shadow-sm active:bg-gold-50/80'
-                                }`}
-                            >
-                                <WarningCircle size={22} weight="bold" />
-                                Report a problem
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {(report === 'choose' || report === 'sending') && (
-                    <div className="flex flex-col items-center gap-4">
-                        <p className={`text-[17px] font-bold ${isFestiveMode ? 'text-mahogany-700' : 'text-[#5C544B]'}`}>
-                            What went wrong?
-                        </p>
-                        <div className="grid grid-cols-2 gap-3">
-                            {ISSUES.map((issue) => (
-                                <button
-                                    key={issue.id}
-                                    disabled={report === 'sending'}
-                                    onClick={() => sendReport(issue.id)}
-                                    className={`min-w-[250px] rounded-2xl border-2 px-6 py-4 text-[17px] font-extrabold transition-transform active:scale-95 disabled:opacity-50 ${
-                                        isFestiveMode
-                                            ? 'border-mahogany-700/30 bg-white/70 text-mahogany-800'
-                                            : 'border-gold-600/30 bg-white text-[#1A1714] shadow-sm hover:border-gold-500 active:bg-gold-50/80'
-                                    }`}
-                                >
-                                    {issue.label}
-                                </button>
-                            ))}
-                        </div>
-                        <button
-                            onClick={onReset}
-                            className={`text-[15px] font-bold underline underline-offset-4 ${isFestiveMode ? 'text-mahogany-700/70' : 'text-[#8C8072]'}`}
-                        >
-                            Never mind, everything is fine
-                        </button>
-                    </div>
-                )}
-
-                {(report === 'sent' || report === 'failed') && (
-                    <div className="flex max-w-[640px] flex-col items-center gap-4 text-center">
-                        <p className={`text-[20px] font-extrabold ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
-                            {report === 'sent'
-                                ? 'Thank you. The MIMO team has been told. Please keep the pages, the team may ask to see them.'
-                                : `We could not send your report. Please tell the staff your code ${printCode ?? ''}.`}
-                        </p>
-                        <button
-                            onClick={onReset}
-                            className={`flex items-center gap-3 rounded-full px-12 py-4 text-[17px] font-black uppercase tracking-[0.2em] shadow-xl transition-transform active:scale-95 ${
-                                isFestiveMode
-                                    ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white'
-                                    : 'bg-gradient-to-br from-gold-400 via-gold-500 to-gold-600 text-white shadow-[0_8px_24px_rgba(200,134,10,0.35)] ring-1 ring-gold-300/70'
-                            }`}
-                        >
-                            Done
-                            <Check size={22} weight="bold" />
-                        </button>
-                    </div>
-                )}
-
-                {isFestiveMode && <DiyaRow count={9} size={30} gap={22} />}
+                <button
+                    className="done-button-dynamic"
+                    style={{
+                        padding: '0 50px', height: '64px', borderRadius: '32px',
+                        background: isCV001 ? 'linear-gradient(135deg, #00e5ff, #0077b6)' : isSV002 ? 'var(--gold-accent)' : 'linear-gradient(135deg, #E8B86D, #C8860A)', color: isCV001 ? '#000a17' : '#fff', border: 'none',
+                        fontSize: '20px', fontWeight: 900, letterSpacing: '4px',
+                        textTransform: 'uppercase', cursor: 'pointer',
+                        boxShadow: isCV001 ? '0 20px 50px rgba(0,229,255,0.45), inset 0 1px 2px rgba(255,255,255,0.3)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45), inset 0 1px 2px rgba(255,255,255,0.3)',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                        animation: isActive ? 'fadeInUp 1s ease-out 0.5s forwards' : 'none',
+                        opacity: 0
+                    }}
+                    onClick={onReset}
+                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = isCV001 ? '0 10px 25px rgba(0,229,255,0.25)' : isSV002 ? '0 5px 15px rgba(183,140,67,0.3)' : '0 10px 25px rgba(200,134,10,0.25)'; }}
+                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = isCV001 ? '0 20px 50px rgba(0,229,255,0.45)' : isSV002 ? '0 10px 30px rgba(183,140,67,0.3)' : '0 20px 50px rgba(200,134,10,0.45)'; }}
+                >
+                    Done
+                    <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>check_circle</span>
+                </button>
             </div>
 
             <style>{`
-                @keyframes kiosk-paper-dispense {
-                    0%, 5%   { transform: translate(-50%, -220px); opacity: 1; }
-                    25%, 40% { transform: translate(-50%, 0px); opacity: 1; }
-                    55%      { transform: translate(-50%, 60px); opacity: 1; }
-                    65%      { transform: translate(-50%, 220px); opacity: 0; }
-                    100%     { transform: translate(-50%, 220px); opacity: 0; }
+                @keyframes fadeInUp {
+                    0% { opacity: 0; transform: translateY(40px); }
+                    100% { opacity: 1; transform: translateY(0); }
+                }
+
+                @keyframes blink {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.4; }
+                }
+
+                .done-button-dynamic:hover {
+                    box-shadow: 0 0 40px rgba(200,134,10,0.5), 0 20px 50px rgba(200,134,10,0.35);
+                    transform: translateY(-2px);
+                }
+                
+                .theme-sv002 .done-button-dynamic:hover {
+                    box-shadow: 0 0 40px rgba(183,140,67,0.4), 0 20px 50px rgba(183,140,67,0.3);
+                }
+
+                @keyframes paperDispenseHand {
+                    0%, 5% { transform: translateY(-320px); opacity: 1; }
+                    25%, 35% { transform: translateY(0px) rotate(0deg) skewX(0deg); opacity: 1; filter: brightness(1); }
+                    41% { transform: translateY(0px) rotate(0deg) skewX(0deg); opacity: 1; filter: brightness(0.9); }
+                    50% { transform: translateY(80px) rotate(-2deg) skewX(-3deg); opacity: 1; filter: brightness(0.9); }
+                    60% { transform: translateY(300px) rotate(-6deg) skewX(-6deg); opacity: 0; filter: brightness(0.9); }
+                    100% { transform: translateY(300px); opacity: 0; }
+                }
+
+                @keyframes handGrabAction {
+                    0%, 25% { transform: translate(-50%, 350px); opacity: 0; filter: drop-shadow(0 0 0 rgba(0,0,0,0)); }
+                    35% { transform: translate(-50%, 140px) scale(1.05); opacity: 1; filter: drop-shadow(0 40px 30px rgba(0,0,0,0.5)) brightness(1.1); }
+                    41% { transform: translate(-50%, 150px) scale(0.95); opacity: 1; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.8)) brightness(0.9); }
+                    50% { transform: translate(-50%, 230px) scale(0.95); opacity: 1; filter: drop-shadow(0 8px 15px rgba(0,0,0,0.7)) brightness(0.9); }
+                    60% { transform: translate(-50%, 450px) scale(0.95); opacity: 0; filter: drop-shadow(0 15px 25px rgba(0,0,0,0.6)) brightness(0.95); }
+                    100% { transform: translate(-50%, 450px) scale(0.95); opacity: 0; }
                 }
             `}</style>
         </div>

@@ -1,8 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
-import { WarningOctagon, Clock, ArrowClockwise, House, HandHeart } from '@phosphor-icons/react';
-import { FestiveBackdrop, Toran, ZariBorder } from '../festive/NavaratriDecor';
-import { isFestivalActive } from '../../config/festivalConfig';
 
 interface SystemErrorScreenProps {
     isActive: boolean;
@@ -20,16 +16,8 @@ interface SystemErrorScreenProps {
 
 const AUTO_RESET_SECONDS = 15;
 
-export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({
-    isActive,
-    jobData,
-    onReset,
-    onRetry,
-    errorMsg,
-    showRefundBanner,
-    kioskId,
-}) => {
-    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({ isActive, jobData, onReset, onRetry, errorMsg, showRefundBanner, kioskId }) => {
+    const isCV001 = kioskId === 'CV-001';
     const firstName = jobData?.userName?.split(' ')[0] || 'there';
     const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
 
@@ -39,148 +27,389 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({
             return;
         }
         setCountdown(AUTO_RESET_SECONDS);
-        let remaining = AUTO_RESET_SECONDS;
         const interval = setInterval(() => {
-            remaining -= 1;
-            if (remaining <= 0) {
-                clearInterval(interval);
-                onReset();
-                return;
-            }
-            setCountdown(remaining);
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    onReset();
+                    return AUTO_RESET_SECONDS;
+                }
+                return prev - 1;
+            });
         }, 1000);
         return () => clearInterval(interval);
     }, [isActive, onReset]);
 
     return (
-        <div
-            className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col items-center justify-between overflow-hidden px-20 text-center ${
-                isFestiveMode ? 'bg-parchment-100 pb-10 pt-[104px]' : 'bg-[#FAFAF8] py-8'
-            }`}
+        <div 
+            className={`screen err-screen ${isActive ? 'visible' : ''}`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
-            {!isFestiveMode && (
-                <div
-                    className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[150px]"
-                    style={{ background: 'radial-gradient(closest-side, rgba(243,91,91,0.08), transparent)' }}
-                />
-            )}
-            {isFestiveMode && (
-                <>
-                    <FestiveBackdrop />
-                    <Toran compact />
-                    <ZariBorder />
-                </>
-            )}
+            {/* Botanical background only for standard kiosk */}
+            {!isCV001 && <div className="kiosk-bg" />}
+            <div className="ambient-glow glow-1" />
+            <div className="ambient-glow glow-2" />
 
-            {/* Badge */}
-            <motion.div
-                initial={isActive ? { opacity: 0, y: -14, scale: 0.9 } : false}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
-                className={`relative z-10 flex items-center gap-2.5 rounded-full px-6 py-2 shadow-lg ${
-                    isFestiveMode
-                        ? 'bg-gradient-to-br from-mahogany-600 to-mahogany-800 border border-gold-600/40'
-                        : 'bg-gradient-to-br from-danger-600 to-[#ff8a3d]'
-                }`}
-            >
-                <WarningOctagon size={20} weight="fill" className="text-white" />
-                <span className="text-[14px] font-extrabold uppercase tracking-[0.15em] text-white">Print Error</span>
-            </motion.div>
-
-            {/* Main content */}
-            <div className="relative z-10 flex w-full max-w-[1000px] flex-1 flex-col justify-center gap-4 text-left">
-                <div className="flex items-baseline gap-2">
-                    <span className={`text-[32px] font-black uppercase tracking-wide ${isFestiveMode ? 'text-mahogany-600/70' : 'text-[#8C8072]'}`}>
-                        Hey
-                    </span>
-                    <span
-                        className={`text-[32px] font-black uppercase tracking-wide ${
-                            isFestiveMode ? 'text-gold-600 underline decoration-gold-600/60 underline-offset-8' : 'text-[#1A1714]'
-                        }`}
-                    >
-                        {firstName},
-                    </span>
+            <div className="err-pop-badge-container err-a1">
+                <div className="err-pop-badge">
+                    <svg className="err-pop-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M32 6L4 58h56L32 6Z" fill="rgba(255,255,255,0.1)" stroke="#fff" strokeWidth="4" strokeLinejoin="round" />
+                        <rect x="29" y="24" width="6" height="15" rx="3" fill="#fff" />
+                        <circle cx="32" cy="48" r="4" fill="#fff" />
+                    </svg>
+                    <span className="err-pop-text">PRINT ERROR</span>
                 </div>
+            </div>
 
-                <div
-                    className={`relative overflow-hidden rounded-[24px] border px-9 py-6 backdrop-blur-xl ${
-                        isFestiveMode
-                            ? 'border-gold-600/40 bg-gradient-to-br from-white to-parchment-200 shadow-[0_20px_50px_rgba(74,45,20,0.12)]'
-                            : 'border-danger-500/25 bg-white/90 shadow-[0_20px_50px_rgba(243,91,91,0.06)]'
-                    }`}
-                >
-                    <p className={`text-[22px] font-medium leading-snug ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
-                        {errorMsg || 'We apologize for the inconvenience. Something went wrong while printing your document.'}
-                    </p>
-                    {!showRefundBanner && (
-                        <p className={`mt-2 text-[19px] font-extrabold ${isFestiveMode ? 'text-gold-600' : 'text-danger-600'}`}>
-                            Please try again.
+            {/* ── MAIN CONTENT ── */}
+            <div className="err-top err-a2">
+                <div className="err-greeting-row">
+                    <span className="err-hey-label">HEY&nbsp;</span>
+                    <span className="err-hey-name">{firstName.toUpperCase()},</span>
+                </div>
+                
+                <div className="err-glass-card">
+                    <div className="err-card-border" />
+                    <div className="err-apology-content">
+                        <p className="err-apology-main">
+                            {errorMsg || 'We apologize for the inconvenience. Something went wrong while printing your document.'}
                         </p>
-                    )}
+                        {!showRefundBanner && (
+                            <p className="err-retry-line">PLEASE TRY AGAIN.</p>
+                        )}
+                    </div>
                 </div>
 
+                {/* ── Refund Banner ── */}
                 {showRefundBanner && (
-                    <div
-                        className={`flex items-center gap-5 rounded-3xl border px-7 py-4 ${
-                            isFestiveMode
-                                ? 'border-gold-600/30 bg-gradient-to-br from-white to-parchment-100'
-                                : 'border-success-500/30 bg-gradient-to-br from-success-500/10 to-white shadow-sm'
-                        }`}
-                    >
-                        <span
-                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
-                                isFestiveMode ? 'bg-success-500/15 text-success-600' : 'bg-success-500/15 text-success-600'
-                            }`}
-                        >
-                            <HandHeart size={22} weight="fill" />
-                        </span>
-                        <div className="flex flex-col gap-0.5 text-left">
-                            <strong className={`text-[19px] font-extrabold text-success-600`}>
-                                Refund in Progress
-                            </strong>
-                            <span className={`text-[15px] ${isFestiveMode ? 'text-mahogany-800/70' : 'text-[#5C544B]'}`}>
-                                If you were charged, your payment will be refunded within 5–7 business days.
-                            </span>
+                    <div className="err-refund-banner err-a2">
+                        <div className="err-refund-icon">💚</div>
+                        <div className="err-refund-text">
+                            <strong>Refund in Progress</strong>
+                            <span>If you were charged, your payment will be refunded within 5–7 business days.</span>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Bottom */}
-            <div className="relative z-10 flex flex-col items-center gap-4 pb-1">
-                <div className={`flex items-center gap-2 text-[15px] font-medium ${isFestiveMode ? 'text-mahogany-600/80' : 'text-[#5C544B]'}`}>
-                    <Clock size={17} />
-                    Returning home in{' '}
-                    <strong className={isFestiveMode ? 'text-gold-600' : 'text-gold-700'}>{countdown}s</strong>
+
+            {/* ── WARM AMBIENT GLOW beneath marquee ── */}
+            <div className="err-glow" />
+
+            {/* ── BOTTOM SECTION ── */}
+            <div className="err-bottom err-a3">
+                <div className="err-auto-return">
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', opacity: 0.7 }}>schedule</span>
+                    Returning to home in <strong style={{ color: isCV001 ? '#00e5ff' : '#FFD97D' }}>{countdown}s</strong>
                 </div>
-                <div className="flex items-center gap-6">
+                <div className="err-buttons">
                     {!showRefundBanner && (
                         <button
+                            className="err-btn-white"
                             onClick={onRetry}
-                            className={`flex items-center gap-2.5 rounded-full px-9 py-3.5 text-[17px] font-extrabold shadow-lg transition-transform active:scale-95 ${
-                                isFestiveMode
-                                    ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white'
-                                    : 'bg-gradient-to-br from-gold-400 via-gold-500 to-gold-600 text-white shadow-[0_8px_20px_rgba(200,134,10,0.35)] ring-1 ring-gold-300/70'
-                            }`}
+                            onPointerDown={e => (e.currentTarget.style.transform = 'scale(0.95)')}
+                            onPointerUp={e => (e.currentTarget.style.transform = '')}
+                            onPointerLeave={e => (e.currentTarget.style.transform = '')}
                         >
-                            <ArrowClockwise size={19} weight="bold" />
+                            <span className="material-symbols-outlined err-spin">refresh</span>
                             Try Again
                         </button>
                     )}
                     <button
+                        className={showRefundBanner ? 'err-btn-white' : 'err-btn-glass'}
                         onClick={onReset}
-                        className={`flex items-center gap-2.5 rounded-full border px-8 py-3.5 text-[17px] font-extrabold transition-transform active:scale-95 ${
-                            isFestiveMode
-                                ? 'border-gold-600/30 bg-white text-mahogany-800'
-                                : 'border-gold-600/30 bg-white text-[#1A1714] shadow-sm active:bg-gold-50/80'
-                        }`}
+                        onPointerDown={e => (e.currentTarget.style.transform = 'scale(0.95)')}
+                        onPointerUp={e => (e.currentTarget.style.transform = '')}
+                        onPointerLeave={e => (e.currentTarget.style.transform = '')}
                     >
-                        <House size={19} weight="bold" />
+                        <span className="material-symbols-outlined">home</span>
                         Back to Home
                     </button>
                 </div>
             </div>
+
+            <style>{`
+                .err-screen {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: space-between;
+                    text-align: center;
+                    overflow: hidden;
+                    background: transparent;
+                    padding: 42px 80px 40px;
+                }
+
+                /* ── TOP ── */
+                .err-top {
+                    z-index: 10;
+                    display: flex;
+                    flex-direction: column;
+                    width: 100%;
+                    padding-left: 50px;
+                    text-align: left;
+                    gap: 20px;
+                    margin-top: -35px;
+                }
+
+                .err-greeting-row {
+                    display: flex;
+                    align-items: baseline;
+                }
+
+                .err-hey-label, .err-hey-name {
+                    font-size: 56px;
+                    font-weight: 900;
+                    letter-spacing: 0.08em;
+                    color: #fff;
+                    text-transform: uppercase;
+                    line-height: 1;
+                }
+
+                /* GLASS CARD */
+                .err-glass-card {
+                    position: relative;
+                    max-width: 1000px;
+                    background: rgba(255, 255, 255, 0.04);
+                    backdrop-filter: blur(25px);
+                    -webkit-backdrop-filter: blur(25px);
+                    border-radius: 28px;
+                    overflow: hidden;
+                    box-shadow: 0 20px 80px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.06);
+                    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease;
+                }
+
+
+                .err-card-border {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    bottom: 0;
+                    width: 8px;
+                    background: ${isCV001 ? 'linear-gradient(to bottom, #00e5ff, #0077ff)' : 'linear-gradient(to bottom, #ff9d00, #ff5e00)'};
+                    opacity: 0.8;
+                }
+
+                .err-apology-content {
+                    padding: 36px 48px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
+
+                .err-apology-main {
+                    font-size: 42px;
+                    font-weight: 500;
+                    letter-spacing: -0.01em;
+                    color: rgba(255, 255, 255, 0.9);
+                    text-transform: none;
+                    margin: 0;
+                    line-height: 1.4;
+                }
+
+                .err-retry-line {
+                    font-size: 42px;
+                    font-weight: 800;
+                    letter-spacing: 0.02em;
+                    color: #fff;
+                    text-transform: none;
+                    margin: 0;
+                    line-height: 1;
+                    opacity: 1;
+                }
+
+                /* ── Refund Banner ── */
+                .err-refund-banner {
+                    display: flex;
+                    align-items: center;
+                    gap: 24px;
+                    padding: 24px 40px;
+                    background: linear-gradient(135deg, rgba(0, 200, 140, 0.18), rgba(0, 242, 180, 0.10));
+                    border: 1.5px solid rgba(0, 230, 160, 0.45);
+                    border-radius: 24px;
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
+                    box-shadow: 0 0 40px rgba(0, 200, 140, 0.18), inset 0 1px 0 rgba(255,255,255,0.08);
+                    max-width: 900px;
+                    animation: refund-glow-pulse 3s ease-in-out infinite;
+                }
+
+                @keyframes refund-glow-pulse {
+                    0%, 100% { box-shadow: 0 0 30px rgba(0, 200, 140, 0.15), inset 0 1px 0 rgba(255,255,255,0.08); }
+                    50%       { box-shadow: 0 0 60px rgba(0, 200, 140, 0.32), inset 0 1px 0 rgba(255,255,255,0.08); }
+                }
+
+                .err-refund-icon {
+                    font-size: 48px;
+                    flex-shrink: 0;
+                    filter: drop-shadow(0 0 10px rgba(0, 230, 160, 0.6));
+                }
+
+                .err-refund-text {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    text-align: left;
+                }
+
+                .err-refund-text strong {
+                    font-size: 32px;
+                    font-weight: 800;
+                    color: #00e6a0;
+                    letter-spacing: 0.01em;
+                }
+
+                .err-refund-text span {
+                    font-size: 26px;
+                    font-weight: 400;
+                    color: rgba(255, 255, 255, 0.75);
+                    line-height: 1.4;
+                }
+
+                /* ── POP BADGE ── */
+                .err-pop-badge-container {
+                    margin-top: 18px;
+                    z-index: 5;
+                    pointer-events: none;
+                }
+
+                .err-pop-badge {
+                    display: flex;
+                    align-items: center;
+                    gap: 22px;
+                    padding: 16px 40px;
+                    background: ${isCV001 ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95))' : 'linear-gradient(135deg, rgba(255, 77, 77, 0.95), rgba(255, 120, 60, 0.95))'};
+                    border-radius: 100px;
+                    box-shadow: 0 20px 60px rgba(255, 77, 77, 0.35), 0 0 0 6px rgba(255, 255, 255, 0.1);
+                    animation: pop-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+                }
+
+                .err-pop-icon {
+                    width: 36px;
+                    height: 36px;
+                    filter: drop-shadow(0 0 12px rgba(255,255,255,0.4));
+                }
+
+                .err-pop-text {
+                    font-size: 32px;
+                    font-weight: 950;
+                    letter-spacing: 0.1em;
+                    color: #fff;
+                    text-transform: uppercase;
+                    line-height: 1;
+                }
+
+
+                /* ── WARM GLOW beneath marquee ── */
+                .err-glow {
+                    position: absolute;
+                    top: calc(50% + 60px);
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 700px;
+                    height: 180px;
+                    background: ${isCV001 ? 'radial-gradient(ellipse at center, rgba(0, 229, 255, 0.15) 0%, transparent 70%)' : 'radial-gradient(ellipse at center, rgba(255, 160, 50, 0.1) 0%, transparent 70%)'};
+                    pointer-events: none;
+                    z-index: 5;
+                    opacity: 0.8;
+                }
+
+                @keyframes amber-pulse {
+                    0%, 100% { border-color: rgba(255, 180, 60, 0.85); }
+                    50%       { border-color: rgba(255, 210, 100, 1); }
+                }
+
+                /* ── BOTTOM ── */
+                .err-bottom {
+                    z-index: 10;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 24px;
+                    margin-bottom: 40px;
+                }
+
+                .err-auto-return {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    font-size: 22px;
+                    font-weight: 500;
+                    color: rgba(255, 255, 255, 0.55);
+                    letter-spacing: 0.01em;
+                }
+
+
+                /* ── Entry animations ── */
+                .err-a1 { animation: err-reveal 0.9s cubic-bezier(0.16,1,0.3,1) both 0.1s; }
+                .err-a2 { animation: err-reveal 0.9s cubic-bezier(0.16,1,0.3,1) both 0.4s; }
+                .err-a3 { animation: err-reveal 0.9s cubic-bezier(0.16,1,0.3,1) both 0.7s; }
+
+                @keyframes err-reveal {
+                    0%   { opacity: 0; transform: translateY(24px); filter: blur(6px); }
+                    100% { opacity: 1; transform: translateY(0);    filter: blur(0); }
+                }
+
+                /* ── Buttons ── */
+                .err-buttons {
+                    display: flex;
+                    align-items: center;
+                    gap: 90px;
+                }
+
+                /* White solid pill */
+                .err-btn-white {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                    padding: 26px 85px;
+                    border-radius: 50px;
+                    border: none;
+                    background: #ffffff;
+                    color: #0e3a6e;
+                    font-family: 'Plus Jakarta Sans', sans-serif;
+                    font-size: 26px;
+                    font-weight: 800;
+                    letter-spacing: 0.01em;
+                    cursor: pointer;
+                    box-shadow: 0 12px 50px rgba(0,0,0,0.25);
+                    transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+                    touch-action: manipulation;
+                }
+
+                /* Glass ghost pill */
+                .err-btn-glass {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                    padding: 26px 70px;
+                    border-radius: 50px;
+                    border: 2px solid rgba(255,255,255,0.28);
+                    background: rgba(255,255,255,0.09);
+                    color: #ffffff;
+                    font-family: 'Plus Jakarta Sans', sans-serif;
+                    font-size: 26px;
+                    font-weight: 700;
+                    letter-spacing: 0.01em;
+                    cursor: pointer;
+                    backdrop-filter: blur(30px);
+                    -webkit-backdrop-filter: blur(30px);
+                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 4px 20px rgba(0,0,0,0.15);
+                    transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+                    touch-action: manipulation;
+                }
+
+                .err-spin {
+                    animation: err-icon-spin 2s linear infinite;
+                }
+
+                @keyframes err-icon-spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 };

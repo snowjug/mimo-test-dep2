@@ -1,14 +1,51 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { Printer } from '@phosphor-icons/react';
-import { isFestivalActive } from '../../config/festivalConfig';
-import { DiyaRow, FestiveBackdrop, Mandala, Toran, ZariBorder } from '../festive/NavaratriDecor';
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
-// '0000' and '9999' are both faked entirely client-side in App.tsx (no print_jobs doc is ever created for
-// them), so neither can ever be found by a real backend poll. '9999' used to be missing from this list here,
-// so it would poll job-status for a job that doesn't exist, sit on "Warming up printer…" forever, and only
-// ever resolve by hitting the print timeout and showing an error — looking exactly like "doesn't work".
-const isDemoPrintCode = (code?: string) => code === '0000' || code === '9999';
+
+const FlowerIcon1: React.FC = () => (
+  <svg 
+    viewBox="0 0 24 24" 
+    style={{ color: '#fff', width: '1em', height: '1em', display: 'block' }} 
+    fill="currentColor"
+  >
+    <circle cx="12" cy="12" r="3" />
+    <circle cx="12" cy="7" r="4" />
+    <circle cx="7.25" cy="10.45" r="4" />
+    <circle cx="9.06" cy="16.05" r="4" />
+    <circle cx="14.94" cy="16.05" r="4" />
+    <circle cx="16.75" cy="10.45" r="4" />
+  </svg>
+);
+
+const FlowerIcon2: React.FC = () => (
+  <svg 
+    viewBox="0 0 24 24" 
+    style={{ color: '#fff', width: '1em', height: '1em', display: 'block' }} 
+    fill="currentColor"
+  >
+    <circle cx="12" cy="12" r="3.5" />
+    <circle cx="12" cy="6.5" r="2.5" />
+    <circle cx="12" cy="17.5" r="2.5" />
+    <circle cx="6.5" cy="12" r="2.5" />
+    <circle cx="17.5" cy="12" r="2.5" />
+    <circle cx="15.89" cy="8.11" r="2.5" />
+    <circle cx="8.11" cy="8.11" r="2.5" />
+    <circle cx="15.89" cy="15.89" r="2.5" />
+    <circle cx="8.11" cy="15.89" r="2.5" />
+  </svg>
+);
+
+const MusicNoteIcon1: React.FC = () => (
+  <svg viewBox="0 0 24 24" style={{ width: '1em', height: '1em', display: 'block' }} fill="currentColor">
+    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+  </svg>
+);
+
+const MusicNoteIcon2: React.FC = () => (
+  <svg viewBox="0 0 24 24" style={{ width: '1em', height: '1em', display: 'block' }} fill="currentColor">
+    <path d="M21 3H10v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h9V10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V3z"/>
+  </svg>
+);
 
 interface PrintingScreenProps {
   isActive: boolean;
@@ -18,7 +55,6 @@ interface PrintingScreenProps {
   onError?: (errorMsg?: string) => void;
   pages?: number;
   copies?: number;
-  doubleSided?: boolean | string;
   printCode?: string;       // ← needed to poll real status
   manualProgress?: number;  // ← optional override for testing
   colorMode?: 'color' | 'bw';
@@ -44,13 +80,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   onError,
   pages = 1,
   copies = 1,
-  doubleSided = false,
   printCode,
   manualProgress,
   colorMode = 'bw',
   kioskId,
 }) => {
-  const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+  const isCV001 = kioskId === 'CV-001';
+  const isSV002 = kioskId === 'SV-002';
   const [progress, setProgress]         = useState(0);
   const [typedTitle, setTypedTitle]     = useState('');
   const [typedSub, setTypedSub]         = useState('');
@@ -73,31 +109,14 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   const isCompleted = progress >= 100;
 
-  // Print duration budget: mirrors the backend/Pi's own per-sheet timing — the colour inkjet
-  // genuinely needs far longer per sheet than the B&W laser (see pi_scripts/firebase_listener.py's
-  // own cups_timeout, and pi-listener's per-colour-mode calibration) — plus a 30s buffer so a
-  // backend timeout (which triggers an auto-refund) wins the race over this screen giving up first.
-  // A flat timeout here regressed to 120s on 2026-09-24: MIMO 2.0 colour jobs (which routinely need
-  // several minutes) started failing while MIMO 1.0 B&W jobs (always well under 2 min) did not.
-  const printTimeoutMs = useMemo(() => {
-    const totalSheets = Math.max(1, pages * copies);
-    const isColor = colorMode === 'color';
-    const baseWarmupSec = 600; // 10 min base warmup/spooling/rendering time
-    const secPerPage = isColor ? 360 : 20; // 360s/page colour inkjet, 20s/page B&W laser
-    return (baseWarmupSec + totalSheets * secPerPage + 30) * 1000;
-  }, [pages, copies, colorMode]);
 
 
   const finalTitle = isCompleted
     ? "Print Completed ✅"
-    : (isFestiveMode && statusTitle === "Print Completed ✅")
-    ? "Printing in Progress"
     : (statusTitle || "Printing in Progress");
 
   const finalSub = isCompleted
     ? "Your document has been printed successfully."
-    : (isFestiveMode && statusTitle === "Print Completed ✅")
-    ? "Printing in progress…\nPlease wait."
     : (statusSub || "Printing in progress…\nPlease wait.");
 
   // ─── helpers ───────────────────────────────────────────────────────────────
@@ -125,120 +144,92 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     tickTimerRef.current = null;
     stallTimerRef.current = null;
 
-    // Immediate 100% completion upon hardware verification confirmation
+    // Snap progress directly to 100% and display clear confirmation
     progressRef.current = 100;
     setProgress(100);
     setStatusMsg('Print Completed ✅');
 
-    // 400ms celebration hold before transitioning to summary screen
+    // Hold for 1.0 second before transitioning to summary screen
     completionTimerRef.current = window.setTimeout(() => {
       onComplete();
-    }, 400);
-  }, [onComplete]);
+    }, 1000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onComplete, colorMode]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
-  const schedulePoll = useCallback((delayMs = 200) => {
-    if (!printCode || isDemoPrintCode(printCode) || !isActive) return;
+  const schedulePoll = useCallback((delayMs = 1000) => {
+    if (!printCode || printCode === '0000' || !isActive) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
-      // Enforce the colour/page-aware print deadline from the start of printing
-      if (Date.now() - startTimeRef.current >= printTimeoutMs) {
-        if (!isCompletingRef.current) {
-          clearAllTimers();
-          if (onError) onError('Print timed out. If your document was not printed, please contact support.');
-        }
-        return;
-      }
-
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 5000);
-
       try {
         const res = await fetch(
           `${BACKEND_URL}/kiosk/job-status?printCode=${encodeURIComponent(printCode)}`,
-          { cache: 'no-store', signal: controller.signal }
+          { cache: 'no-store' }
         );
-        window.clearTimeout(timeoutId);
         const data = await res.json();
 
         // Reset last successful poll timestamp — the network is alive
         lastSuccessfulPollTimeRef.current = Date.now();
 
-        // Authoritative completion signal from backend
         if (data.status === 'completed' || data.isPrinted === true) {
           setPrintDone(true);
           // animateTo100AndComplete will be called via the printDone effect
-        } else if (data.status === 'failed' || data.status === 'refunded') {
+        } else if (data.status === 'failed') {
           const errMsg = data.printerStatus || data.error || 'Printer reported an error.';
           setStatusMsg(errMsg);
           clearAllTimers();
           if (onError) onError(errMsg);
-        } else if (data.status === 'printing') {
-          const isDuplex = doubleSided === true || doubleSided === 'double' || data.double_sided === 'double' || data.doubleSided === true;
-          const fallbackSheets = (isDuplex ? Math.ceil(pages / 2) : pages) * copies;
-          const total = Number(data.totalSheets) || Math.max(1, fallbackSheets);
-          const completed = Number(data.sheetsCompleted) || 0;
-
-          // Velocity-matched smooth progress: approaches but never exceeds 98%
-          const isColor = colorMode === 'color';
-          const expectedSec = (isColor ? 15 + total * 8 : 12 + total * 2.0);
-          const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
-          const timePercent = Math.min(98, Math.round((elapsedSec / expectedSec) * 98));
-
-          let targetPercent = timePercent;
-          if (completed > 0) {
-            const hardwarePercent = Math.min(95, Math.round((completed / total) * 95));
-            targetPercent = Math.max(targetPercent, hardwarePercent);
-          }
-          targetPercent = Math.min(98, Math.max(progressRef.current, targetPercent));
-
-          progressRef.current = targetPercent;
-          setProgress(targetPercent);
-
-          if (total === 1) {
-            setStatusMsg(targetPercent < 20 ? 'Warming up printer…' : 'Printing document…');
-          } else {
-            if (completed > 0) {
-              setStatusMsg(`Printing sheet ${completed} of ${total}…`);
-            } else {
-              const estSheet = Math.min(total, Math.max(1, Math.ceil((targetPercent / 98) * total)));
-              setStatusMsg(targetPercent < 15 ? 'Warming up printer…' : `Printing sheet ${estSheet} of ${total}…`);
-            }
-          }
-
-          schedulePoll(200);
         } else {
-          // Status 'paid' or waiting for start
-          setStatusMsg('Warming up printer…');
-          schedulePoll(300);
+          // Still printing — poll again in 1 s for immediate completion sync
+          schedulePoll(1000);
         }
       } catch {
-        window.clearTimeout(timeoutId);
-        // Network hiccup — retry in 2 s without failing immediately if transient
-        if (isActive && !isCompletingRef.current) {
-          pollTimerRef.current = window.setTimeout(() => schedulePoll(200), 2000);
-        }
+        // Network hiccup — retry in 2 s
+        pollTimerRef.current = window.setTimeout(() => schedulePoll(1000), 2000);
       }
     }, delayMs);
-  }, [printCode, isActive, pages, copies, onError, clearAllTimers, printTimeoutMs]);
+  }, [printCode, isActive, onError, clearAllTimers]);
 
-  // ─── demo mode fallback (used ONLY when printCode is '0000'/'9999' or missing) ──
+  // ─── slow progress simulation ──────────────────────────────────────────────
 
   const startSlowTick = useCallback(() => {
     if (manualProgress !== undefined) return;
 
     const totalSheets = Math.max(1, pages * copies);
-    const cap = 100;
-    const baseDelay = 150;
+
+    // ── Target total time for the 0→99% animation ─────────────────────────────
+    // Calibrated to match actual physical printer speeds so progress reaches
+    // ~95% exactly as the physical paper emerges from the machine.
+    // B&W laser:    ~1.5s per sheet (Brother HL-L2440DW prints at 32 ppm)
+    // Color inkjet: ~60s per sheet (Epson L3250 EcoTank 150 DPI fast color print speed)
+    const isColor = colorMode === 'color';
+    const baseWarmup  = isColor ? 3000 : 2000;
+    const speedFactor = isColor ? 60000 : 1500;
+    const totalAnimMs = baseWarmup + totalSheets * speedFactor;
+    const baseDelay   = Math.max(40, totalAnimMs / 99); // ms per 1% step
 
     const tick = () => {
       if (isCompletingRef.current) return;
 
       const currentProgress = progressRef.current;
+      const cap = (printCode && printCode !== '0000') ? 85 : 100;
 
       if (currentProgress >= cap) {
-        animateTo100AndComplete();
+        if (!printCode || printCode === '0000') {
+          animateTo100AndComplete();
+        } else {
+          // Creep very slowly above 85% so it never looks frozen
+          const nextCreep = Math.min(94, currentProgress + 1);
+          progressRef.current = nextCreep;
+          setProgress(nextCreep);
+          setStatusMsg(
+            totalSheets > 1
+              ? `Ejecting paper (${totalSheets} of ${totalSheets})…`
+              : `Ejecting paper into tray…`
+          );
+          tickTimerRef.current = window.setTimeout(tick, 8000); // 8 seconds per 1% creep
+        }
         return;
       }
 
@@ -246,26 +237,50 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       progressRef.current = next;
       setProgress(next);
 
-      if (next <= 15) {
+      // ── Phase-based delay multipliers & status text ────────────────────────
+      let delay: number;
+      if (next <= 20) {
+        // Warm-up (0→20%): 1.1× — warm-up & feed
+        delay = baseDelay * 1.1;
         setStatusMsg('Warming up printer…');
-      } else {
-        const printProgressPct = (next - 15) / (cap - 15);
-        const currentSheetEstimate = Math.min(
+      } else if (next <= 50) {
+        // Normal pace (20→50%): 0.85× — active spooling and print start
+        delay = baseDelay * 0.85;
+        const printingPct = next - 20; // 0…30
+        const currentPage = Math.min(
           totalSheets,
-          Math.max(1, Math.ceil(printProgressPct * totalSheets))
+          Math.ceil((printingPct / 30) * Math.ceil(totalSheets / 2))
         );
         setStatusMsg(
           totalSheets === 1
             ? `Printing document…`
-            : `Printing sheet ${currentSheetEstimate} of ${totalSheets}…`
+            : `Printing page ${currentPage} of ${totalSheets}…`
+        );
+      } else {
+        // Slowing pace (50→85%): 1.6× to 2.8× — physical paper passage
+        const slowFactor = 1.6 + ((next - 50) / 35) * 1.2;
+        delay = baseDelay * slowFactor;
+        const currentPage = Math.min(
+          totalSheets,
+          Math.ceil(((next - 20) / 65) * totalSheets)
+        );
+        setStatusMsg(
+          totalSheets === 1
+            ? `Printing document…`
+            : `Printing page ${currentPage} of ${totalSheets}…`
         );
       }
 
-      tickTimerRef.current = window.setTimeout(tick, baseDelay);
+      if (next !== lastProgressRef.current) {
+        lastProgressRef.current = progressRef.current;
+      }
+
+      const jitter = (Math.random() - 0.5) * delay * 0.05;
+      tickTimerRef.current = window.setTimeout(tick, Math.max(100, delay + jitter));
     };
 
-    tickTimerRef.current = window.setTimeout(tick, baseDelay);
-  }, [pages, copies, manualProgress, animateTo100AndComplete]);
+    tickTimerRef.current = window.setTimeout(tick, 600);
+  }, [pages, copies, printCode, manualProgress, colorMode, animateTo100AndComplete]);
 
   // ─── main effect ──────────────────────────────────────────────────────────
 
@@ -287,10 +302,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       return;
     }
 
-    // Explicitly start at 0% on screen activation
-    setProgress(0);
-    progressRef.current = 0;
-    lastProgressRef.current = 0;
     setTypedTitle('');
     setTypedSub('');
     startTimeRef.current = Date.now();
@@ -311,17 +322,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (subIdx >= finalSub.length) clearInterval(subInterval);
     }, 30);
 
-    // Handle manualProgress mode vs live polling vs demo mode
+    // Handle manualProgress mode
     if (manualProgress !== undefined) {
       setProgress(manualProgress);
       progressRef.current = manualProgress;
       if (manualProgress >= 100) {
         animateTo100AndComplete();
       }
-    } else if (printCode && !isDemoPrintCode(printCode)) {
-      schedulePoll(200); // Live polling driven by backend sheet progress
     } else {
-      startSlowTick(); // Demo mode simulation
+      startSlowTick();
+      if (printCode) schedulePoll(1000); // First check after 1s, then every 2s
     }
 
     return () => {
@@ -340,14 +350,22 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   }, [printDone, isActive, animateTo100AndComplete]);
 
   // ── Stall & Timeout detector ──────────────────────────────────────────────
-  // Fires every 1 second.
-  // 1. Print Timeout: colour/page-aware cutoff (printTimeoutMs above) from the moment the print
-  //    screen activates — NOT a flat number, so a genuinely slow colour job isn't killed early.
-  // 2. Network Stall Check: If no poll response received for > 45 seconds, assume network loss.
+  // Fires every 5 seconds.
+  // 1. Connection Stall Check: If we haven't received a successful poll response
+  //    for > 45 seconds, we assume network connectivity is lost.
+  // 2. Physical Printing Timeout Check: Based on page count and color mode,
+  //    we calculate a generous print time limit (matching the backend). If the
+  //    total elapsed time exceeds this limit, we time out.
   useEffect(() => {
-    if (!isActive || !printCode || isDemoPrintCode(printCode)) return;
+    if (!isActive || !printCode || printCode === '0000') return;
 
-    const networkStallThresholdMs = 45000; // 45 seconds with no network response
+    const totalSheets = Math.max(1, pages * copies);
+    const isColor = colorMode === 'color';
+    const baseWarmupSec = 600; // 600 seconds (10 min) base warmup/spooling/rendering time
+    const secPerPage = isColor ? 360 : 20; // 360s (6 min) per color page for EcoTank inkjet; 20s/page for B&W laser
+    // Timeout matching backend plus a 30 seconds buffer to prioritize backend failure message/refund trigger
+    const printTimeoutMs = (baseWarmupSec + totalSheets * secPerPage + 30) * 1000;
+    const networkStallThresholdMs = 90000; // 90 seconds with no network response (for large rendering operations)
 
     const checkTimeout = () => {
       if (isCompletingRef.current) return; // already finishing — no action needed
@@ -355,12 +373,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       const elapsedMs = Date.now() - startTimeRef.current;
       const msSinceLastPoll = Date.now() - lastSuccessfulPollTimeRef.current;
 
-      // Enforce the colour/page-aware print deadline from start of printing
-      if (elapsedMs >= printTimeoutMs) {
-        console.warn(`[PrintingScreen] Print timeout reached (${elapsedMs}ms / ${printTimeoutMs}ms budget). Surfacing error.`);
+      // Check for total print timeout
+      if (elapsedMs > printTimeoutMs) {
+        console.warn(`[PrintingScreen] Print timeout exceeded: ${elapsedMs}ms > ${printTimeoutMs}ms. Surfacing error.`);
         clearAllTimers();
         if (onError) {
-          onError('Print timed out. Please contact support if your document was not printed.');
+          onError('Print timed out. If you were charged, your refund will be processed automatically.');
         }
         return;
       }
@@ -375,15 +393,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         return;
       }
 
-      stallTimerRef.current = window.setTimeout(checkTimeout, 1000);
+      stallTimerRef.current = window.setTimeout(checkTimeout, 5000);
     };
 
-    stallTimerRef.current = window.setTimeout(checkTimeout, 1000);
+    // Start checking after 10s
+    stallTimerRef.current = window.setTimeout(checkTimeout, 10000);
 
     return () => {
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
     };
-  }, [isActive, printCode, clearAllTimers, onError, printTimeoutMs]);
+  }, [isActive, printCode, pages, copies, colorMode, clearAllTimers, onError]);
 
   // ─── SVG geometry ─────────────────────────────────────────────────────────
 
@@ -407,143 +426,323 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     return points;
   }, [progress, radius]);
 
+  // Musical note characters to cycle through
+  const noteChars = ['\u2669', '\u266a', '\u266b', '\u266c'];
+
+  // Static list of note particles with pre-computed x/y orbit positions
+  const noteParticles = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const angleRad = (i / 12) * 2 * Math.PI;
+      // Vary orbit radius slightly per note
+      const orbitR = 158 + (i % 3 === 0 ? 18 : i % 3 === 1 ? -18 : 4);
+      // Pre-compute position on the orbit circle (centre is 190,190 in SVG space; 190px offset in div)
+      const x = 190 + orbitR * Math.cos(angleRad); // px from left=0 of the 380px container
+      const y = 190 + orbitR * Math.sin(angleRad);
+      return {
+        id: i,
+        char: noteChars[i % noteChars.length],
+        x,
+        y,
+        duration: 2800 + i * 350,
+        delay: -(i * 280), // negative delay = start mid-cycle for staggered look
+        fontSize: 16 + (i % 3) * 5,
+        opacity: 0.55 + (i % 3) * 0.15,
+      };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+
   // ─── render ───────────────────────────────────────────────────────────────
 
   return (
     <div
-      className={`screen ${isActive ? 'visible' : ''} flex flex-row items-center justify-center gap-24 overflow-hidden px-24 ${
-        isFestiveMode ? 'bg-parchment-100' : 'bg-[#FAFAF8]'
-      }`}
-      style={{ display: isActive ? 'flex' : 'none' }}
+      className={`screen printing-wrap ${isActive ? 'visible' : ''}`}
+      style={{
+        display: isActive ? 'flex' : 'none',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '100px',
+        padding: '0 100px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
     >
-      <div
-        className="pointer-events-none absolute left-1/2 top-1/2 h-[600px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[150px]"
-        style={{
-          background: isFestiveMode
-            ? 'radial-gradient(closest-side, rgba(201,151,62,0.14), transparent)'
-            : 'radial-gradient(closest-side, rgba(217,165,68,0.12), transparent)',
-        }}
-      />
-
-      {isFestiveMode && (
-        <>
-          <FestiveBackdrop />
-          <Toran compact />
-          <ZariBorder />
-        </>
-      )}
+      {/* Botanical background */}
+      <div className="kiosk-bg" />
+      <div className="ambient-glow glow-1" />
+      <div className="ambient-glow glow-2" />
+      <style>{`
+        @keyframes spin-slow {
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes spin-slow-reverse {
+          100% { transform: rotate(-360deg); }
+        }
+        @keyframes pulse-ring {
+          0%   { transform: scale(0.85); opacity: 0; }
+          50%  { opacity: 0.8; }
+          100% { transform: scale(1.4);  opacity: 0; }
+        }
+        @keyframes petal-float {
+          0%   { transform: translate(0, 0)        rotate(0deg)   scale(0.7); opacity: 0; }
+          15%  { opacity: 0.85; }
+          60%  { transform: translate(50px, -55px) rotate(120deg) scale(1.0); opacity: 0.70; }
+          100% { transform: translate(80px, -110px) rotate(220deg) scale(0.5); opacity: 0; }
+        }
+        @keyframes petal-float-2 {
+          0%   { transform: translate(0, 0)         rotate(0deg)   scale(0.6); opacity: 0; }
+          15%  { opacity: 0.75; }
+          60%  { transform: translate(-40px, -70px) rotate(-140deg) scale(1.0); opacity: 0.60; }
+          100% { transform: translate(-65px,-130px) rotate(-260deg) scale(0.4); opacity: 0; }
+        }
+        @keyframes text-glow-pulse {
+          0%,100% { filter: drop-shadow(0 0 15px rgba(200,134,10,0.4)); }
+          50%      { filter: drop-shadow(0 0 35px rgba(232,184,109,0.9)); }
+        }
+        @keyframes text-glow-pulse-cyan {
+          0%,100% { filter: drop-shadow(0 0 15px rgba(0,229,255,0.4)); }
+          50%      { filter: drop-shadow(0 0 35px rgba(0,229,255,0.9)); }
+        }
+        .petal-fly {
+          position: absolute;
+          font-size: 28px;
+          animation: petal-float 3.2s cubic-bezier(0.25,1,0.5,1) infinite;
+          pointer-events: none;
+          /* Strip colour from emoji — renders as white petals */
+          filter: grayscale(1) brightness(8) drop-shadow(0 2px 8px rgba(255,255,255,0.5));
+        }
+        .petal-fly.p2 { animation: petal-float-2 2.8s cubic-bezier(0.25,1,0.5,1) infinite 1.1s; top: 20px; font-size: 22px; }
+        .petal-fly.p3 { animation: petal-float 3.6s cubic-bezier(0.25,1,0.5,1) infinite 2.0s; top: -20px; font-size: 24px; }
+        @keyframes collect-pulse {
+          0%,100% { box-shadow: 0 0 0 0 rgba(76,175,80,0.4); }
+          50%      { box-shadow: 0 0 0 30px rgba(76,175,80,0); }
+        }
+        @keyframes collect-fade-in {
+          from { opacity: 0; transform: scale(0.94); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes petal-orbit {
+          0%   { opacity: 0;   transform: translateY(0px)   scale(0.7) rotate(0deg); }
+          15%  { opacity: 0.9; }
+          50%  { opacity: 0.6; transform: translateY(-20px) scale(1.1) rotate(180deg); }
+          100% { opacity: 0;   transform: translateY(-40px) scale(0.6) rotate(360deg); }
+        }
+      `}</style>
 
       {/* ── Color print: "Collecting your pages" overlay ── */}
       {collectingPages && (
-        <div
-          className={`absolute inset-0 z-[200] flex flex-col items-center justify-center gap-9 ${
-            isFestiveMode ? 'bg-gradient-to-br from-parchment-100 to-parchment-200' : 'bg-gradient-to-br from-white via-[#FAF6EE] to-white'
-          }`}
-        >
-          <div className="relative flex items-center justify-center">
-            <div
-              className={`flex h-36 w-36 items-center justify-center rounded-full border-2 ${
-                isFestiveMode ? 'border-gold-600/40 bg-gold-500/10 text-gold-600' : 'border-gold-500/35 bg-gold-500/10 text-gold-600 shadow-lg'
-              }`}
-              style={{ animation: 'kiosk-collect-pulse 2s ease-in-out infinite' }}
-            >
-              <Printer size={64} weight="regular" />
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 200,
+          background: 'linear-gradient(135deg, #001a28 0%, #00101c 100%)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '36px',
+          animation: 'collect-fade-in 0.5s ease',
+        }}>
+          {/* Printer icon + pulse ring */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '140px', height: '140px', borderRadius: '50%',
+              background: 'rgba(0,242,254,0.08)',
+              border: '3px solid rgba(0,242,254,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: 'collect-pulse 2s ease-in-out infinite',
+            }}>
+              <span className="material-symbols-outlined" style={{
+                fontSize: '72px', color: '#00f2fe',
+                filter: 'drop-shadow(0 0 16px rgba(0,242,254,0.7))',
+              }}>print</span>
             </div>
           </div>
 
-          <div className="max-w-2xl px-10 text-center">
-            <h2 className={`mb-4 text-[50px] font-extrabold leading-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
-              Collecting your pages…
+          {/* Main message */}
+          <div style={{ textAlign: 'center', maxWidth: '700px', padding: '0 40px' }}>
+            <h2 style={{
+              fontSize: '62px', fontWeight: 800, letterSpacing: '-2px',
+              lineHeight: 1.1, marginBottom: '20px',
+              background: 'linear-gradient(135deg, #00f2fe, #4facfe)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>
+              🖨️ Collecting your pages…
             </h2>
-            <p className={`text-[24px] font-medium leading-relaxed ${isFestiveMode ? 'text-mahogany-800/70' : 'text-[#5C544B]'}`}>
-              Your color print is being ejected.
-              <br />
-              <strong className={isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}>Please wait at the printer</strong> for your document.
+            <p style={{
+              fontSize: '28px', fontWeight: 500, color: 'rgba(255,255,255,0.75)',
+              lineHeight: 1.5,
+            }}>
+              Your color print is being ejected.<br />
+              <strong style={{ color: '#fff' }}>Please wait at the printer</strong> for your document.
             </p>
           </div>
 
-          <div className="flex flex-col items-center gap-2">
-            <div
-              className={`flex h-[84px] w-[84px] items-center justify-center rounded-full border-4 tabular ${
-                isFestiveMode ? 'border-gold-600/30 bg-gold-500/10 text-gold-600' : 'border-gold-500/30 bg-gold-500/10 text-gold-700'
-              }`}
-            >
-              <span className="text-[34px] font-extrabold">{collectCountdown}</span>
+          {/* Countdown ring */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+          }}>
+            <div style={{
+              width: '90px', height: '90px', borderRadius: '50%',
+              border: '4px solid rgba(0,242,254,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(0,242,254,0.06)',
+              boxShadow: 'inset 0 0 20px rgba(0,242,254,0.1)',
+            }}>
+              <span style={{
+                fontSize: '38px', fontWeight: 800, color: '#00f2fe',
+                fontVariantNumeric: 'tabular-nums',
+                filter: 'drop-shadow(0 0 8px rgba(0,242,254,0.6))',
+              }}>{collectCountdown}</span>
             </div>
-            <p className={`text-[13px] font-semibold uppercase tracking-[0.2em] ${isFestiveMode ? 'text-mahogany-800/45' : 'text-[#8C8072]'}`}>
+            <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px', textTransform: 'uppercase' }}>
               seconds
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Left text card ── */}
-      <div
-        className={`relative z-10 flex max-w-[720px] flex-1 flex-col items-start gap-6 rounded-[28px] border px-14 py-11 text-left backdrop-blur-xl ${
-          isFestiveMode
-            ? 'border-gold-600/30 bg-gradient-to-br from-white to-parchment-200 shadow-[0_20px_50px_rgba(74,45,20,0.12)]'
-            : 'border-gold-600/25 bg-white/80 shadow-[0_20px_50px_rgba(74,45,20,0.06)]'
-        }`}
-      >
-        <div className="min-h-[170px]">
-          <h2 className={`mb-5 text-[64px] font-extrabold leading-[1.06] tracking-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
-            {typedTitle}
+      {/* ── Left text block — glass card for readability on amber bg ── */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '30px',
+        flex: 1, textAlign: 'left', maxWidth: '750px', zIndex: 10,
+        background: isSV002 ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0,0,0,0.22)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        border: isSV002 ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.14)',
+        borderRadius: '28px',
+        padding: '40px 48px',
+        boxShadow: isSV002 ? '0 10px 40px rgba(0,0,0,0.06)' : '0 8px 40px rgba(0,0,0,0.18)',
+      }}>
+        <div style={{ minHeight: '180px' }}>
+          <h2 style={{ fontSize: isSV002 ? '80px' : '92px', fontWeight: 800, marginBottom: '20px', letterSpacing: '-2px', lineHeight: '1.05', display: 'flex', flexDirection: 'column', textShadow: isSV002 ? 'none' : '0 4px 24px rgba(0,0,0,0.4)' }}>
+            <span style={{ color: isSV002 ? 'var(--text-primary)' : 'inherit' }}>
+              {typedTitle}
+            </span>
           </h2>
-          <p className={`mb-4 whitespace-pre-line text-[28px] font-medium leading-snug ${isFestiveMode ? 'text-mahogany-800/70' : 'text-[#5C544B]'}`}>
+          <p style={{ color: isSV002 ? '#777777' : 'rgba(255,255,255,0.95)', fontSize: isSV002 ? '28px' : '36px', fontWeight: isSV002 ? 500 : 600, lineHeight: '1.5', whiteSpace: 'pre-line', marginBottom: '15px', textShadow: isSV002 ? 'none' : '0 2px 12px rgba(0,0,0,0.3)' }}>
             {typedSub}
           </p>
           {!isCompleted && (
-            <p className={`min-h-[32px] text-[21px] font-bold tracking-wide ${isFestiveMode ? 'text-gold-600' : 'text-gold-700'}`}>
+            <p style={{ color: isSV002 ? 'var(--amber-warm)' : (isCV001 ? '#80efff' : '#FFD97D'), fontSize: '24px', fontWeight: 700, opacity: 1, letterSpacing: '0.5px', textShadow: isSV002 ? 'none' : (isCV001 ? '0 0 16px rgba(0,229,255,0.6)' : '0 0 16px rgba(200,134,10,0.5)'), minHeight: '36px' }}>
               {statusMsg}
             </p>
-          )}
-          {isFestiveMode && (
-            <div className="mt-7">
-              <DiyaRow count={9} size={34} gap={16} litCount={Math.floor((progress * 9) / 100)} />
-            </div>
           )}
         </div>
       </div>
 
-      {/* ── Right: circular progress ── */}
-      <div className="relative z-10 flex items-center justify-center">
-        <div className="relative flex h-[380px] w-[380px] items-center justify-center">
-          {isFestiveMode && (
-            <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.22]">
-              <Mandala size={540} />
-            </div>
+      {/* ── Right circle ── */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+        <div
+          className="circular-progress-container"
+          style={{ position: 'relative', width: '380px', height: '380px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          {/* Glow background — grows with progress */}
+          {!isSV002 && (
+            <div style={{
+              position: 'absolute',
+              width: '300px',
+              height: '300px',
+              borderRadius: '50%',
+              background: isCV001 ? '#0077b6' : '#C8860A',
+              filter: 'blur(70px)',
+              opacity: 0.10 + (progress / 100) * 0.22,
+              transition: 'opacity 0.3s',
+              pointerEvents: 'none',
+            }} />
           )}
-          <div
-            className="pointer-events-none absolute h-[300px] w-[300px] rounded-full blur-[70px] transition-opacity duration-300"
-            style={{
-              background: isFestiveMode ? 'var(--color-mahogany-600)' : 'var(--color-gold-500)',
-              opacity: 0.1 + (progress / 100) * 0.2,
-            }}
-          />
 
-          {isActive && progress < 100 && (
+          {/* Pulse-ring halos */}
+          {isActive && progress < 100 && !isSV002 && (
             <>
-              <span
-                className={`pointer-events-none absolute inset-[45px] rounded-full border-2 ${
-                  isFestiveMode ? 'border-gold-600/40' : 'border-gold-500/30'
-                }`}
-                style={{ animation: 'kiosk-pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite' }}
-              />
-              <span
-                className={`pointer-events-none absolute inset-[45px] rounded-full border-2 ${
-                  isFestiveMode ? 'border-gold-600/20' : 'border-gold-500/15'
-                }`}
-                style={{ animation: 'kiosk-pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite 1.5s' }}
-              />
+              <div style={{
+                position: 'absolute', inset: '45px', borderRadius: '50%',
+                border: isCV001 ? '2px solid rgba(0,229,255,0.6)' : '2px solid rgba(232,184,109,0.6)',
+                animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite',
+                pointerEvents: 'none',
+              }} />
+              <div style={{
+                position: 'absolute', inset: '45px', borderRadius: '50%',
+                border: isCV001 ? '2px solid rgba(0,180,216,0.35)' : '2px solid rgba(200,134,10,0.28)',
+                animation: 'pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite 1.5s',
+                pointerEvents: 'none',
+              }} />
             </>
           )}
+          {/* ── Floating particles (Music notes for CV-001, Petals for standard) ── */}
+          {isActive && !isSV002 && noteParticles.map(note => (
+            <div
+              key={note.id}
+              className="music-note-particle"
+              style={{
+                left: `${note.x}px`,
+                top: `${note.y}px`,
+                fontSize: `${note.fontSize - 4}px`,
+                animationName: 'petal-orbit',
+                animationDuration: `${note.duration}ms`,
+                animationDelay: `${note.delay}ms`,
+                animationTimingFunction: 'ease-in-out',
+                animationIterationCount: 'infinite',
+                textShadow: 'none',
+                color: isCV001 ? '#80efff' : '#fff',
+                filter: isCV001 ? 'drop-shadow(0 0 10px rgba(0, 229, 255, 0.8))' : 'drop-shadow(0 4px 12px rgba(120, 60, 0, 0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+              }}
+            >
+              {isCV001 
+                ? (note.id % 2 === 0 ? <MusicNoteIcon1 /> : <MusicNoteIcon2 />)
+                : (note.id % 2 === 0 ? <FlowerIcon1 /> : <FlowerIcon2 />)}
+            </div>
+          ))}
 
-          <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2, overflow: 'visible' }}>
+          {isSV002 ? (
+            <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2, overflow: 'visible' }}>
+              <circle cx="190" cy="190" r="190" fill="#ffffff" opacity="0.95" />
+              
+              <circle cx="190" cy="190" r={radius} fill="transparent" stroke="#f0ede6" strokeWidth="14" />
+              
+              <circle cx="190" cy="190" r={radius - 24} fill="transparent" stroke="#e0d5c1" strokeWidth="2" strokeDasharray="4 16" />
+              
+              <text x="190" y="175" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                <tspan fontSize="88px" fontWeight="700" fill="#111111" letterSpacing="-2px">{progress}</tspan>
+                <tspan fontSize="52px" fontWeight="600" fill="#111111">%</tspan>
+              </text>
+              <text x="190" y="245" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '18px', fontWeight: 500, fill: '#666666' }}>
+                {statusMsg}
+              </text>
+
+              <g style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+                <circle
+                  cx="190" cy="190" r={radius}
+                  fill="transparent"
+                  stroke="#ba924b"
+                  strokeWidth="14"
+                  strokeDasharray={progress === 100 ? 'none' : circumference}
+                  strokeDashoffset={progress === 100 ? 0 : strokeDashoffset}
+                  strokeLinecap="round"
+                  style={{ transition: 'stroke-dashoffset 0.18s linear' }}
+                />
+              </g>
+
+              {progress > 0 && progress < 100 && cometTailPoints[0] && (
+                <circle
+                  cx={cometTailPoints[0].x}
+                  cy={cometTailPoints[0].y}
+                  r="12"
+                  fill="#ba924b"
+                  stroke="#ffffff"
+                  strokeWidth="4"
+                  style={{ transition: 'cx 0.18s linear, cy 0.18s linear', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
+                />
+              )}
+            </svg>
+          ) : (
+            <svg width="380" height="380" style={{ position: 'absolute', zIndex: 2, overflow: 'visible' }}>
             <defs>
               <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor={isFestiveMode ? '#F5D061' : '#FFD97D'} />
-                <stop offset="50%" stopColor={isFestiveMode ? '#D4973E' : '#E8B86D'} />
-                <stop offset="100%" stopColor={isFestiveMode ? '#8E5D24' : '#C8860A'} />
+                <stop offset="0%"   stopColor="#FFD97D" />
+                <stop offset="50%"  stopColor="#E8B86D" />
+                <stop offset="100%" stopColor="#C8860A" />
+              </linearGradient>
+              <linearGradient id="progressGradientCyber" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%"   stopColor="#ffffff" />
+                <stop offset="50%"  stopColor="#80efff" />
+                <stop offset="100%" stopColor="#00b4d8" />
               </linearGradient>
               <filter id="neonGlow" x="-30%" y="-30%" width="160%" height="160%">
                 <feGaussianBlur stdDeviation="6" result="blur" />
@@ -561,40 +760,52 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
               </filter>
             </defs>
 
-            {/* Slow outer dashed ring */}
-            <g style={{ transformOrigin: 'center', animation: isActive ? 'kiosk-spin-slow 26s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="172" fill="transparent" stroke={isFestiveMode ? 'rgba(180,123,55,0.18)' : 'rgba(200,134,10,0.20)'} strokeWidth="2" strokeDasharray="10 16" />
+            {/* Outer dashed ring — slow clockwise spin */}
+            <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow 24s linear infinite' : 'none' }}>
+              <circle cx="190" cy="190" r="176" fill="transparent" stroke={isCV001 ? "rgba(0,229,255,0.15)" : "rgba(255,255,255,0.08)"} strokeWidth="3" strokeDasharray="12 18" />
             </g>
 
-            {/* Static background track */}
-            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isFestiveMode ? 'rgba(180,123,55,0.15)' : 'rgba(200,134,10,0.12)'} strokeWidth="10" />
+            {/* Inner dotted ring — slow counter-clockwise spin */}
+            <g style={{ transformOrigin: 'center', animation: isActive ? 'spin-slow-reverse 18s linear infinite' : 'none' }}>
+              <circle cx="190" cy="190" r="105" fill="transparent" stroke={isCV001 ? "rgba(0,229,255,0.35)" : "rgba(232,184,109,0.22)"} strokeWidth="5" strokeDasharray="2 14" strokeLinecap="round" />
+            </g>
 
-            {/* Center percentage */}
-            <text x="190" y="196" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              <tspan
-                fontSize="92px"
-                fontWeight="800"
-                fill={isFestiveMode ? '#3C2113' : '#1A1714'}
-                letterSpacing="-2px"
-                style={{ fontVariantNumeric: 'tabular-nums' }}
-              >
-                {progress}
-              </tspan>
-              <tspan fontSize="32px" fontWeight="700" fill={isFestiveMode ? '#b47b37' : '#C8860A'} dx="4">%</tspan>
+            {/* Glassmorphic center circle background */}
+            <circle cx="190" cy="190" r="130" fill={isCV001 ? "rgba(0, 20, 45, 0.65)" : "rgba(30, 18, 0, 0.62)"} stroke={isCV001 ? "rgba(0,229,255,0.35)" : "rgba(200,134,10,0.20)"} strokeWidth="2" />
+
+            {/* Static background track */}
+            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isCV001 ? "rgba(0,229,255,0.10)" : "rgba(255,255,255,0.05)"} strokeWidth="10" />
+
+            {/* Center Percentage Display */}
+            <text
+              x="190" y="196"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                animation: isActive && progress < 100 ? (isCV001 ? 'text-glow-pulse-cyan 2s infinite alternate' : 'text-glow-pulse 2s infinite alternate') : 'none',
+              }}
+            >
+              <tspan fontSize="92px" fontWeight="800" fill="#ffffff" letterSpacing="-2px" style={{ fontFeatureSettings: '"tnum"', fontVariantNumeric: 'tabular-nums' }}>{progress}</tspan>
+              <tspan fontSize="32px" fontWeight="700" fill={isCV001 ? "#00e5ff" : "#FFD97D"} dx="4">%</tspan>
             </text>
 
+            {/* Rotated group for progress arc and comet tail */}
             <g style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+              {/* Progress arc — neon glow layer */}
               <circle
                 cx="190" cy="190" r={radius}
                 fill="transparent"
-                stroke="url(#progressGradient)"
+                stroke={isCV001 ? "url(#progressGradientCyber)" : "url(#progressGradient)"}
                 strokeWidth="10"
                 strokeDasharray={progress === 100 ? 'none' : circumference}
                 strokeDashoffset={progress === 100 ? 0 : strokeDashoffset}
                 strokeLinecap="round"
                 filter="url(#neonGlow)"
-                style={{ transition: 'stroke-dashoffset 0.14s linear' }}
+                style={{ transition: 'stroke-dashoffset 0.18s linear' }}
               />
+
+              {/* Progress arc — bright white core */}
               <circle
                 cx="190" cy="190" r={radius}
                 fill="transparent"
@@ -603,41 +814,28 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 strokeDasharray={progress === 100 ? 'none' : circumference}
                 strokeDashoffset={progress === 100 ? 0 : strokeDashoffset}
                 strokeLinecap="round"
-                opacity="0.75"
+                opacity="0.8"
                 style={{ transition: 'stroke-dashoffset 0.18s linear' }}
               />
             </g>
 
+            {/* Comet tail */}
             {cometTailPoints.map(pt => (
               <circle
                 key={pt.key}
                 cx={pt.x}
                 cy={pt.y}
                 r={Math.max(0.5, pt.r)}
-                fill={pt.key === 0 ? '#ffffff' : isFestiveMode ? '#b47b37' : '#E8B86D'}
+                fill={pt.key === 0 ? '#ffffff' : (isCV001 ? '#00e5ff' : '#E8B86D')}
                 opacity={pt.opacity * (pt.key === 0 ? 1 : 0.65)}
                 filter={pt.key <= 2 ? 'url(#cometGlow)' : undefined}
-                style={{ transition: 'cx 0.14s linear, cy 0.14s linear' }}
+                style={{ transition: 'cx 0.18s linear, cy 0.18s linear' }}
               />
             ))}
           </svg>
+          )}
         </div>
       </div>
-
-      <style>{`
-        @keyframes kiosk-spin-slow {
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes kiosk-pulse-ring {
-          0%   { transform: scale(0.85); opacity: 0; }
-          50%  { opacity: 0.8; }
-          100% { transform: scale(1.4);  opacity: 0; }
-        }
-        @keyframes kiosk-collect-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(217,165,68,0.35); }
-          50%      { box-shadow: 0 0 0 30px rgba(217,165,68,0); }
-        }
-      `}</style>
     </div>
   );
 };

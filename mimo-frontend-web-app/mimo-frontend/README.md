@@ -1,85 +1,73 @@
-# MIMO Kiosk App (`mimo-frontend-web-app/mimo-frontend/`)
+# React + TypeScript + Vite
 
-The touchscreen UI shown on each MIMO kiosk. A student walks up, types the **4-digit print code** from the website, watches
-live progress and collects the printout. It runs full-screen inside the Android kiosk shell (`LENOVO TABLET APP/`) or a
-browser in kiosk mode.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-| | |
-|---|---|
-| Production | Vercel. MIMO 1.0: `https://mimo-frontend-three.vercel.app/?kioskId=CV-001` · MIMO 2.0: `https://mimo-2-0.vercel.app/?kioskId=SV-002`. The Android tablets load `mimo-kiosk-app.vercel.app` (constant in the shell app); which Vercel project serves which domain is set in Vercel and **unverified** |
-| Stack | React 19 · Vite 8 · TypeScript |
-| Talks to | Cloud Functions API `https://api-upqxuj7evq-uc.a.run.app` — **hard-coded** in `src/App.tsx`, `PrintingScreen.tsx` and `components/screens/adds/Adds.tsx` (no environment variable) |
-| Machine identity | `?kioskId=CV-001` (MIMO 1.0) or `?kioskId=SV-002` (MIMO 2.0) in the URL, or `VITE_KIOSK_ID` at build time |
+Currently, two official plugins are available:
 
-## How a print works
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-```
-CodeEntryScreen  → POST /get-documents-by-code {printCode, kioskId}   (validates the code, colour/B&W rules per machine)
-                 → POST /kiosk/print           {printCode, kioskId}   (job becomes "printing" for THIS kiosk)
-PrintingScreen   → GET  /kiosk/job-status?printCode=…  every ~0.3–0.4 s (progress, done, or failed)
-                   ▲ the Raspberry Pi listener sees status "printing" in Firestore, prints via CUPS,
-                     and writes progress / "completed" / "failed" back
-```
+## React Compiler
 
-* Colour jobs are only accepted on `SV-002`; both machines accept black & white.
-* Wrong codes are counted by a server-side rate limiter (5 failures/min); the kiosk shows the server's message.
-* If a print fails, the server refunds automatically and the kiosk shows the refund banner.
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-## Structure
+## Expanding the ESLint configuration
 
-```
-src/
-├── App.tsx                         Screen state machine (main → code entry → printing → summary / error / maintenance)
-│                                   and the /get-documents-by-code + /kiosk/print calls
-├── components/screens/             MainScreen · CodeEntryScreen · PrintingScreen · SummaryScreen ·
-│                                   SystemErrorScreen · MaintenanceScreen · adds/ (idle screensaver)
-├── config/festivalConfig.ts        Seasonal theme switches
-└── assets/, public/                Backgrounds, logos, PWA manifest
-```
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-## Run locally
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
 
-```bash
-cd mimo-frontend-web-app/mimo-frontend
-npm install
-npm run dev      # http://localhost:5173 — open with ?kioskId=CV-001
-npm run build    # tsc -b && vite build
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
 
-`vite.config.ts` uses `base: './'` so the bundle works from any path (Vercel, or a file:// WebView).
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-## Deploy
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
 
-Vercel builds this folder (project settings live in the Vercel dashboard, not in this repo; the two kiosk URLs above are the deployments the tablets load).
-**Do not move or rename this folder** without updating that setting. After a deploy, the Android kiosk picks up the new
-version on its next reload.
-
-## Related
-
-* `LENOVO TABLET APP/` — Kotlin WebView shell that locks the tablet into kiosk mode and loads the URL above.
-* `pi_scripts/` and `pi-listener/` — the Raspberry Pi programs that do the actual printing.
-* API contract: [`functions/README.md`](../../functions/README.md) and `functions/src/validators/kioskContract.js`.
-
-## Status, known issues and safety
-
-| | |
-|---|---|
-| **Implemented** | Code entry, live progress, summary, refund banner, error and maintenance screens, screensaver (config read from Firestore, falling back to `GET /api/screensaver`), per-machine theming |
-| **Known issue** | ⚠ The API address is hard-coded to **production**. `npm run dev` therefore talks to the live API: wrong codes count against the rate limiter and a *real* print code would start a *real* print. To develop against a local backend, change the three constants locally (`http://localhost:3000`) and **never commit that change**. |
-| **Unverified** | `npm run lint` (ESLint) exists but was not run in the documentation audit; there are no automated tests. |
-
-## Dependencies and environment
-`react`, `react-dom`; dev: Vite, TypeScript, ESLint. Only variable: `VITE_KIOSK_ID` (optional; the URL parameter `?kioskId=` wins). No secrets.
-
-## Testing and checks
-`npm run build` (type-check with `tsc -b`, then Vite build) is the check used in CI. Manual test: open `http://localhost:5173/?kioskId=SV-002` and walk through the screens with your browser's device emulation set to a landscape tablet size.
-
-## Troubleshooting
-| Symptom | Cause |
-|---|---|
-| "Kiosk ID not configured" | URL has no `?kioskId=` and `VITE_KIOSK_ID` is unset |
-| "Too many attempts" | Rate limiter (failed lookups per IP) — wait a minute |
-| "Color print… only at Machine 2" | Colour job entered at CV-001 (intended) |
-| Progress stays at "Warming up printer…" | The Pi has not picked the job up: see [`pi_scripts/README.md`](../../pi_scripts/README.md) |
-
-Related: [`architecture.md` §4.2](../../architecture.md#42-at-the-kiosk) · [`design.md` §3](../../design.md#3-frontend-design) · [`../README.md`](../README.md).
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
