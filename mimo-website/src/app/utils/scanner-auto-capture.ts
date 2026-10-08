@@ -49,6 +49,11 @@ export class ScannerAutoCaptureEngine {
   private isLocked: boolean = false;
   private isArmed: boolean = true;
   private lastCapturedCorners: DocumentCorners | null = null;
+  private lastCapturedSample: Uint8Array | null = null;
+  private prevCorners: DocumentCorners | null = null;
+  // After "Add Page", the page just captured may still be in view: wait until it leaves or changes.
+  private awaitingNewDocument: boolean = false;
+  private framesWithoutDocument: number = 0;
 
   constructor(config?: AutoCaptureConfig) {
     this.config = {
@@ -74,6 +79,7 @@ export class ScannerAutoCaptureEngine {
   public resetStability() {
     this.steadyStartTime = null;
     this.prevSample = null;
+    this.prevCorners = null;
   }
 
   /**
@@ -83,17 +89,24 @@ export class ScannerAutoCaptureEngine {
     this.isLocked = true;
     this.isArmed = false;
     this.lastCapturedCorners = corners || null;
+    this.lastCapturedSample = this.prevSample ? new Uint8Array(this.prevSample) : null;
     this.lastCaptureTime = Date.now();
     this.resetStability();
   }
 
   /**
-   * Re-arm the scanner for the next page (e.g., when user taps "Add Page" or "Retake")
+   * Re-arm the scanner. "Add Page" passes requireNewDocument so the page already captured is not captured
+   * again while it is still in view; "Retake" re-arms immediately so the same page can be captured again.
    */
-  public reArm() {
+  public reArm(options?: { requireNewDocument?: boolean }) {
     this.isLocked = false;
     this.isArmed = true;
-    this.lastCapturedCorners = null;
+    this.awaitingNewDocument = !!options?.requireNewDocument && !!this.lastCapturedCorners;
+    this.framesWithoutDocument = 0;
+    if (!this.awaitingNewDocument) {
+      this.lastCapturedCorners = null;
+      this.lastCapturedSample = null;
+    }
     this.lastCaptureTime = 0;
     this.resetStability();
   }
@@ -227,6 +240,7 @@ export class ScannerAutoCaptureEngine {
           guideSampleCount++;
         } else {
           outerLuminance += lum;
+          outerSampleCount++;
         }
       }
     }
@@ -249,12 +263,48 @@ export class ScannerAutoCaptureEngine {
     const edgeContrast = Math.abs(meanLuminance - meanOuterLuminance);
     const isExposureValid = meanLuminance >= this.config.minLuminance && meanLuminance <= this.config.maxLuminance;
 
-    // Determine document detection (either from CV or luminance edge heuristic)
+    // Only a real paper boundary found by OpenCV counts. Brightness alone (an empty table, a wall) never does.
     const isCVDetected = !!(cvResult && cvResult.hasDocument && !cvResult.isFallback && cvResult.areaPercent >= 0.08 && cvResult.areaPercent <= 0.98);
-    const isHeuristicDetected = isExposureValid && edgeContrast >= this.config.minEdgeContrast;
-    const isDocumentDetected = isCVDetected || isHeuristicDetected;
+    const isDocumentDetected = isCVDetected;
 
-    const isSteady = isDocumentDetected && motionScore < this.config.motionThreshold;
+    // The four corners must hold still too, not just the pixels.
+    let cornersSteady = false;
+    if (isCVDetected && cvResult) {
+      cornersSteady = !!this.prevCorners && maxCornerShift(this.prevCorners, cvResult.corners) < 0.015;
+      this.prevCorners = cvResult.corners;
+    } else {
+      this.prevCorners = null;
+    }
+
+    // After "Add Page": hold off until the page that was just captured leaves the frame or is replaced.
+    if (this.awaitingNewDocument) {
+      if (!isCVDetected) {
+        this.framesWithoutDocument++;
+        if (this.framesWithoutDocument >= 3) this.awaitingNewDocument = false;
+      } else {
+        this.framesWithoutDocument = 0;
+        const samePlace = this.isSameDocumentAsLastCapture(cvResult!.corners);
+        const contentChange = this.lastCapturedSample ? meanAbsDiff(currentSample, this.lastCapturedSample) : 255;
+        if (!samePlace || contentChange > 12) this.awaitingNewDocument = false;
+      }
+      if (this.awaitingNewDocument) {
+        this.steadyStartTime = null;
+        return {
+          status: "locked",
+          isDocumentDetected,
+          isSteady: false,
+          motionScore,
+          meanLuminance,
+          edgeContrast,
+          stabilityProgress: 0,
+          message: "Place the next page in view",
+        };
+      }
+      this.lastCapturedCorners = null;
+      this.lastCapturedSample = null;
+    }
+
+    const isSteady = isDocumentDetected && cornersSteady && motionScore < this.config.motionThreshold;
 
     // Evaluate Stability Progression
     let stabilityProgress = 0;
@@ -304,4 +354,20 @@ export class ScannerAutoCaptureEngine {
       message,
     };
   }
+}
+
+function maxCornerShift(a: DocumentCorners, b: DocumentCorners): number {
+  return Math.max(
+    Math.hypot(a.topLeft.x - b.topLeft.x, a.topLeft.y - b.topLeft.y),
+    Math.hypot(a.topRight.x - b.topRight.x, a.topRight.y - b.topRight.y),
+    Math.hypot(a.bottomRight.x - b.bottomRight.x, a.bottomRight.y - b.bottomRight.y),
+    Math.hypot(a.bottomLeft.x - b.bottomLeft.x, a.bottomLeft.y - b.bottomLeft.y)
+  );
+}
+
+function meanAbsDiff(a: Uint8Array, b: Uint8Array): number {
+  const n = Math.min(a.length, b.length);
+  let total = 0;
+  for (let i = 0; i < n; i++) total += Math.abs(a[i] - b[i]);
+  return n ? total / n : 0;
 }
