@@ -47,9 +47,22 @@ export interface WarpOptions {
   enhancement?: EnhancementMode;
 }
 
+// OpenCV.js 4.9.0 (Apache-2.0) is served from the site itself (public/vendor/opencv), so detection never
+// depends on a third-party CDN. The docs.opencv.org 4.11.0 build the scanner used to load returns 404.
+const OPENCV_SRC = "/vendor/opencv/opencv-4.9.0.js";
+// The file is ~10 MB; give slow phone connections time before reporting detection as unavailable.
+const OPENCV_LOAD_TIMEOUT_MS = 60000;
+
+export type CvLoadStatus = "loading" | "ready" | "unavailable";
+
 // Global OpenCV Loader Singleton
-let openCvPromise: Promise<any> | null = null;
+let openCvPromise: Promise<boolean> | null = null;
 let isOpenCvReady = false;
+let cvLoadStatus: CvLoadStatus = "loading";
+
+export function getCvLoadStatus(): CvLoadStatus {
+  return cvLoadStatus;
+}
 
 /**
  * Check if OpenCV is loaded and available
@@ -59,77 +72,88 @@ export function isCVReady(): boolean {
 }
 
 /**
- * Asynchronously lazy-load OpenCV.js WebAssembly from CDN
+ * Lazy-load OpenCV.js (bundled with the site). Resolves true once `window.cv` is usable, false when it cannot
+ * be loaded — callers must then report detection as unavailable rather than invent corners.
+ * (It never resolves with `cv` itself: the Emscripten runtime object is a thenable, so a promise would try to
+ * adopt it and never settle.)
  */
-export function loadOpenCV(): Promise<any> {
+export function loadOpenCV(): Promise<boolean> {
   if (openCvPromise) return openCvPromise;
 
   if (isCVReady()) {
     isOpenCvReady = true;
-    return Promise.resolve((window as any).cv);
+    cvLoadStatus = "ready";
+    return Promise.resolve(true);
   }
 
-  openCvPromise = new Promise<any>((resolve) => {
-    // If script already in DOM
-    const existingScript = document.getElementById("opencv-wasm-script");
-    if (existingScript && (window as any).cv) {
-      if ((window as any).cv.Mat) {
-        isOpenCvReady = true;
-        resolve((window as any).cv);
-        return;
-      }
-    }
-
-    const script = existingScript || document.createElement("script");
-    script.id = "opencv-wasm-script";
-    script.setAttribute("async", "true");
-    script.setAttribute("type", "text/javascript");
-    script.setAttribute(
-      "src",
-      "https://docs.opencv.org/4.11.0/opencv.js"
-    );
+  cvLoadStatus = "loading";
+  openCvPromise = new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      isOpenCvReady = ok;
+      cvLoadStatus = ok ? "ready" : "unavailable";
+      if (ok) console.log("[CV-ENGINE] OpenCV.js ready");
+      else openCvPromise = null; // allow a later retry
+      resolve(ok);
+    };
 
     const timeout = setTimeout(() => {
-      console.warn("[CV-ENGINE] OpenCV load timed out. Running with native high-precision fallback engine.");
-      resolve(null);
-    }, 8000);
+      console.warn("[CV-ENGINE] OpenCV.js did not initialise in time; document detection unavailable.");
+      finish(false);
+    }, OPENCV_LOAD_TIMEOUT_MS);
 
+    // window.cv becomes usable (cv.Mat defined) once the WebAssembly runtime has initialised. Poll for it rather
+    // than awaiting window.cv, which is a self-referencing thenable.
     const checkReady = () => {
-      if (isCVReady()) {
-        clearTimeout(timeout);
-        isOpenCvReady = true;
-        console.log("[CV-ENGINE] OpenCV.js WebAssembly initialized successfully 🚀");
-        resolve((window as any).cv);
+      if (settled) return;
+      const w = window as any;
+      if (w.cv && typeof w.cv.Mat === "function") {
+        finish(true);
       } else {
-        setTimeout(checkReady, 50);
+        setTimeout(checkReady, 100);
       }
     };
 
     (window as any).Module = {
       onRuntimeInitialized() {
-        clearTimeout(timeout);
-        isOpenCvReady = true;
-        console.log("[CV-ENGINE] OpenCV.js WebAssembly runtime ready 🚀");
-        resolve((window as any).cv);
+        checkReady();
       },
     };
 
-    script.onload = () => {
-      checkReady();
-    };
-
+    const existingScript = document.getElementById("opencv-wasm-script") as HTMLScriptElement | null;
+    const script = existingScript || document.createElement("script");
+    script.id = "opencv-wasm-script";
+    script.async = true;
+    script.type = "text/javascript";
+    script.src = OPENCV_SRC;
+    script.onload = () => checkReady();
     script.onerror = (err) => {
-      clearTimeout(timeout);
-      console.warn("[CV-ENGINE] Failed to load OpenCV.js from CDN. Using native fallback.", err);
-      resolve(null);
+      console.warn("[CV-ENGINE] Failed to load bundled OpenCV.js; document detection unavailable.", err);
+      script.remove();
+      finish(false);
     };
 
     if (!existingScript) {
       document.body.appendChild(script);
+    } else {
+      checkReady();
     }
   });
 
   return openCvPromise;
+}
+
+/** The whole frame — used when no paper edge was found, so nothing is cropped on a guess. */
+export function getFullFrameCorners(): DocumentCorners {
+  return {
+    topLeft: { x: 0, y: 0 },
+    topRight: { x: 1, y: 0 },
+    bottomRight: { x: 1, y: 1 },
+    bottomLeft: { x: 0, y: 1 },
+  };
 }
 
 /**
@@ -195,6 +219,14 @@ export function orderCornerPoints(pts: Point2D[]): DocumentCorners {
     bottomRight: { x: Math.max(0, Math.min(1, br.x)), y: Math.max(0, Math.min(1, br.y)) },
     bottomLeft: { x: Math.max(0, Math.min(1, bl.x)), y: Math.max(0, Math.min(1, bl.y)) },
   };
+}
+
+/** Move each corner `fraction` of the way towards the quad's centroid. */
+function insetCorners(c: DocumentCorners, fraction: number): DocumentCorners {
+  const cx = (c.topLeft.x + c.topRight.x + c.bottomRight.x + c.bottomLeft.x) / 4;
+  const cy = (c.topLeft.y + c.topRight.y + c.bottomRight.y + c.bottomLeft.y) / 4;
+  const move = (p: Point2D): Point2D => ({ x: p.x + (cx - p.x) * fraction, y: p.y + (cy - p.y) * fraction });
+  return { topLeft: move(c.topLeft), topRight: move(c.topRight), bottomRight: move(c.bottomRight), bottomLeft: move(c.bottomLeft) };
 }
 
 /**
@@ -489,7 +521,9 @@ export function detectDocumentCorners(
         }
 
         if (result.quad) {
-          const orderedCorners = orderCornerPoints(result.quad);
+          // Pull the corners ~0.8% towards the centre so the paper edge (and any table showing beyond it)
+          // is trimmed from the scan.
+          const orderedCorners = insetCorners(orderCornerPoints(result.quad), 0.008);
           const areaPercent = result.area / (sw * sh);
 
           return {
@@ -516,47 +550,14 @@ export function detectDocumentCorners(
       }
     }
 
-    // ================= 2. NATIVE CANVAS EDGE & LUMINANCE FALLBACK =================
-    const imgData = ctx.getImageData(0, 0, sw, sh);
-    const data = imgData.data;
-
-    const gx1 = Math.floor(sw * 0.12);
-    const gx2 = Math.floor(sw * 0.88);
-    const gy1 = Math.floor(sh * 0.08);
-    const gy2 = Math.floor(sh * 0.92);
-
-    let innerLumSum = 0;
-    let innerCount = 0;
-    let outerLumSum = 0;
-    let outerCount = 0;
-
-    const step = 4;
-    for (let y = 0; y < sh; y += step) {
-      for (let x = 0; x < sw; x += step) {
-        const idx = (y * sw + x) * 4;
-        const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-        if (x >= gx1 && x <= gx2 && y >= gy1 && y <= gy2) {
-          innerLumSum += lum;
-          innerCount++;
-        } else {
-          outerLumSum += lum;
-          outerCount++;
-        }
-      }
-    }
-
-    const meanInner = innerCount > 0 ? innerLumSum / innerCount : 128;
-    const meanOuter = outerCount > 0 ? outerLumSum / outerCount : 128;
-    const contrastDiff = Math.abs(meanInner - meanOuter);
-
-    const hasReasonableContrast = contrastDiff >= 8 && meanInner >= 40 && meanInner <= 245;
-
+    // No paper boundary found (or OpenCV unavailable). Report that honestly: the corners returned here are
+    // only the on-screen alignment guide and must never be used as a crop.
     return {
-      hasDocument: hasReasonableContrast,
+      hasDocument: false,
       corners: getDefaultCorners(),
-      areaPercent: 0.65,
+      areaPercent: 0,
       aspectRatio: 0.707,
-      confidence: hasReasonableContrast ? 0.70 : 0.35,
+      confidence: 0,
       isFallback: true,
     };
   } finally {
@@ -607,6 +608,12 @@ export function warpPerspective(
       dstHeight = 1754;
     }
   }
+
+  // Free-ratio output follows the source size; cap it so a 12 MP phone photo does not become a 12 MP page.
+  const MAX_OUTPUT_DIM = 2000;
+  const shrink = Math.min(1, MAX_OUTPUT_DIM / Math.max(dstWidth, dstHeight));
+  dstWidth = Math.max(1, Math.round(dstWidth * shrink));
+  dstHeight = Math.max(1, Math.round(dstHeight * shrink));
 
   const outputCanvas = document.createElement("canvas");
   outputCanvas.width = dstWidth;
