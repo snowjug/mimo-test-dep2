@@ -264,7 +264,7 @@ const postCreateOrder = async (req, res) => {
       duplex: printOptions?.doubleSided === "double",
       finalCost: jobCost,
       totalCost: jobCost,
-      kioskId: printOptions?.directKioskId || (colorMode === "color" ? "SV-002" : "CV-001"),
+      kioskId: printOptions?.directKioskId || "CV-001",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       retentionStartAt: earliestRetentionStartAt || admin.firestore.FieldValue.serverTimestamp()
@@ -783,8 +783,7 @@ const postPaymentSuccess = async (req, res) => {
     jobsToUpdate.forEach((doc) => {
       const data = doc.data();
       const jobKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
-      const isColor = (data.colorMode === "color" || data.printOptions?.colorMode === "color" || data.color === true);
-      const targetKiosk = jobKioskId || (isColor ? "SV-002" : "CV-001");
+      const targetKiosk = jobKioskId || "CV-001";
       if (jobKioskId) {
         directKioskId = jobKioskId;
       }
