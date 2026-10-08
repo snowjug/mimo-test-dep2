@@ -21,6 +21,10 @@ test("ignores placeholders, environment reads, tests, lockfiles, the allow marke
   assert.deepStrictEqual(rules("+++ b/a.js\n@@ -1 +0,0 @@\n-const password = 'realisticlooking1';\n"), []);
 });
 
+test("vendored third-party bundles are skipped (a minified/base64 blob can coincidentally match a rule)", () => {
+  assert.deepStrictEqual(rules(diff("mimo-website/public/vendor/opencv/opencv-4.9.0.js", "const t='EAA" + "x".repeat(70) + "';")), []);
+});
+
 test("reports the file and line of the finding", () => {
   const d = "+++ b/src/x.js\n@@ -10,0 +11,2 @@\n+const ok = 1;\n+const password = 'realisticlooking1';\n";
   const [f] = scanAddedLines(d);

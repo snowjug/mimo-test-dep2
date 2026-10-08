@@ -24,7 +24,10 @@ const RULES = [
     ignoreValue: /(?:<[^>]+>|\.\.\.|example|changeme|placeholder|your[-_ ]|xxx|\$\{|process\.env|local-dev|choose-something|test-secret|dummy)/i,
   },
 ];
-const SKIP_FILE = /(^|\/)(__tests__|fixtures|node_modules)\/|package-lock\.json$|\.lock$|\.(png|jpe?g|gif|pdf|ico|woff2?|ttf)$/i;
+// vendor/ holds unmodified third-party bundles (e.g. a multi-MB minified OpenCV.js build) — like
+// node_modules, nobody hand-types a credential into one, and a large base64/binary blob can easily contain a
+// byte sequence that coincidentally matches one of the RULES above.
+const SKIP_FILE = /(^|\/)(__tests__|fixtures|node_modules|vendor)\/|package-lock\.json$|\.lock$|\.(png|jpe?g|gif|pdf|ico|woff2?|ttf)$/i;
 // Public Firebase web config keys are meant to be in front-end code
 const ALLOWED_FILES = /(^|\/)firebase\.ts$/;
 
