@@ -1,5 +1,8 @@
-// Deploy trigger: 2026-07-03 botanical redesign
 import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'motion/react';
+import { ArrowRight, Check, CaretRight } from '@phosphor-icons/react';
+import { DiyaRow, FestiveBackdrop, Kalash, Lotus, Mandala, OrnamentDivider, Toran, ZariBorder } from '../festive/NavaratriDecor';
+import { isFestivalActive } from '../../config/festivalConfig';
 
 interface MainScreenProps {
     onNext: () => void;
@@ -8,7 +11,8 @@ interface MainScreenProps {
 }
 
 export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskId }) => {
-    const isCV001 = kioskId === 'CV-001';
+    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+    const isSV002 = kioskId === 'SV-002';
     const [isDragging, setIsDragging] = useState(false);
     const [dragX, setDragX] = useState(0);
     const [isUnlocked, setIsUnlocked] = useState(false);
@@ -102,160 +106,213 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
         };
     }, [isDragging, isUnlocked, onNext]);
 
+    const thumbWidth = thumbRef.current?.offsetWidth || 240;
+    const fillWidth = dragX + thumbWidth / 2 + TRACK_PADDING;
+
+    const swipeTrack = (
+        <div className="relative z-10 flex w-full justify-center px-6">
+            <div
+                ref={trackRef}
+                className={`relative h-[88px] w-full max-w-[620px] overflow-hidden rounded-full border transition-colors duration-300 ${
+                    isFestiveMode
+                        ? `border-gold-600/50 ${isUnlocked ? 'bg-success-500/10' : 'bg-white/75'} shadow-[inset_0_0_0_4px_rgba(251,246,236,0.95),inset_0_0_0_5px_rgba(201,151,62,0.35),0_14px_34px_rgba(122,18,48,0.12)]`
+                        : `border-gold-600/35 ${isUnlocked ? 'bg-success-500/10 border-success-500/40' : 'bg-white/80'} shadow-[inset_0_2px_4px_rgba(0,0,0,0.03),0_10px_30px_rgba(200,134,10,0.10)] backdrop-blur-md`
+                }`}
+                style={{ padding: TRACK_PADDING }}
+            >
+                {/* Progress fill trailing the thumb */}
+                <div
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{
+                        width: `${fillWidth}px`,
+                        background: isUnlocked
+                            ? 'linear-gradient(90deg, var(--color-success-600), var(--color-success-500))'
+                            : isFestiveMode
+                            ? 'linear-gradient(90deg, var(--color-mahogany-700), var(--color-gold-500))'
+                            : 'linear-gradient(90deg, #F0C878, #D9A544, #B8862F)',
+                        transition: isDragging ? 'none' : 'width 0.5s var(--ease-kiosk)',
+                        opacity: dragX > 0 || isUnlocked ? 1 : 0,
+                    }}
+                />
+
+                {/* Chevron affordance, fades out as the thumb travels */}
+                <div
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center gap-1"
+                    style={{ opacity: Math.max(0, 1 - dragX / 140) }}
+                >
+                    {[0, 1, 2, 3].map((i) => (
+                        <CaretRight
+                            key={i}
+                            size={22}
+                            weight="bold"
+                            className={isFestiveMode ? 'text-mahogany-600/35' : 'text-gold-600/30'}
+                        />
+                    ))}
+                </div>
+
+                {/* Draggable thumb */}
+                <div
+                    ref={thumbRef}
+                    onMouseDown={handleDragStart}
+                    onTouchStart={handleDragStart}
+                    className={`relative flex h-[72px] cursor-grab select-none items-center gap-3.5 rounded-full px-2.5 pr-7 shadow-lg active:cursor-grabbing ${
+                        isUnlocked
+                            ? 'bg-success-600 text-white ring-1 ring-success-400'
+                            : isFestiveMode
+                            ? 'bg-gradient-to-br from-mahogany-600 to-mahogany-800 ring-1 ring-gold-400/70 shadow-[0_10px_24px_rgba(122,18,48,0.35)]'
+                            : 'bg-gradient-to-r from-gold-500 via-gold-500 to-gold-600 ring-1 ring-gold-300/80 shadow-[0_6px_20px_rgba(200,134,10,0.35)]'
+                    }`}
+                    style={{
+                        transform: `translateX(${dragX}px)`,
+                        transition: isDragging ? 'none' : 'transform 0.5s var(--ease-kiosk)',
+                        width: 'fit-content',
+                    }}
+                >
+                    <span
+                        className={`flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-sm ${
+                            isUnlocked
+                                ? 'bg-white text-success-600'
+                                : isFestiveMode
+                                ? 'bg-gradient-to-br from-gold-200 to-gold-500 text-mahogany-800'
+                                : 'bg-white text-gold-700'
+                        }`}
+                    >
+                        {isUnlocked ? <Check size={26} weight="bold" /> : <ArrowRight size={24} weight="bold" />}
+                    </span>
+                    <span
+                        className={`whitespace-nowrap text-[18px] font-extrabold uppercase tracking-[0.14em] ${
+                            isUnlocked ? 'text-white' : isFestiveMode ? 'text-parchment-50' : 'text-white'
+                        }`}
+                    >
+                        {isUnlocked ? 'Unlocked' : 'Swipe to start'}
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+
+    const copyright = (
+        <footer
+            className={`relative z-10 text-center text-[13px] font-medium ${
+                isFestiveMode ? 'pb-7 text-mahogany-800/45' : 'pb-6 text-[#7C7267]'
+            }`}
+        >
+            &copy; 2026 <strong className="font-semibold text-[#5C544B]">VisionPrintt</strong>. All rights reserved.
+        </footer>
+    );
+
+    if (isFestiveMode) {
+        return (
+            <div
+                className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col overflow-hidden bg-parchment-100`}
+                style={{ display: isActive ? 'flex' : 'none' }}
+            >
+                <FestiveBackdrop />
+
+                <div className="pointer-events-none absolute left-1/2 top-[338px] z-0 -translate-x-1/2 -translate-y-1/2 opacity-[0.17]">
+                    <Mandala size={680} />
+                </div>
+
+                <Kalash className="absolute left-[86px] top-[296px] z-[1]" />
+                <Kalash className="absolute right-[86px] top-[296px] z-[1]" style={{ transform: 'scaleX(-1)' }} />
+
+                <Toran />
+
+                <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pt-[60px]">
+                    <motion.section
+                        initial={isActive ? { opacity: 0, y: 22 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex flex-col items-center text-center"
+                    >
+                        <div className="flex items-center gap-4">
+                            <Lotus size={26} />
+                            <p lang="hi" className="font-deva text-[36px] leading-[1.2] text-mahogany-600">
+                                शुभ नवरात्रि
+                            </p>
+                            <Lotus size={26} />
+                        </div>
+
+                        <p className="mt-2 text-[13px] font-bold uppercase tracking-[0.55em] text-mahogany-700/60">
+                            Welcome to
+                        </p>
+
+                        <div className="relative mt-1 flex items-baseline justify-center leading-none [filter:drop-shadow(0_3px_0_rgba(122,18,48,0.18))]">
+                            <h1 className="bg-gradient-to-b from-gold-300 via-gold-500 to-gold-700 bg-clip-text font-sans text-[128px] font-black tracking-tight text-transparent">
+                                MIMO
+                            </h1>
+                            <span className="bg-gradient-to-b from-gold-300 via-gold-500 to-gold-700 bg-clip-text pb-5 pl-2 font-sans text-[46px] font-extrabold text-transparent">
+                                {isSV002 ? '2.0' : '1.0'}
+                            </span>
+                        </div>
+
+                        <h2 className="mt-1 text-[34px] font-semibold text-mahogany-800">
+                            Self-Service <span className="text-gold-600">Printing Kiosk</span>
+                        </h2>
+
+                        <div className="mb-3 mt-4">
+                            <OrnamentDivider width={110} />
+                        </div>
+
+                        <p className="font-serif text-[27px] font-medium italic text-mahogany-700">
+                            Happy Navaratri &mdash; nine nights of devotion, dance &amp; light
+                        </p>
+                    </motion.section>
+                </main>
+
+                <div className="relative z-10 pb-5">
+                    <DiyaRow count={9} size={38} gap={46} />
+                </div>
+
+                <div className="relative z-10 pb-4">
+                    {swipeTrack}
+                </div>
+                {copyright}
+                <ZariBorder />
+            </div>
+        );
+    }
+
     return (
         <div
-            className={`screen main-interface-wrap ${isActive ? 'visible' : ''} ${isCV001 ? 'cv001-main' : ''}`}
+            className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col overflow-hidden bg-[#FAFAF8]`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
-            {/* Botanical background */}
-            <div className="kiosk-bg" />
+            <div
+                className="pointer-events-none absolute left-1/2 top-[32%] h-[600px] w-[960px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[140px]"
+                style={{ background: 'radial-gradient(closest-side, rgba(217,165,68,0.14), transparent)' }}
+            />
 
-            {/* Ambient warm glows */}
-            <div className="ambient-glow glow-1" />
-            <div className="ambient-glow glow-2" />
-            <div className="ambient-glow glow-3" />
+            <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pb-6">
+                <motion.section
+                    initial={isActive ? { opacity: 0, y: 22 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex flex-col items-center text-center"
+                >
+                    <p className="mb-2 text-[15px] font-bold uppercase tracking-[0.55em] text-gold-700/80">Welcome to</p>
 
-            {/* Oversized watermark */}
-            <div className="watermark-mimo">MIMO</div>
-
-            <main className="immersive-container">
-                <section className="brand-panel">
-
-                    <div style={{ opacity: 0.88, transform: 'translateY(2px)' }}>
-                        <p className="tag-line">— WELCOME TO —</p>
+                    <div className="relative flex items-baseline justify-center leading-none [filter:drop-shadow(0_4px_18px_rgba(200,134,10,0.20))]">
+                        <h1 className="bg-gradient-to-b from-gold-400 via-gold-500 to-gold-700 bg-clip-text font-sans text-[136px] font-black tracking-tight text-transparent">
+                            MIMO
+                        </h1>
+                        <span className="bg-gradient-to-b from-gold-400 via-gold-500 to-gold-700 bg-clip-text pb-6 pl-2.5 font-sans text-[50px] font-extrabold text-transparent">
+                            {isSV002 ? '2.0' : '1.0'}
+                        </span>
                     </div>
 
-                    <div className="main-heading">
-                        <svg width="820" height="180" viewBox="0 0 820 180" style={{ overflow: 'visible', filter: isCV001 ? 'drop-shadow(0 16px 36px rgba(0, 20, 110, 0.55))' : 'drop-shadow(0 10px 22px rgba(80,40,0,0.38))' }}>
-                            <defs>
-                                <linearGradient id="mimoBotanicalGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%"   stopColor="#ffd97d" />
-                                    <stop offset="100%" stopColor="#b78c43" />
-                                </linearGradient>
-                                <linearGradient id="mimoCyberGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%"   stopColor="#ffffff" />
-                                    <stop offset="100%" stopColor="#e3f2ff" />
-                                </linearGradient>
-                            </defs>
+                    <h2 className="mt-2 text-[40px] font-bold text-[#1A1714]">
+                        Self-Service <span className="text-gold-600">Printing Kiosk</span>
+                    </h2>
 
-                            {/* 3D shadow layer */}
-                            <text
-                                x="50%" y="52%"
-                                dominantBaseline="middle"
-                                textAnchor="middle"
-                                fill={isCV001 ? 'rgba(0, 30, 140, 0.5)' : 'rgba(80,40,0,0.45)'}
-                                transform="translate(5, 18)"
-                                style={{
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                    fontSize: '155px',
-                                    fontWeight: 900,
-                                    letterSpacing: '4px'
-                                }}
-                            >
-                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">2.0</tspan>
-                            </text>
-
-                            {/* Main text */}
-                            <text
-                                x="50%" y="52%"
-                                dominantBaseline="middle"
-                                textAnchor="middle"
-                                fill={isCV001 ? 'url(#mimoCyberGrad)' : 'url(#mimoBotanicalGrad)'}
-                                stroke={isCV001 ? 'none' : 'rgba(255,255,255,0.35)'}
-                                strokeWidth={isCV001 ? '0' : '1.5'}
-                                paintOrder="stroke fill"
-                                transform="translate(0, 12)"
-                                style={{
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                    fontSize: '155px',
-                                    fontWeight: 900,
-                                    letterSpacing: '4px'
-                                }}
-                            >
-                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">2.0</tspan>
-                            </text>
-                        </svg>
-                    </div>
-
-                    <div className="sub-heading-wrap">
-                        <h2 className="sub-heading">
-                            Self-Service <span className={isCV001 ? "neon-cyan-text" : "cyan-text"}>Printing Kiosk</span>
-                        </h2>
-                    </div>
-                    <p className="brand-desc">Fast, secure document printing via Mimo code.</p>
-                </section>
-
-                <section className="action-panel">
-                    <div
-                        className={`swipe-track-glass ${isUnlocked ? 'unlocked' : ''} ${isCV001 ? 'cv001-track' : ''}`}
-                        ref={trackRef}
-                    >
-                        <div className="glass-reflection" />
-
-                        {/* Progress fill */}
-                        <div
-                            className={`swipe-fill ${isCV001 ? 'cv001-swipe-fill' : ''}`}
-                            style={{
-                                width: dragX + (thumbRef.current?.offsetWidth || 360) / 2 + TRACK_PADDING + 'px',
-                                transition: isDragging ? 'none' : 'width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                                opacity: dragX > 0 ? 1 : 0
-                            }}
-                        />
-
-                        {/* Shimmer chevrons */}
-                        <div
-                            className="swipe-right-text"
-                            style={{
-                                opacity: Math.max(0, 1 - (dragX / 150)),
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center'
-                            }}
-                        >
-                            <div className={`shimmer-chevrons-container ${isCV001 ? 'cv001-chevrons' : ''}`}>
-                                {[0, 1, 2, 3, 4].map((i) => (
-                                    <span
-                                        key={i}
-                                        className="material-symbols-outlined"
-                                        style={{ margin: '0 -22px', fontVariationSettings: '"wght" 300' }}
-                                    >
-                                        chevron_right
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Draggable thumb */}
-                        <div
-                            className={`swipe-pill-thumb ${isDragging ? 'dragging' : ''} ${isCV001 ? 'cv001-thumb' : ''}`}
-                            ref={thumbRef}
-                            style={{
-                                transform: `translateX(${dragX}px)`,
-                                transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)'
-                            }}
-                            onMouseDown={handleDragStart}
-                            onTouchStart={handleDragStart}
-                        >
-                            <span className="thumb-text">
-                                {isUnlocked ? 'UNLOCKED' : 'SWIPE TO START'}
-                            </span>
-                            <div className="arrow-circle">
-                                <span
-                                    className="material-symbols-outlined"
-                                    style={{ color: isUnlocked ? '#4CAF50' : (isCV001 ? '#0056f5' : '') }}
-                                >
-                                    {isUnlocked ? 'check' : 'arrow_forward'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                    <p className="mt-3 text-[19px] font-medium text-[#5C544B]">Fast, secure document printing via Mimo code.</p>
+                </motion.section>
             </main>
 
-            <footer className="kiosk-footer" style={{ position: 'relative', zIndex: 10 }}>
-                Crafted with innovation by <strong>Md Huzaif, Rathin &amp; Atharv.</strong><br />
-                &copy; 2026 <strong>VisionPrintt</strong>. All rights reserved.
-            </footer>
+            <div className="relative z-10 pb-8">
+                {swipeTrack}
+            </div>
+            {copyright}
         </div>
     );
 };

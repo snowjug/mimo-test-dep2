@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { HandTap } from '@phosphor-icons/react';
 
 interface AddsProps {
   isActive: boolean;
@@ -199,27 +200,18 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
       )}
 
       {/* Touch prompt banner */}
-      <div style={{
-        position: 'absolute',
-        bottom: '2.5rem',
-        background: 'rgba(0, 0, 0, 0.65)',
-        backdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255, 255, 255, 0.15)',
-        padding: '0.75rem 2rem',
-        borderRadius: '2rem',
-        color: '#ffffff',
-        fontSize: '1.25rem',
-        fontWeight: 600,
-        letterSpacing: '0.02em',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem',
-        pointerEvents: 'none'
-      }}>
-        <span style={{ animation: 'bounce 1s infinite', fontSize: '1.5rem' }}>👆</span> 
-        Tap anywhere to start printing with Mimo
+      <div
+        className="pointer-events-none absolute bottom-10 flex items-center gap-3 rounded-full border border-gold-500/30 bg-white/90 px-8 py-3 text-[#1A1714] shadow-2xl backdrop-blur-md"
+      >
+        <HandTap size={22} weight="fill" className="text-gold-600" style={{ animation: 'kiosk-tap-bounce 1.1s ease-in-out infinite' }} />
+        <span className="text-[19px] font-semibold tracking-wide">Tap anywhere to start printing with Mimo</span>
       </div>
+      <style>{`
+        @keyframes kiosk-tap-bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
+      `}</style>
     </div>,
     document.body
   );
