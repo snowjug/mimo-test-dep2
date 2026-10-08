@@ -39,9 +39,19 @@ async function main() {
 
   for (const [collectionName, docs] of COLLECTIONS) {
     for (const [id, data] of Object.entries(docs)) {
-      console.log(`${collectionName}/${id}`, JSON.stringify(data));
       if (apply) {
-        await db.collection(collectionName).doc(id).set(data, { merge: true });
+        // Only ever write this doc once: a machine's status/fields may have been hand-edited since the first
+        // seed (e.g. an admin set CV-001 to MAINTENANCE), and a blind merge:true on every run would silently
+        // stomp that back to the literal default. Matches provision-machine.js's existing guard.
+        const existing = await db.collection(collectionName).doc(id).get();
+        if (existing.exists) {
+          console.log(`${collectionName}/${id} already exists — skipping (run once only; edit it directly in Firestore to change it)`);
+          continue;
+        }
+        console.log(`${collectionName}/${id}`, JSON.stringify(data));
+        await db.collection(collectionName).doc(id).set(data);
+      } else {
+        console.log(`${collectionName}/${id}`, JSON.stringify(data));
       }
     }
   }

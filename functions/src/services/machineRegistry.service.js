@@ -89,6 +89,20 @@ function resolveCapabilities(machine, template) {
 }
 
 /**
+ * Whether kioskId is a real, active, capability-matched print destination — the registry-driven replacement
+ * for the literal `kioskId !== "CV-001" && kioskId !== "SV-002"` checks that used to gate print-job routing
+ * (print.controller.js, kiosk.routes.js). A machine that isn't ACTIVE (still PROVISIONING, in MAINTENANCE, or
+ * DECOMMISSIONED) must never accept a job, even if it's otherwise a known, well-formed registry entry.
+ */
+function describeDestination(machines, templates, kioskId) {
+  const machine = machines.get(kioskId);
+  if (!machine) return { known: false, active: false, supportsColor: false };
+  const template = machine.templateId ? templates.get(machine.templateId) : null;
+  const capabilities = resolveCapabilities(machine, template);
+  return { known: true, active: machine.status === "ACTIVE", supportsColor: !!capabilities.colour };
+}
+
+/**
  * The brief's PROVISIONING -> ONLINE -> AVAILABLE/BUSY/DEGRADED/OFFLINE -> MAINTENANCE -> DECOMMISSIONED
  * lifecycle, split in two: `lifecycleStatus` is admin-set and stored (MACHINE_LIFECYCLE_STATUSES); the
  * live sub-state is always computed, never stored, so it can't drift from reality the way a cached field could.
@@ -117,4 +131,5 @@ module.exports = {
   loadCampusesMap,
   resolveCapabilities,
   computeLiveState,
+  describeDestination,
 };

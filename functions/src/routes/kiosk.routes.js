@@ -17,6 +17,7 @@ const { claimRefund, refundIdFor } = require("../services/refund.service");
 const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
 const { unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
 const { getTransporter } = require("../services/email.service");
+const { loadMachinesMap, loadMachineTemplatesMap, describeDestination } = require("../services/machineRegistry.service");
 
 const REPORTABLE_ISSUES = { blank: "Blank pages", missing: "Pages missing", faint: "Too faint or streaky", other: "Something else" };
 const REPORT_WINDOW_MS = 30 * 60 * 1000;
@@ -280,6 +281,11 @@ function createKioskRouter(dependencies) {
       let transactionFailedError = null;
       let updatedJobData = null;
 
+      // Registry lookup outside the transaction: machine/template data isn't part of the job's transactional
+      // consistency requirement, and reading it inside db.runTransaction would just be an extra round trip.
+      const [registryMachines, registryTemplates] = await Promise.all([loadMachinesMap(db), loadMachineTemplatesMap(db)]);
+      const destination = describeDestination(registryMachines, registryTemplates, kioskId);
+
       try {
         const statusDoc = await db.collection("system_status").doc(kioskId).get();
         if (statusDoc.exists) {
@@ -309,27 +315,24 @@ function createKioskRouter(dependencies) {
           const jobDoc = sortedDocs[0];
           const jobData = jobDoc.data();
 
-          // Capability-based Routing Validation inside transaction:
-          // - Color jobs: ONLY allowed at MIMO 2.0 (SV-002)
-          // - B&W jobs: allowed at EITHER MIMO 1.0 (CV-001) OR MIMO 2.0 (SV-002)
+          // Capability-based routing validation, driven by the machine registry (looked up above, outside
+          // this transaction): the destination must be a known, ACTIVE machine, and a colour job needs a
+          // machine whose template/override actually supports colour.
           const isColor = isColorJob ? isColorJob(jobData) : (jobData.colorMode === "color");
 
-          if (isColor) {
-            if (kioskId !== "SV-002") {
-              transactionFailedError = {
-                status: 400,
-                message: "This is a Color print job. Color printing is only available at Machine 2 (SV-002). Please use Machine 2."
-              };
-              throw new Error("TX_ABORT");
-            }
-          } else {
-            if (kioskId !== "CV-001" && kioskId !== "SV-002") {
-              transactionFailedError = {
-                status: 400,
-                message: "Invalid printer station. Please use Machine 1 (CV-001) or Machine 2 (SV-002)."
-              };
-              throw new Error("TX_ABORT");
-            }
+          if (!destination.known || !destination.active) {
+            transactionFailedError = {
+              status: 400,
+              message: "Invalid printer station. Please use a machine shown on the Find a Kiosk page."
+            };
+            throw new Error("TX_ABORT");
+          }
+          if (isColor && !destination.supportsColor) {
+            transactionFailedError = {
+              status: 400,
+              message: "This is a Color print job. This machine can only print black & white. Please use a colour-capable machine."
+            };
+            throw new Error("TX_ABORT");
           }
 
           const unprintable = unprintableFilesForKiosk([jobData], kioskId);
