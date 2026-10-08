@@ -112,7 +112,7 @@ export function DocumentScanner() {
   const [activeCornerKey, setActiveCornerKey] = useState<keyof DocumentCorners | null>(null);
   const [editRotation, setEditRotation] = useState<number>(0);
   const [editFilter, setEditFilter] = useState<EnhancementMode>("enhanced");
-  const [editAspectRatio, setEditAspectRatio] = useState<AspectRatioMode>("a4");
+  const [editAspectRatio, setEditAspectRatio] = useState<AspectRatioMode>("free");
   const [isProcessingEdit, setIsProcessingEdit] = useState<boolean>(false);
 
   // Dragging corner handles state in Edit Modal
@@ -141,7 +141,7 @@ export function DocumentScanner() {
   const [isAutoCaptureEnabled, setIsAutoCaptureEnabled] = useState<boolean>(true);
   const [autoCaptureStatus, setAutoCaptureStatus] = useState<AutoCaptureStatus>("searching");
   const [autoCaptureProgress, setAutoCaptureProgress] = useState<number>(0);
-  const [autoCaptureMessage, setAutoCaptureMessage] = useState<string>("Align document inside frame");
+  const [autoCaptureMessage, setAutoCaptureMessage] = useState<string>("Align document or ID card inside frame");
   const [isShutterFlashing, setIsShutterFlashing] = useState<boolean>(false);
 
   // 1. Load OpenCV.js (bundled with the site) on mount
@@ -245,7 +245,8 @@ export function DocumentScanner() {
     setEditCorners(page.corners || getFullFrameCorners());
     setEditRotation(page.rotation || 0);
     setEditFilter(page.filter || "enhanced");
-    setEditAspectRatio("a4");
+    // "Free" keeps whatever shape the corners are dragged to; the user can still pick "A4" explicitly below.
+    setEditAspectRatio("free");
   };
 
   // ================= STAGE 2: CAPTURE & PERSPECTIVE WARP =================
@@ -306,9 +307,12 @@ export function DocumentScanner() {
       const originalDataUrl = canvas.toDataURL("image/jpeg", PAGE_JPEG_QUALITY);
       const targetCorners = corners ?? getFullFrameCorners();
 
-      // 3. Perspective-correct and crop to the paper (A4, portrait or landscape from the paper's shape)
+      // 3. Perspective-correct and crop to the paper, keeping the paper's OWN proportions. Forcing "a4" here
+      // used to stretch anything that isn't A4-shaped — an Aadhar card, a receipt, a photo — into A4's 0.707
+      // ratio, which is why scans looked distorted. The PDF page is still A4 (scanner-pdf-budget.ts /
+      // scanner.service.js center the real-shaped image on an A4 sheet), so nothing is lost by not forcing it here.
       const warpedCanvas = warpPerspective(canvas, targetCorners, {
-        aspectRatio: detected ? "a4" : "free",
+        aspectRatio: "free",
         enhancement: "enhanced",
       });
 
@@ -347,7 +351,7 @@ export function DocumentScanner() {
     if (!isCameraActive || cameraError || isCameraLoading || editingPage !== null || isFinalizing) {
       setAutoCaptureStatus("searching");
       setAutoCaptureProgress(0);
-      setAutoCaptureMessage("Align document inside frame");
+      setAutoCaptureMessage("Align document or ID card inside frame");
       return;
     }
 
@@ -426,8 +430,9 @@ export function DocumentScanner() {
         if (!found) withoutEdges++;
         const corners = found ? detected.corners : getFullFrameCorners();
 
+        // Same reasoning as the live capture path: keep the document's own shape, never force A4.
         const warpedCanvas = warpPerspective(img, corners, {
-          aspectRatio: found ? "a4" : "free",
+          aspectRatio: "free",
           enhancement: "enhanced",
         });
 
@@ -759,10 +764,11 @@ export function DocumentScanner() {
               <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <polygon
                   points={cornerKeys.map((k) => `${detectedCorners[k].x * 100},${detectedCorners[k].y * 100}`).join(" ")}
+                  vectorEffect="non-scaling-stroke"
                   className={`transition-all duration-100 ${
                     isDocDetected
                       ? "fill-emerald-500/20 stroke-emerald-400 stroke-[1.2]"
-                      : "fill-white/5 stroke-white/60 stroke-[1]"
+                      : "fill-white/5 stroke-white/85 stroke-[1.5] [stroke-dasharray:6,5]"
                   }`}
                 />
                 {isDocDetected &&

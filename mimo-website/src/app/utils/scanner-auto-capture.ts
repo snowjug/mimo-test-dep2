@@ -29,8 +29,9 @@ export interface AutoCaptureAnalysis {
 
 export interface AutoCaptureConfig {
   sampleFps?: number;           // Target sampling FPS (default: 12 FPS)
-  stabilityDurationMs?: number; // Required steady time in ms (default: 750ms)
-  motionThreshold?: number;     // Maximum pixel delta to consider steady (default: 5.0)
+  stabilityDurationMs?: number; // Required steady time in ms (default: 600ms)
+  motionThreshold?: number;     // Maximum pixel delta to consider steady (default: 6.5)
+  cornerShiftThreshold?: number; // Maximum normalized corner movement to consider steady (default: 0.02)
   minLuminance?: number;        // Minimum acceptable brightness (default: 35)
   maxLuminance?: number;        // Maximum acceptable brightness (default: 242)
   minEdgeContrast?: number;     // Minimum edge/contrast variance (default: 8.0)
@@ -58,8 +59,9 @@ export class ScannerAutoCaptureEngine {
   constructor(config?: AutoCaptureConfig) {
     this.config = {
       sampleFps: config?.sampleFps ?? 12,
-      stabilityDurationMs: config?.stabilityDurationMs ?? 750,
-      motionThreshold: config?.motionThreshold ?? 5.0,
+      stabilityDurationMs: config?.stabilityDurationMs ?? 600,
+      motionThreshold: config?.motionThreshold ?? 6.5,
+      cornerShiftThreshold: config?.cornerShiftThreshold ?? 0.02,
       minLuminance: config?.minLuminance ?? 35,
       maxLuminance: config?.maxLuminance ?? 242,
       minEdgeContrast: config?.minEdgeContrast ?? 8.0,
@@ -197,7 +199,7 @@ export class ScannerAutoCaptureEngine {
         meanLuminance: 0,
         edgeContrast: 0,
         stabilityProgress: 0,
-        message: "Align document inside frame",
+        message: "Align document or ID card inside frame",
       };
     }
 
@@ -270,7 +272,7 @@ export class ScannerAutoCaptureEngine {
     // The four corners must hold still too, not just the pixels.
     let cornersSteady = false;
     if (isCVDetected && cvResult) {
-      cornersSteady = !!this.prevCorners && maxCornerShift(this.prevCorners, cvResult.corners) < 0.015;
+      cornersSteady = !!this.prevCorners && maxCornerShift(this.prevCorners, cvResult.corners) < this.config.cornerShiftThreshold;
       this.prevCorners = cvResult.corners;
     } else {
       this.prevCorners = null;
@@ -309,7 +311,7 @@ export class ScannerAutoCaptureEngine {
     // Evaluate Stability Progression
     let stabilityProgress = 0;
     let status: AutoCaptureStatus = "searching";
-    let message = isCVDetected ? "Document detected - hold steady" : "Align document inside frame";
+    let message = isCVDetected ? "Document detected - hold steady" : "Align document or ID card inside frame";
 
     if (!isExposureValid) {
       this.steadyStartTime = null;
@@ -318,7 +320,7 @@ export class ScannerAutoCaptureEngine {
     } else if (!isDocumentDetected) {
       this.steadyStartTime = null;
       status = "searching";
-      message = "Align document inside frame";
+      message = "Align document or ID card inside frame";
     } else if (!isSteady) {
       this.steadyStartTime = null;
       status = "detected";
