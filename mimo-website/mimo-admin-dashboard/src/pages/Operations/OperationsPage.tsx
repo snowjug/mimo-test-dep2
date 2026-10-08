@@ -19,6 +19,7 @@ const STATUS_FILTERS = [
   { id: 'failed', label: 'Failed' },
   { id: 'refunded', label: 'Refunded' },
   { id: 'active', label: 'In progress' },
+  { id: 'abandoned', label: 'Left / never claimed' },
 ];
 const MACHINE_FILTERS = [
   { id: 'ALL', label: 'All machines' },
@@ -69,6 +70,7 @@ export const OperationsPage: React.FC = () => {
       if (statusFilter === 'failed' && j.outcome !== 'failed') return false;
       if (statusFilter === 'refunded' && j.outcome !== 'refunded' && j.outcome !== 'refund_pending') return false;
       if (statusFilter === 'active' && j.outcome !== 'printing' && j.outcome !== 'waiting') return false;
+      if (statusFilter === 'abandoned' && j.outcome !== 'abandoned') return false;
       if (!q) return true;
       return [displayName(j), j.userEmail, j.userPhone, j.file, j.orderId].some((v) => v && v.toLowerCase().includes(q));
     });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, X, IndianRupee, Loader2, Clock, ChevronDown, MessageSquareWarning, RotateCcw, FileText } from 'lucide-react';
+import { Check, X, IndianRupee, Loader2, Clock, ChevronDown, MessageSquareWarning, RotateCcw, FileText, UserX } from 'lucide-react';
 import type { JobOutcome, JobRow } from '../../types/insights.types';
 import { clockTime, duration, inr } from '../../lib/format';
 
@@ -29,6 +29,7 @@ const OUTCOME: Record<JobOutcome, { label: string; cls: string; icon: React.Reac
   refund_pending: { label: 'Refund processing', cls: 'border-2 border-blue-500 text-blue-500', icon: <IndianRupee size={12} strokeWidth={2.75} /> },
   printing: { label: 'Printing', cls: 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400', icon: <Loader2 size={14} className="animate-spin" /> },
   waiting: { label: 'Paid, not printed yet', cls: 'border border-slate-300 text-slate-400 dark:border-slate-600', icon: <Clock size={13} /> },
+  abandoned: { label: 'Uploaded, never claimed', cls: 'border border-slate-300 bg-slate-100 text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400', icon: <UserX size={13} /> },
 };
 
 export const StatusIcon: React.FC<{ outcome?: JobOutcome }> = ({ outcome = 'waiting' }) => {

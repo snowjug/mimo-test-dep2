@@ -72,6 +72,13 @@ test("status column: refunded beats failed beats printed", () => {
   assert.strictEqual(jobOutcome("paid", null), "waiting");
 });
 
+test("status column: a job the customer uploaded/paid for and never claimed is its own outcome, not 'waiting'", () => {
+  // retention.trigger.js sets these after the 24h cleanup: "pending" (never paid) -> "abandoned",
+  // "paid" (paid, never printed) -> "expired". Both mean the same thing to an admin reading the list.
+  assert.strictEqual(jobOutcome("abandoned", null), "abandoned");
+  assert.strictEqual(jobOutcome("expired", null), "abandoned");
+});
+
 test("B&W trays are 250 sheets and paper left follows the printer's page counter", () => {
   const [bw] = hardwareFor({ "CV-001": { type: "bw", paperLevel: 500, paperCapacity: 500 } }, "CV-001");
   assert.strictEqual(bw.paperCapacity, 250);
@@ -81,6 +88,26 @@ test("B&W trays are 250 sheets and paper left follows the printer's page counter
   assert.strictEqual(tracked.paperTracked, true);
   const [colour] = hardwareFor({ "SV-002-COLOR": { type: "color", paperLevel: 40 } }, "SV-002");
   assert.strictEqual(colour.paperCapacity, 100);
+});
+
+test("a printer already live-decrementing paperLevel itself is trusted as-is, not double-corrected", () => {
+  // Reproduces the live bug: CV-001 right now reports paperLevel=120 (already current, the Pi decrements it
+  // directly and stamps lastPaperDeduction on every print) while also exposing pageCount/paperRefillPageCount.
+  // Subtracting the page-counter delta on top of the already-current value drove the shown level to 0.
+  const [selfReported] = hardwareFor({
+    "CV-001": { type: "bw", paperLevel: 120, pageCount: 17477, paperRefillPageCount: 17318, lastPaperDeduction: { seconds: 1 } },
+  }, "CV-001");
+  assert.strictEqual(selfReported.paperLevel, 120);
+  assert.strictEqual(selfReported.paperSource, "pi-live");
+  assert.strictEqual(selfReported.paperTracked, true);
+
+  // No lastPaperDeduction: the page-counter correction still applies (the newer, not-yet-deployed Pi
+  // behaviour, where the Pi only reports a static pageCount and the backend computes paper left).
+  const [computed] = hardwareFor({
+    "CV-001": { type: "bw", paperLevel: 250, pageCount: 16500, paperRefillPageCount: 16440 },
+  }, "CV-001");
+  assert.strictEqual(computed.paperLevel, 190);
+  assert.strictEqual(computed.paperSource, "computed");
 });
 
 test("refill sets the tray to 250 and remembers the page counter", async () => {

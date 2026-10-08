@@ -120,7 +120,7 @@ export interface JobRow {
   customerIssue?: CustomerIssue | null;
 }
 
-export type JobOutcome = 'printed' | 'failed' | 'refunded' | 'refund_pending' | 'printing' | 'waiting';
+export type JobOutcome = 'printed' | 'failed' | 'refunded' | 'refund_pending' | 'printing' | 'waiting' | 'abandoned';
 
 export interface RefundInfo {
   state: 'refunded' | 'pending';

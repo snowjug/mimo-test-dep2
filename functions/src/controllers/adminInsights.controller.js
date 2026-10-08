@@ -265,6 +265,9 @@ function jobOutcome(status, refund) {
   if (s === "failed" || s === "error" || s === "cancelled") return "failed";
   if (["completed", "printed", "success"].includes(s)) return "printed";
   if (["printing", "processing", "in_progress"].includes(s)) return "printing";
+  // Uploaded/paid, then never claimed at the kiosk; the 24h retention cleanup (retention.trigger.js) purges
+  // the file and sets this. Previously fell into "waiting", indistinguishable from a job still in progress.
+  if (s === "abandoned" || s === "expired") return "abandoned";
   return "waiting";
 }
 const num0 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -277,14 +280,20 @@ const hardwareFor = (hardware, kioskId) =>
       const type = p.type || (key.toUpperCase().includes("COLOR") ? "color" : "bw");
       const capacity = type === "color" ? num0(p.paperCapacity) || COLOR_PAPER_CAPACITY : BW_PAPER_CAPACITY;
       let paperLevel = p.paperLevel === undefined ? null : num0(p.paperLevel);
+      // Some Pis already decrement paperLevel themselves on every print (stamping lastPaperDeduction each
+      // time) — that value is already current. Re-subtracting the page-counter delta on top of it double
+      // counts the same consumption and can drive the shown level to 0 while real paper remains. Only apply
+      // the page-counter correction when nothing is already live-decrementing paperLevel for us.
+      const selfReporting = p.lastPaperDeduction !== undefined && p.lastPaperDeduction !== null;
       // B&W: the Pi reports the printer's own page counter, so paper left = level at refill − sheets printed since.
-      const tracked = type !== "color" && paperLevel !== null && Number.isFinite(p.pageCount) && Number.isFinite(p.paperRefillPageCount);
+      const tracked = !selfReporting && type !== "color" && paperLevel !== null && Number.isFinite(p.pageCount) && Number.isFinite(p.paperRefillPageCount);
       if (tracked) paperLevel -= Math.max(0, p.pageCount - p.paperRefillPageCount);
       if (paperLevel !== null) paperLevel = Math.max(0, Math.min(capacity, paperLevel));
       return {
         key,
         type,
-        paperTracked: tracked,
+        paperTracked: tracked || selfReporting,
+        paperSource: selfReporting ? "pi-live" : tracked ? "computed" : "static",
         paperRefilledAt: A.iso(A.toMillis(p.paperRefilledAt)),
         panelMessage: p.panelMessage || null,
         status: p.status || null,
