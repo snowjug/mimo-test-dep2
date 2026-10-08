@@ -27,6 +27,7 @@ exports.scheduledFileRetentionCleanup = onSchedule(
       let lastDoc = null;
       let pagesRead = 0;
       const MAX_PAGES = 5;
+      let rawMatches = 0;
 
       while (pagesRead < MAX_PAGES && candidateMap.size < MAX_CANDIDATES_TOTAL) {
         let query = db.collection("print_jobs")
@@ -38,8 +39,18 @@ exports.scheduledFileRetentionCleanup = onSchedule(
           query = query.startAfter(lastDoc);
         }
 
-        const snap = await query.get();
+        let snap;
+        try {
+          snap = await query.get();
+        } catch (fieldErr) {
+          // Every run for 30+ days logged "Found 0 candidates" with no error anywhere, yet the identical
+          // query run ad-hoc found real matches instantly — this diagnostic exists to catch whatever the
+          // difference is (so far unexplained via static review) on the next scheduled run.
+          console.error(`[RETENTION CLEANUP] query failed for field "${fieldName}":`, fieldErr.message || fieldErr);
+          break;
+        }
         pagesRead++;
+        rawMatches += snap.size;
 
         if (snap.empty) break;
 
@@ -55,6 +66,7 @@ exports.scheduledFileRetentionCleanup = onSchedule(
         lastDoc = snap.docs[snap.docs.length - 1];
         if (snap.docs.length < PAGE_SIZE) break;
       }
+      console.log(`[RETENTION CLEANUP] field="${fieldName}" rawMatches=${rawMatches} pagesRead=${pagesRead} candidateMapSize=${candidateMap.size}`);
     }
 
     try {
