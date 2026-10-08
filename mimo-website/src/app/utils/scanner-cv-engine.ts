@@ -7,7 +7,13 @@
  * 3. 4-point quadrilateral homography & perspective warping to standard A4 ratio.
  * 4. Document enhancement algorithms (Original, Magic Enhance, High-Contrast B&W, Grayscale).
  * 5. Built-in analytical 3x3 projective homography & adaptive threshold fallback engine.
+ *
+ * Candidate SELECTION (which quad is "the document") is not decided here. Every strategy below only
+ * proposes quadrilaterals; scanner-document-scorer.ts scores and picks the winner. This split is what stops
+ * a face/body/table silhouette — often the single largest convex quad in frame — from being picked just
+ * because it is the biggest.
  */
+import { pickBestCandidate, scoreCandidate, type CandidateInput, type CandidateScoreBreakdown } from "./scanner-document-scorer.ts";
 
 export interface Point2D {
   x: number; // 0..1 normalized or absolute pixels
@@ -26,18 +32,23 @@ export interface DocumentDetectionResult {
   corners: DocumentCorners; // Normalized 0..1
   areaPercent: number; // 0..1
   aspectRatio: number;
-  confidence: number; // 0..1
+  confidence: number; // 0..1 — the winning candidate's composite score from scanner-document-scorer.ts
   isFallback: boolean;
+  // Present only when options.debug is true: every candidate this frame produced, worst to best, for the
+  // on-screen debug overlay (document-scanner.tsx). Never populated in normal (non-debug) operation.
+  debugCandidates?: Array<CandidateScoreBreakdown & { areaPercent: number; isExtremalFallback?: boolean }>;
 }
 
 export type EnhancementMode = "original" | "enhanced" | "bw" | "grayscale";
 
 export interface DetectionOptions {
   minAreaPercent?: number; // Minimum area of frame (default: 0.10)
-  maxAreaPercent?: number; // Maximum area of frame (default: 0.98)
+  maxAreaPercent?: number; // Maximum area of frame (default: 0.85)
   downscaleWidth?: number; // Width for analysis canvas (default: 480)
   downscaleHeight?: number; // Height for analysis canvas
   smoothingFactor?: number; // Temporal corner smoothing 0..1 (default: 0.45)
+  previousQuad?: DocumentCorners | null; // last accepted quad, fed to the scorer for temporal continuity
+  debug?: boolean; // when true, populates DocumentDetectionResult.debugCandidates
 }
 
 export interface WarpOptions {
@@ -269,30 +280,41 @@ export function smoothCorners(
 let analysisCanvas: HTMLCanvasElement | null = null;
 let isDetecting = false;
 
+function quadAspectRatio(c: DocumentCorners): number {
+  const topW = Math.hypot(c.topRight.x - c.topLeft.x, c.topRight.y - c.topLeft.y);
+  const botW = Math.hypot(c.bottomRight.x - c.bottomLeft.x, c.bottomRight.y - c.bottomLeft.y);
+  const leftH = Math.hypot(c.bottomLeft.x - c.topLeft.x, c.bottomLeft.y - c.topLeft.y);
+  const rightH = Math.hypot(c.bottomRight.x - c.topRight.x, c.bottomRight.y - c.topRight.y);
+  return (topW + botW) / 2 / (((leftH + rightH) / 2) || 1e-4);
+}
+
 /**
- * Helper: Find the best document-like quadrilateral from a binary edge/threshold image
+ * Helper: Collect every document-LIKE quadrilateral candidate from a binary edge/threshold image.
+ *
+ * Deliberately does not pick a winner. The old version ranked candidates by hull area alone ("biggest wins"),
+ * which is exactly what let a face/body/table silhouette be chosen over the actual paper — a person's
+ * head+shoulders outline against a wall is very often the single largest convex quad in frame. This function
+ * only proposes candidates (with a coarse aspect-ratio sanity filter so absurd slivers never reach the
+ * scorer); scanner-document-scorer.ts does the real ranking across every strategy's output combined.
  */
-function findBestQuadFromBinary(
+function findQuadCandidatesFromBinary(
   cv: any,
   binaryMat: any,
   sw: number,
   sh: number,
   minArea: number,
   maxArea: number
-): { quad: Point2D[] | null; area: number; confidence: number } {
+): CandidateInput[] {
   let contours: any = null;
   let hierarchy: any = null;
   let hull: any = null;
   let approx: any = null;
+  const candidates: CandidateInput[] = [];
 
   try {
     contours = new cv.MatVector();
     hierarchy = new cv.Mat();
     cv.findContours(binaryMat, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
-
-    let maxScore = 0;
-    let bestQuad: Point2D[] | null = null;
-    let bestArea = 0;
 
     hull = new cv.Mat();
     approx = new cv.Mat();
@@ -302,112 +324,74 @@ function findBestQuadFromBinary(
     for (let i = 0; i < contours.size(); i++) {
       const contour = contours.get(i);
       const area = cv.contourArea(contour);
+      if (area < minArea || area > maxArea) continue;
 
-      if (area >= minArea && area <= maxArea) {
-        // Calculate convex hull to eliminate hand/finger notches and ragged edges
-        cv.convexHull(contour, hull);
-        const hullArea = cv.contourArea(hull);
-        const perimeter = cv.arcLength(hull, true);
+      // Calculate convex hull to eliminate hand/finger notches and ragged edges
+      cv.convexHull(contour, hull);
+      const hullArea = cv.contourArea(hull);
+      const perimeter = cv.arcLength(hull, true);
+      const areaPercent = hullArea / totalFrameArea;
 
-        // Multi-epsilon polygon approximation for robust 4-vertex discovery
-        const epsilons = [0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10];
-        let foundQuad = false;
+      // Multi-epsilon polygon approximation for robust 4-vertex discovery
+      const epsilons = [0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10];
+      let foundQuad = false;
 
-        for (const eps of epsilons) {
-          cv.approxPolyDP(hull, approx, eps * perimeter, true);
+      for (const eps of epsilons) {
+        cv.approxPolyDP(hull, approx, eps * perimeter, true);
 
-          if (approx.rows === 4 && cv.isContourConvex(approx)) {
-            const points: Point2D[] = [];
-            for (let j = 0; j < 4; j++) {
-              points.push({
-                x: approx.data32S[j * 2] / sw,
-                y: approx.data32S[j * 2 + 1] / sh,
-              });
-            }
+        if (approx.rows === 4 && cv.isContourConvex(approx)) {
+          const points: Point2D[] = [];
+          for (let j = 0; j < 4; j++) {
+            points.push({ x: approx.data32S[j * 2] / sw, y: approx.data32S[j * 2 + 1] / sh });
+          }
 
-            const ordered = orderCornerPoints(points);
-            const topW = Math.hypot(ordered.topRight.x - ordered.topLeft.x, ordered.topRight.y - ordered.topLeft.y);
-            const botW = Math.hypot(ordered.bottomRight.x - ordered.bottomLeft.x, ordered.bottomRight.y - ordered.bottomLeft.y);
-            const leftH = Math.hypot(ordered.bottomLeft.x - ordered.topLeft.x, ordered.bottomLeft.y - ordered.topLeft.y);
-            const rightH = Math.hypot(ordered.bottomRight.x - ordered.topRight.x, ordered.bottomRight.y - ordered.topRight.y);
+          const ordered = orderCornerPoints(points);
+          const ratio = quadAspectRatio(ordered);
 
-            const avgW = (topW + botW) / 2;
-            const avgH = (leftH + rightH) / 2;
-            const ratio = avgW / (avgH || 1e-4);
-
-            // Document aspect ratio plausibility (supports portrait & landscape A4, receipts, ID cards)
-            if (ratio >= 0.35 && ratio <= 2.8) {
-              const areaPercent = hullArea / totalFrameArea;
-              const score = hullArea * (1 + (ratio >= 0.5 && ratio <= 2.0 ? 0.2 : 0));
-
-              if (score > maxScore) {
-                maxScore = score;
-                bestQuad = points;
-                bestArea = hullArea;
-              }
-              foundQuad = true;
-              break;
-            }
+          // Coarse plausibility gate only (portrait & landscape A4, receipts, ID cards, slight distortion).
+          // The scorer does the real ranking afterwards; this just keeps absurd slivers out of the pool.
+          if (ratio >= 0.35 && ratio <= 2.8) {
+            candidates.push({ corners: ordered, areaPercent });
+            foundQuad = true;
+            break;
           }
         }
+      }
 
-        // If exact 4-point approximation was not reached but convex hull has 5 to 10 vertices
-        if (!foundQuad && approx.rows >= 5 && approx.rows <= 10) {
-          // Extract 4 extremal corners from the convex hull
-          const hullPoints: Point2D[] = [];
-          for (let j = 0; j < hull.rows; j++) {
-            hullPoints.push({
-              x: hull.data32S[j * 2] / sw,
-              y: hull.data32S[j * 2 + 1] / sh,
-            });
+      // If exact 4-point approximation was not reached but the convex hull has 5 to 10 vertices, fall back
+      // to the 4 extremal points. Less reliable than a clean approxPolyDP quad, so it is tagged for the
+      // scorer's small extremal-fallback penalty.
+      if (!foundQuad && approx.rows >= 5 && approx.rows <= 10) {
+        const hullPoints: Point2D[] = [];
+        for (let j = 0; j < hull.rows; j++) {
+          hullPoints.push({ x: hull.data32S[j * 2] / sw, y: hull.data32S[j * 2 + 1] / sh });
+        }
+
+        if (hullPoints.length >= 4) {
+          let minSumPt = hullPoints[0], maxSumPt = hullPoints[0];
+          let minDiffPt = hullPoints[0], maxDiffPt = hullPoints[0];
+          let minSum = Infinity, maxSum = -Infinity;
+          let minDiff = Infinity, maxDiff = -Infinity;
+
+          for (const pt of hullPoints) {
+            const s = pt.x + pt.y;
+            const d = pt.y - pt.x;
+            if (s < minSum) { minSum = s; minSumPt = pt; }
+            if (s > maxSum) { maxSum = s; maxSumPt = pt; }
+            if (d < minDiff) { minDiff = d; minDiffPt = pt; }
+            if (d > maxDiff) { maxDiff = d; maxDiffPt = pt; }
           }
 
-          if (hullPoints.length >= 4) {
-            let minSumPt = hullPoints[0], maxSumPt = hullPoints[0];
-            let minDiffPt = hullPoints[0], maxDiffPt = hullPoints[0];
-            let minSum = Infinity, maxSum = -Infinity;
-            let minDiff = Infinity, maxDiff = -Infinity;
-
-            for (const pt of hullPoints) {
-              const s = pt.x + pt.y;
-              const d = pt.y - pt.x;
-              if (s < minSum) { minSum = s; minSumPt = pt; }
-              if (s > maxSum) { maxSum = s; maxSumPt = pt; }
-              if (d < minDiff) { minDiff = d; minDiffPt = pt; }
-              if (d > maxDiff) { maxDiff = d; maxDiffPt = pt; }
-            }
-
-            const candidateQuad = [minSumPt, minDiffPt, maxSumPt, maxDiffPt];
-            const ordered = orderCornerPoints(candidateQuad);
-            const topW = Math.hypot(ordered.topRight.x - ordered.topLeft.x, ordered.topRight.y - ordered.topLeft.y);
-            const botW = Math.hypot(ordered.bottomRight.x - ordered.bottomLeft.x, ordered.bottomRight.y - ordered.bottomLeft.y);
-            const leftH = Math.hypot(ordered.bottomLeft.x - ordered.topLeft.x, ordered.bottomLeft.y - ordered.topLeft.y);
-            const rightH = Math.hypot(ordered.bottomRight.x - ordered.topRight.x, ordered.bottomRight.y - ordered.topRight.y);
-
-            const avgW = (topW + botW) / 2;
-            const avgH = (leftH + rightH) / 2;
-            const ratio = avgW / (avgH || 1e-4);
-
-            if (ratio >= 0.35 && ratio <= 2.8) {
-              const score = hullArea * 0.85; // slight discount for extremal fallback
-              if (score > maxScore) {
-                maxScore = score;
-                bestQuad = candidateQuad;
-                bestArea = hullArea;
-              }
-            }
+          const ordered = orderCornerPoints([minSumPt, minDiffPt, maxSumPt, maxDiffPt]);
+          const ratio = quadAspectRatio(ordered);
+          if (ratio >= 0.35 && ratio <= 2.8) {
+            candidates.push({ corners: ordered, areaPercent, isExtremalFallback: true });
           }
         }
       }
     }
 
-    if (bestQuad) {
-      const areaPercent = bestArea / totalFrameArea;
-      const confidence = Math.min(1.0, 0.55 + areaPercent * 0.45);
-      return { quad: bestQuad, area: bestArea, confidence };
-    }
-
-    return { quad: null, area: 0, confidence: 0 };
+    return candidates;
   } finally {
     if (contours) contours.delete();
     if (hierarchy) hierarchy.delete();
@@ -447,7 +431,9 @@ export function detectDocumentCorners(
     const sh = Math.max(120, Math.round(srcH * scale));
 
     const minArea = (options?.minAreaPercent ?? 0.08) * sw * sh;
-    const maxArea = (options?.maxAreaPercent ?? 0.98) * sw * sh;
+    // 0.85 rather than 0.98: a document essentially never needs to fill nearly the whole frame, and a
+    // near-full-frame contour is far more often the background/table/a person than a held document.
+    const maxArea = (options?.maxAreaPercent ?? 0.85) * sw * sh;
 
     if (!analysisCanvas) {
       analysisCanvas = document.createElement("canvas");
@@ -469,6 +455,10 @@ export function detectDocumentCorners(
 
     // Draw downsampled frame with aspect ratio preserved
     ctx.drawImage(source, 0, 0, sw, sh);
+
+    // Carries the debug breakdown out to the "no document found" fallback below, when options.debug is set
+    // and every candidate this frame produced was rejected (so the caller can see why, not just that it failed).
+    let lastDebugCandidates: DocumentDetectionResult["debugCandidates"];
 
     // ================= 1. OPENCV.JS MULTI-STRATEGY PIPELINE =================
     if (isCVReady()) {
@@ -498,41 +488,60 @@ export function detectDocumentCorners(
         cv.cvtColor(srcMat, grayMat, cv.COLOR_RGBA2GRAY);
         cv.GaussianBlur(grayMat, blurMat, new cv.Size(5, 5), 0);
 
+        // Every strategy only PROPOSES candidates; none of them decides the winner (see findQuadCandidatesFromBinary
+        // and scanner-document-scorer.ts). Strategy A runs first and, if it already produced something clearly
+        // good, the more expensive strategies B/C are skipped — but "good" here means a high scored candidate,
+        // not merely "a quad existed", which is the bug that let a face/body quad short-circuit the cascade before.
+        const QUICK_ACCEPT_SCORE = 0.75;
+        let candidates: CandidateInput[] = [];
+
         // Strategy A: Dual-Threshold Canny + Morphological Closing
         cv.Canny(blurMat, cannyMat, 30, 110);
         cv.morphologyEx(cannyMat, edgesMat, cv.MORPH_CLOSE, kernel5);
+        candidates = candidates.concat(findQuadCandidatesFromBinary(cv, edgesMat, sw, sh, minArea, maxArea));
+        let picked = pickBestCandidate(candidates, { previousQuad: options?.previousQuad });
 
-        let result = findBestQuadFromBinary(cv, edgesMat, sw, sh, minArea, maxArea);
-
-        // Strategy B: Otsu Binarization + Morphological Closing (ideal for paper on darker desks)
-        if (!result.quad) {
+        if (!picked || picked.score.total < QUICK_ACCEPT_SCORE) {
+          // Strategy B: Otsu Binarization + Morphological Closing (ideal for paper on darker desks)
           cv.threshold(blurMat, otsuMat, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
           cv.morphologyEx(otsuMat, edgesMat, cv.MORPH_CLOSE, kernel7);
           cv.Canny(edgesMat, cannyMat, 40, 120);
-          result = findBestQuadFromBinary(cv, cannyMat, sw, sh, minArea, maxArea);
+          candidates = candidates.concat(findQuadCandidatesFromBinary(cv, cannyMat, sw, sh, minArea, maxArea));
+          picked = pickBestCandidate(candidates, { previousQuad: options?.previousQuad });
         }
 
-        // Strategy C: Adaptive Gaussian Thresholding (ideal for uneven desk lighting & shadows)
-        if (!result.quad) {
+        if (!picked || picked.score.total < QUICK_ACCEPT_SCORE) {
+          // Strategy C: Adaptive Gaussian Thresholding (ideal for uneven desk lighting & shadows)
           cv.adaptiveThreshold(blurMat, adaptMat, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 15, 3);
           cv.morphologyEx(adaptMat, edgesMat, cv.MORPH_CLOSE, kernel5);
           cv.Canny(edgesMat, cannyMat, 40, 120);
-          result = findBestQuadFromBinary(cv, cannyMat, sw, sh, minArea, maxArea);
+          candidates = candidates.concat(findQuadCandidatesFromBinary(cv, cannyMat, sw, sh, minArea, maxArea));
+          picked = pickBestCandidate(candidates, { previousQuad: options?.previousQuad });
         }
 
-        if (result.quad) {
+        if (options?.debug) {
+          lastDebugCandidates = candidates
+            .map((c) => ({
+              ...scoreCandidate(c, { previousQuad: options?.previousQuad }),
+              areaPercent: c.areaPercent,
+              isExtremalFallback: c.isExtremalFallback,
+            }))
+            .sort((a, b) => a.total - b.total);
+        }
+
+        if (picked) {
           // Pull the corners ~0.8% towards the centre so the paper edge (and any table showing beyond it)
           // is trimmed from the scan.
-          const orderedCorners = insetCorners(orderCornerPoints(result.quad), 0.008);
-          const areaPercent = result.area / (sw * sh);
+          const orderedCorners = insetCorners(candidates[picked.bestIndex].corners, 0.008);
 
           return {
             hasDocument: true,
             corners: orderedCorners,
-            areaPercent,
-            aspectRatio: 0.707,
-            confidence: result.confidence,
+            areaPercent: candidates[picked.bestIndex].areaPercent,
+            aspectRatio: picked.score.aspectRatioValue,
+            confidence: picked.score.total,
             isFallback: false,
+            debugCandidates: lastDebugCandidates,
           };
         }
       } catch (cvErr) {
@@ -559,6 +568,7 @@ export function detectDocumentCorners(
       aspectRatio: 0.707,
       confidence: 0,
       isFallback: true,
+      debugCandidates: lastDebugCandidates,
     };
   } finally {
     isDetecting = false;

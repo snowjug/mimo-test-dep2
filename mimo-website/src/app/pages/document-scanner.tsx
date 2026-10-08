@@ -48,6 +48,7 @@ import {
   getDefaultCorners,
   getFullFrameCorners,
   DocumentCorners,
+  DocumentDetectionResult,
   EnhancementMode,
 } from "../utils/scanner-cv-engine";
 import { fitPagesToPdfLimit } from "../utils/scanner-pdf-budget";
@@ -143,6 +144,17 @@ export function DocumentScanner() {
   const [autoCaptureProgress, setAutoCaptureProgress] = useState<number>(0);
   const [autoCaptureMessage, setAutoCaptureMessage] = useState<string>("Align document or ID card inside frame");
   const [isShutterFlashing, setIsShutterFlashing] = useState<boolean>(false);
+
+  // True only once a real document has been detected at least once; gates sending a meaningless default
+  // guide box to the scorer as "the previous frame's document" (would bias continuity toward the center).
+  const hasEverDetectedRef = useRef<boolean>(false);
+
+  // Debug mode (?scannerDebug=1 in the URL): shows the scorer's candidate breakdown on screen. Off by
+  // default and never shown to a real customer unless this exact query param is present.
+  const [isScannerDebugEnabled] = useState<boolean>(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("scannerDebug") === "1"
+  );
+  const [debugCandidates, setDebugCandidates] = useState<DocumentDetectionResult["debugCandidates"]>(undefined);
 
   // 1. Load OpenCV.js (bundled with the site) on mount
   useEffect(() => {
@@ -294,7 +306,11 @@ export function DocumentScanner() {
 
       // 2. Find the paper on the full-resolution frame; the live overlay's corners are the fallback.
       let corners: DocumentCorners | null = null;
-      const captureResult = detectDocumentCorners(canvas, { downscaleWidth: 640, minAreaPercent: 0.08 });
+      const captureResult = detectDocumentCorners(canvas, {
+        downscaleWidth: 640,
+        minAreaPercent: 0.08,
+        previousQuad: hasEverDetectedRef.current ? smoothedCornersRef.current : null,
+      });
       if (captureResult.hasDocument && !captureResult.isFallback) {
         corners = captureResult.corners;
       } else if (isDocDetected) {
@@ -364,12 +380,18 @@ export function DocumentScanner() {
         lastAnalysisTime = timestamp;
         if (videoRef.current && videoRef.current.readyState >= 2) {
           try {
-            // 1. Detect 4 Corners in Real-Time
+            // 1. Detect 4 Corners in Real-Time. previousQuad only once something real has been seen before —
+            // otherwise the very first frame would bias continuity scoring toward the meaningless center guide.
             const cvResult = detectDocumentCorners(videoRef.current, {
               downscaleWidth: 480,
+              previousQuad: hasEverDetectedRef.current ? smoothedCornersRef.current : null,
+              debug: isScannerDebugEnabled,
             });
 
+            if (isScannerDebugEnabled) setDebugCandidates(cvResult.debugCandidates);
+
             if (cvResult.hasDocument && !cvResult.isFallback) {
+              hasEverDetectedRef.current = true;
               const smoothed = smoothCorners(cvResult.corners, smoothedCornersRef.current, 0.45);
               smoothedCornersRef.current = smoothed;
               setDetectedCorners(smoothed);
@@ -403,7 +425,7 @@ export function DocumentScanner() {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [isCameraActive, cameraError, isCameraLoading, editingPage, isFinalizing, isAutoCaptureEnabled, handleCapture]);
+  }, [isCameraActive, cameraError, isCameraLoading, editingPage, isFinalizing, isAutoCaptureEnabled, isScannerDebugEnabled, handleCapture]);
 
   // Handle file import from disk / gallery
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -826,6 +848,25 @@ export function DocumentScanner() {
                   </span>
                 )}
               </div>
+
+              {/* Debug mode (?scannerDebug=1): candidate score breakdown, worst to best. Never shown otherwise. */}
+              {isScannerDebugEnabled && (
+                <div className="absolute inset-x-3 bottom-3 z-30 max-h-[40%] overflow-y-auto rounded-lg bg-black/75 p-2 font-mono text-[10px] leading-tight text-emerald-300 backdrop-blur-md">
+                  {!debugCandidates || debugCandidates.length === 0 ? (
+                    <div className="text-white/60">No candidates this frame</div>
+                  ) : (
+                    [...debugCandidates].reverse().map((c, i) => (
+                      <div key={i} className={i === 0 ? "text-emerald-300" : "text-white/50"}>
+                        {i === 0 ? "WINNER " : "reject "}
+                        total={c.total.toFixed(2)} area={c.area.toFixed(2)} rect={c.rectangularity.toFixed(2)} angle=
+                        {c.angle.toFixed(2)} aspect={c.aspectRatio.toFixed(2)} ({c.aspectRatioValue.toFixed(2)}) center=
+                        {c.center.toFixed(2)} cont={c.continuity === null ? "n/a" : c.continuity.toFixed(2)} areaPct=
+                        {(c.areaPercent * 100).toFixed(0)}% {c.isExtremalFallback ? "[fallback]" : ""}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           )}
 
