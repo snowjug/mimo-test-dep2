@@ -172,7 +172,7 @@ export const MimoCharacter3D: React.FC<MimoCharacter3DProps> = ({
               className={`relative z-20 flex items-center gap-1.5 px-4 py-1.5 rounded-full border shadow-lg backdrop-blur-md ${
                 isFestive
                   ? 'bg-white/90 border-gold-500/40 text-mahogany-900 shadow-[0_4px_16px_rgba(122,18,48,0.15)]'
-                  : 'bg-ink-950/85 border-gold-400/30 text-gold-300 shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
+                  : 'bg-white/95 border-gold-500/40 text-[#1A1714] shadow-[0_4px_16px_rgba(200,134,10,0.18)]'
               }`}
             >
               <span className="text-[14px] font-bold tracking-wide whitespace-nowrap">
@@ -182,7 +182,7 @@ export const MimoCharacter3D: React.FC<MimoCharacter3DProps> = ({
               {/* Small speech bubble arrow */}
               <span
                 className={`absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-x-[6px] border-x-transparent border-t-[6px] ${
-                  isFestive ? 'border-t-white/90' : 'border-t-ink-950/85'
+                  isFestive ? 'border-t-white/90' : 'border-t-white/95'
                 }`}
               />
             </motion.div>

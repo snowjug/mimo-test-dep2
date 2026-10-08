@@ -412,7 +412,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   return (
     <div
       className={`screen ${isActive ? 'visible' : ''} flex flex-row items-center justify-center gap-24 overflow-hidden px-24 ${
-        isFestiveMode ? 'bg-parchment-100' : 'bg-ink-950'
+        isFestiveMode ? 'bg-parchment-100' : 'bg-[#FAFAF8]'
       }`}
       style={{ display: isActive ? 'flex' : 'none' }}
     >
@@ -437,13 +437,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       {collectingPages && (
         <div
           className={`absolute inset-0 z-[200] flex flex-col items-center justify-center gap-9 ${
-            isFestiveMode ? 'bg-gradient-to-br from-parchment-100 to-parchment-200' : 'bg-gradient-to-br from-ink-950 to-black'
+            isFestiveMode ? 'bg-gradient-to-br from-parchment-100 to-parchment-200' : 'bg-gradient-to-br from-white via-[#FAF6EE] to-white'
           }`}
         >
           <div className="relative flex items-center justify-center">
             <div
               className={`flex h-36 w-36 items-center justify-center rounded-full border-2 ${
-                isFestiveMode ? 'border-gold-600/40 bg-gold-500/10 text-gold-600' : 'border-gold-500/35 bg-gold-500/10 text-gold-400'
+                isFestiveMode ? 'border-gold-600/40 bg-gold-500/10 text-gold-600' : 'border-gold-500/35 bg-gold-500/10 text-gold-600 shadow-lg'
               }`}
               style={{ animation: 'kiosk-collect-pulse 2s ease-in-out infinite' }}
             >
@@ -452,25 +452,25 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           </div>
 
           <div className="max-w-2xl px-10 text-center">
-            <h2 className={`mb-4 text-[50px] font-extrabold leading-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-white'}`}>
+            <h2 className={`mb-4 text-[50px] font-extrabold leading-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
               Collecting your pages…
             </h2>
-            <p className={`text-[24px] font-medium leading-relaxed ${isFestiveMode ? 'text-mahogany-800/70' : 'text-white/65'}`}>
+            <p className={`text-[24px] font-medium leading-relaxed ${isFestiveMode ? 'text-mahogany-800/70' : 'text-[#5C544B]'}`}>
               Your color print is being ejected.
               <br />
-              <strong className={isFestiveMode ? 'text-mahogany-800' : 'text-white'}>Please wait at the printer</strong> for your document.
+              <strong className={isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}>Please wait at the printer</strong> for your document.
             </p>
           </div>
 
           <div className="flex flex-col items-center gap-2">
             <div
               className={`flex h-[84px] w-[84px] items-center justify-center rounded-full border-4 tabular ${
-                isFestiveMode ? 'border-gold-600/30 bg-gold-500/10 text-gold-600' : 'border-gold-500/25 bg-gold-500/10 text-gold-400'
+                isFestiveMode ? 'border-gold-600/30 bg-gold-500/10 text-gold-600' : 'border-gold-500/30 bg-gold-500/10 text-gold-700'
               }`}
             >
               <span className="text-[34px] font-extrabold">{collectCountdown}</span>
             </div>
-            <p className={`text-[13px] font-semibold uppercase tracking-[0.2em] ${isFestiveMode ? 'text-mahogany-800/45' : 'text-white/35'}`}>
+            <p className={`text-[13px] font-semibold uppercase tracking-[0.2em] ${isFestiveMode ? 'text-mahogany-800/45' : 'text-[#8C8072]'}`}>
               seconds
             </p>
           </div>
@@ -482,18 +482,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         className={`relative z-10 flex max-w-[720px] flex-1 flex-col items-start gap-6 rounded-[28px] border px-14 py-11 text-left backdrop-blur-xl ${
           isFestiveMode
             ? 'border-gold-600/30 bg-gradient-to-br from-white to-parchment-200 shadow-[0_20px_50px_rgba(74,45,20,0.12)]'
-            : 'border-white/10 bg-white/[0.04] shadow-[0_20px_60px_rgba(0,0,0,0.22)]'
+            : 'border-gold-600/25 bg-white/80 shadow-[0_20px_50px_rgba(74,45,20,0.06)]'
         }`}
       >
         <div className="min-h-[170px]">
-          <h2 className={`mb-5 text-[64px] font-extrabold leading-[1.06] tracking-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-white'}`}>
+          <h2 className={`mb-5 text-[64px] font-extrabold leading-[1.06] tracking-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
             {typedTitle}
           </h2>
-          <p className={`mb-4 whitespace-pre-line text-[28px] font-medium leading-snug ${isFestiveMode ? 'text-mahogany-800/70' : 'text-white/85'}`}>
+          <p className={`mb-4 whitespace-pre-line text-[28px] font-medium leading-snug ${isFestiveMode ? 'text-mahogany-800/70' : 'text-[#5C544B]'}`}>
             {typedSub}
           </p>
           {!isCompleted && (
-            <p className={`min-h-[32px] text-[21px] font-bold tracking-wide ${isFestiveMode ? 'text-gold-600' : 'text-gold-400'}`}>
+            <p className={`min-h-[32px] text-[21px] font-bold tracking-wide ${isFestiveMode ? 'text-gold-600' : 'text-gold-700'}`}>
               {statusMsg}
             </p>
           )}
@@ -525,13 +525,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             <>
               <span
                 className={`pointer-events-none absolute inset-[45px] rounded-full border-2 ${
-                  isFestiveMode ? 'border-gold-600/40' : 'border-gold-400/40'
+                  isFestiveMode ? 'border-gold-600/40' : 'border-gold-500/30'
                 }`}
                 style={{ animation: 'kiosk-pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite' }}
               />
               <span
                 className={`pointer-events-none absolute inset-[45px] rounded-full border-2 ${
-                  isFestiveMode ? 'border-gold-600/20' : 'border-gold-500/20'
+                  isFestiveMode ? 'border-gold-600/20' : 'border-gold-500/15'
                 }`}
                 style={{ animation: 'kiosk-pulse-ring 3s cubic-bezier(0.2,0.6,0.3,1) infinite 1.5s' }}
               />
@@ -563,24 +563,24 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
             {/* Slow outer dashed ring */}
             <g style={{ transformOrigin: 'center', animation: isActive ? 'kiosk-spin-slow 26s linear infinite' : 'none' }}>
-              <circle cx="190" cy="190" r="172" fill="transparent" stroke={isFestiveMode ? 'rgba(180,123,55,0.18)' : 'rgba(255,255,255,0.07)'} strokeWidth="2" strokeDasharray="10 16" />
+              <circle cx="190" cy="190" r="172" fill="transparent" stroke={isFestiveMode ? 'rgba(180,123,55,0.18)' : 'rgba(200,134,10,0.20)'} strokeWidth="2" strokeDasharray="10 16" />
             </g>
 
             {/* Static background track */}
-            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isFestiveMode ? 'rgba(180,123,55,0.15)' : 'rgba(255,255,255,0.06)'} strokeWidth="10" />
+            <circle cx="190" cy="190" r={radius} fill="transparent" stroke={isFestiveMode ? 'rgba(180,123,55,0.15)' : 'rgba(200,134,10,0.12)'} strokeWidth="10" />
 
             {/* Center percentage */}
             <text x="190" y="196" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               <tspan
                 fontSize="92px"
                 fontWeight="800"
-                fill={isFestiveMode ? '#3C2113' : '#ffffff'}
+                fill={isFestiveMode ? '#3C2113' : '#1A1714'}
                 letterSpacing="-2px"
                 style={{ fontVariantNumeric: 'tabular-nums' }}
               >
                 {progress}
               </tspan>
-              <tspan fontSize="32px" fontWeight="700" fill={isFestiveMode ? '#b47b37' : '#FFD97D'} dx="4">%</tspan>
+              <tspan fontSize="32px" fontWeight="700" fill={isFestiveMode ? '#b47b37' : '#C8860A'} dx="4">%</tspan>
             </text>
 
             <g style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>

@@ -3,7 +3,6 @@ import { motion } from 'motion/react';
 import { ArrowRight, Check, CaretRight } from '@phosphor-icons/react';
 import { DiyaRow, FestiveBackdrop, Kalash, Lotus, Mandala, OrnamentDivider, Toran, ZariBorder } from '../festive/NavaratriDecor';
 import { isFestivalActive } from '../../config/festivalConfig';
-import { MimoCharacter3D } from '../3d/MimoCharacter3D';
 
 interface MainScreenProps {
     onNext: () => void;
@@ -107,17 +106,17 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
         };
     }, [isDragging, isUnlocked, onNext]);
 
-    const thumbWidth = thumbRef.current?.offsetWidth || 340;
+    const thumbWidth = thumbRef.current?.offsetWidth || 240;
     const fillWidth = dragX + thumbWidth / 2 + TRACK_PADDING;
 
     const swipeTrack = (
-        <div className={`relative z-10 ${isFestiveMode ? 'px-16 pb-4' : 'px-10 pb-10'}`}>
+        <div className="relative z-10 flex w-full justify-center px-6">
             <div
                 ref={trackRef}
-                className={`relative h-[92px] w-full overflow-hidden rounded-full border transition-colors duration-300 ${
+                className={`relative h-[88px] w-full max-w-[620px] overflow-hidden rounded-full border transition-colors duration-300 ${
                     isFestiveMode
                         ? `border-gold-600/50 ${isUnlocked ? 'bg-success-500/10' : 'bg-white/75'} shadow-[inset_0_0_0_4px_rgba(251,246,236,0.95),inset_0_0_0_5px_rgba(201,151,62,0.35),0_14px_34px_rgba(122,18,48,0.12)]`
-                        : `border-white/10 ${isUnlocked ? 'bg-success-500/10' : 'bg-white/[0.04]'}`
+                        : `border-gold-600/35 ${isUnlocked ? 'bg-success-500/10 border-success-500/40' : 'bg-white/80'} shadow-[inset_0_2px_4px_rgba(0,0,0,0.03),0_10px_30px_rgba(200,134,10,0.10)] backdrop-blur-md`
                 }`}
                 style={{ padding: TRACK_PADDING }}
             >
@@ -130,7 +129,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                             ? 'linear-gradient(90deg, var(--color-success-600), var(--color-success-500))'
                             : isFestiveMode
                             ? 'linear-gradient(90deg, var(--color-mahogany-700), var(--color-gold-500))'
-                            : 'linear-gradient(90deg, var(--color-gold-700), var(--color-gold-400))',
+                            : 'linear-gradient(90deg, #F0C878, #D9A544, #B8862F)',
                         transition: isDragging ? 'none' : 'width 0.5s var(--ease-kiosk)',
                         opacity: dragX > 0 || isUnlocked ? 1 : 0,
                     }}
@@ -141,12 +140,12 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                     className="pointer-events-none absolute inset-0 flex items-center justify-center gap-1"
                     style={{ opacity: Math.max(0, 1 - dragX / 140) }}
                 >
-                    {[0, 1, 2].map((i) => (
+                    {[0, 1, 2, 3].map((i) => (
                         <CaretRight
                             key={i}
                             size={22}
                             weight="bold"
-                            className={isFestiveMode ? 'text-mahogany-600/35' : 'text-white/20'}
+                            className={isFestiveMode ? 'text-mahogany-600/35' : 'text-gold-600/30'}
                         />
                     ))}
                 </div>
@@ -156,12 +155,12 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                     ref={thumbRef}
                     onMouseDown={handleDragStart}
                     onTouchStart={handleDragStart}
-                    className={`relative flex h-[76px] cursor-grab select-none items-center gap-4 rounded-full px-3 pr-8 shadow-lg active:cursor-grabbing ${
+                    className={`relative flex h-[72px] cursor-grab select-none items-center gap-3.5 rounded-full px-2.5 pr-7 shadow-lg active:cursor-grabbing ${
                         isUnlocked
-                            ? 'bg-white'
+                            ? 'bg-success-600 text-white ring-1 ring-success-400'
                             : isFestiveMode
                             ? 'bg-gradient-to-br from-mahogany-600 to-mahogany-800 ring-1 ring-gold-400/70 shadow-[0_10px_24px_rgba(122,18,48,0.35)]'
-                            : 'bg-white'
+                            : 'bg-gradient-to-r from-gold-500 via-gold-500 to-gold-600 ring-1 ring-gold-300/80 shadow-[0_6px_20px_rgba(200,134,10,0.35)]'
                     }`}
                     style={{
                         transform: `translateX(${dragX}px)`,
@@ -170,19 +169,19 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                     }}
                 >
                     <span
-                        className={`flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full ${
+                        className={`flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-sm ${
                             isUnlocked
-                                ? 'bg-success-500/15 text-success-600'
+                                ? 'bg-white text-success-600'
                                 : isFestiveMode
                                 ? 'bg-gradient-to-br from-gold-200 to-gold-500 text-mahogany-800'
-                                : 'bg-ink-950 text-gold-400'
+                                : 'bg-white text-gold-700'
                         }`}
                     >
                         {isUnlocked ? <Check size={26} weight="bold" /> : <ArrowRight size={24} weight="bold" />}
                     </span>
                     <span
-                        className={`whitespace-nowrap text-[19px] font-extrabold uppercase tracking-[0.15em] ${
-                            isUnlocked ? 'text-success-600' : isFestiveMode ? 'text-parchment-50' : 'text-ink-950'
+                        className={`whitespace-nowrap text-[18px] font-extrabold uppercase tracking-[0.14em] ${
+                            isUnlocked ? 'text-white' : isFestiveMode ? 'text-parchment-50' : 'text-white'
                         }`}
                     >
                         {isUnlocked ? 'Unlocked' : 'Swipe to start'}
@@ -194,11 +193,11 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
 
     const copyright = (
         <footer
-            className={`relative z-10 text-center text-[12px] ${
-                isFestiveMode ? 'pb-7 text-mahogany-800/45' : 'pb-5 text-white/30'
+            className={`relative z-10 text-center text-[13px] font-medium ${
+                isFestiveMode ? 'pb-7 text-mahogany-800/45' : 'pb-6 text-[#7C7267]'
             }`}
         >
-            &copy; 2026 <strong className="font-semibold">VisionPrintt</strong>. All rights reserved.
+            &copy; 2026 <strong className="font-semibold text-[#5C544B]">VisionPrintt</strong>. All rights reserved.
         </footer>
     );
 
@@ -226,17 +225,6 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                         className="flex flex-col items-center text-center"
                     >
-                        {!isSV002 && (
-                            <div className="mb-1 flex items-center justify-center">
-                                <MimoCharacter3D
-                                    size="sm"
-                                    isFestive={true}
-                                    isInteracting={isDragging || dragX > 20 || isUnlocked}
-                                    isActive={isActive}
-                                />
-                            </div>
-                        )}
-
                         <div className="flex items-center gap-4">
                             <Lotus size={26} />
                             <p lang="hi" className="font-deva text-[36px] leading-[1.2] text-mahogany-600">
@@ -276,7 +264,9 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                     <DiyaRow count={9} size={38} gap={46} />
                 </div>
 
-                {swipeTrack}
+                <div className="relative z-10 pb-4">
+                    {swipeTrack}
+                </div>
                 {copyright}
                 <ZariBorder />
             </div>
@@ -285,52 +275,43 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
 
     return (
         <div
-            className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col overflow-hidden bg-ink-950`}
+            className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col overflow-hidden bg-[#FAFAF8]`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
             <div
-                className="pointer-events-none absolute left-1/2 top-[30%] h-[520px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[140px]"
-                style={{ background: 'radial-gradient(closest-side, rgba(217,165,68,0.16), transparent)' }}
+                className="pointer-events-none absolute left-1/2 top-[32%] h-[600px] w-[960px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[140px]"
+                style={{ background: 'radial-gradient(closest-side, rgba(217,165,68,0.14), transparent)' }}
             />
 
-            <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pb-8">
+            <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pb-6">
                 <motion.section
                     initial={isActive ? { opacity: 0, y: 22 } : false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                     className="flex flex-col items-center text-center"
                 >
-                    {!isSV002 && (
-                        <div className="mb-2 flex items-center justify-center">
-                            <MimoCharacter3D
-                                size="md"
-                                isFestive={false}
-                                isInteracting={isDragging || dragX > 20 || isUnlocked}
-                                isActive={isActive}
-                            />
-                        </div>
-                    )}
+                    <p className="mb-2 text-[15px] font-bold uppercase tracking-[0.55em] text-gold-700/80">Welcome to</p>
 
-                    <p className="mb-2 text-[15px] font-bold uppercase tracking-[0.5em] text-white/50">Welcome to</p>
-
-                    <div className="relative flex items-baseline justify-center leading-none">
-                        <h1 className="bg-gradient-to-b from-gold-200 via-gold-400 to-gold-600 bg-clip-text font-sans text-[130px] font-black tracking-tight text-transparent">
+                    <div className="relative flex items-baseline justify-center leading-none [filter:drop-shadow(0_4px_18px_rgba(200,134,10,0.20))]">
+                        <h1 className="bg-gradient-to-b from-gold-400 via-gold-500 to-gold-700 bg-clip-text font-sans text-[136px] font-black tracking-tight text-transparent">
                             MIMO
                         </h1>
-                        <span className="bg-gradient-to-b from-gold-200 via-gold-400 to-gold-600 bg-clip-text pb-6 pl-2 font-sans text-[48px] font-extrabold text-transparent">
+                        <span className="bg-gradient-to-b from-gold-400 via-gold-500 to-gold-700 bg-clip-text pb-6 pl-2.5 font-sans text-[50px] font-extrabold text-transparent">
                             {isSV002 ? '2.0' : '1.0'}
                         </span>
                     </div>
 
-                    <h2 className="mt-2 text-[38px] font-medium text-white/90">
-                        Self-Service <span className="text-gold-400">Printing Kiosk</span>
+                    <h2 className="mt-2 text-[40px] font-bold text-[#1A1714]">
+                        Self-Service <span className="text-gold-600">Printing Kiosk</span>
                     </h2>
 
-                    <p className="mt-3 text-[18px] font-medium text-white/50">Fast, secure document printing via Mimo code.</p>
+                    <p className="mt-3 text-[19px] font-medium text-[#5C544B]">Fast, secure document printing via Mimo code.</p>
                 </motion.section>
             </main>
 
-            {swipeTrack}
+            <div className="relative z-10 pb-8">
+                {swipeTrack}
+            </div>
             {copyright}
         </div>
     );

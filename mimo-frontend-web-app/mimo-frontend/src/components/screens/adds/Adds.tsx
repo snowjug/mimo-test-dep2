@@ -201,9 +201,9 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
 
       {/* Touch prompt banner */}
       <div
-        className="pointer-events-none absolute bottom-10 flex items-center gap-3 rounded-full border border-white/15 bg-black/60 px-8 py-3 text-white shadow-2xl backdrop-blur-md"
+        className="pointer-events-none absolute bottom-10 flex items-center gap-3 rounded-full border border-gold-500/30 bg-white/90 px-8 py-3 text-[#1A1714] shadow-2xl backdrop-blur-md"
       >
-        <HandTap size={22} weight="fill" className="text-gold-400" style={{ animation: 'kiosk-tap-bounce 1.1s ease-in-out infinite' }} />
+        <HandTap size={22} weight="fill" className="text-gold-600" style={{ animation: 'kiosk-tap-bounce 1.1s ease-in-out infinite' }} />
         <span className="text-[19px] font-semibold tracking-wide">Tap anywhere to start printing with Mimo</span>
       </div>
       <style>{`

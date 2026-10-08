@@ -75,7 +75,7 @@
     justify-content: center;
     overflow: hidden;
     position: relative;
-    background: var(--color-ink-950);
+    background: #FAFAF8;
   }
 
   body {
@@ -83,11 +83,11 @@
     -webkit-font-smoothing: antialiased;
     width: 100%;
     height: 100%;
-    background: var(--color-ink-950);
+    background: #FAFAF8;
     overflow: hidden;
     position: relative;
     flex-shrink: 0;
-    color: #ffffff;
+    color: #1A1714;
     user-select: none;
     -webkit-user-select: none;
     touch-action: none;
@@ -99,7 +99,7 @@
   #root {
     width: 1440px;
     height: 810px;
-    background: var(--color-ink-950);
+    background: #FAFAF8;
     position: absolute;
     top: 50%;
     left: 50%;
@@ -108,9 +108,12 @@
     flex-shrink: 0;
   }
 
-  #root.theme-cv001,
-  #root.theme-sv002 {
+  #root.theme-cv001 {
     background: var(--color-parchment-100);
+  }
+
+  #root.theme-sv002 {
+    background: #FAFAF8;
   }
 
   @media (max-width: 1000px) {

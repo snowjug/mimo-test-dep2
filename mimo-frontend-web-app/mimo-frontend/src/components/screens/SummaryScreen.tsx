@@ -122,7 +122,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
         <div
             key={renderKey}
             className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col items-center justify-center overflow-hidden px-20 pb-24 ${
-                isFestiveMode ? 'bg-parchment-100' : 'bg-ink-950'
+                isFestiveMode ? 'bg-parchment-100' : 'bg-[#FAFAF8]'
             }`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
@@ -131,7 +131,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 style={{
                     background: isFestiveMode
                         ? 'radial-gradient(closest-side, rgba(201,151,62,0.16), transparent)'
-                        : 'radial-gradient(closest-side, rgba(52,211,153,0.10), transparent)',
+                        : 'radial-gradient(closest-side, rgba(217,165,68,0.12), transparent)',
                 }}
             />
 
@@ -149,8 +149,8 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 className="relative z-10 mb-2 mt-9 text-center"
             >
-                <h1 className={`text-[46px] font-black tracking-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-white'}`}>
-                    <span className={isFestiveMode ? 'text-gold-600' : 'text-gold-400'}>
+                <h1 className={`text-[46px] font-black tracking-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
+                    <span className={isFestiveMode ? 'text-gold-600' : 'text-gold-600'}>
                         {jobData?.userName?.split(' ')[0] || 'DEMO'}
                     </span>
                     , your documents are ready.
@@ -167,35 +167,42 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                     {/* Slot bezel */}
                     <div
                         className={`absolute inset-x-0 top-0 h-[150px] overflow-hidden rounded-2xl border ${
-                            isFestiveMode ? 'border-gold-600/30 bg-white' : 'border-white/10 bg-ink-900'
+                            isFestiveMode
+                                ? 'border-gold-600/30 bg-white'
+                                : 'border-gold-600/30 bg-white shadow-[inset_0_4px_14px_rgba(0,0,0,0.06),0_10px_30px_rgba(74,45,20,0.08)]'
                         }`}
-                        style={{ boxShadow: 'inset 0 14px 26px rgba(0,0,0,0.35)' }}
                     >
-                        {/* Dark void */}
-                        <div className="absolute inset-x-0 top-0 h-[100px] bg-gradient-to-b from-black/70 to-black/25" />
+                        {/* Void */}
+                        <div
+                            className={`absolute inset-x-0 top-0 h-[100px] ${
+                                isFestiveMode
+                                    ? 'bg-gradient-to-b from-black/70 to-black/25'
+                                    : 'bg-gradient-to-b from-[#E2DDD5] to-[#F5F2EC]'
+                            }`}
+                        />
 
                         {/* Sliding paper */}
                         <div
-                            className="absolute left-1/2 top-2 w-[150px] -translate-x-1/2 rounded-md bg-white px-5 py-6 shadow-xl"
+                            className="absolute left-1/2 top-2 w-[150px] -translate-x-1/2 rounded-md bg-white px-5 py-6 shadow-xl border border-gold-600/15"
                             style={{ animation: isActive ? 'kiosk-paper-dispense 6s ease-in-out infinite' : 'none' }}
                         >
                             <span
                                 className={`mb-3 flex h-9 w-9 items-center justify-center rounded-full ${
-                                    isFestiveMode ? 'bg-gold-500/15 text-gold-600' : 'bg-gold-500/15 text-gold-500'
+                                    isFestiveMode ? 'bg-gold-500/15 text-gold-600' : 'bg-gold-500/15 text-gold-600'
                                 }`}
                             >
                                 <Check size={18} weight="bold" />
                             </span>
-                            <div className="mb-2 h-2 w-[90%] rounded-full bg-slate-300" />
-                            <div className="mb-2 h-2 w-[70%] rounded-full bg-slate-300" />
-                            <div className="h-2 w-[55%] rounded-full bg-slate-300" />
+                            <div className="mb-2 h-2 w-[90%] rounded-full bg-slate-200" />
+                            <div className="mb-2 h-2 w-[70%] rounded-full bg-slate-200" />
+                            <div className="h-2 w-[55%] rounded-full bg-slate-200" />
                         </div>
                     </div>
 
                     {/* Base shelf */}
                     <div
                         className={`absolute inset-x-3 top-[142px] h-3 rounded-full ${
-                            isFestiveMode ? 'bg-gold-600/25' : 'bg-white/10'
+                            isFestiveMode ? 'bg-gold-600/25' : 'bg-gold-600/30'
                         }`}
                     />
 
@@ -207,17 +214,17 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
             <div className="relative z-10 flex flex-col items-center gap-7">
                 <div
                     className={`flex items-center gap-4 text-[19px] font-extrabold uppercase tracking-[0.1em] ${
-                        isFestiveMode ? 'text-mahogany-700' : 'text-white/85'
+                        isFestiveMode ? 'text-mahogany-700' : 'text-[#1A1714]'
                     }`}
                 >
-                    <ArrowDown size={22} weight="bold" className="animate-bounce text-gold-500" />
+                    <ArrowDown size={22} weight="bold" className="animate-bounce text-gold-600" />
                     Please collect your documents from below
-                    <ArrowDown size={22} weight="bold" className="animate-bounce text-gold-500" />
+                    <ArrowDown size={22} weight="bold" className="animate-bounce text-gold-600" />
                 </div>
 
                 {report === 'ask' && (
                     <div className="flex flex-col items-center gap-4">
-                        <p className={`text-[17px] font-bold ${isFestiveMode ? 'text-mahogany-700' : 'text-white/70'}`}>
+                        <p className={`text-[17px] font-bold ${isFestiveMode ? 'text-mahogany-700' : 'text-[#5C544B]'}`}>
                             Did your pages print correctly?
                         </p>
                         <div className="flex items-center gap-4">
@@ -226,7 +233,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                                 className={`flex items-center gap-3 rounded-full px-12 py-5 text-[19px] font-black uppercase tracking-[0.2em] shadow-xl transition-transform active:scale-95 ${
                                     isFestiveMode
                                         ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white'
-                                        : 'bg-gradient-to-br from-gold-400 to-gold-600 text-ink-950'
+                                        : 'bg-gradient-to-br from-gold-400 via-gold-500 to-gold-600 text-white shadow-[0_8px_24px_rgba(200,134,10,0.35)] ring-1 ring-gold-300/70'
                                 }`}
                             >
                                 Yes, done
@@ -240,7 +247,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                                 className={`flex items-center gap-2 rounded-full border-2 px-8 py-5 text-[16px] font-extrabold uppercase tracking-[0.12em] transition-transform active:scale-95 ${
                                     isFestiveMode
                                         ? 'border-mahogany-700/40 text-mahogany-800'
-                                        : 'border-white/25 text-white/85'
+                                        : 'border-gold-600/35 bg-white text-[#1A1714] shadow-sm active:bg-gold-50/80'
                                 }`}
                             >
                                 <WarningCircle size={22} weight="bold" />
@@ -252,7 +259,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
 
                 {(report === 'choose' || report === 'sending') && (
                     <div className="flex flex-col items-center gap-4">
-                        <p className={`text-[17px] font-bold ${isFestiveMode ? 'text-mahogany-700' : 'text-white/80'}`}>
+                        <p className={`text-[17px] font-bold ${isFestiveMode ? 'text-mahogany-700' : 'text-[#5C544B]'}`}>
                             What went wrong?
                         </p>
                         <div className="grid grid-cols-2 gap-3">
@@ -264,7 +271,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                                     className={`min-w-[250px] rounded-2xl border-2 px-6 py-4 text-[17px] font-extrabold transition-transform active:scale-95 disabled:opacity-50 ${
                                         isFestiveMode
                                             ? 'border-mahogany-700/30 bg-white/70 text-mahogany-800'
-                                            : 'border-white/15 bg-white/5 text-white'
+                                            : 'border-gold-600/30 bg-white text-[#1A1714] shadow-sm hover:border-gold-500 active:bg-gold-50/80'
                                     }`}
                                 >
                                     {issue.label}
@@ -273,7 +280,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                         </div>
                         <button
                             onClick={onReset}
-                            className={`text-[15px] font-bold underline underline-offset-4 ${isFestiveMode ? 'text-mahogany-700/70' : 'text-white/50'}`}
+                            className={`text-[15px] font-bold underline underline-offset-4 ${isFestiveMode ? 'text-mahogany-700/70' : 'text-[#8C8072]'}`}
                         >
                             Never mind, everything is fine
                         </button>
@@ -282,7 +289,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
 
                 {(report === 'sent' || report === 'failed') && (
                     <div className="flex max-w-[640px] flex-col items-center gap-4 text-center">
-                        <p className={`text-[20px] font-extrabold ${isFestiveMode ? 'text-mahogany-800' : 'text-white'}`}>
+                        <p className={`text-[20px] font-extrabold ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
                             {report === 'sent'
                                 ? 'Thank you. The MIMO team has been told. Please keep the pages, the team may ask to see them.'
                                 : `We could not send your report. Please tell the staff your code ${printCode ?? ''}.`}
@@ -292,7 +299,7 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
                             className={`flex items-center gap-3 rounded-full px-12 py-4 text-[17px] font-black uppercase tracking-[0.2em] shadow-xl transition-transform active:scale-95 ${
                                 isFestiveMode
                                     ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white'
-                                    : 'bg-gradient-to-br from-gold-400 to-gold-600 text-ink-950'
+                                    : 'bg-gradient-to-br from-gold-400 via-gold-500 to-gold-600 text-white shadow-[0_8px_24px_rgba(200,134,10,0.35)] ring-1 ring-gold-300/70'
                             }`}
                         >
                             Done

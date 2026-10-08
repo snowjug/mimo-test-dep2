@@ -50,19 +50,19 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ isActive, 
 
     return (
         <div
-            className={`screen ${isActive ? 'visible' : ''} flex h-full select-none flex-col items-center justify-center overflow-hidden bg-ink-950 text-center`}
+            className={`screen ${isActive ? 'visible' : ''} flex h-full select-none flex-col items-center justify-center overflow-hidden bg-[#FAFAF8] text-center`}
             onPointerDown={handleScreenTouch}
             style={{ touchAction: 'none', display: isActive ? 'flex' : 'none' }}
         >
             <div
                 className="pointer-events-none absolute left-1/2 top-1/2 h-[600px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[150px]"
-                style={{ background: 'radial-gradient(closest-side, rgba(217,165,68,0.08), transparent)' }}
+                style={{ background: 'radial-gradient(closest-side, rgba(217,165,68,0.12), transparent)' }}
             />
 
             {ripples.map(r => (
                 <span
                     key={r.id}
-                    className="pointer-events-none fixed z-50 h-4 w-4 rounded-full bg-gold-400/40 shadow-[0_0_40px_#e3b158]"
+                    className="pointer-events-none fixed z-50 h-4 w-4 rounded-full bg-gold-500/40 shadow-[0_0_40px_#d9a544]"
                     style={{
                         left: r.x,
                         top: r.y,
@@ -78,20 +78,20 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ isActive, 
                 transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
                 className="relative z-10 flex w-full max-w-4xl flex-col items-center gap-11 px-10"
             >
-                <div className="h-px w-full bg-gradient-to-r from-transparent via-gold-500/25 to-transparent" />
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-gold-500/35 to-transparent" />
 
                 <div className="flex flex-col items-center gap-10">
-                    <span className="flex h-32 w-32 items-center justify-center rounded-full bg-gold-500/10 text-gold-400">
+                    <span className="flex h-32 w-32 items-center justify-center rounded-full bg-gold-500/15 text-gold-600 shadow-md">
                         <Wrench size={72} weight="regular" />
                     </span>
-                    <h1 className="text-[70px] font-black uppercase leading-[1.1] tracking-[0.1em] text-white">
+                    <h1 className="text-[70px] font-black uppercase leading-[1.1] tracking-[0.1em] text-[#1A1714]">
                         Temporarily
                         <br />
-                        Out of Service
+                        <span className="text-gold-600">Out of Service</span>
                     </h1>
                 </div>
 
-                <div className="h-px w-full bg-gradient-to-r from-transparent via-gold-500/25 to-transparent" />
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-gold-500/35 to-transparent" />
             </motion.div>
 
             <style>{`

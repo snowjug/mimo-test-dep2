@@ -216,11 +216,11 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
 
   const keyBase = isFestiveMode
     ? 'bg-white text-mahogany-800 border border-gold-600/25 shadow-sm active:bg-parchment-200'
-    : 'bg-ink-800 text-white border border-white/5 active:bg-ink-700';
+    : 'bg-white text-[#1A1714] border border-gold-600/25 shadow-[0_2px_8px_rgba(0,0,0,0.04)] active:scale-95 active:bg-gold-50/80 active:border-gold-500';
 
   return (
     <div
-      className={`screen ${isActive ? 'visible' : ''} flex h-full ${isFestiveMode ? 'bg-parchment-100' : 'bg-ink-950'}`}
+      className={`screen ${isActive ? 'visible' : ''} flex h-full ${isFestiveMode ? 'bg-parchment-100' : 'bg-[#FAFAF8]'}`}
       style={{ display: isActive ? 'flex' : 'none' }}
     >
       {!isFestiveMode && (
@@ -234,8 +234,8 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
       <button
         onClick={onBack}
         aria-label="Go back to home"
-        className={`absolute left-8 top-8 z-20 flex h-14 w-14 items-center justify-center rounded-full transition-colors ${
-          isFestiveMode ? 'bg-white text-mahogany-700 shadow-sm active:bg-parchment-200' : 'bg-white/5 text-white/70 active:bg-white/10'
+        className={`absolute left-8 top-8 z-20 flex h-14 w-14 items-center justify-center rounded-full transition-transform active:scale-95 ${
+          isFestiveMode ? 'bg-white text-mahogany-700 shadow-sm active:bg-parchment-200' : 'bg-white text-[#1A1714] border border-gold-600/25 shadow-sm active:bg-gold-50/80'
         }`}
       >
         <ArrowLeft size={24} weight="bold" />
@@ -245,13 +245,13 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
         {/* LEFT: instruction + code slots */}
         <div className="flex flex-1 flex-col gap-12">
           <h2
-            className={`text-[46px] font-extrabold leading-[1.1] ${
-              isFestiveMode ? 'text-mahogany-800' : 'text-white'
+            className={`text-[48px] font-extrabold leading-[1.1] ${
+              isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'
             }`}
           >
             Enter Your Mimo
             <br />
-            Code Here
+            <span className={isFestiveMode ? 'text-gold-600' : 'text-gold-600'}>Code Here</span>
           </h2>
 
           <motion.div
@@ -265,20 +265,20 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
               return (
                 <div
                   key={i}
-                  className={`flex h-[84px] w-[84px] items-center justify-center rounded-2xl border-2 text-[32px] font-bold transition-all duration-200 ${
+                  className={`flex h-[88px] w-[88px] items-center justify-center rounded-2xl border-2 text-[36px] font-bold transition-all duration-200 ${
                     isShaking
                       ? 'border-danger-500/70 bg-danger-500/10 text-danger-500'
                       : filled
                       ? isFestiveMode
                         ? 'border-gold-600 bg-gold-600/10 text-mahogany-800'
-                        : 'border-gold-500 bg-gold-500/10 text-gold-300'
+                        : 'border-gold-500 bg-gradient-to-b from-gold-100/60 to-white text-gold-700 shadow-[0_4px_16px_rgba(217,165,68,0.22)]'
                       : active
                       ? isFestiveMode
                         ? 'border-mahogany-600/40 text-mahogany-800'
-                        : 'border-white/30 text-white'
+                        : 'border-gold-600 bg-white ring-4 ring-gold-500/15'
                       : isFestiveMode
                       ? 'border-mahogany-600/15 text-mahogany-800'
-                      : 'border-white/10 text-white'
+                      : 'border-gold-600/25 bg-white/80'
                   }`}
                 >
                   {filled ? '•' : ''}
@@ -288,71 +288,69 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
           </motion.div>
         </div>
 
-        {/* RIGHT: keypad */}
-        <div className="grid w-[420px] grid-cols-3 gap-4">
-          {KEYS.map((num) => (
+        {/* RIGHT: keypad inside elevated card */}
+        <div className="relative rounded-[32px] border border-gold-600/25 bg-white/75 p-6 shadow-[0_20px_50px_rgba(74,45,20,0.06)] backdrop-blur-md">
+          <div className="grid w-[420px] grid-cols-3 gap-3.5">
+            {KEYS.map((num) => (
+              <button
+                key={num}
+                id={`key-${num}`}
+                onClick={() => handleNumClick(num)}
+                className={`h-[88px] rounded-2xl text-[30px] font-bold transition-transform active:scale-95 ${keyBase}`}
+              >
+                {num}
+              </button>
+            ))}
+
             <button
-              key={num}
-              id={`key-${num}`}
-              onClick={() => handleNumClick(num)}
-              className={`h-[92px] rounded-2xl text-[30px] font-bold transition-transform active:scale-95 ${keyBase}`}
+              id="key-del"
+              onClick={() => handleNumClick('del')}
+              className={`flex h-[88px] items-center justify-center rounded-2xl bg-white text-danger-600 border border-danger-500/25 shadow-sm transition-transform active:scale-95 active:bg-danger-50`}
             >
-              {num}
+              <Backspace size={28} weight="bold" />
             </button>
-          ))}
 
-          <button
-            id="key-del"
-            onClick={() => handleNumClick('del')}
-            className={`flex h-[92px] items-center justify-center rounded-2xl transition-transform active:scale-95 ${
-              isFestiveMode
-                ? 'bg-white text-danger-600 border border-danger-500/20 shadow-sm'
-                : 'bg-ink-800 text-danger-500 border border-danger-500/15'
-            }`}
-          >
-            <Backspace size={28} weight="bold" />
-          </button>
+            <button
+              id="key-0"
+              onClick={() => handleNumClick('0')}
+              className={`h-[88px] rounded-2xl text-[30px] font-bold transition-transform active:scale-95 ${keyBase}`}
+            >
+              0
+            </button>
 
-          <button
-            id="key-0"
-            onClick={() => handleNumClick('0')}
-            className={`h-[92px] rounded-2xl text-[30px] font-bold transition-transform active:scale-95 ${keyBase}`}
-          >
-            0
-          </button>
-
-          <button
-            id="key-submit"
-            onClick={handleSubmit}
-            disabled={code.length !== 4 || loading}
-            className={`flex h-[92px] items-center justify-center rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-30 ${
-              code.length === 4
-                ? isFestiveMode
-                  ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white shadow-lg'
-                  : 'bg-gradient-to-br from-gold-400 to-gold-600 text-ink-950 shadow-lg'
-                : isFestiveMode
-                ? 'bg-white text-mahogany-800 border border-gold-600/20'
-                : 'bg-ink-800 text-white border border-white/5'
-            }`}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              {loading ? (
-                <motion.span
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, rotate: 360 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
-                >
-                  <CircleNotch size={28} weight="bold" />
-                </motion.span>
-              ) : (
-                <motion.span key="check" initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
-                  <Check size={28} weight="bold" />
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </button>
+            <button
+              id="key-submit"
+              onClick={handleSubmit}
+              disabled={code.length !== 4 || loading}
+              className={`flex h-[88px] items-center justify-center rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-35 ${
+                code.length === 4
+                  ? isFestiveMode
+                    ? 'bg-gradient-to-br from-mahogany-700 to-mahogany-800 text-white shadow-lg'
+                    : 'bg-gradient-to-br from-gold-400 via-gold-500 to-gold-600 text-white shadow-[0_8px_20px_rgba(200,134,10,0.35)] ring-1 ring-gold-300/70'
+                  : isFestiveMode
+                  ? 'bg-white text-mahogany-800 border border-gold-600/20'
+                  : 'bg-white text-gold-700/40 border border-gold-600/20'
+              }`}
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                {loading ? (
+                  <motion.span
+                    key="loading"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1, rotate: 360 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
+                  >
+                    <CircleNotch size={28} weight="bold" />
+                  </motion.span>
+                ) : (
+                  <motion.span key="check" initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
+                    <Check size={28} weight="bold" />
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+          </div>
         </div>
       </div>
     </div>

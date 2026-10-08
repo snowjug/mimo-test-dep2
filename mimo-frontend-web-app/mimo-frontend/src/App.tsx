@@ -267,15 +267,19 @@ function App() {
         <div
           className={`fixed left-1/2 top-9 z-[1000] flex -translate-x-1/2 items-center gap-4 rounded-2xl border px-7 py-4 shadow-2xl backdrop-blur-xl ${
             toastError
-              ? 'border-danger-500/30 bg-danger-600/90 text-white'
-              : 'border-white/10 bg-ink-800/95 text-white'
+              ? 'border-danger-500/30 bg-danger-600/95 text-white'
+              : 'border-gold-500/30 bg-white/95 text-[#1A1714]'
           }`}
         >
-          {toastError ? <WarningCircle size={22} weight="fill" /> : <Info size={22} weight="fill" className="text-gold-400" />}
+          {toastError ? <WarningCircle size={22} weight="fill" /> : <Info size={22} weight="fill" className="text-gold-600" />}
           <span className="text-[17px] font-semibold">{toastMsg}</span>
           <button
             onClick={() => setToastMsg('')}
-            className="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+            className={`ml-1 flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+              toastError
+                ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                : 'text-[#8C8072] hover:bg-black/5 hover:text-[#1A1714]'
+            }`}
           >
             <X size={16} weight="bold" />
           </button>
