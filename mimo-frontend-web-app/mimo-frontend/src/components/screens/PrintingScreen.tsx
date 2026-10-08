@@ -4,6 +4,11 @@ import { isFestivalActive } from '../../config/festivalConfig';
 import { DiyaRow, FestiveBackdrop, Mandala, Toran, ZariBorder } from '../festive/NavaratriDecor';
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
+// '0000' and '9999' are both faked entirely client-side in App.tsx (no print_jobs doc is ever created for
+// them), so neither can ever be found by a real backend poll. '9999' used to be missing from this list here,
+// so it would poll job-status for a job that doesn't exist, sit on "Warming up printer…" forever, and only
+// ever resolve by hitting the print timeout and showing an error — looking exactly like "doesn't work".
+const isDemoPrintCode = (code?: string) => code === '0000' || code === '9999';
 
 interface PrintingScreenProps {
   isActive: boolean;
@@ -134,7 +139,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   // ─── polling ───────────────────────────────────────────────────────────────
 
   const schedulePoll = useCallback((delayMs = 200) => {
-    if (!printCode || printCode === '0000' || !isActive) return;
+    if (!printCode || isDemoPrintCode(printCode) || !isActive) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
       // Enforce the colour/page-aware print deadline from the start of printing
@@ -218,7 +223,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     }, delayMs);
   }, [printCode, isActive, pages, copies, onError, clearAllTimers, printTimeoutMs]);
 
-  // ─── demo mode fallback (used ONLY when printCode is '0000' or missing) ──
+  // ─── demo mode fallback (used ONLY when printCode is '0000'/'9999' or missing) ──
 
   const startSlowTick = useCallback(() => {
     if (manualProgress !== undefined) return;
@@ -313,7 +318,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (manualProgress >= 100) {
         animateTo100AndComplete();
       }
-    } else if (printCode && printCode !== '0000') {
+    } else if (printCode && !isDemoPrintCode(printCode)) {
       schedulePoll(200); // Live polling driven by backend sheet progress
     } else {
       startSlowTick(); // Demo mode simulation
@@ -340,7 +345,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   //    screen activates — NOT a flat number, so a genuinely slow colour job isn't killed early.
   // 2. Network Stall Check: If no poll response received for > 45 seconds, assume network loss.
   useEffect(() => {
-    if (!isActive || !printCode || printCode === '0000') return;
+    if (!isActive || !printCode || isDemoPrintCode(printCode)) return;
 
     const networkStallThresholdMs = 45000; // 45 seconds with no network response
 
