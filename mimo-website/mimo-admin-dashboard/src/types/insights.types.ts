@@ -107,6 +107,7 @@ export interface JobRow {
   colorMode: 'color' | 'bw';
   duplex: boolean;
   destination: string;
+  destinationShortLabel?: string | null;
   orderId: string | null;
   printerStatus: string | null;
   refundStatus: string | null;
@@ -177,6 +178,12 @@ export interface KioskLive {
   name: string;
   type: 'bw' | 'color';
   description: string;
+  shortLabel?: string;
+  locationId?: string | null;
+  locationName?: string | null;
+  campusId?: string | null;
+  lifecycleStatus?: string;
+  liveState?: 'AVAILABLE' | 'BUSY' | 'DEGRADED' | 'OFFLINE' | 'PROVISIONING' | 'MAINTENANCE' | 'DECOMMISSIONED';
   online: boolean;
   lastSeen: string | null;
   secondsSinceSeen: number | null;

@@ -6,6 +6,7 @@
 const { admin, db } = require("../config/firebase");
 const A = require("../services/analytics.service");
 const { resolveRefunds, cashfreeRefundFetcher } = require("../services/refundSync.service");
+const R = require("../services/machineRegistry.service");
 
 // Cashfree refund lookups for the history (manual refunds made in the Cashfree app). Tests swap this out.
 let fetchCashfreeRefunds = (orderId) => {
@@ -157,13 +158,14 @@ const getAdminJobs = async (req, res) => {
     docs = docs.slice(0, limit);
 
     const normalized = new Map(docs.map((d) => [d.id, A.normalizeJobs([d])[0]]));
-    const [users, refunds, orders] = await Promise.all([
+    const [users, refunds, orders, machines] = await Promise.all([
       lookupUsers(docs.map((d) => d.userId)),
       resolveRefunds({ db, jobs: docs.map((d) => ({ ...d, cost: normalized.get(d.id).cost })), fetchCashfreeRefunds }).catch((err) => {
         console.error("[ADMIN-INSIGHTS] refund lookup failed:", err.message || err);
         return new Map();
       }),
       lookupOrders(docs.map((d) => d.orderId)),
+      R.loadMachinesMap(db),
     ]);
     const jobs = docs.map((d) => {
       const n = normalized.get(d.id);
@@ -201,6 +203,7 @@ const getAdminJobs = async (req, res) => {
         colorMode: n.isColor ? "color" : "bw",
         duplex: n.isDuplex,
         destination: n.kioskId || "Unassigned",
+        destinationShortLabel: n.kioskId ? (machines.get(n.kioskId)?.shortLabel || n.kioskId.slice(0, 2)) : null,
         orderId: n.orderId,
         printerStatus: n.printerStatus,
         refundStatus: n.refundStatus,
@@ -315,18 +318,23 @@ const restartView = (c) => (c ? {
 } : null);
 
 async function loadKiosks(range) {
-  const [statusSnap, hwDoc, queuedSnap, win, commandSnap] = await Promise.all([
+  const [statusSnap, hwDoc, queuedSnap, win, commandSnap, machines, locations] = await Promise.all([
     db.collection("system_status").get(),
     db.collection("hardware").doc("printers").get(),
     db.collection("print_jobs").where("status", "in", A.QUEUED_JOB_STATUSES).limit(500).get(),
     A.loadWindow(db, Timestamp, range.from, range.to),
     db.collection("kiosk_commands").get(),
+    R.loadMachinesMap(db),
+    R.loadLocationsMap(db),
   ]);
   const commandById = new Map(commandSnap.docs.map((d) => [d.id, d.data()]));
   const hardware = hwDoc.exists ? hwDoc.data() : {};
   const statusById = new Map(statusSnap.docs.map((d) => [d.id, d.data()]));
 
-  const ids = new Set(Object.keys(A.KNOWN_KIOSKS));
+  // The registry (real or defaulted, see machineRegistry.service.js) is now the primary source of known
+  // machine ids; KIOSK_ID_PATTERN still admits a machine that reports a heartbeat before it has a registry
+  // record at all, exactly as it did before the registry existed.
+  const ids = new Set(machines.keys());
   statusById.forEach((_, id) => { if (A.KIOSK_ID_PATTERN.test(id)) ids.add(id); });
 
   const orders = A.normalizeOrders(win.orders, win.txns);
@@ -344,16 +352,28 @@ async function loadKiosks(range) {
 
   const now = Date.now();
   const kiosks = [...ids].sort().map((id) => {
-    const meta = A.KNOWN_KIOSKS[id] || { name: id, type: "bw", description: "" };
+    const machine = machines.get(id) || { name: id, type: "bw", description: "", shortLabel: id.slice(0, 2), status: "ACTIVE" };
+    const location = machine.locationId ? locations.get(machine.locationId) : null;
     const st = statusById.get(id) || {};
     const lastSeenMs = A.toMillis(st.lastSeen);
     const online = Number.isFinite(lastSeenMs) && now - lastSeenMs <= ONLINE_WINDOW_MS;
     const stats = perKiosk.get(id) || { jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0 };
+    const q = queue.get(id) || { paid: 0, printing: 0 };
+    const printers = hardwareFor(hardware, id);
+    const printerDegraded = printers.some((p) => (p.paperPct !== null && p.paperPct < PAPER_LOW_PCT) || (p.tonerLevel !== null && p.tonerLevel < TONER_LOW_PCT) || p.status === "Paused/Error");
     return {
       kioskId: id,
-      name: meta.name,
-      type: meta.type,
-      description: meta.description,
+      name: machine.name,
+      type: machine.type,
+      description: machine.description,
+      shortLabel: machine.shortLabel || id.slice(0, 2),
+      locationId: machine.locationId || null,
+      locationName: location?.name || null,
+      campusId: location?.campusId || null,
+      // Admin-set lifecycle (PROVISIONING/ACTIVE/MAINTENANCE/DECOMMISSIONED), separate from the derived
+      // live sub-state below — see machineRegistry.service.js's computeLiveState doc comment.
+      lifecycleStatus: machine.status || "ACTIVE",
+      liveState: R.computeLiveState({ lifecycleStatus: machine.status || "ACTIVE", online, hasQueueActivity: q.printing > 0 || q.paid > 0, printerDegraded }),
       online,
       lastSeen: A.iso(lastSeenMs),
       secondsSinceSeen: Number.isFinite(lastSeenMs) ? Math.round((now - lastSeenMs) / 1000) : null,
@@ -362,8 +382,8 @@ async function loadKiosks(range) {
       // would read as "signal found and it's zero bars" instead of "nothing reported".
       wifiSignalDbm: Number.isFinite(st.wifiSignalDbm) ? st.wifiSignalDbm : null,
       wifiQualityPct: Number.isFinite(st.wifiQualityPct) ? st.wifiQualityPct : null,
-      printers: hardwareFor(hardware, id),
-      queue: queue.get(id) || { paid: 0, printing: 0 },
+      printers,
+      queue: q,
       stats: { jobs: stats.jobs, completed: stats.completed, failed: stats.failed, pages: stats.pages, revenue: stats.revenue },
       restart: restartView(commandById.get(id)),
     };

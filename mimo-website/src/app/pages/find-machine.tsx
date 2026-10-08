@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Navigation, Printer } from "lucide-react";
 import { AppBar, Screen, StatusPill } from "../components/mimo/ui";
+import api from "../api";
 
 interface MachineLocation {
   id: string;
@@ -14,28 +16,31 @@ interface MachineLocation {
   longitude?: number;
 }
 
-/** Google Maps walking directions to the kiosk. No origin: Google Maps starts from the user's current location. */
-const directionsUrl = (latitude: number, longitude: number) =>
-  `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=walking`;
+/** Hand-shot photos for the machines we have them for. Not registry data, so it stays a local map keyed by machineId. */
+const MACHINE_IMAGES: Record<string, string> = {
+  "CV-001": "/images/machines/cv-raman-block-780.jpg",
+  "SV-002": "/images/machines/central-library-780.jpg",
+};
 
-const machines: MachineLocation[] = [
+/** Same four machines as before, used only until the /api/machines fetch resolves (and if it fails). */
+const FALLBACK_MACHINES: MachineLocation[] = [
   {
-    id: "1.0",
+    id: "CV-001",
     name: "MIMO 1.0",
     location: "CV Raman Block",
     details: "1st Floor, Entrance",
-    image: "/images/machines/cv-raman-block-780.jpg",
+    image: MACHINE_IMAGES["CV-001"],
     colour: false,
     isAvailable: true,
     latitude: 13.116712,
     longitude: 77.634768,
   },
   {
-    id: "2.0",
+    id: "SV-002",
     name: "MIMO 2.0",
     location: "Central Library",
     details: "Entrance (Left Side)",
-    image: "/images/machines/central-library-780.jpg",
+    image: MACHINE_IMAGES["SV-002"],
     colour: true,
     isAvailable: true,
     latitude: 13.1147477,
@@ -61,8 +66,51 @@ const machines: MachineLocation[] = [
   },
 ];
 
+interface ApiMachine {
+  machineId: string;
+  displayName: string;
+  locationName: string | null;
+  details: string | null;
+  campusName: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  capabilities: { colour?: boolean };
+  available: boolean;
+}
+
+/** Google Maps walking directions to the kiosk. No origin: Google Maps starts from the user's current location. */
+const directionsUrl = (latitude: number, longitude: number) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=walking`;
+
 export function FindMachine() {
   const navigate = useNavigate();
+  const [machines, setMachines] = useState<MachineLocation[]>(FALLBACK_MACHINES);
+
+  useEffect(() => {
+    const fetchMachines = async () => {
+      try {
+        const response = await api.get<{ machines: ApiMachine[] }>("/api/machines");
+        const list = response.data?.machines;
+        if (!list || list.length === 0) return;
+        setMachines(
+          list.map((m) => ({
+            id: m.machineId,
+            name: m.displayName,
+            location: m.locationName || "",
+            details: m.details || "",
+            image: MACHINE_IMAGES[m.machineId] ?? null,
+            colour: Boolean(m.capabilities?.colour),
+            isAvailable: m.available,
+            latitude: m.latitude ?? undefined,
+            longitude: m.longitude ?? undefined,
+          }))
+        );
+      } catch (error) {
+        console.error("Failed to fetch machine list:", error);
+      }
+    };
+    fetchMachines();
+  }, []);
 
   const handleBack = () => {
     if (window.history.length > 1) {

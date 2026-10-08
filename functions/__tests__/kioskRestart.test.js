@@ -49,6 +49,15 @@ test("unknown or malformed kiosk ids are rejected", async () => {
   assert.deepStrictEqual(fake.data("kiosk_commands"), {});
 });
 
+test("a machine known only through the registry (no heartbeat yet) is still recognized", async () => {
+  // A freshly provisioned machine: registered in machines/{id}, but hasn't sent its first heartbeat to
+  // system_status yet. Restart should still be accepted — the whole point of the registry is that a machine
+  // is "known" the moment it has a registry record, not only once it has reported in.
+  fake.reset({ machines: { "CV-003": { name: "MIMO 3.0", status: "PROVISIONING" } } });
+  const res = await restart("CV-003");
+  assert.strictEqual(res.code, 200);
+});
+
 test("the job timeline lists the steps that happened, in time order", () => {
   const t = (s) => new Date(`2026-09-29T10:${s}Z`);
   const steps = jobTimeline({
