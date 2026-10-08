@@ -130,6 +130,14 @@ export const KiosksPage: React.FC = () => {
             <div className="mt-3 text-xs text-[var(--text-2)]">
               <p><span className="text-[var(--text-3)]">Last heartbeat:</span> {k.lastSeen ? `${timeAgo(k.lastSeen)} (${new Date(k.lastSeen).toLocaleTimeString()})` : 'never'}</p>
               {k.printerStatus && <p className="mt-0.5 break-words"><span className="text-[var(--text-3)]">Printer status:</span> {k.printerStatus}</p>}
+              {k.wifiQualityPct !== null && (
+                <p className="mt-0.5">
+                  <span className="text-[var(--text-3)]">WiFi signal:</span>{' '}
+                  <span className={k.wifiQualityPct < 25 ? 'text-rose-600 font-bold' : k.wifiQualityPct < 50 ? 'text-amber-600 font-bold' : ''}>
+                    {k.wifiQualityPct}% ({k.wifiSignalDbm} dBm)
+                  </span>
+                </p>
+              )}
               {k.restart && <RestartStatus r={k.restart} />}
             </div>
             <div className="mt-3">

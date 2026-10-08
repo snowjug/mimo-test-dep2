@@ -181,6 +181,8 @@ export interface KioskLive {
   lastSeen: string | null;
   secondsSinceSeen: number | null;
   printerStatus: string | null;
+  wifiSignalDbm: number | null;
+  wifiQualityPct: number | null;
   printers: PrinterInfo[];
   queue: { paid: number; printing: number };
   stats: { jobs: number; completed: number; failed: number; pages: number; revenue: number };

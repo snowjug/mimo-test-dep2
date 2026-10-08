@@ -1971,6 +1971,35 @@ def check_printer_health_when_idle():
     return True
 
 
+def wifi_quality_pct(dbm):
+    """Rough signal-strength percentage from dBm, the same linear mapping most OS WiFi indicators use:
+    -50 dBm or better is 100%, -100 dBm or worse is 0%."""
+    if dbm is None:
+        return None
+    return max(0, min(100, round(2 * (dbm + 100))))
+
+
+def read_wifi_signal():
+    """(dBm, quality%) for whichever wireless interface is up, or (None, None) on wired/no-signal devices.
+    Never raises — a Pi on Ethernet (no wireless interface at all) is a normal, common case, not a failure."""
+    import re
+    try:
+        ifaces = subprocess.run(["iw", "dev"], capture_output=True, text=True, timeout=5).stdout
+        iface_names = re.findall(r"Interface\s+(\S+)", ifaces)
+    except Exception:
+        return None, None
+    for iface in iface_names:
+        try:
+            link = subprocess.run(["iw", "dev", iface, "link"], capture_output=True, text=True, timeout=5).stdout
+            m = re.search(r"signal:\s*(-?\d+)\s*dBm", link)
+            if m:
+                dbm = int(m.group(1))
+                return dbm, wifi_quality_pct(dbm)
+        except Exception:
+            continue
+    return None, None
+
+
 def heartbeat_loop():
     last_health = 0.0
     while True:
@@ -1979,10 +2008,13 @@ def heartbeat_loop():
             color_ok, _color_reason = is_printer_online(COLOR_PRINTER_NAME)
             status_bw = "Idle" if bw_ok else "Paused/Error"
             status_color = "Idle" if color_ok else "Paused/Error"
+            wifi_dbm, wifi_pct = read_wifi_signal()
 
             db.collection("system_status").document(KIOSK_ID).set({
                 "lastSeen": firestore.SERVER_TIMESTAMP,
-                "printerStatus": f"B&W: {status_bw} | Color: {status_color}"
+                "printerStatus": f"B&W: {status_bw} | Color: {status_color}",
+                "wifiSignalDbm": wifi_dbm,
+                "wifiQualityPct": wifi_pct,
             }, merge=True)
         except Exception as e:
             print(f"⚠️ Heartbeat failed: {e}")

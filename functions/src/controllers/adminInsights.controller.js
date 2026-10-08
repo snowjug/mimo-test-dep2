@@ -358,6 +358,10 @@ async function loadKiosks(range) {
       lastSeen: A.iso(lastSeenMs),
       secondsSinceSeen: Number.isFinite(lastSeenMs) ? Math.round((now - lastSeenMs) / 1000) : null,
       printerStatus: st.printerStatus || null,
+      // null on a wired kiosk (no wireless interface) or on Pi code that predates this field — never 0, which
+      // would read as "signal found and it's zero bars" instead of "nothing reported".
+      wifiSignalDbm: Number.isFinite(st.wifiSignalDbm) ? st.wifiSignalDbm : null,
+      wifiQualityPct: Number.isFinite(st.wifiQualityPct) ? st.wifiQualityPct : null,
       printers: hardwareFor(hardware, id),
       queue: queue.get(id) || { paid: 0, printing: 0 },
       stats: { jobs: stats.jobs, completed: stats.completed, failed: stats.failed, pages: stats.pages, revenue: stats.revenue },
