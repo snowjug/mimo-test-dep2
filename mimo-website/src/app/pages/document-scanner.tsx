@@ -40,22 +40,20 @@ import { ScannerAutoCaptureEngine, AutoCaptureStatus } from "../utils/scanner-au
 import {
   loadOpenCV,
   isCVReady,
+  getCvLoadStatus,
+  CvLoadStatus,
   detectDocumentCorners,
   smoothCorners,
   warpPerspective,
-  enhanceDocumentImage,
   getDefaultCorners,
-  orderCornerPoints,
-  compressCanvasToOptimizedJpeg,
-  getRecommendedPageBudget,
+  getFullFrameCorners,
   DocumentCorners,
-  Point2D,
   EnhancementMode,
 } from "../utils/scanner-cv-engine";
+import { fitPagesToPdfLimit } from "../utils/scanner-pdf-budget";
 
 export interface ScannedPageItem {
   id: string; // Local unique ID
-  backendPageId?: string; // Backend pageId (e.g. "page-001")
   dataUrl: string; // Clean perspective-warped & enhanced document image
   originalDataUrl: string; // Full uncropped frame for manual re-adjustment
   corners: DocumentCorners; // 4 corners used for warp (normalized 0..1)
@@ -63,43 +61,47 @@ export interface ScannedPageItem {
   file?: File;
   name: string;
   createdAt: number;
-  rotation: number; // 0, 90, 180, 270
-  isUploading?: boolean;
+  rotation: number; // 0, 90, 180, 270 (already applied to dataUrl)
 }
 
 type AspectRatioMode = "a4" | "free" | "1:1" | "4:3" | "16:9";
 
-// Helper: Convert DataURL to Blob and MIME type
-function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string } {
-  const parts = dataUrl.split(",");
-  const mimeMatch = parts[0].match(/:(.*?);/);
-  const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
-  const byteCharacters = atob(parts[1]);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  return {
-    blob: new Blob([byteArray], { type: mimeType }),
-    mimeType,
-  };
+// Read a picked file as a data URL
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error(`Could not read "${file.name}"`));
+    reader.readAsDataURL(file);
+  });
 }
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not open the image"));
+    img.src = src;
+  });
+}
+
+// Pages are kept at high quality while scanning; the final size is decided once, at Continue, for the real
+// page count (see fitPagesToPdfLimit).
+const PAGE_JPEG_QUALITY = 0.92;
 
 export function DocumentScanner() {
   const navigate = useNavigate();
 
-  // Backend session state
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [, setIsCreatingSession] = useState<boolean>(false);
   const [isFinalizing, setIsFinalizing] = useState<boolean>(false);
 
   // Page state
   const [pages, setPages] = useState<ScannedPageItem[]>([]);
+  const pagesRef = useRef<ScannedPageItem[]>(pages);
+  pagesRef.current = pages;
   const [selectedPreview, setSelectedPreview] = useState<ScannedPageItem | null>(null);
 
   // Computer Vision & Corner Detection state
-  const [isOpenCvReady, setIsOpenCvReady] = useState<boolean>(false);
+  const [cvStatus, setCvStatus] = useState<CvLoadStatus>(getCvLoadStatus());
   const [detectedCorners, setDetectedCorners] = useState<DocumentCorners>(getDefaultCorners());
   const [isDocDetected, setIsDocDetected] = useState<boolean>(false);
   const smoothedCornersRef = useRef<DocumentCorners>(getDefaultCorners());
@@ -121,6 +123,9 @@ export function DocumentScanner() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // Each camera start gets a number; a start that has been superseded (React StrictMode mounts effects twice
+  // in development, or a quick "Try again") stops its own stream and never reports an error.
+  const cameraAttemptRef = useRef<number>(0);
 
   const [isCameraActive, setIsCameraActive] = useState<boolean>(true);
   const [isCameraLoading, setIsCameraLoading] = useState<boolean>(false);
@@ -139,13 +144,15 @@ export function DocumentScanner() {
   const [autoCaptureMessage, setAutoCaptureMessage] = useState<string>("Align document inside frame");
   const [isShutterFlashing, setIsShutterFlashing] = useState<boolean>(false);
 
-  // 1. Lazy load OpenCV.js WebAssembly on component mount
+  // 1. Load OpenCV.js (bundled with the site) on mount
   useEffect(() => {
-    loadOpenCV().then((cv) => {
-      if (cv) {
-        setIsOpenCvReady(true);
-      }
+    let cancelled = false;
+    loadOpenCV().then((ok) => {
+      if (!cancelled) setCvStatus(ok ? "ready" : "unavailable");
     });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Trigger brief visual shutter flash animation
@@ -155,69 +162,6 @@ export function DocumentScanner() {
       setIsShutterFlashing(false);
     }, 250);
   }, []);
-
-  // Initialize or get backend scanner session
-  const ensureSession = useCallback(async (): Promise<string> => {
-    if (sessionId) return sessionId;
-
-    setIsCreatingSession(true);
-    try {
-      const res = await api.post("/scanner/sessions");
-      const newSid = res.data.sessionId;
-      setSessionId(newSid);
-      return newSid;
-    } catch (err: any) {
-      console.error("[SCANNER] Failed to create scanner session:", err);
-      toast.error(err.response?.data?.error || "Failed to initialize document scanning session");
-      throw err;
-    } finally {
-      setIsCreatingSession(false);
-    }
-  }, [sessionId]);
-
-  // Upload a page to backend session
-  const uploadPageToBackend = async (
-    targetSessionId: string,
-    pageItem: ScannedPageItem,
-    pageNumber: number
-  ) => {
-    try {
-      const { blob, mimeType } = dataUrlToBlob(pageItem.dataUrl);
-      const extension = mimeType === "image/png" ? "png" : "jpg";
-      const filename = pageItem.name || `page_${pageNumber}.${extension}`;
-
-      const formData = new FormData();
-      formData.append("page", blob, filename);
-      formData.append("pageNumber", String(pageNumber));
-
-      const res = await api.post(`/scanner/sessions/${targetSessionId}/pages`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      const backendPageId = res.data.pageId;
-
-      // If page had rotation, patch it to backend
-      if (pageItem.rotation && [90, 180, 270].includes(pageItem.rotation)) {
-        await api.patch(`/scanner/sessions/${targetSessionId}/pages/${backendPageId}`, {
-          rotation: pageItem.rotation,
-        }).catch(() => {});
-      }
-
-      setPages((prev) =>
-        prev.map((p) =>
-          p.id === pageItem.id
-            ? { ...p, backendPageId, isUploading: false }
-            : p
-        )
-      );
-    } catch (err: any) {
-      console.error(`[SCANNER] Failed to upload page ${pageNumber}:`, err);
-      setPages((prev) =>
-        prev.map((p) => (p.id === pageItem.id ? { ...p, isUploading: false } : p))
-      );
-      toast.error(`Page ${pageNumber} upload failed: ${err.response?.data?.error || err.message}`);
-    }
-  };
 
   // Stop camera tracks cleanly
   const stopCamera = useCallback(() => {
@@ -235,6 +179,7 @@ export function DocumentScanner() {
 
   // Start camera
   const startCamera = useCallback(async () => {
+    const attempt = ++cameraAttemptRef.current;
     stopCamera();
     setCameraError(null);
     setIsCameraLoading(true);
@@ -255,6 +200,11 @@ export function DocumentScanner() {
         audio: false,
       });
 
+      if (attempt !== cameraAttemptRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       streamRef.current = stream;
 
       if (videoRef.current) {
@@ -262,8 +212,10 @@ export function DocumentScanner() {
         await videoRef.current.play();
       }
 
-      setIsCameraActive(true);
+      if (attempt === cameraAttemptRef.current) setIsCameraActive(true);
     } catch (err: any) {
+      // Superseded start, or play() interrupted by a newer source: not a camera failure.
+      if (attempt !== cameraAttemptRef.current || err?.name === "AbortError") return;
       console.warn("Camera access error:", err);
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
         setCameraError("Camera permission was denied. Please allow camera access in your browser settings, or upload an image file directly.");
@@ -275,7 +227,7 @@ export function DocumentScanner() {
         setCameraError(err.message || "Failed to start camera. You can upload image files directly.");
       }
     } finally {
-      setIsCameraLoading(false);
+      if (attempt === cameraAttemptRef.current) setIsCameraLoading(false);
     }
   }, [stopCamera]);
 
@@ -283,30 +235,36 @@ export function DocumentScanner() {
   useEffect(() => {
     startCamera();
     return () => {
+      cameraAttemptRef.current++;
       stopCamera();
     };
   }, [startCamera, stopCamera]);
 
+  const openEditor = (page: ScannedPageItem) => {
+    setEditingPage(page);
+    setEditCorners(page.corners || getFullFrameCorners());
+    setEditRotation(page.rotation || 0);
+    setEditFilter(page.filter || "enhanced");
+    setEditAspectRatio("a4");
+  };
+
   // ================= STAGE 2: CAPTURE & PERSPECTIVE WARP =================
   const handleAddNewPage = useCallback(() => {
-    autoEngineRef.current?.reArm();
+    // The page just captured may still be in view; auto capture waits until it is moved or replaced.
+    autoEngineRef.current?.reArm({ requireNewDocument: true });
     setIsCaptureLocked(false);
-    toast.info(`Ready for Page ${pages.length + 1} — align document inside frame`);
-  }, [pages.length]);
+    toast.info(`Ready for page ${pagesRef.current.length + 1} — place the next page in view`);
+  }, []);
 
-  const handleRetakeCurrentPage = useCallback(async () => {
-    if (pages.length === 0) return;
-    const lastPage = pages[pages.length - 1];
+  const handleRetakeCurrentPage = useCallback(() => {
+    if (pagesRef.current.length === 0) return;
     setPages((prev) => prev.slice(0, -1));
-    if (sessionId && lastPage.backendPageId) {
-      api.delete(`/scanner/sessions/${sessionId}/pages/${lastPage.backendPageId}`).catch(() => {});
-    }
     autoEngineRef.current?.reArm();
     setIsCaptureLocked(false);
     toast.info("Retaking page — align document inside frame");
-  }, [pages, sessionId]);
+  }, []);
 
-  const handleCapture = useCallback(async (options?: { isAuto?: boolean }) => {
+  const handleCapture = useCallback((options?: { isAuto?: boolean }) => {
     if (isCapturingRef.current) return;
     if (!videoRef.current || !canvasRef.current) {
       if (!options?.isAuto) toast.error("Camera view is not available");
@@ -332,97 +290,57 @@ export function DocumentScanner() {
 
       // 1. Capture raw full-resolution camera frame
       ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
-      triggerShutterFlash();
 
-      // Full frame Data URL for manual adjustment in edit modal
-      const originalDataUrl = canvas.toDataURL("image/jpeg", 0.95);
-
-      // 2. Perform 4-Corner Perspective Warp & Document Rectification
-      let targetCorners: DocumentCorners;
-      let usedFallback = false;
-      if (isDocDetected) {
-        targetCorners = smoothedCornersRef.current;
-      } else {
-        // Run detection on the captured full-resolution canvas with high resolution analysis (640px)
-        const captureResult = detectDocumentCorners(canvas, {
-          downscaleWidth: 640,
-          minAreaPercent: 0.08,
-        });
-        if (captureResult.hasDocument && !captureResult.isFallback) {
-          targetCorners = captureResult.corners;
-        } else {
-          targetCorners = getDefaultCorners();
-          usedFallback = true;
-        }
+      // 2. Find the paper on the full-resolution frame; the live overlay's corners are the fallback.
+      let corners: DocumentCorners | null = null;
+      const captureResult = detectDocumentCorners(canvas, { downscaleWidth: 640, minAreaPercent: 0.08 });
+      if (captureResult.hasDocument && !captureResult.isFallback) {
+        corners = captureResult.corners;
+      } else if (isDocDetected) {
+        corners = smoothedCornersRef.current;
       }
+      const detected = corners !== null;
+      if (!detected && options?.isAuto) return; // auto capture only ever fires on a real paper boundary
 
-      // Warp perspective to clean A4 document canvas
+      triggerShutterFlash();
+      const originalDataUrl = canvas.toDataURL("image/jpeg", PAGE_JPEG_QUALITY);
+      const targetCorners = corners ?? getFullFrameCorners();
+
+      // 3. Perspective-correct and crop to the paper (A4, portrait or landscape from the paper's shape)
       const warpedCanvas = warpPerspective(canvas, targetCorners, {
-        aspectRatio: "a4",
+        aspectRatio: detected ? "a4" : "free",
         enhancement: "enhanced",
       });
 
-      // Compress JPEG adaptively according to per-page budget for 500 KB limit
-      let assignedPageNumber = 1;
-      setPages((prev) => {
-        assignedPageNumber = prev.length + 1;
-        return prev;
-      });
-
-      const pageBudget = getRecommendedPageBudget(assignedPageNumber);
-      const { dataUrl: finalDataUrl } = compressCanvasToOptimizedJpeg(warpedCanvas, {
-        maxBytesPerPage: pageBudget,
-      });
-
-      let newPage: ScannedPageItem;
-
-      setPages((prev) => {
-        assignedPageNumber = prev.length + 1;
-        newPage = {
-          id: `page_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-          dataUrl: finalDataUrl,
-          originalDataUrl,
-          corners: targetCorners,
-          filter: "enhanced",
-          name: `Page ${assignedPageNumber}.jpg`,
-          createdAt: Date.now(),
-          rotation: 0,
-          isUploading: true,
-        };
-        return [...prev, newPage];
-      });
+      const pageNumber = pagesRef.current.length + 1;
+      const newPage: ScannedPageItem = {
+        id: `page_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        dataUrl: warpedCanvas.toDataURL("image/jpeg", PAGE_JPEG_QUALITY),
+        originalDataUrl,
+        corners: targetCorners,
+        filter: "enhanced",
+        name: `Page ${pageNumber}.jpg`,
+        createdAt: Date.now(),
+        rotation: 0,
+      };
+      setPages((prev) => [...prev, newPage]);
 
       // Lock auto-capture on this physical document
-      if (autoEngineRef.current) {
-        autoEngineRef.current.lockCapture(targetCorners);
-      }
+      autoEngineRef.current?.lockCapture(targetCorners);
       setIsCaptureLocked(true);
 
-      if (usedFallback) {
-        toast.info(`Page ${assignedPageNumber} captured with standard frame. Tap Edit to adjust corners.`);
-      } else {
+      if (detected) {
         toast.success(
-          options?.isAuto
-            ? `Page ${assignedPageNumber} scanned & straightened!`
-            : `Page ${assignedPageNumber} captured & rectified!`
+          options?.isAuto ? `Page ${pageNumber} scanned & straightened!` : `Page ${pageNumber} captured & straightened!`
         );
-      }
-
-      // Upload clean scanned page to backend session
-      try {
-        const sid = await ensureSession();
-        setTimeout(() => {
-          if (newPage) {
-            uploadPageToBackend(sid, newPage, assignedPageNumber);
-          }
-        }, 0);
-      } catch (err) {
-        console.warn("Deferred backend upload:", err);
+      } else {
+        toast.info(`No paper edge found on page ${pageNumber}. Drag the four corners onto the page.`);
+        openEditor(newPage);
       }
     } finally {
       isCapturingRef.current = false;
     }
-  }, [ensureSession, isDocDetected, triggerShutterFlash]);
+  }, [isDocDetected, triggerShutterFlash]);
 
   // ================= STAGE 1: REAL-TIME CORNER DETECTION LOOP =================
   useEffect(() => {
@@ -485,94 +403,70 @@ export function DocumentScanner() {
 
   // Handle file import from disk / gallery
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length === 0) return;
 
     const validMimes = new Set(["image/jpeg", "image/jpg", "image/png"]);
-    let currentCount = pages.length;
+    const imported: ScannedPageItem[] = [];
+    let withoutEdges = 0;
 
-    let targetSid: string | null = null;
-    try {
-      targetSid = await ensureSession();
-    } catch (_) {}
-
-    Array.from(files).forEach((file) => {
+    // One at a time so the pages keep the order the files were picked in
+    for (const file of files) {
       const mime = (file.type || "").toLowerCase();
       if (!validMimes.has(mime) && !file.name.match(/\.(jpe?g|png)$/i)) {
         toast.error(`"${file.name}" is not a JPEG or PNG image.`);
-        return;
+        continue;
       }
-
-      currentCount++;
-      const assignedPageNumber = currentCount;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        if (dataUrl) {
-          // Detect corners on imported image
-          const tempImg = new Image();
-          tempImg.onload = () => {
-            const detected = detectDocumentCorners(tempImg, { downscaleWidth: 640 });
-            const cornersToUse = detected.hasDocument && !detected.isFallback ? detected.corners : getDefaultCorners();
-
-            const warpedCanvas = warpPerspective(tempImg, cornersToUse, {
-              aspectRatio: "a4",
-              enhancement: "enhanced",
-            });
-            const pageBudget = getRecommendedPageBudget(assignedPageNumber);
-            const { dataUrl: finalWarpedDataUrl } = compressCanvasToOptimizedJpeg(warpedCanvas, {
-              maxBytesPerPage: pageBudget,
-            });
-
-            const item: ScannedPageItem = {
-              id: `page_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-              dataUrl: finalWarpedDataUrl,
-              originalDataUrl: dataUrl,
-              corners: cornersToUse,
-              filter: "enhanced",
-              file,
-              name: file.name,
-              createdAt: Date.now(),
-              rotation: 0,
-              isUploading: !!targetSid,
-            };
-
-            setPages((prev) => [...prev, item]);
-            toast.success(`Imported & rectified "${file.name}"`);
-
-            if (targetSid) {
-              uploadPageToBackend(targetSid, item, assignedPageNumber);
-            }
-          };
-          tempImg.src = dataUrl;
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-    e.target.value = "";
-  };
-
-  // Remove a page by ID
-  const handleRemovePage = async (pageId: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-
-    const targetPage = pages.find((p) => p.id === pageId);
-    setPages((prev) => prev.filter((p) => p.id !== pageId));
-    toast.info("Page removed");
-
-    if (sessionId && targetPage?.backendPageId) {
       try {
-        await api.delete(`/scanner/sessions/${sessionId}/pages/${targetPage.backendPageId}`);
+        const dataUrl = await readFileAsDataUrl(file);
+        const img = await loadImageElement(dataUrl);
+        const detected = detectDocumentCorners(img, { downscaleWidth: 640 });
+        const found = detected.hasDocument && !detected.isFallback;
+        if (!found) withoutEdges++;
+        const corners = found ? detected.corners : getFullFrameCorners();
+
+        const warpedCanvas = warpPerspective(img, corners, {
+          aspectRatio: found ? "a4" : "free",
+          enhancement: "enhanced",
+        });
+
+        imported.push({
+          id: `page_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          dataUrl: warpedCanvas.toDataURL("image/jpeg", PAGE_JPEG_QUALITY),
+          originalDataUrl: dataUrl,
+          corners,
+          filter: "enhanced",
+          file,
+          name: file.name,
+          createdAt: Date.now(),
+          rotation: 0,
+        });
       } catch (err: any) {
-        console.warn(`[SCANNER] Backend delete error for ${targetPage.backendPageId}:`, err);
+        toast.error(err.message || `Could not import "${file.name}"`);
       }
+    }
+
+    if (imported.length === 0) return;
+    setPages((prev) => [...prev, ...imported]);
+    if (withoutEdges > 0) {
+      toast.info(
+        `${imported.length} page${imported.length === 1 ? "" : "s"} imported. No paper edge was found on ${withoutEdges}; tap Adjust on ${withoutEdges === 1 ? "it" : "them"} to set the corners.`
+      );
+    } else {
+      toast.success(`${imported.length} page${imported.length === 1 ? "" : "s"} imported & straightened`);
     }
   };
 
+  // Remove a page by ID
+  const handleRemovePage = (pageId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setPages((prev) => prev.filter((p) => p.id !== pageId));
+    toast.info("Page removed");
+  };
+
   // Reorder page move left/right
-  const handleMovePage = async (index: number, direction: "left" | "right", e: React.MouseEvent) => {
+  const handleMovePage = (index: number, direction: "left" | "right", e: React.MouseEvent) => {
     e.stopPropagation();
     const newIndex = direction === "left" ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= pages.length) return;
@@ -581,39 +475,20 @@ export function DocumentScanner() {
     const [moved] = newPages.splice(index, 1);
     newPages.splice(newIndex, 0, moved);
     setPages(newPages);
-
-    if (sessionId && newPages.every((p) => p.backendPageId)) {
-      try {
-        const order = newPages.map((p) => p.backendPageId!);
-        await api.post(`/scanner/sessions/${sessionId}/reorder`, { order });
-      } catch (err: any) {
-        console.warn("[SCANNER] Backend reorder error:", err);
-      }
-    }
   };
 
   // Clear all pages
-  const handleClearAll = async () => {
-    if (sessionId && pages.length > 0) {
-      pages.forEach((p) => {
-        if (p.backendPageId) {
-          api.delete(`/scanner/sessions/${sessionId}/pages/${p.backendPageId}`).catch(() => {});
-        }
-      });
-    }
+  const handleClearAll = () => {
     setPages([]);
-    setSessionId(null);
+    autoEngineRef.current?.reArm();
+    setIsCaptureLocked(false);
     toast.info("All scanned pages cleared");
   };
 
   // ================= EDIT MODE: 4-CORNER PIN ADJUSTMENT & ENHANCEMENT =================
   const handleStartEdit = (page: ScannedPageItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setEditingPage(page);
-    setEditCorners(page.corners || getDefaultCorners());
-    setEditRotation(page.rotation || 0);
-    setEditFilter(page.filter || "enhanced");
-    setEditAspectRatio("a4");
+    openEditor(page);
   };
 
   // Corner pointer drag handler in edit modal
@@ -665,20 +540,19 @@ export function DocumentScanner() {
     setEditRotation((prev) => (prev + 90) % 360);
   };
 
-  // Rotate 90 degrees counter-clockwise
-  const handleRotateCCW = () => {
-    setEditRotation((prev) => (prev - 90 + 360) % 360);
-  };
-
-  // Reset corners to default A4 frame
+  // Reset corners to the whole photo
   const handleResetCorners = () => {
-    setEditCorners(getDefaultCorners());
-    toast.info("Corners reset to full frame");
+    setEditCorners(getFullFrameCorners());
+    toast.info("Corners reset to the full photo");
   };
 
   // Re-run Auto Corner Detection on the original image
   const handleAutoDetectCorners = () => {
     if (!editingPage) return;
+    if (!isCVReady()) {
+      toast.error("Edge detection is not available right now. Drag the corners onto the page.");
+      return;
+    }
     const img = new Image();
     img.onload = () => {
       const res = detectDocumentCorners(img, { downscaleWidth: 640 });
@@ -686,8 +560,7 @@ export function DocumentScanner() {
         setEditCorners(res.corners);
         toast.success("Document corners detected!");
       } else {
-        setEditCorners(getDefaultCorners());
-        toast.info("No clear paper boundary detected. Set to standard A4 frame.");
+        toast.info("No clear paper edge found. Drag the corners onto the page.");
       }
     };
     img.src = editingPage.originalDataUrl || editingPage.dataUrl;
@@ -714,7 +587,8 @@ export function DocumentScanner() {
         enhancement: editFilter,
       });
 
-      // 2. Apply optional 90/180/270 degree rotation if requested
+      // 2. Rotation is applied to the image itself here (it is not sent to the backend as well, so the PDF
+      // page is never rotated twice).
       let finalCanvas = warpedCanvas;
       if (editRotation !== 0) {
         const is90or270 = editRotation % 180 !== 0;
@@ -730,14 +604,9 @@ export function DocumentScanner() {
         }
       }
 
-      const pageBudget = getRecommendedPageBudget(pages.length);
-      const { dataUrl: finalDataUrl } = compressCanvasToOptimizedJpeg(finalCanvas, {
-        maxBytesPerPage: pageBudget,
-      });
-
       const updatedPage: ScannedPageItem = {
         ...editingPage,
-        dataUrl: finalDataUrl,
+        dataUrl: finalCanvas.toDataURL("image/jpeg", PAGE_JPEG_QUALITY),
         corners: editCorners,
         filter: editFilter,
         rotation: editRotation,
@@ -746,13 +615,6 @@ export function DocumentScanner() {
       setPages((prev) =>
         prev.map((p) => (p.id === editingPage.id ? updatedPage : p))
       );
-
-      // Synchronize update with backend if session exists
-      if (sessionId && editingPage.backendPageId) {
-        api.patch(`/scanner/sessions/${sessionId}/pages/${editingPage.backendPageId}`, {
-          rotation: editRotation,
-        }).catch((err) => console.warn("[SCANNER] Failed to patch rotation:", err));
-      }
 
       if (selectedPreview && selectedPreview.id === editingPage.id) {
         setSelectedPreview(updatedPage);
@@ -777,67 +639,66 @@ export function DocumentScanner() {
 
     setIsFinalizing(true);
     try {
-      let targetSid = sessionId;
-      if (!targetSid) {
-        targetSid = await ensureSession();
-      }
+      let fromStep = 0;
+      // Fit, upload, finalize. If the backend's own measurement of the PDF is still over 500 KB, go one step
+      // smaller and try again with a fresh session.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const fitted = await fitPagesToPdfLimit(pages.map((p) => p.dataUrl), fromStep);
+        if (!fitted) {
+          toast.error("This document can't be made smaller than 500 KB and stay readable. Remove a page and try again.");
+          return;
+        }
 
-      // Upload any un-uploaded pages
-      for (let i = 0; i < pages.length; i++) {
-        const page = pages[i];
-        if (!page.backendPageId) {
-          const { blob, mimeType } = dataUrlToBlob(page.dataUrl);
-          const extension = mimeType === "image/png" ? "png" : "jpg";
+        const sessionRes = await api.post("/scanner/sessions");
+        const sid: string = sessionRes.data.sessionId;
+
+        for (let i = 0; i < fitted.jpegs.length; i++) {
           const formData = new FormData();
-          formData.append("page", blob, page.name || `page_${i + 1}.${extension}`);
+          formData.append("page", fitted.jpegs[i], `page_${i + 1}.jpg`);
           formData.append("pageNumber", String(i + 1));
-
-          const res = await api.post(`/scanner/sessions/${targetSid}/pages`, formData, {
+          await api.post(`/scanner/sessions/${sid}/pages`, formData, {
             headers: { "Content-Type": "multipart/form-data" },
           });
-
-          page.backendPageId = res.data.pageId;
-
-          if (page.rotation && [90, 180, 270].includes(page.rotation)) {
-            await api.patch(`/scanner/sessions/${targetSid}/pages/${res.data.pageId}`, {
-              rotation: page.rotation,
-            }).catch(() => {});
-          }
         }
+
+        let finalizeRes;
+        try {
+          finalizeRes = await api.post(`/scanner/sessions/${sid}/finalize`);
+        } catch (err: any) {
+          const msg: string = err.response?.data?.error || "";
+          if (err.response?.status === 400 && /500 KB|maximum allowed size/i.test(msg)) {
+            fromStep = fitted.step + 1;
+            continue;
+          }
+          throw err;
+        }
+
+        const { jobId, pageCount, fileName } = finalizeRes.data;
+
+        // Start a fresh checkout, same hand-off as the upload screen
+        ["printCode", "printOptions", "printStatus", "uploadedImages", "totalPages"].forEach((k) =>
+          sessionStorage.removeItem(k)
+        );
+        sessionStorage.setItem(
+          "printFiles",
+          JSON.stringify([
+            {
+              jobId,
+              name: fileName || "scanned_document.pdf",
+              size: fitted.pdfBytes,
+              type: "application/pdf",
+              pageCount: pageCount || pages.length,
+            },
+          ])
+        );
+        sessionStorage.setItem("uploadTotalPages", String(pageCount || pages.length));
+        sessionStorage.setItem("uploadAmount", String((pageCount || pages.length) * 2));
+
+        toast.success("Document compiled into ready-to-print PDF!");
+        navigate("/print-options");
+        return;
       }
-
-      // Reorder pages in backend
-      if (pages.every((p) => p.backendPageId)) {
-        await api.post(`/scanner/sessions/${targetSid}/reorder`, {
-          order: pages.map((p) => p.backendPageId!),
-        }).catch(() => {});
-      }
-
-      // Finalize session into PDF
-      const finalizeRes = await api.post(`/scanner/sessions/${targetSid}/finalize`);
-      const { jobId, pageCount, fileName } = finalizeRes.data;
-
-      // Start a fresh checkout, same hand-off as the upload screen
-      ["printCode", "printOptions", "printStatus", "uploadedImages", "totalPages"].forEach((k) =>
-        sessionStorage.removeItem(k)
-      );
-      sessionStorage.setItem(
-        "printFiles",
-        JSON.stringify([
-          {
-            jobId,
-            name: fileName || "scanned_document.pdf",
-            size: 0,
-            type: "application/pdf",
-            pageCount: pageCount || pages.length,
-          },
-        ])
-      );
-      sessionStorage.setItem("uploadTotalPages", String(pageCount || pages.length));
-      sessionStorage.setItem("uploadAmount", String((pageCount || pages.length) * 2));
-
-      toast.success("Document compiled into ready-to-print PDF!");
-      navigate("/print-options");
+      toast.error("This document can't be made smaller than 500 KB. Remove a page and try again.");
     } catch (err: any) {
       console.error("[SCANNER] Finalization error:", err);
       toast.error(
@@ -920,7 +781,9 @@ export function DocumentScanner() {
               <div className="absolute inset-x-3 top-3 z-30 flex items-center justify-between">
                 <div
                   className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold text-white backdrop-blur-md transition-colors ${
-                    !isAutoCaptureEnabled
+                    cvStatus === "unavailable"
+                      ? "bg-amber-700/90"
+                      : !isAutoCaptureEnabled || cvStatus === "loading"
                       ? "bg-black/60"
                       : autoCaptureStatus === "steady"
                       ? "bg-emerald-600/90"
@@ -929,7 +792,17 @@ export function DocumentScanner() {
                       : "bg-black/60"
                   }`}
                 >
-                  {isAutoCaptureEnabled ? (
+                  {cvStatus === "loading" ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      <span>Loading edge detection…</span>
+                    </>
+                  ) : cvStatus === "unavailable" ? (
+                    <>
+                      <AlertCircle className="size-3.5" />
+                      <span>Edge detection unavailable: tap Capture, then set the corners</span>
+                    </>
+                  ) : isAutoCaptureEnabled ? (
                     <>
                       <Sparkles className="size-3.5" />
                       <span>{autoCaptureMessage}</span>
@@ -937,7 +810,7 @@ export function DocumentScanner() {
                   ) : (
                     <>
                       <Camera className="size-3.5" />
-                      <span>Manual: tap Capture</span>
+                      <span>{isDocDetected ? "Paper detected: tap Capture" : "Manual: tap Capture"}</span>
                     </>
                   )}
                 </div>
@@ -1083,11 +956,6 @@ export function DocumentScanner() {
                 >
                   <span className="relative block h-14 w-10 shrink-0 overflow-hidden rounded-md bg-black">
                     <img src={page.dataUrl} alt={`Page ${index + 1}`} className="h-full w-full object-cover" />
-                    {page.isUploading && (
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/50">
-                        <Loader2 className="size-4 animate-spin text-white" />
-                      </span>
-                    )}
                   </span>
                   <span className="min-w-0">
                     <span className="block text-[16px] text-ink">Page {index + 1}</span>

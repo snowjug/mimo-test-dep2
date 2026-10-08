@@ -2,6 +2,18 @@ const { admin, db } = require("../config/firebase");
 const { getPDFDocument } = require("../services/pdf.service");
 const { degrees } = require("pdf-lib");
 
+const A4_PORTRAIT = { width: 595.28, height: 841.89 };
+
+function a4Layout(imageWidth, imageHeight) {
+  const landscape = imageWidth > imageHeight;
+  const pageWidth = landscape ? A4_PORTRAIT.height : A4_PORTRAIT.width;
+  const pageHeight = landscape ? A4_PORTRAIT.width : A4_PORTRAIT.height;
+  const scale = Math.min(pageWidth / imageWidth, pageHeight / imageHeight);
+  const width = imageWidth * scale;
+  const height = imageHeight * scale;
+  return { pageWidth, pageHeight, x: (pageWidth - width) / 2, y: (pageHeight - height) / 2, width, height };
+}
+
 async function createScannerSession(userId) {
   if (!userId) {
     throw new Error("userId is required");
@@ -457,12 +469,15 @@ async function finalizeScannerSession(userId, sessionId) {
       embeddedImage = await pdfDoc.embedPng(imageBytes);
     }
 
-    const page = pdfDoc.addPage([embeddedImage.width, embeddedImage.height]);
+    // One A4 page per scan (portrait or landscape to match the scan), image scaled to fit and centred.
+    // The website sizes the page JPEGs with this same layout (mimo-website/src/app/utils/scanner-pdf-budget.ts).
+    const layout = a4Layout(embeddedImage.width, embeddedImage.height);
+    const page = pdfDoc.addPage([layout.pageWidth, layout.pageHeight]);
     page.drawImage(embeddedImage, {
-      x: 0,
-      y: 0,
-      width: embeddedImage.width,
-      height: embeddedImage.height,
+      x: layout.x,
+      y: layout.y,
+      width: layout.width,
+      height: layout.height,
     });
 
     const rotation = Number(p.rotation) || 0;
