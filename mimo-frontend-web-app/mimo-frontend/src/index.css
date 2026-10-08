@@ -97,7 +97,7 @@
   }
 
   #root {
-    width: 1440px;
+    width: var(--kiosk-width, 1440px);
     height: 810px;
     background: #FAFAF8;
     position: absolute;
@@ -116,9 +116,13 @@
     background: #FAFAF8;
   }
 
+  html.kiosk-full-bleed body.theme-cv001 {
+    background: var(--color-parchment-100);
+  }
+
   @media (max-width: 1000px) {
     #root {
-      width: 1440px;
+      width: var(--kiosk-width, 1440px);
       height: 810px;
       transform: translate(-50%, -50%) rotate(-90deg) scale(var(--kiosk-scale, 1));
       transform-origin: center;

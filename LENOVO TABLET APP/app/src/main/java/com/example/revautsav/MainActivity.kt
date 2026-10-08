@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var connectivityManager: ConnectivityManager
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var isLoadedSuccessfully = false
-    private val kioskUrl = "https://mimo-kiosk-app.vercel.app/"
+    private var kioskUrl = "https://mimo-kiosk-app.vercel.app/?kioskId=SV-002"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -308,6 +308,19 @@ class MainActivity : AppCompatActivity() {
     private fun handleIntent(intent: android.content.Intent?) {
         if (intent == null) return
         
+        val customUrl = intent.getStringExtra("url")
+        val customKioskId = intent.getStringExtra("kioskId")
+        if (!customUrl.isNullOrEmpty() && customUrl != kioskUrl) {
+            kioskUrl = customUrl
+            webView.loadUrl(kioskUrl)
+        } else if (!customKioskId.isNullOrEmpty()) {
+            val newUrl = "https://mimo-kiosk-app.vercel.app/?kioskId=$customKioskId"
+            if (newUrl != kioskUrl) {
+                kioskUrl = newUrl
+                webView.loadUrl(kioskUrl)
+            }
+        }
+
         val action = intent.getStringExtra("action")
         if (action == "unlock") {
             try {

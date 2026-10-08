@@ -1,8 +1,25 @@
-import React, { useId } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 
 // Every screen stays mounted (hidden with display:none), so SVG gradient ids must be
 // unique per instance — a url(#id) that resolves into a hidden screen renders blank.
 const useSvgId = (prefix: string) => `${prefix}-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
+// Unscaled #root width: 1440 normally, wider on full-bleed kiosks (see main.tsx).
+const readCanvasWidth = () => document.getElementById('root')?.offsetWidth || 1440;
+
+const useCanvasWidth = () => {
+    const [width, setWidth] = useState(readCanvasWidth);
+    useEffect(() => {
+        const onResize = () => setWidth(readCanvasWidth());
+        window.addEventListener('resize', onResize);
+        window.addEventListener('orientationchange', onResize);
+        return () => {
+            window.removeEventListener('resize', onResize);
+            window.removeEventListener('orientationchange', onResize);
+        };
+    }, []);
+    return width;
+};
 
 const MAROON = '#7A1230';
 const GOLD = '#C9973E';
@@ -80,8 +97,8 @@ const LEAF_UP = 'M0 0 C 10 -12 11 -34 0 -52 C -11 -34 -10 -12 0 0 Z';
 export const Toran: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
     const leafGrad = useSvgId('toran-leaf');
     const bandGrad = useSvgId('toran-band');
-    const W = 1440;
-    const swags = 9;
+    const W = useCanvasWidth();
+    const swags = Math.max(9, Math.round(W / 160));
     const span = W / swags;
     const cordY = 16;
     const dip = compact ? 30 : 52;
@@ -160,7 +177,7 @@ export const Toran: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
             {/* Fabric band + mauli cord */}
             <rect x="0" y="0" width={W} height={cordY - 2} fill={`url(#${bandGrad})`} />
             <line x1="0" y1={cordY - 2} x2={W} y2={cordY - 2} stroke={GOLD} strokeWidth="2" />
-            {Array.from({ length: 72 }, (_, i) => (
+            {Array.from({ length: Math.ceil(W / 20) }, (_, i) => (
                 <circle key={`d-${i}`} cx={10 + i * 20} cy={(cordY - 2) / 2} r="1.6" fill={GOLD} fillOpacity="0.8" />
             ))}
             {Array.from({ length: swags + 1 }, (_, i) => (
