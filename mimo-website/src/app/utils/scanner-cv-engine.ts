@@ -519,6 +519,45 @@ export function detectDocumentCorners(
           picked = pickBestCandidate(candidates, { previousQuad: options?.previousQuad });
         }
 
+        if (!picked || picked.score.total < QUICK_ACCEPT_SCORE) {
+          // Strategy D: low-saturation + bright mask. Paper is close to white/gray (low colour saturation,
+          // high brightness); skin, hair and most clothing/backgrounds carry noticeably more saturation. A/B/C
+          // are all luminance-edge (Canny) based, so when a document is held up against or overlapping a
+          // face the edge between them can be weak (similar brightness on both sides) and the two merge into
+          // one contour — which is exactly how a face/body quad gets proposed at all. This strategy finds the
+          // document on a completely different channel where paper and skin actually look different.
+          let hsvMat: any = null;
+          let channels: any = null;
+          let satMat: any = null;
+          let valMat: any = null;
+          let satMask: any = null;
+          let paperMask: any = null;
+          try {
+            hsvMat = new cv.Mat();
+            cv.cvtColor(srcMat, hsvMat, cv.COLOR_RGBA2RGB);
+            cv.cvtColor(hsvMat, hsvMat, cv.COLOR_RGB2HSV);
+            channels = new cv.MatVector();
+            cv.split(hsvMat, channels);
+            satMat = channels.get(1);
+            valMat = channels.get(2);
+            satMask = new cv.Mat();
+            paperMask = new cv.Mat();
+            cv.threshold(satMat, satMask, 55, 255, cv.THRESH_BINARY_INV); // low saturation -> candidate paper
+            cv.threshold(valMat, paperMask, 95, 255, cv.THRESH_BINARY); // bright enough to not be shadow
+            cv.bitwise_and(satMask, paperMask, paperMask);
+            cv.morphologyEx(paperMask, paperMask, cv.MORPH_CLOSE, kernel7);
+            candidates = candidates.concat(findQuadCandidatesFromBinary(cv, paperMask, sw, sh, minArea, maxArea));
+            picked = pickBestCandidate(candidates, { previousQuad: options?.previousQuad });
+          } finally {
+            if (satMat) satMat.delete();
+            if (valMat) valMat.delete();
+            if (satMask) satMask.delete();
+            if (paperMask) paperMask.delete();
+            if (channels) channels.delete();
+            if (hsvMat) hsvMat.delete();
+          }
+        }
+
         if (options?.debug) {
           lastDebugCandidates = candidates
             .map((c) => ({

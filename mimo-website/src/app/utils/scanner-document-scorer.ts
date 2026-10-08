@@ -42,7 +42,7 @@ const KNOWN_ASPECT_RATIOS = [0.707, 1.414, 0.773, 1.294, 0.63, 1.586, 1.0];
 
 const WEIGHTS = { area: 0.2, rectangularity: 0.15, angle: 0.25, aspectRatio: 0.2, center: 0.05, continuity: 0.15 };
 const EXTREMAL_FALLBACK_PENALTY = 0.05;
-export const DEFAULT_MIN_ACCEPT_SCORE = 0.5;
+export const DEFAULT_MIN_ACCEPT_SCORE = 0.58;
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
@@ -121,7 +121,7 @@ function rectangularityScore(corners: DocumentCorners): number {
 function angleScore(corners: DocumentCorners): number {
   const angles = interiorAngles(corners);
   const avgDeviation = angles.reduce((s, a) => s + Math.abs(a - 90), 0) / angles.length;
-  return clamp(1 - avgDeviation / 40, 0, 1);
+  return clamp(1 - avgDeviation / 28, 0, 1);
 }
 
 /** Closest match (log-distance, tolerant of perspective skew) to a known document aspect ratio. */
@@ -157,17 +157,33 @@ export function scoreCandidate(candidate: CandidateInput, options?: ScoringOptio
   const center = centerScore(candidate.corners);
   const continuity = continuityScore(candidate.corners, options?.previousQuad);
 
-  const parts: Array<[number, number]> = [
+  const baseParts: Array<[number, number]> = [
     [WEIGHTS.area, area],
     [WEIGHTS.rectangularity, rectangularity],
     [WEIGHTS.angle, angle],
     [WEIGHTS.aspectRatio, aspectRatio],
     [WEIGHTS.center, center],
   ];
-  if (continuity !== null) parts.push([WEIGHTS.continuity, continuity]);
+  const baseWeightSum = baseParts.reduce((s, [w]) => s + w, 0);
+  const baseTotal = baseParts.reduce((s, [w, v]) => s + w * v, 0) / baseWeightSum;
 
-  const weightSum = parts.reduce((s, [w]) => s + w, 0);
-  let total = parts.reduce((s, [w, v]) => s + w * v, 0) / weightSum;
+  // Continuity only ever smooths jitter between candidates that already look plausible on their own; it must
+  // never be the reason a shape that doesn't look like a document on its own merits keeps getting re-accepted
+  // frame after frame just because it matches what was (wrongly) accepted last time.
+  const CONTINUITY_MIN_BASE_SCORE = 0.45;
+  let total = baseTotal;
+  if (continuity !== null && baseTotal >= CONTINUITY_MIN_BASE_SCORE) {
+    const weightSum = baseWeightSum + WEIGHTS.continuity;
+    total = (baseTotal * baseWeightSum + continuity * WEIGHTS.continuity) / weightSum;
+  }
+
+  // Hard angle gate: a quad whose corners are nowhere near 90° is not a rectangle, however well it scores on
+  // everything else (area, aspect ratio and even rectangularity can all look fine for a merged face+paper
+  // blob). Below angle 0.5 the whole score is scaled down proportionally rather than just averaged in, so a
+  // bad angle can't be compensated away by other signals.
+  const angleGate = clamp(angle / 0.5, 0, 1);
+  total *= angleGate;
+
   if (candidate.isExtremalFallback) total = Math.max(0, total - EXTREMAL_FALLBACK_PENALTY);
 
   return { total: clamp(total, 0, 1), area, rectangularity, angle, aspectRatio, center, continuity, aspectRatioValue: ratio };

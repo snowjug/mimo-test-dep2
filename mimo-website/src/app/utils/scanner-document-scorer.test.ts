@@ -33,6 +33,31 @@ const FACE_AND_BODY: CandidateInput = {
   areaPercent: 0.7,
 };
 
+// From a real failure report: a notebook held up close to the face produced a merged contour running from
+// the hairline, through the ear/jaw, down to the chest — a quad with only a weak paper-vs-skin edge on one
+// side, so Canny merged the two into one shape. Reconstructed in normalized coordinates from the screenshot.
+const NOTEBOOK_MERGED_WITH_FACE: CandidateInput = {
+  corners: {
+    topLeft: { x: 0.52, y: 0.18 },
+    topRight: { x: 0.95, y: 0.37 },
+    bottomRight: { x: 0.7, y: 0.95 },
+    bottomLeft: { x: 0.52, y: 0.6 },
+  },
+  areaPercent: 0.33,
+};
+
+test("regression: a document merged with a face (real failure report) is rejected outright", () => {
+  const result = pickBestCandidate([NOTEBOOK_MERGED_WITH_FACE]);
+  assert.equal(result, null, `expected rejection; got score ${scoreCandidate(NOTEBOOK_MERGED_WITH_FACE).total}`);
+});
+
+test("regression: continuity cannot keep resurrecting a candidate that fails on its own merits", () => {
+  // Simulates the sticky-wrong-answer failure: the bad candidate matching itself frame-to-frame must not be
+  // enough to push it over the accept floor.
+  const score = scoreCandidate(NOTEBOOK_MERGED_WITH_FACE, { previousQuad: NOTEBOOK_MERGED_WITH_FACE.corners });
+  assert.ok(score.total < DEFAULT_MIN_ACCEPT_SCORE, `continuity rescued a bad candidate: ${score.total}`);
+});
+
 test("scoreCandidate: a held document scores well above a face/body-sized silhouette", () => {
   const paperScore = scoreCandidate(PAPER);
   const bodyScore = scoreCandidate(FACE_AND_BODY);
