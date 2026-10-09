@@ -9,7 +9,7 @@ const http = require("http");
 const path = require("path");
 
 process.env.CASHFREE_SECRET_KEY = "unit-test-secret";
-process.env.JWT_SECRET = "unit-test-jwt";
+process.env.JWT_SECRET = "unit-test-jwt-secret-fixture-32-chars"; // must be >= 32 chars (see src/config/env.js)
 
 // ---- fake Firestore injected in place of config/firebase ----
 // The controller captures { admin, db } once at import, so these objects are stable and their state is reset per test.

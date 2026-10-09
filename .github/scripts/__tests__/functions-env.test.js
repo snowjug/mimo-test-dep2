@@ -10,7 +10,7 @@ const SCRIPT = path.join(__dirname, "..", "functions-env.js");
 const GOOD = {
   JWT_SECRET: "j".repeat(48), ADMIN_EMAIL: "ops@example.com", ADMIN_PASSWORD: "correct-horse-battery-staple",
   CASHFREE_ENV: "production", CASHFREE_APP_ID: "app-id-value", CASHFREE_SECRET_KEY: "cf-secret-value",
-  GMAIL_APP_PASSWORD: "gmail-app-pass-value",
+  GMAIL_APP_PASSWORD: "gmail-app-pass-value", WA_ACCESS_TOKEN: "wa-access-token-value",
 };
 
 const run = (env, live) => {

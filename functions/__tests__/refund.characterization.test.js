@@ -6,7 +6,7 @@ const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 const { installAxiosStub } = require("./helpers/stubAxios");
 
-process.env.JWT_SECRET = "characterization-test-secret";
+process.env.JWT_SECRET = "characterization-test-secret-fixture-32ch"; // must be >= 32 chars (see src/config/env.js)
 process.env.CASHFREE_ENV = "sandbox";
 
 const fake = createFakeFirestore();
