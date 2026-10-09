@@ -2,6 +2,7 @@
 // count from the file bytes (via pdf-lib), never the client-declared value in the request body.
 // Without this, a user could declare pageCount: 1 for a 300-page PDF and pay for a single page
 // while the whole file is sent to print.
+process.env.JWT_SECRET = "upload-pdf-page-count-test-secret-32chr"; // must be >= 32 chars (see src/config/env.js)
 const test = require("node:test");
 require("./helpers/quiet");
 const assert = require("node:assert");
