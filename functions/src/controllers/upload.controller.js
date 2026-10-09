@@ -1,4 +1,5 @@
 const path = require("path");
+const axios = require("axios");
 const { SUPPORTED_OFFICE_EXTENSIONS, callOfficeConverter } = require("../services/converter.service");
 const { admin, db } = require("../config/firebase");
 const { getPDFDocument } = require("../services/pdf.service");
@@ -41,10 +42,35 @@ const postFinalizeUpload = async (req, res) => {
       let convertedStoragePath = null;
 
       if (isPdf) {
-        // PDF flow: client pdf-lib count is accurate; fallback to 1 if missing or invalid
-        const rawCount = Number(f.pageCount);
-        const isValidCount = Number.isInteger(rawCount) && rawCount > 0 && Number.isFinite(rawCount);
-        resolvedPageCount = isValidCount ? rawCount : 1;
+        // PDF flow: DO NOT trust the client-declared pageCount. A client can under-report the
+        // page count to pay for fewer pages than it actually prints, so download the real bytes
+        // and compute the authoritative count server-side with pdf-lib (same loader/pattern used
+        // in postGenerateTextPdf and the WhatsApp PDF-intake flow below).
+        let pdfBuffer;
+        try {
+          const pdfRes = await axios.get(f.url, { responseType: "arraybuffer" });
+          pdfBuffer = Buffer.from(pdfRes.data);
+        } catch (downloadErr) {
+          console.error(`[FINALIZE-UPLOAD ERROR] Failed to download '${f.name}' for page count verification:`, downloadErr.message);
+          return res.status(400).json({
+            error: `Failed to read "${f.name}" for verification. Please re-upload and try again.`
+          });
+        }
+
+        try {
+          const PDFDocument = getPDFDocument();
+          const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+          const verifiedCount = pdfDoc.getPageCount();
+          if (!Number.isInteger(verifiedCount) || verifiedCount < 1) {
+            throw new Error(`pdf-lib reported an invalid page count (${verifiedCount})`);
+          }
+          resolvedPageCount = verifiedCount;
+        } catch (pdfErr) {
+          console.error(`[FINALIZE-UPLOAD ERROR] Could not read PDF '${f.name}' with pdf-lib:`, pdfErr.message);
+          return res.status(400).json({
+            error: `"${f.name}" couldn't be read. It might be corrupted, password-protected, or not a valid PDF. Please save it as a standard PDF and try again.`
+          });
+        }
         printableMimetype = "application/pdf";
       } else if (isImage) {
         // Images are always 1 page
