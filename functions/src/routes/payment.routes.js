@@ -8,7 +8,7 @@ const router = express.Router();
 const { codeGuessLimiter } = createLimiters(db);
 
 router.post("/create-order", authMiddleware, payment.postCreateOrder);
-router.get("/verify-payment/:orderId", payment.getVerifyPayment);
+router.get("/verify-payment/:orderId", authMiddleware, payment.getVerifyPayment);
 // Signature is verified from req.rawBody inside the controller (no body-parser middleware needed).
 router.post("/cashfree-webhook", payment.postCashfreeWebhook);
 // Same printCode-brute-force protection as /print/get-documents-by-code (same 4-digit code, same attack).
