@@ -164,6 +164,7 @@ jobs:
       - name: actionlint
         uses: reviewdog/action-actionlint@0402254acafd5438e12a424363e0ff6429c4366e # v1.80.0
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           fail_level: error
           reporter: github-check
 
