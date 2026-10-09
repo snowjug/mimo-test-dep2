@@ -6,6 +6,7 @@ require("./helpers/quiet");
 const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 
+process.env.JWT_SECRET = "upload-finalize-guard-test-secret-32chars"; // must be >= 32 chars (see src/config/env.js)
 const fake = createFakeFirestore();
 fake.install();
 const { postFinalizeUpload } = require("../src/controllers/upload.controller");

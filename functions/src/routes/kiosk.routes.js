@@ -12,12 +12,21 @@
  */
 
 const express = require("express");
+const crypto = require("crypto");
 const { createLimiters } = require("../middleware/rateLimit");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
 const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
 const { unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
 const { getTransporter } = require("../services/email.service");
 const { loadMachinesMap, loadMachineTemplatesMap, describeDestination } = require("../services/machineRegistry.service");
+
+// Constant-time secret comparison: both sides are hashed to a fixed 32-byte digest first, so a length
+// mismatch (e.g. missing/wrong-length secret) can never throw or short-circuit the comparison early.
+const secretsMatch = (a, b) => {
+  const ha = crypto.createHash("sha256").update(String(a || "")).digest();
+  const hb = crypto.createHash("sha256").update(String(b || "")).digest();
+  return crypto.timingSafeEqual(ha, hb);
+};
 
 const REPORTABLE_ISSUES = { blank: "Blank pages", missing: "Pages missing", faint: "Too faint or streaky", other: "Something else" };
 const REPORT_WINDOW_MS = 30 * 60 * 1000;
@@ -388,7 +397,7 @@ function createKioskRouter(dependencies) {
   router.post("/report-failure", async (req, res) => {
     try {
       const { jobId, reason, secret } = req.body;
-      if (secret !== process.env.INTERNAL_WEBHOOK_SECRET && secret !== "mimo_secret_123") {
+      if (!process.env.INTERNAL_WEBHOOK_SECRET || !secretsMatch(secret, process.env.INTERNAL_WEBHOOK_SECRET)) {
         console.warn("[AUTO-REFUND] Unauthorized report-failure call");
         return res.status(403).json({ error: "Unauthorized" });
       }

@@ -1426,22 +1426,25 @@ def report_print_failure(doc_ref, reason):
     import os
     import requests
     job_id = doc_ref.id
-    try:
-        secret = os.environ.get("INTERNAL_WEBHOOK_SECRET", "mimo_secret_123")
-        api_url = os.environ.get("BACKEND_URL", "https://api-upqxuj7evq-uc.a.run.app")
-        endpoint = f"{api_url.rstrip('/')}/kiosk/report-failure"
-        print(f"📣 [AUTO-REFUND] Reporting print failure for job {job_id} to backend: {reason}")
-        res = requests.post(endpoint, json={
-            "jobId": job_id,
-            "reason": reason,
-            "secret": secret
-        }, timeout=15)
-        print(f"📣 [AUTO-REFUND] Backend response: {res.status_code} - {res.text}")
-        if res.status_code == 200:
-            return True
-    except Exception as e:
-        print(f"⚠️ [AUTO-REFUND] Failed to report failure to backend: {e}")
-    
+    secret = os.environ.get("INTERNAL_WEBHOOK_SECRET")
+    if not secret:
+        print(f"⚠️ [AUTO-REFUND] INTERNAL_WEBHOOK_SECRET is not set — skipping report-failure call for job {job_id}")
+    else:
+        try:
+            api_url = os.environ.get("BACKEND_URL", "https://api-upqxuj7evq-uc.a.run.app")
+            endpoint = f"{api_url.rstrip('/')}/kiosk/report-failure"
+            print(f"📣 [AUTO-REFUND] Reporting print failure for job {job_id} to backend: {reason}")
+            res = requests.post(endpoint, json={
+                "jobId": job_id,
+                "reason": reason,
+                "secret": secret
+            }, timeout=15)
+            print(f"📣 [AUTO-REFUND] Backend response: {res.status_code} - {res.text}")
+            if res.status_code == 200:
+                return True
+        except Exception as e:
+            print(f"⚠️ [AUTO-REFUND] Failed to report failure to backend: {e}")
+
     print(f"⚠️ [AUTO-REFUND] Falling back to local Firestore failed status for job {job_id}")
     safe_update(doc_ref, {"status": "failed", "printerStatus": reason})
     return False

@@ -8,6 +8,7 @@ const fs = require("fs");
 const path = require("path");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 
+process.env.JWT_SECRET = "api-surface-test-secret-fixture-32chars"; // must be >= 32 chars (see src/config/env.js)
 createFakeFirestore().install(); // no real Firebase in tests
 const app = require("../src/server");
 

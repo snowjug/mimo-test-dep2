@@ -84,6 +84,9 @@ function createFailureLimiter(db, { scope, limits, failureStatuses = [404, 409],
 }
 
 // One shared budget for the two endpoints that accept a print code, and a looser one for status polling.
+// loginLimiter uses the same budget as codeGuessLimiter (credential guessing is brute-forceable the same
+// way a 4-digit code is) and counts both "wrong credentials" (400/401) responses used by the login/register
+// routes across admin and customer auth as failures.
 function createLimiters(db) {
   return {
     codeGuessLimiter: createFailureLimiter(db, {
@@ -93,6 +96,11 @@ function createLimiters(db) {
     statusLimiter: createFailureLimiter(db, {
       scope: "status",
       limits: [{ windowMs: 60 * 1000, max: 20 }, { windowMs: 60 * 60 * 1000, max: 100 }],
+    }),
+    loginLimiter: createFailureLimiter(db, {
+      scope: "login",
+      limits: [{ windowMs: 60 * 1000, max: 5 }, { windowMs: 60 * 60 * 1000, max: 20 }],
+      failureStatuses: [400, 401],
     }),
   };
 }

@@ -7,7 +7,7 @@ const authMiddleware = async (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY);
+    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
     let userId = verified.userId || verified.id || verified.user?.id;
     if (!userId) return res.status(403).json({ error: "Invalid token payload" });
     // Resolve userId to actual Firestore doc ID
@@ -30,7 +30,7 @@ const adminAuthMiddleware = (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY);
+    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
     if (!verified.isAdmin) return res.status(403).json({ error: "Forbidden: Admins only" });
     req.admin = verified;
     next();

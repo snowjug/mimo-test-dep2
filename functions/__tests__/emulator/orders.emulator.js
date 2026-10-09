@@ -11,7 +11,7 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) {
 }
 process.env.GCLOUD_PROJECT = "demo-mimo-emulator";
 process.env.CASHFREE_ENV = "sandbox";
-process.env.JWT_SECRET = "emulator-test-secret";
+process.env.JWT_SECRET = "emulator-test-secret-fixture-32-chars"; // must be >= 32 chars (see src/config/env.js)
 
 const { installAxiosStub } = require("../helpers/stubAxios");
 const http = installAxiosStub();

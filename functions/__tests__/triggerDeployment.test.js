@@ -6,6 +6,7 @@ require("./helpers/quiet");
 const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 
+process.env.JWT_SECRET = "trigger-deployment-test-secret-fixture-32"; // must be >= 32 chars (see src/config/env.js)
 createFakeFirestore().install();
 const { scheduledPrintTimeoutSweep } = require("../src/triggers/printTimeout.trigger");
 const triggers = {

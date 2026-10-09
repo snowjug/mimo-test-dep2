@@ -8,6 +8,7 @@ const { installAxiosStub } = require("./helpers/stubAxios");
 
 process.env.CASHFREE_ENV = "sandbox";
 process.env.INTERNAL_WEBHOOK_SECRET = "test-internal-secret";
+process.env.JWT_SECRET = "kiosk-failure-refund-test-secret-32chars"; // must be >= 32 chars (see src/config/env.js)
 const fake = createFakeFirestore();
 fake.install();
 const http = installAxiosStub();
