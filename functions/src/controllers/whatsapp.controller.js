@@ -1,9 +1,21 @@
 const axios = require("axios");
 const { CASHFREE_BASE_URL, WA_ACCESS_TOKEN, WA_VERIFY_TOKEN, cashfreeHeaders } = require("../config/env");
-const { _askForCoupon, _finalizePayment, sendWhatsAppButtons, sendWhatsAppMessage, sendWhatsAppOrderCard, waContext } = require("../services/whatsapp.service");
+const { _askForCoupon, _finalizePayment, sendWhatsAppButtons, sendWhatsAppList, sendWhatsAppMessage, sendWhatsAppOrderCard, waContext } = require("../services/whatsapp.service");
 const { admin, db } = require("../config/firebase");
 const { getPDFDocument } = require("../services/pdf.service");
 const { generateUniquePrintCode } = require("../services/printCode.service");
+const { loadMachinesMap, loadMachineTemplatesMap, describeDestination } = require("../services/machineRegistry.service");
+
+/** Every ACTIVE, known machine, as {kioskId, name, supportsColor} — same source of truth the website and kiosk
+ * print routing already use. A new machine becomes orderable over WhatsApp the moment it's provisioned and
+ * verified ACTIVE; nothing here needs to change when a 4th, 5th, ... 10th machine is added. */
+async function listOrderableDestinations() {
+  const [machines, templates] = await Promise.all([loadMachinesMap(db), loadMachineTemplatesMap(db)]);
+  return [...machines.keys()]
+    .map((kioskId) => ({ kioskId, ...describeDestination(machines, templates, kioskId) }))
+    .filter((m) => m.known && m.active)
+    .map((m) => ({ kioskId: m.kioskId, name: machines.get(m.kioskId)?.name || m.kioskId, supportsColor: m.supportsColor }));
+}
 
 // ================= WHATSAPP HOSTED CHECKOUT PAGE =================
 // This serves a self-contained payment page for users coming from WhatsApp links.
@@ -315,36 +327,56 @@ const postWhatsappWebhook = async (req, res) => {
           pageCount
         });
 
-        await sendWhatsAppButtons(from,
-          `📄 *${doc.filename || (isImage ? "Image" : "Document")}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`,
-          [
-            { id: "dest_cv", title: "📍 MIMO 1.0" },
-            { id: "dest_sv", title: "📍 MIMO 2.0" }
-          ]
-        );
+        const destinations = await listOrderableDestinations();
+        if (destinations.length === 0) {
+          await sendWhatsAppMessage(from, "❌ No machines are available to print to right now. Please try again shortly.");
+          return res.sendStatus(200);
+        }
+        const destBody = `📄 *${doc.filename || (isImage ? "Image" : "Document")}* uploaded successfully! (${pageCount} pages)\n\nPlease select Print Destination:`;
+        if (destinations.length > 3) {
+          // WhatsApp's button message caps at 3; a list message scales to 10.
+          await sendWhatsAppList(from, destBody, "Choose machine", destinations.map((d) => ({
+            id: `dest_${d.kioskId}`,
+            title: `📍 ${d.name}`,
+            description: d.supportsColor ? "Colour + B&W" : "Black & white only",
+          })));
+        } else {
+          await sendWhatsAppButtons(from, destBody, destinations.map((d) => ({
+            id: `dest_${d.kioskId}`,
+            title: `📍 ${d.name}`,
+          })));
+        }
         return res.sendStatus(200);
       }
 
-      // ── Handle interactive button replies ───────────────────────────────────────
-      if (msgType === "interactive" && msg.interactive.type === "button_reply") {
-        const buttonId = msg.interactive.button_reply.id;
+      // ── Handle interactive button/list replies ───────────────────────────────────
+      if (msgType === "interactive" && (msg.interactive.type === "button_reply" || msg.interactive.type === "list_reply")) {
+        const buttonId = msg.interactive.type === "list_reply" ? msg.interactive.list_reply.id : msg.interactive.button_reply.id;
 
         if (session.state === "awaiting_destination") {
-          if (buttonId === "dest_cv") {
-            // MIMO V1 (CV-001) is B&W only, skip color selection
-            await sessionRef.update({ state: "awaiting_copies", destination: "CV-001", kioskId: "CV-001", colorMode: "bw" });
-            await sendWhatsAppButtons(from, "How many copies?", [
-              { id: "copies_1", title: "1 Copy" },
-              { id: "copies_2", title: "2 Copies" },
-              { id: "copies_3", title: "3 Copies" }
-            ], "Select copies or type a number");
-          } else if (buttonId === "dest_sv") {
-            // MIMO V2 (SV-002 / pi@pi) has both options
-            await sessionRef.update({ state: "awaiting_color", destination: "SV-002", kioskId: "SV-002" });
-            await sendWhatsAppButtons(from, "Please select Print Type:", [
-              { id: "color_bw", title: "⚫ B&W (₹2.80/pg)" },
-              { id: "color_color", title: "🎨 Color (₹10.00/pg)" }
-            ]);
+          if (buttonId.startsWith("dest_")) {
+            const kioskId = buttonId.slice(5);
+            const [machines, templates] = await Promise.all([loadMachinesMap(db), loadMachineTemplatesMap(db)]);
+            const dest = describeDestination(machines, templates, kioskId);
+            if (!dest.known || !dest.active) {
+              await sendWhatsAppMessage(from, "❌ That machine isn't available anymore. Please re-upload your file to choose again.");
+              return res.sendStatus(200);
+            }
+            if (!dest.supportsColor) {
+              // Black & white only: skip the color question entirely.
+              await sessionRef.update({ state: "awaiting_copies", destination: kioskId, kioskId, colorMode: "bw" });
+              await sendWhatsAppButtons(from, "How many copies?", [
+                { id: "copies_1", title: "1 Copy" },
+                { id: "copies_2", title: "2 Copies" },
+                { id: "copies_3", title: "3 Copies" }
+              ], "Select copies or type a number");
+            } else {
+              await sessionRef.update({ state: "awaiting_color", destination: kioskId, kioskId });
+              await sendWhatsAppButtons(from, "Please select Print Type:", [
+                { id: "color_bw", title: "⚫ B&W (₹2.80/pg)" },
+                { id: "color_color", title: "🎨 Color (₹10.00/pg)" }
+              ]);
+            }
           }
           return res.sendStatus(200);
         }

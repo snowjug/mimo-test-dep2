@@ -5,9 +5,9 @@ const fs = require("fs");
 
 if (!admin.apps.length) {
   let credential = null;
-  const rawKey = process.env.FIREBASE_PRIVATE_KEY;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const projectId = process.env.FIREBASE_PROJECT_ID || "mimo-v2-11868";
+  const rawKey = process.env.MIMO_SA_PRIVATE_KEY;
+  const clientEmail = process.env.MIMO_SA_CLIENT_EMAIL;
+  const projectId = process.env.MIMO_SA_PROJECT_ID || "mimo-v2-11868";
 
   if (rawKey && clientEmail) {
     credential = admin.credential.cert({

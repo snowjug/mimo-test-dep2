@@ -6,6 +6,7 @@ const { discoverStoragePaths, isProtectedTemplate, isStoragePathReferencedByOthe
 const { getTransporter } = require("../services/email.service");
 const { sendWhatsAppButtons } = require("../services/whatsapp.service");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
+const { loadMachinesMap } = require("../services/machineRegistry.service");
 
 // ================= AUTO REFUND LISTENER =================
 exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) => {
@@ -169,7 +170,9 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
         let normalized = waPhone.replace(/[^\d]/g, "");
         if (normalized.length === 10) normalized = "91" + normalized;
 
-        const machineLabel = (afterData.kioskId === "CV-001" || afterData.printDestination === "CV-001") ? "MIMO 1.0" : "MIMO 2.0";
+        const notifyKioskId = afterData.kioskId || afterData.printDestination;
+        const machines = await loadMachinesMap(db);
+        const machineLabel = machines.get(notifyKioskId)?.name || notifyKioskId || "Mimo";
         await sendWhatsAppButtons(
           normalized,
           `🎉 *PRINT COMPLETE!* 🎉\n\nYour document *${afterData.fileName || "document"}* was successfully printed at *${machineLabel}*! 🖨️✨\n\nNeed to print more files? Click below!`,
@@ -270,6 +273,7 @@ exports.printerHardwareNotification = onDocumentUpdated(
         );
       };
 
+      const machines = await loadMachinesMap(db);
       for (const [printerId, printer] of Object.entries(afterData)) {
         if (!printer || typeof printer !== "object") {
           continue;
@@ -281,20 +285,18 @@ exports.printerHardwareNotification = onDocumentUpdated(
           printer.type === "color" ||
           printerId.toLowerCase().includes("color");
 
+        // printerId is either a bare kioskId ("CV-001") or a kioskId with a hardware suffix
+        // ("SV-002-BW" / "SV-002-COLOR") for a kiosk with separate bw/colour printers.
+        const resolvedKioskId = machines.has(printerId)
+          ? printerId
+          : (machines.has(printerId.replace(/-(BW|COLOR)$/, "")) ? printerId.replace(/-(BW|COLOR)$/, "") : null);
+
+        const kioskId = printer.kioskId || printer.kiosk || resolvedKioskId || "Unknown Kiosk";
+
         const printerName =
           printer.name ||
           printer.printerName ||
-          (printerId === "CV-001" ? "Brother HL-L5210DN (CV-001)" :
-            printerId === "SV-002-BW" ? "Brother HL-L2440DW (SV-002)" :
-              printerId === "SV-002-COLOR" ? "Epson EcoTank L3250 (SV-002)" :
-                printerId);
-
-        const kioskId =
-          printer.kioskId ||
-          printer.kiosk ||
-          (printerId.startsWith("CV") ? "CV-001" :
-            printerId.startsWith("SV") ? "SV-002" :
-              "Unknown Kiosk");
+          (resolvedKioskId ? `${machines.get(resolvedKioskId).name} Printer (${printerId})` : printerId);
 
         const transporter = getTransporter();
 
@@ -491,9 +493,10 @@ exports.colourPaperUsageNotification = onDocumentUpdated(
         return;
       }
 
+      const usageKioskId = after.kioskId || after.printDestination || after.destination || "Unknown";
       const usageRef = db
         .collection("printer_usage")
-        .doc("SV-002-COLOR");
+        .doc(`${usageKioskId}-COLOR`);
 
       let milestone = null;
       let totalSheets = 0;
@@ -537,6 +540,8 @@ exports.colourPaperUsageNotification = onDocumentUpdated(
       }
 
       const transporter = getTransporter();
+      const usageMachines = await loadMachinesMap(db);
+      const usageKioskName = usageMachines.get(usageKioskId)?.name || usageKioskId;
 
       await transporter.sendMail({
         from: '"Mimo Printing" <visionprintt@gmail.com>',
@@ -544,8 +549,8 @@ exports.colourPaperUsageNotification = onDocumentUpdated(
         subject: `MIMO Colour Paper Usage Alert - ${milestone} Pages`,
         text:
           `MIMO Colour Paper Usage Alert\n\n` +
-          `Printer: SV-002-COLOR\n` +
-          `Kiosk: SV-002 (MIMO 2.0)\n\n` +
+          `Printer: ${usageKioskId}-COLOR\n` +
+          `Kiosk: ${usageKioskId} (${usageKioskName})\n\n` +
           `Total colour pages/sheets printed: ${totalSheets}\n` +
           `Milestone reached: ${milestone}\n\n` +
           `The colour printer has reached another 50-page usage milestone.`,

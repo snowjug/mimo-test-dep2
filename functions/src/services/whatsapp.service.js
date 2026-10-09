@@ -4,6 +4,7 @@ const { CASHFREE_BASE_URL, WA_ACCESS_TOKEN, WA_PHONE_NUMBER_ID, cashfreeHeaders 
 const { admin, db } = require("../config/firebase");
 const { loadPricing } = require("./pricing.service");
 const { generateUniquePrintCode } = require("./printCode.service");
+const { loadMachinesMap } = require("./machineRegistry.service");
 
 const waContext = new AsyncLocalStorage();
 
@@ -73,6 +74,50 @@ async function sendWhatsAppButtons(to, bodyText, buttons, headerText = null) {
     console.log(`[WHATSAPP] Button message sent to ${normalized}`);
   } catch (err) {
     console.error(`[WHATSAPP ERROR] Failed to send buttons to ${to}:`, err.response?.data || err.message);
+  }
+}
+
+/**
+ * Send a WhatsApp interactive list message. Use this instead of sendWhatsAppButtons once there are more than
+ * 3 options — WhatsApp's "button" message type hard-caps at 3 buttons, but "list" supports up to 10 rows.
+ * @param {string} to - Phone number
+ * @param {string} bodyText - The main message body
+ * @param {string} buttonText - Label of the menu button that opens the list (max 20 chars)
+ * @param {Array<{id: string, title: string, description?: string}>} rows - Up to 10 rows
+ * @param {string} [headerText] - Optional header text
+ */
+async function sendWhatsAppList(to, bodyText, buttonText, rows, headerText = null) {
+  try {
+    const normalized = to.replace(/[^\d]/g, "");
+    const payload = {
+      messaging_product: "whatsapp",
+      to: normalized,
+      type: "interactive",
+      interactive: {
+        type: "list",
+        body: { text: bodyText },
+        action: {
+          button: buttonText.substring(0, 20),
+          sections: [{
+            rows: rows.slice(0, 10).map(r => ({
+              id: r.id,
+              title: r.title.substring(0, 24),
+              ...(r.description ? { description: r.description.substring(0, 72) } : {})
+            }))
+          }]
+        }
+      }
+    };
+    if (headerText) payload.interactive.header = { type: "text", text: headerText };
+    await axios.post(getWaApiUrl(), payload, {
+      headers: {
+        Authorization: `Bearer ${WA_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      }
+    });
+    console.log(`[WHATSAPP] List message sent to ${normalized}`);
+  } catch (err) {
+    console.error(`[WHATSAPP ERROR] Failed to send list to ${to}:`, err.response?.data || err.message);
   }
 }
 
@@ -190,7 +235,8 @@ async function _askForCoupon(from, session, sessionRef, copies) {
   // Update session
   await sessionRef.update({ state: "awaiting_coupon", copies, rawTotal: totalAmount });
 
-  const kioskName = (session.destination === "CV-001" || session.destination === "KIOSK-001-CV") ? "🖨️ MIMO 1.0" : "🖨️ MIMO 2.0";
+  const destMachines = await loadMachinesMap(db);
+  const kioskName = `🖨️ ${destMachines.get(session.destination)?.name || session.destination || "Mimo"}`;
   const colorText = session.colorMode === "color" ? "🎨 Color" : "📄 B&W";
 
   const receiptText = `🧾 *MIMO PRINT SUMMARY* 🧾
@@ -319,6 +365,7 @@ module.exports = {
   _askForCoupon,
   _finalizePayment,
   sendWhatsAppButtons,
+  sendWhatsAppList,
   sendWhatsAppMessage,
   sendWhatsAppOrderCard,
   waContext,

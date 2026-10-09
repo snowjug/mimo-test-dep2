@@ -13,6 +13,28 @@ interface UploadedFile {
   pageCount?: number;
 }
 
+interface SelectablePrinter {
+  id: string;
+  name: string;
+  detail: string;
+  supportsColor: boolean;
+  supportsDuplex: boolean;
+}
+
+interface ApiMachine {
+  machineId: string;
+  displayName: string;
+  capabilities: { colour?: boolean; duplex?: boolean };
+  available: boolean;
+}
+
+/** Same 2 machines as before, used only until the /api/machines fetch resolves (and if it fails) — identical
+ * to today's behaviour when nothing else is active in the registry yet. */
+const FALLBACK_PRINTERS: SelectablePrinter[] = [
+  { id: "CV-001", name: "MIMO 1.0", detail: "Black and white", supportsColor: false, supportsDuplex: true },
+  { id: "SV-002", name: "MIMO 2.0", detail: "Black and white or colour", supportsColor: true, supportsDuplex: true },
+];
+
 // Parse range string (e.g. "1-3,5") to list of page numbers
 const parsePageRange = (rangeStr: string, maxPages: number): number[] => {
   const selected: number[] = [];
@@ -88,6 +110,29 @@ export function PrintOptions() {
   const [customScale, setCustomScale] = useState(100);
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
   const [directKioskId, setDirectKioskId] = useState<string | null>(null);
+  const [printers, setPrinters] = useState<SelectablePrinter[]>(FALLBACK_PRINTERS);
+
+  useEffect(() => {
+    const fetchPrinters = async () => {
+      try {
+        const response = await api.get<{ machines: ApiMachine[] }>("/api/machines");
+        const list = response.data?.machines?.filter((m) => m.available);
+        if (!list || list.length === 0) return;
+        setPrinters(
+          list.map((m) => ({
+            id: m.machineId,
+            name: m.displayName,
+            detail: m.capabilities?.colour ? "Black and white or colour" : "Black and white",
+            supportsColor: Boolean(m.capabilities?.colour),
+            supportsDuplex: m.capabilities?.duplex !== false,
+          }))
+        );
+      } catch (error) {
+        console.error("Failed to fetch printer list:", error);
+      }
+    };
+    fetchPrinters();
+  }, []);
 
   const [activeFileIndex, setActiveFileIndex] = useState(0);
   const [fileConfigs, setFileConfigs] = useState<Record<string, {
@@ -377,7 +422,8 @@ export function PrintOptions() {
   };
 
   const isSinglePageDocument = files.reduce((sum, f) => sum + (f.pageCount || 1), 0) <= 1;
-  const isDuplexSupported = (!directKioskId || directKioskId === "SV-002" || directKioskId === "CV-001") && colorMode === "bw";
+  const selectedPrinter = printers.find((p) => p.id === directKioskId);
+  const isDuplexSupported = (!directKioskId || selectedPrinter?.supportsDuplex !== false) && colorMode === "bw";
 
   useEffect(() => {
     if (!isDuplexSupported) {
@@ -388,15 +434,13 @@ export function PrintOptions() {
     }
   }, [isSinglePageDocument, isDuplexSupported, doubleSided, pageSelection]);
 
-  const selectPrinter = (id: "CV-001" | "SV-002") => {
-    if (id === "CV-001") {
-      setDirectKioskId("CV-001");
+  const selectPrinter = (id: string) => {
+    setDirectKioskId(id);
+    const printer = printers.find((p) => p.id === id);
+    if (printer && !printer.supportsColor) {
       setColorMode("bw");
-    } else {
-      setDirectKioskId("SV-002");
-      if (colorMode === "color") {
-        setDoubleSided("single");
-      }
+    } else if (colorMode === "color") {
+      setDoubleSided("single");
     }
   };
 
@@ -405,18 +449,17 @@ export function PrintOptions() {
       setColorMode("bw");
       return;
     }
-    if (directKioskId === "CV-001") {
-      toast.info("Switched to KIOSK-002-SV for Color printing");
-      setDirectKioskId("SV-002");
+    const current = printers.find((p) => p.id === directKioskId);
+    if (current && !current.supportsColor) {
+      const colorPrinter = printers.find((p) => p.supportsColor);
+      if (colorPrinter) {
+        toast.info(`Switched to ${colorPrinter.name} for Color printing`);
+        setDirectKioskId(colorPrinter.id);
+      }
     }
     setColorMode("color");
     setDoubleSided("single");
   };
-
-  const printers = [
-    { id: "CV-001" as const, name: "MIMO 1.0", detail: "Black and white" },
-    { id: "SV-002" as const, name: "MIMO 2.0", detail: "Black and white or colour" },
-  ];
 
   const sheetsTotal = actualPages * (Number(copies) || 1);
   const blockingMessage = !directKioskId
@@ -442,7 +485,7 @@ export function PrintOptions() {
           className={`transition-opacity duration-300 ${!directKioskId ? "pointer-events-none select-none opacity-40" : ""}`}
           aria-disabled={!directKioskId}
         >
-          <Group title="Options" footer={!directKioskId ? "Choose a printer first. MIMO 2.0 is the one that prints in colour." : undefined}>
+          <Group title="Options" footer={!directKioskId ? "Choose a printer first. Machines that print in colour are marked below." : undefined}>
             <Row
               label="Copies"
               trailing={

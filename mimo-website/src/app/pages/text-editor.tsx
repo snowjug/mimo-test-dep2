@@ -5,6 +5,15 @@ import { ActionBar, ActionBarSpacer, AppBar, ChoiceRow, Group, PrimaryButton, Ro
 import api from "../api";
 import { toast } from "sonner";
 
+interface SelectablePrinter { id: string; name: string; detail: string; }
+interface ApiMachine { machineId: string; displayName: string; capabilities: { colour?: boolean }; available: boolean; }
+
+/** Same 2 machines as before, used only until the /api/machines fetch resolves (and if it fails). */
+const FALLBACK_PRINTERS: SelectablePrinter[] = [
+  { id: "CV-001", name: "MIMO 1.0", detail: "Black and white" },
+  { id: "SV-002", name: "MIMO 2.0", detail: "Black and white or colour" },
+];
+
 export function TextEditor() {
   const navigate = useNavigate();
   const [textContent, setTextContent] = useState("");
@@ -19,6 +28,7 @@ export function TextEditor() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [pricePerPage, setPricePerPage] = useState(2.80); // Dynamic from settings
+  const [printers, setPrinters] = useState<SelectablePrinter[]>(FALLBACK_PRINTERS);
 
   useEffect(() => {
     api.get('/api/settings')
@@ -26,6 +36,20 @@ export function TextEditor() {
         if (res.data?.pricePerPageBW) {
           setPricePerPage(res.data.pricePerPageBW);
         }
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    api.get<{ machines: ApiMachine[] }>('/api/machines')
+      .then(res => {
+        const list = res.data?.machines?.filter((m) => m.available);
+        if (!list || list.length === 0) return;
+        setPrinters(list.map((m) => ({
+          id: m.machineId,
+          name: m.displayName,
+          detail: m.capabilities?.colour ? "Black and white or colour" : "Black and white",
+        })));
       })
       .catch(console.error);
   }, []);
@@ -124,7 +148,7 @@ export function TextEditor() {
 
   return <TextEditorView {...{
     textContent, setTextContent, fontFamily, setFontFamily, fontSize, setFontSize, lineSpacing, setLineSpacing,
-    alignment, setAlignment, pageSize, setPageSize, margins, setMargins, directKioskId, setDirectKioskId,
+    alignment, setAlignment, pageSize, setPageSize, margins, setMargins, directKioskId, setDirectKioskId, printers,
     copies, setCopies, isProcessing, estimatedPages, totalCost, handleContinue, getMarginPadding, getPreviewFont,
   }} />;
 }
@@ -140,7 +164,7 @@ function TextEditorView(p: {
   alignment: string; setAlignment: (v: string) => void;
   pageSize: string; setPageSize: (v: string) => void;
   margins: string; setMargins: (v: string) => void;
-  directKioskId: string | null; setDirectKioskId: (v: string) => void;
+  directKioskId: string | null; setDirectKioskId: (v: string) => void; printers: SelectablePrinter[];
   copies: number; setCopies: (fn: (prev: number) => number) => void;
   isProcessing: boolean; estimatedPages: number; totalCost: number;
   handleContinue: () => void; getMarginPadding: () => string; getPreviewFont: () => string;
@@ -275,8 +299,15 @@ function TextEditorView(p: {
 
         <Group title="Printer">
           <div role="radiogroup" aria-label="Printer">
-            <ChoiceRow label="MIMO 1.0" detail="Black and white" selected={p.directKioskId === "CV-001"} onSelect={() => p.setDirectKioskId("CV-001")} />
-            <ChoiceRow label="MIMO 2.0" detail="Black and white or colour" selected={p.directKioskId === "SV-002"} onSelect={() => p.setDirectKioskId("SV-002")} />
+            {p.printers.map((printer) => (
+              <ChoiceRow
+                key={printer.id}
+                label={printer.name}
+                detail={printer.detail}
+                selected={p.directKioskId === printer.id}
+                onSelect={() => p.setDirectKioskId(printer.id)}
+              />
+            ))}
           </div>
         </Group>
 
