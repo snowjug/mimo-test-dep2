@@ -1,5 +1,6 @@
 const { db } = require("../config/firebase");
 const { isColorJob, unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
+const { loadMachinesMap, loadMachineTemplatesMap, describeDestination } = require("../services/machineRegistry.service");
 
 // ================= KIOSK: GET DOCUMENTS BY CODE =================
 const postGetDocumentsByCode = async (req, res) => {
@@ -30,24 +31,20 @@ const postGetDocumentsByCode = async (req, res) => {
       return res.status(404).json({ error: "Invalid or expired print code" });
     }
 
-    // Capability-based Routing Validation:
-    // - Color jobs: ONLY allowed at MIMO 2.0 (SV-002)
-    // - B&W jobs: allowed at EITHER MIMO 1.0 (CV-001) OR MIMO 2.0 (SV-002)
+    // Capability-based routing validation, driven by the machine registry: a machine must be a known, ACTIVE
+    // destination, and a colour job must land on a machine whose template/override actually supports colour.
     const firstJob = snapshot.docs[0].data();
     const isColor = snapshot.docs.some(doc => isColorJob(doc.data()));
 
-    if (isColor) {
-      if (kioskId !== "SV-002") {
-        return res.status(400).json({
-          error: "This is a Color print job. Color printing is only available at Machine 2 (SV-002). Please use Machine 2."
-        });
-      }
-    } else {
-      if (kioskId !== "CV-001" && kioskId !== "SV-002") {
-        return res.status(400).json({
-          error: "Invalid printer station. Please use Machine 1 (CV-001) or Machine 2 (SV-002)."
-        });
-      }
+    const [machines, templates] = await Promise.all([loadMachinesMap(db), loadMachineTemplatesMap(db)]);
+    const dest = describeDestination(machines, templates, kioskId);
+    if (!dest.known || !dest.active) {
+      return res.status(400).json({ error: "Invalid printer station. Please use a machine shown on the Find a Kiosk page." });
+    }
+    if (isColor && !dest.supportsColor) {
+      return res.status(400).json({
+        error: "This is a Color print job. This machine can only print black & white. Please use a colour-capable machine."
+      });
     }
 
     const unprintable = unprintableFilesForKiosk(snapshot.docs.map((doc) => doc.data()), kioskId);

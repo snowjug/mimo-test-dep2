@@ -6,8 +6,8 @@ import { clockTime, duration, inr } from '../../lib/format';
 /* ── Machine badge: M1 / M2 in a grey circle; a colour print on M2 is blue ── */
 const MACHINE_SHORT: Record<string, string> = { 'CV-001': 'M1', 'SV-002': 'M2' };
 
-export const MachineBadge: React.FC<{ kioskId: string; color?: boolean }> = ({ kioskId, color }) => {
-  const label = MACHINE_SHORT[kioskId] ?? (kioskId === 'Unassigned' ? '–' : kioskId.slice(0, 2));
+export const MachineBadge: React.FC<{ kioskId: string; color?: boolean; shortLabel?: string | null }> = ({ kioskId, color, shortLabel }) => {
+  const label = shortLabel || MACHINE_SHORT[kioskId] || (kioskId === 'Unassigned' ? '–' : kioskId.slice(0, 2));
   return (
     <span
       title={`${kioskId}${color ? ' · colour' : ' · black & white'}`}
@@ -239,7 +239,7 @@ export const PrintHistoryList: React.FC<{
                   {took !== null && took > 3 * 60 * 1000 && <span className="hidden shrink-0 text-[10px] font-bold text-amber-600 sm:inline">slow {duration(took)}</span>}
                   <ChevronDown size={13} className={`ml-auto hidden shrink-0 text-[var(--text-3)] transition-transform sm:block ${expanded ? 'rotate-180' : ''}`} />
                 </span>
-                <span className="flex justify-center"><MachineBadge kioskId={j.destination} color={j.colorMode === 'color'} /></span>
+                <span className="flex justify-center"><MachineBadge kioskId={j.destination} color={j.colorMode === 'color'} shortLabel={j.destinationShortLabel} /></span>
                 <span className="text-right font-semibold tabular-nums text-[var(--text-1)]">
                   {j.duplex ? (
                     <span title={`${totalPgs} document pages (${sheets} physical sheets double-sided)`} className="inline-flex items-baseline gap-0.5">

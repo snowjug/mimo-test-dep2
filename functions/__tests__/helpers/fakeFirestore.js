@@ -141,6 +141,7 @@ function createFakeFirestore(seed = {}) {
       return fn(tx);
     },
     settings: () => {},
+    getAll: async (...refs) => Promise.all(refs.map((ref) => ref.get())),
   };
 
   const admin = {
@@ -150,7 +151,7 @@ function createFakeFirestore(seed = {}) {
         increment: (n) => ({ __sentinel: "increment", n }),
         delete: () => ({ __sentinel: "delete" }),
       },
-      Timestamp: { fromDate: (d) => d, now: () => new Date(FIXED_NOW) },
+      Timestamp: { fromDate: (d) => d, fromMillis: (ms) => new Date(ms), now: () => new Date(FIXED_NOW) },
     }),
     // Tests that do not care about Firebase Auth get a predictable failure, like a user that does not exist.
     auth: () => ({ getUser: async () => { const e = new Error("fake: user not found in Firebase Auth"); e.code = "auth/user-not-found"; throw e; } }),

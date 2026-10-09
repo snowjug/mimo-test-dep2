@@ -6,6 +6,7 @@
 const crypto = require("crypto");
 const { admin, db } = require("../config/firebase");
 const A = require("../services/analytics.service");
+const R = require("../services/machineRegistry.service");
 
 const IN_FLIGHT = ["pending", "waiting_idle", "rebooting"];
 // A restart that has not finished in this long is treated as stuck, so the admin may send a new one.
@@ -19,7 +20,8 @@ const postAdminKioskRestart = async (req, res) => {
       db.collection("system_status").doc(kioskId).get(),
       db.collection("kiosk_commands").doc(kioskId).get(),
     ]);
-    if (!A.KNOWN_KIOSKS[kioskId] && !statusDoc.exists) return res.status(404).json({ error: "Unknown kiosk" });
+    const machineDoc = await db.collection("machines").doc(kioskId).get();
+    if (!A.KNOWN_KIOSKS[kioskId] && !statusDoc.exists && !machineDoc.exists) return res.status(404).json({ error: "Unknown kiosk" });
 
     const current = cmdDoc.exists ? cmdDoc.data() : null;
     if (current && IN_FLIGHT.includes(current.status) && Date.now() - A.toMillis(current.updatedAt || current.requestedAt) < IN_FLIGHT_MAX_MS) {
@@ -79,4 +81,53 @@ const postAdminRefillPaper = async (req, res) => {
   }
 };
 
-module.exports = { postAdminKioskRestart, postAdminRefillPaper };
+/**
+ * Self-test for a provisioned machine (brief item 12): a freshly provisioned machine stays in PROVISIONING
+ * until it has a template, a location, has reported at least one heartbeat, and (if it has a printer entry)
+ * that printer isn't in an error state. Only once all of those pass does this flip it to ACTIVE.
+ *
+ * CV-001 and SV-002 are seeded straight into ACTIVE (see scripts/seed-machine-registry.js) since they're
+ * already-working production machines that predate this check — verify is only required for a *new*
+ * machine's first activation, so calling (or never calling) this endpoint cannot affect them.
+ */
+const postAdminKioskVerify = async (req, res) => {
+  try {
+    const kioskId = String(req.params.kioskId || "");
+    if (!A.KIOSK_ID_PATTERN.test(kioskId)) return res.status(400).json({ error: "Unknown kiosk" });
+
+    const machineRef = db.collection("machines").doc(kioskId);
+    const [machineDoc, templates, locations, hwDoc, statusDoc] = await Promise.all([
+      machineRef.get(),
+      R.loadMachineTemplatesMap(db),
+      R.loadLocationsMap(db),
+      db.collection("hardware").doc("printers").get(),
+      db.collection("system_status").doc(kioskId).get(),
+    ]);
+    if (!machineDoc.exists) return res.status(404).json({ error: "No registry record for this kiosk yet" });
+
+    const machine = machineDoc.data();
+    const hardware = hwDoc.exists ? hwDoc.data() : {};
+    const printerKeys = Object.keys(hardware).filter((k) => k === kioskId || k.startsWith(`${kioskId}-`));
+
+    const checks = {
+      hasTemplate: !!machine.templateId && templates.has(machine.templateId),
+      hasLocation: !!machine.locationId && locations.has(machine.locationId),
+      printerVerified: printerKeys.length > 0 && printerKeys.every((k) => hardware[k]?.status !== "Paused/Error"),
+      hasReportedIn: statusDoc.exists,
+    };
+    const passed = Object.values(checks).every(Boolean);
+    const willActivate = passed && machine.status === "PROVISIONING";
+
+    await machineRef.set({
+      selfTest: { passed, checks, checkedAt: admin.firestore.FieldValue.serverTimestamp() },
+      ...(willActivate ? { status: "ACTIVE" } : {}),
+    }, { merge: true });
+
+    return res.json({ kioskId, passed, checks, status: willActivate ? "ACTIVE" : machine.status });
+  } catch (err) {
+    console.error("[KIOSK-COMMAND] Self-test failed:", err);
+    return res.status(500).json({ error: "Could not run the self-test" });
+  }
+};
+
+module.exports = { postAdminKioskRestart, postAdminRefillPaper, postAdminKioskVerify };
