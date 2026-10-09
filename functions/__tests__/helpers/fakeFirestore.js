@@ -48,8 +48,14 @@ function applyOps(op, a, b) {
   }
 }
 
-function createFakeFirestore(seed = {}) {
-  const state = { store: new Map(), log: { writes: [], reads: 0 }, autoId: 0 };
+// `strictTransactions`: opt-in, used only by tests that specifically exercise concurrent db.runTransaction calls
+// (see paymentSuccessRace.test.js). Default-mode tests are completely unaffected. In this mode, a transaction's
+// writes are queued (not applied) until its callback resolves; a global write-version counter (bumped by every
+// committed write, inside or outside a transaction) is captured when the transaction starts, and if it has moved
+// by the time the callback finishes, the whole callback is discarded and re-run from scratch (fresh reads) -- the
+// same "abort and retry on conflict" guarantee real Firestore transactions provide.
+function createFakeFirestore(seed = {}, { strictTransactions = false } = {}) {
+  const state = { store: new Map(), log: { writes: [], reads: 0 }, autoId: 0, version: 0 };
 
   const load = (data) => {
     state.store = new Map();
@@ -58,6 +64,7 @@ function createFakeFirestore(seed = {}) {
     });
     state.log = { writes: [], reads: 0 };
     state.autoId = 0;
+    state.version = 0;
   };
   const col = (name) => { if (!state.store.has(name)) state.store.set(name, new Map()); return state.store.get(name); };
 
@@ -69,6 +76,7 @@ function createFakeFirestore(seed = {}) {
   const record = (type, colName, id, payload) => state.log.writes.push({ type, path: `${colName}/${id}`, payload: clone(payload) });
 
   const applyWrite = (type, colName, id, payload, options) => {
+    state.version += 1;
     const target = col(colName);
     if (type === "create") {
       if (target.has(id)) { const e = new Error("6 ALREADY_EXISTS: Document already exists"); e.code = 6; throw e; }
@@ -131,14 +139,36 @@ function createFakeFirestore(seed = {}) {
       return api;
     },
     runTransaction: async (fn) => {
-      const tx = {
-        get: async (target) => target.get(),
-        set: (ref, data, options) => applyWrite("set", ref.path.split("/")[0], ref.id, data, options),
-        update: (ref, data) => applyWrite("update", ref.path.split("/")[0], ref.id, data),
-        create: (ref, data) => applyWrite("create", ref.path.split("/")[0], ref.id, data),
-        delete: (ref) => applyWrite("delete", ref.path.split("/")[0], ref.id),
-      };
-      return fn(tx);
+      if (!strictTransactions) {
+        const tx = {
+          get: async (target) => target.get(),
+          set: (ref, data, options) => applyWrite("set", ref.path.split("/")[0], ref.id, data, options),
+          update: (ref, data) => applyWrite("update", ref.path.split("/")[0], ref.id, data),
+          create: (ref, data) => applyWrite("create", ref.path.split("/")[0], ref.id, data),
+          delete: (ref) => applyWrite("delete", ref.path.split("/")[0], ref.id),
+        };
+        return fn(tx);
+      }
+      // Strict mode: writes are queued (never applied mid-callback) and only committed if no OTHER write landed
+      // anywhere in the store while this attempt's callback was running; otherwise the whole attempt is discarded
+      // and re-run with fresh reads, mirroring real Firestore's abort-and-retry-on-conflict behaviour.
+      const MAX_ATTEMPTS = 25;
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+        const versionAtStart = state.version;
+        const queued = [];
+        const tx = {
+          get: async (target) => target.get(),
+          set: (ref, data, options) => { queued.push(["set", ref, data, options]); },
+          update: (ref, data) => { queued.push(["update", ref, data]); },
+          create: (ref, data) => { queued.push(["create", ref, data]); },
+          delete: (ref) => { queued.push(["delete", ref]); },
+        };
+        const result = await fn(tx);
+        if (state.version !== versionAtStart) continue; // a concurrent write landed; discard this attempt and retry
+        queued.forEach(([type, ref, data, options]) => applyWrite(type, ref.path.split("/")[0], ref.id, data, options));
+        return result;
+      }
+      throw new Error("fakeFirestore: transaction retry limit exceeded (too much contention)");
     },
     settings: () => {},
     getAll: async (...refs) => Promise.all(refs.map((ref) => ref.get())),

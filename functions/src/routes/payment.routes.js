@@ -5,7 +5,7 @@ const payment = require("../controllers/payment.controller");
 const router = express.Router();
 
 router.post("/create-order", authMiddleware, payment.postCreateOrder);
-router.get("/verify-payment/:orderId", payment.getVerifyPayment);
+router.get("/verify-payment/:orderId", authMiddleware, payment.getVerifyPayment);
 // Signature is verified from req.rawBody inside the controller (no body-parser middleware needed).
 router.post("/cashfree-webhook", payment.postCashfreeWebhook);
 router.post("/check-status", payment.postCheckStatus);

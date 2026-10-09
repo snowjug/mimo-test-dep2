@@ -51,14 +51,14 @@ test("money and refund endpoints keep their authentication (guards against a mid
     }
     return null;
   };
-  const guarded = [["post", "/create-order"], ["post", "/payment-success"], ["post", "/request-refund"], ["post", "/admin/refund"], ["get", "/admin/refund-requests"], ["get", "/admin/analytics"], ["get", "/admin/transactions"], ["post", "/admin/settings"], ["post", "/admin/coupons"]];
+  const guarded = [["post", "/create-order"], ["get", "/verify-payment/:orderId"], ["post", "/payment-success"], ["post", "/request-refund"], ["post", "/admin/refund"], ["get", "/admin/refund-requests"], ["get", "/admin/analytics"], ["get", "/admin/transactions"], ["post", "/admin/settings"], ["post", "/admin/coupons"]];
   for (const [method, p] of guarded) {
     const chain = find(method, p);
     assert.ok(chain, `${method.toUpperCase()} ${p} exists`);
     assert.ok(chain.length >= 2, `${method.toUpperCase()} ${p} must have an auth middleware before its handler (got: ${chain.join(" -> ")})`);
   }
   // Documented exceptions: public by design (see architecture.md section 7)
-  for (const [method, p] of [["get", "/verify-payment/:orderId"], ["post", "/cashfree-webhook"], ["post", "/get-documents-by-code"]]) {
+  for (const [method, p] of [["post", "/cashfree-webhook"], ["post", "/get-documents-by-code"]]) {
     assert.ok(find(method, p), `${method.toUpperCase()} ${p} exists`);
   }
 });
