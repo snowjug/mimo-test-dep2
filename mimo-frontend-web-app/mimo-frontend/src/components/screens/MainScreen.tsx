@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Check, CaretRight } from '@phosphor-icons/react';
-import { DiyaRow, FestiveBackdrop, Kalash, Lotus, Mandala, OrnamentDivider, Toran, ZariBorder } from '../festive/NavaratriDecor';
+import { DiyaRow, FestiveBackdrop, Kalash, Lotus, OrnamentDivider, Toran, ZariBorder } from '../festive/NavaratriDecor';
 import { isFestivalActive } from '../../config/festivalConfig';
 
 interface MainScreenProps {
@@ -204,14 +204,10 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
     if (isFestiveMode) {
         return (
             <div
-                className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col overflow-hidden bg-parchment-100`}
+                className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col overflow-hidden bg-[#FFF8EC]`}
                 style={{ display: isActive ? 'flex' : 'none' }}
             >
                 <FestiveBackdrop />
-
-                <div className="pointer-events-none absolute left-1/2 top-[338px] z-0 -translate-x-1/2 -translate-y-1/2 opacity-[0.17]">
-                    <Mandala size={680} />
-                </div>
 
                 <Kalash className="absolute left-[86px] top-[296px] z-[1]" />
                 <Kalash className="absolute right-[86px] top-[296px] z-[1]" style={{ transform: 'scaleX(-1)' }} />

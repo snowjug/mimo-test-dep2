@@ -26,16 +26,6 @@ const GOLD = '#C9973E';
 
 const svgUri = (svg: string) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 
-// Bandhani (Gujarati tie-dye) dot clusters, printed faintly in maroon on ivory silk.
-const BANDHANI = svgUri(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'>` +
-        `<g fill='${MAROON}' fill-opacity='0.09'>` +
-        `<circle cx='11' cy='7.5' r='1.5'/><circle cx='14.5' cy='11' r='1.5'/><circle cx='11' cy='14.5' r='1.5'/><circle cx='7.5' cy='11' r='1.5'/>` +
-        `<circle cx='33' cy='29.5' r='1.5'/><circle cx='36.5' cy='33' r='1.5'/><circle cx='33' cy='36.5' r='1.5'/><circle cx='29.5' cy='33' r='1.5'/>` +
-        `</g>` +
-        `<g fill='${GOLD}' fill-opacity='0.22'><circle cx='33' cy='11' r='1.2'/><circle cx='11' cy='33' r='1.2'/></g>` +
-        `</svg>`,
-);
 
 // Zari (woven gold) saree border: maroon band with gold lozenges.
 const ZARI = svgUri(
@@ -48,16 +38,7 @@ const ZARI = svgUri(
 );
 
 export const FestiveBackdrop: React.FC = () => (
-    <div className="pointer-events-none absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-parchment-100" style={{ backgroundImage: BANDHANI }} />
-        <div
-            className="absolute inset-0"
-            style={{
-                background:
-                    'radial-gradient(ellipse 70% 55% at 50% 38%, rgba(255,214,150,0.45), transparent 70%), radial-gradient(ellipse at center, transparent 58%, rgba(122,18,48,0.10) 100%)',
-            }}
-        />
-    </div>
+    <div className="pointer-events-none absolute inset-0 z-0 bg-[#FFF8EC]" />
 );
 
 export const ZariBorder: React.FC<{ edge?: 'top' | 'bottom' }> = ({ edge = 'bottom' }) => (

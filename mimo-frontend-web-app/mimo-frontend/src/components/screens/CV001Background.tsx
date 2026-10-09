@@ -8,7 +8,7 @@ export const CV001Background: React.FC = () => {
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundColor: '#FAF4E8',
+          backgroundColor: '#FFF8EC',
           zIndex: 0
         }} 
       />

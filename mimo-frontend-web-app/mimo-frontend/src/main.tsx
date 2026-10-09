@@ -9,8 +9,9 @@ const kioskId =
   kioskIdParam ||
   import.meta.env.VITE_KIOSK_ID ||
   (host.includes('mimo-2-0') || host.includes('mimo-kiosk-app') ? 'SV-002' : undefined);
-// SV-002's screen is wider than the 16:9 canvas; widen the canvas instead of letterboxing it.
-const isFullBleed = kioskId === 'SV-002';
+
+// Both SV-002 and CV-001 screens widen the canvas to fill the viewport instead of letterboxing.
+const isFullBleed = kioskId === 'SV-002' || kioskId === 'CV-001';
 if (isFullBleed) document.documentElement.classList.add('kiosk-full-bleed');
 
 const updateScale = () => {

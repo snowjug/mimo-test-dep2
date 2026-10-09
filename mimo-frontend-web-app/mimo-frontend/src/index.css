@@ -26,7 +26,7 @@
 
   /* Festive (parchment + gold + mahogany) */
   --color-parchment-50: #fefbf3;
-  --color-parchment-100: #fbf6ec;
+  --color-parchment-100: #FFF8EC;
   --color-parchment-200: #f4e9d4;
 
   /* Navaratri ruby — deep festive red/maroon, the traditional Devi colour, paired with gold */
@@ -112,10 +112,7 @@
     background: var(--color-parchment-100);
   }
 
-  #root.theme-sv002 {
-    background: #FAFAF8;
-  }
-
+  body.theme-cv001,
   html.kiosk-full-bleed body.theme-cv001 {
     background: var(--color-parchment-100);
   }
