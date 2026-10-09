@@ -153,12 +153,19 @@ jobs:
     needs: changes
     if: needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
+      # Was: `bash <(curl -sSL .../rhysd/actionlint/main/scripts/download-actionlint.bash)`, which pulled an
+      # install script from actionlint's mutable `main` branch on every run. Using actionlint's own published,
+      # SHA-pinned action instead (the standard way projects run actionlint in CI) removes that supply-chain risk.
       - name: actionlint
-        run: |
-          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-          ./actionlint -color
+        uses: reviewdog/action-actionlint@0402254acafd5438e12a424363e0ff6429c4366e # v1.80.0
+        with:
+          fail_level: error
+          reporter: github-check
 
   secrets:
     name: Secret scan (added lines only)
