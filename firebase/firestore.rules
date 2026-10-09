@@ -16,7 +16,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isSelfDoc();
-      allow create: if signedIn() && request.resource.data.id == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.id == request.auth.uid && userId == request.auth.uid;
       allow update, delete: if isOwner(userId) || isSelfDoc();
     }
 
@@ -36,8 +36,13 @@ service cloud.firestore {
       allow read: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
+    // Pricing/screensaver config: read is harmless to expose, but write must never be open — every
+    // legitimate writer (admin dashboard's /admin/settings, /admin/screensaver) already goes through the
+    // authenticated backend (Admin SDK bypasses this rule entirely), so client-side write has no legitimate
+    // use and was a live free-printing / config-tamper hole.
     match /mimo_settings/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if false;
     }
 
     // Default deny for everything else
