@@ -7,6 +7,7 @@ require("./helpers/quiet");
 const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 
+process.env.JWT_SECRET = "admin-history-test-secret-fixture-32ch"; // must be >= 32 chars (see src/config/env.js)
 const fake = createFakeFirestore();
 fake.install();
 const { resolveRefunds, refundFromCashfree } = require("../src/services/refundSync.service");

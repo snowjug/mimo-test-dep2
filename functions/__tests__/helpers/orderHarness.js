@@ -4,7 +4,7 @@ require("./quiet");
 const { createFakeFirestore } = require("./fakeFirestore");
 const { installAxiosStub } = require("./stubAxios");
 
-process.env.JWT_SECRET = "characterization-test-secret";
+process.env.JWT_SECRET = "characterization-test-secret-fixture-32ch"; // must be >= 32 chars (see src/config/env.js)
 process.env.CASHFREE_ENV = "sandbox";
 delete process.env.GMAIL_APP_PASSWORD; // tests never send e-mail unless they set it explicitly
 delete process.env.PORT;

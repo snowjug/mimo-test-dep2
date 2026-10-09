@@ -7,7 +7,7 @@ const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 const { installAxiosStub } = require("./helpers/stubAxios");
 
-process.env.JWT_SECRET = "characterization-test-secret";
+process.env.JWT_SECRET = "characterization-test-secret-fixture-32ch"; // must be >= 32 chars (see src/config/env.js)
 delete process.env.GMAIL_APP_PASSWORD; // never try to send e-mail from tests
 delete process.env.PORT;
 
@@ -39,7 +39,7 @@ test.describe("GET /verify-payment/:orderId", () => {
   test("Cashfree says PAID: order is marked PAID and the print code is generated through /payment-success", async () => {
     http.on("get", ORDER_URL, () => ({ data: { order_status: "PAID" } }));
     const res = response();
-    await getVerifyPayment({ params: { orderId: "order_1" } }, res);
+    await getVerifyPayment({ params: { orderId: "order_1" }, user: { userId: "u1" } }, res);
 
     assert.deepStrictEqual(res.body, { order_status: "PAID", printCode: "4821", directKioskId: "SV-002" });
     assert.strictEqual(fake.data("orders").o1.status, "PAID");
@@ -53,7 +53,7 @@ test.describe("GET /verify-payment/:orderId", () => {
   test("Cashfree says the order is still ACTIVE: nothing is marked paid, no code is generated", async () => {
     http.on("get", ORDER_URL, () => ({ data: { order_status: "ACTIVE" } }));
     const res = response();
-    await getVerifyPayment({ params: { orderId: "order_1" } }, res);
+    await getVerifyPayment({ params: { orderId: "order_1" }, user: { userId: "u1" } }, res);
 
     assert.deepStrictEqual(res.body, { order_status: "ACTIVE", printCode: null, directKioskId: null });
     assert.strictEqual(fake.data("orders").o1.status, "INITIATED");
@@ -64,7 +64,7 @@ test.describe("GET /verify-payment/:orderId", () => {
     http.on("get", ORDER_URL, () => { throw new Error("timeout"); });
     fake.reset({ orders: { o1: { orderId: "order_1", userId: "u1", amount: 25, status: "PAID" } } });
     const res = response();
-    await getVerifyPayment({ params: { orderId: "order_1" } }, res);
+    await getVerifyPayment({ params: { orderId: "order_1" }, user: { userId: "u1" } }, res);
 
     assert.strictEqual(res.body.order_status, "PAID");
     assert.strictEqual(res.body.printCode, "4821");
@@ -84,9 +84,21 @@ test.describe("GET /verify-payment/:orderId", () => {
     http.on("get", ORDER_URL, () => ({ data: { order_status: "PAID" } }));
     http.on("post", /\/payment-success$/, () => { throw new Error("internal failure"); });
     const res = response();
-    await getVerifyPayment({ params: { orderId: "order_1" } }, res);
+    await getVerifyPayment({ params: { orderId: "order_1" }, user: { userId: "u1" } }, res);
     assert.strictEqual(res.code, 200);
     assert.deepStrictEqual(res.body, { order_status: "PAID", printCode: null, directKioskId: null });
+  });
+
+  test("SECURITY: a caller who is not the order's owner is refused with 403 and never sees the print code", async () => {
+    http.on("get", ORDER_URL, () => ({ data: { order_status: "PAID" } }));
+    const res = response();
+    await getVerifyPayment({ params: { orderId: "order_1" }, user: { userId: "someone-else" } }, res);
+
+    assert.strictEqual(res.code, 403);
+    assert.strictEqual(res.body.printCode, undefined);
+    assert.strictEqual(internalCalls().length, 0, "the internal /payment-success call (which hands out the code) is never made");
+    // The order's PAID status is still not advanced past what Cashfree already reported as part of ownership check short-circuit.
+    assert.strictEqual(fake.data("orders").o1.status, "INITIATED");
   });
 });
 

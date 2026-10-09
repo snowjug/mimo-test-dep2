@@ -1,8 +1,23 @@
 rules_version = '2';
+// IMPORTANT, read before changing: this app has NO Firebase Auth session anywhere (confirmed — neither the
+// customer website nor the admin dashboard ever calls signInWithCustomToken/signInWithEmailAndPassword/etc).
+// request.auth is therefore always null for every real request this app makes, so a rule like
+// "allow write: if request.auth != null" would reject 100% of legitimate uploads, not just attackers.
+// Until there's a real bridge from this app's existing custom-JWT auth to Firebase Auth (e.g. the backend
+// issuing a Firebase custom token after JWT login, and the frontend calling signInWithCustomToken with it,
+// then scoping these rules by request.auth.uid), per-user ownership cannot be enforced here.
+//
+// This is therefore a PARTIAL mitigation, not a full fix: it stops an attacker from touching anything in
+// this bucket OUTSIDE the paths the app actually uses, but within those paths read/write is unchanged
+// (still unauthenticated) because the app's real upload flow (uploadBytesResumable directly from the
+// browser in upload-file.tsx, user-profile.tsx, and the admin dashboard's ConfigurationPage.tsx) has no
+// identity to check. Properly closing this requires the auth bridge described above.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if true;
-    }
+    match /uploads/{allPaths=**} { allow read, write: if true; }
+    match /profiles/{allPaths=**} { allow read, write: if true; }
+    match /screensaver/{allPaths=**} { allow read, write: if true; }
+    match /templates/{allPaths=**} { allow read, write: if true; }
+    match /{allPaths=**} { allow read, write: if false; }
   }
 }

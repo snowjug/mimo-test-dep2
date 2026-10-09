@@ -29,10 +29,10 @@ const ALLOWED_PATTERNS = [/^[A-Z0-9]+_(PI_URL|PRINTER_NAME)$/];
 const REQUIRED = [
   "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD",
   "CASHFREE_ENV", "CASHFREE_APP_ID", "CASHFREE_SECRET_KEY",
-  "GMAIL_APP_PASSWORD",
+  "GMAIL_APP_PASSWORD", "WA_ACCESS_TOKEN",
 ];
 // Have code fallbacks; missing is worth a warning, not a stop.
-const RECOMMENDED = ["GOOGLE_CLIENT_ID", "WA_PHONE_NUMBER_ID", "WA_ACCESS_TOKEN", "WA_VERIFY_TOKEN"];
+const RECOMMENDED = ["GOOGLE_CLIENT_ID", "WA_PHONE_NUMBER_ID", "WA_VERIFY_TOKEN"];
 
 // Bound with `secrets: [...]` in functions/index.js. When the live function already has the Secret Manager
 // reference, the value must NOT also be written to .env (Google rejects the overlap) and is not required here.

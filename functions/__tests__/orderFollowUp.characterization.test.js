@@ -120,7 +120,7 @@ test.describe("GET /verify-payment twice (duplicate verification)", () => {
       extra: { orders: { o1: { orderId: "order_1", userId: "u1", amount: 20, status: "INITIATED" } } } });
     wire();
   });
-  const verify = async () => { const res = response(); await controller.getVerifyPayment({ params: { orderId: "order_1" } }, res); return res; };
+  const verify = async (userId = "u1") => { const res = response(); await controller.getVerifyPayment({ params: { orderId: "order_1" }, user: { userId } }, res); return res; };
 
   test("the first verification pays the order and hands out ONE code for all its jobs", async () => {
     const res = await verify();

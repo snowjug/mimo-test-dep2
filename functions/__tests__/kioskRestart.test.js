@@ -5,6 +5,7 @@ require("./helpers/quiet");
 const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
 
+process.env.JWT_SECRET = "kiosk-restart-test-secret-fixture-32chars"; // must be >= 32 chars (see src/config/env.js)
 const fake = createFakeFirestore();
 fake.install();
 const { postAdminKioskRestart } = require("../src/controllers/kioskCommands.controller");

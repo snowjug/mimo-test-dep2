@@ -1,12 +1,15 @@
 const express = require("express");
 const { adminAuthMiddleware } = require("../middleware/auth");
+const { db } = require("../config/firebase");
+const { createLimiters } = require("../middleware/rateLimit");
 const admin = require("../controllers/admin.controller");
 const insights = require("../controllers/adminInsights.controller");
 const kioskCommands = require("../controllers/kioskCommands.controller");
 
 const router = express.Router();
+const { loginLimiter } = createLimiters(db);
 
-router.post("/admin/login", admin.postAdminLogin);
+router.post("/admin/login", loginLimiter, admin.postAdminLogin);
 router.get("/admin/coupons", adminAuthMiddleware, admin.getAdminCoupons);
 router.post("/admin/coupons", adminAuthMiddleware, admin.postAdminCoupons);
 router.post("/admin/coupons/bulk", adminAuthMiddleware, admin.postAdminCouponsBulk);

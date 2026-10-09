@@ -480,6 +480,13 @@ const getVerifyPayment = async (req, res) => {
     if (!orderSnapshot.empty) {
       const orderDoc = orderSnapshot.docs[0];
       userId = orderDoc.data().userId;
+
+      // Ownership check: only the order's owner may poll its status / print code. Only matters once an order is
+      // actually found above (an unknown orderId has no userId to check against, and reports "CREATED" below).
+      if (userId && req.user.userId !== userId) {
+        return res.status(403).json({ error: "Forbidden: you do not own this order." });
+      }
+
       if (cashfreeStatus === "PAID") {
         await orderDoc.ref.update({ status: "PAID" });
       } else if (!cashfreeStatus) {
@@ -602,10 +609,11 @@ const postCashfreeWebhook = async (req, res) => {
       await jobsBatch.commit();
 
       // ✅ Call /payment-success internally to generate the print code
-      // Guard: only call if no print code exists yet on these jobs
+      // Guard: only call if no print code exists yet on THIS order's jobs (scoped by orderId, not userId --
+      // otherwise a customer's second/future order would be silently skipped because an earlier order of theirs
+      // already carries a printCode). postPaymentSuccess itself uses the same orderId scoping.
       const existingCodeCheck = await db.collection("print_jobs")
-        .where("userId", "==", userId)
-        .where("status", "==", "paid")
+        .where("orderId", "==", orderId)
         .where("printCode", "!=", null)
         .limit(1)
         .get();
@@ -622,7 +630,7 @@ const postCashfreeWebhook = async (req, res) => {
           console.error("[WEBHOOK] Failed to call internal /payment-success:", internalErr.message);
         }
       } else {
-        console.log(`[WEBHOOK] Print code already exists for user ${userId}, skipping duplicate generation.`);
+        console.log(`[WEBHOOK] Print code already exists for order ${orderId}, skipping duplicate generation.`);
       }
 
       // Update User Statistics (V2 Schema)
@@ -732,85 +740,107 @@ const postPaymentSuccess = async (req, res) => {
     const { orderId } = req.body; // Scoped to the specific order being confirmed
     const now = new Date();
 
-    let queryRef = db.collection("print_jobs")
-      .where("userId", "==", userId)
-      .where("status", "in", ["pending", "paid"]);
+    // The whole read-check-write sequence runs inside a single Firestore transaction, keyed by orderId, so that two
+    // near-simultaneous calls for the same order (e.g. the Cashfree webhook and a client poll both landing here)
+    // cannot both observe "no printCode yet" / "coins not deducted yet" before either one's write commits. This
+    // mirrors the claim-before-write pattern in services/refund.service.js's claimRefund: all reads happen first,
+    // then the writes are computed and applied, all inside db.runTransaction.
+    const outcome = await db.runTransaction(async (tx) => {
+      let queryRef = db.collection("print_jobs")
+        .where("userId", "==", userId)
+        .where("status", "in", ["pending", "paid"]);
 
-    // If orderId provided, narrow query to only jobs from this order
-    if (orderId) {
-      queryRef = queryRef.where("orderId", "==", orderId);
-    }
-
-    const snapshot = await queryRef.get();
-
-    if (snapshot.empty) {
-      return res.status(400).json({ error: "No pending jobs found" });
-    }
-
-    let jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
-
-    if (jobsToUpdate.length === 0) {
-      const recentJob = snapshot.docs.find(doc => doc.data().printCode);
-      if (recentJob) {
-        const jobData = recentJob.data();
-        const directKioskId = jobData.printOptions?.directKioskId || jobData.settings?.directKioskId || jobData.kioskId || null;
-        return res.json({ printCode: recentJob.data().printCode, directKioskId });
+      // If orderId provided, narrow query to only jobs from this order
+      if (orderId) {
+        queryRef = queryRef.where("orderId", "==", orderId);
       }
-      return res.status(400).json({ error: "No pending jobs without code" });
-    }
 
-    // A code is only issued for PAID orders. /verify-payment and the Cashfree webhook confirm the payment and mark the
-    // order PAID before they call this handler; a customer calling it directly for an unpaid order is refused.
-    const orderIdsToCheck = new Set(jobsToUpdate.map((d) => d.data().orderId || null));
-    for (const jobOrderId of orderIdsToCheck) {
-      let paid = false;
-      if (jobOrderId) {
-        for (const collectionName of ["orders", "payment_transactions"]) {
-          const found = await db.collection(collectionName).where("orderId", "==", jobOrderId).where("userId", "==", userId).get();
-          if (found.docs.some((d) => d.data().status === "PAID")) { paid = true; break; }
+      const snapshot = await tx.get(queryRef);
+
+      if (snapshot.empty) {
+        return { status: 400, body: { error: "No pending jobs found" } };
+      }
+
+      let jobsToUpdate = snapshot.docs.filter(doc => !doc.data().printCode);
+
+      if (jobsToUpdate.length === 0) {
+        const recentJob = snapshot.docs.find(doc => doc.data().printCode);
+        if (recentJob) {
+          const jobData = recentJob.data();
+          const directKioskId = jobData.printOptions?.directKioskId || jobData.settings?.directKioskId || jobData.kioskId || null;
+          return { status: 200, alreadyIssued: true, body: { printCode: recentJob.data().printCode, directKioskId } };
+        }
+        return { status: 400, body: { error: "No pending jobs without code" } };
+      }
+
+      // A code is only issued for PAID orders. /verify-payment and the Cashfree webhook confirm the payment and mark the
+      // order PAID before they call this handler; a customer calling it directly for an unpaid order is refused.
+      // (All reads for this check happen here, before any write below.)
+      const orderIdsToCheck = new Set(jobsToUpdate.map((d) => d.data().orderId || null));
+      for (const jobOrderId of orderIdsToCheck) {
+        let paid = false;
+        if (jobOrderId) {
+          for (const collectionName of ["orders", "payment_transactions"]) {
+            const found = await tx.get(db.collection(collectionName).where("orderId", "==", jobOrderId).where("userId", "==", userId));
+            if (found.docs.some((d) => d.data().status === "PAID")) { paid = true; break; }
+          }
+        }
+        if (!paid) {
+          return { status: 403, body: { error: "Payment has not been confirmed for this order." } };
         }
       }
-      if (!paid) {
-        return res.status(403).json({ error: "Payment has not been confirmed for this order." });
-      }
-    }
 
-    const printCode = await generateUniquePrintCode(db);
-    let directKioskId = null;
+      // All reads are done. generateUniquePrintCode only performs reads (no writes), so calling it here is still
+      // safe with respect to Firestore's "all reads before any writes" transaction rule.
+      const printCode = await generateUniquePrintCode(db);
+      let directKioskId = null;
 
-    const batch = db.batch();
-    let coinsToCharge = 0;
-    jobsToUpdate.forEach((doc) => {
-      const data = doc.data();
-      const jobKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
-      const targetKiosk = jobKioskId || "CV-001";
-      if (jobKioskId) {
-        directKioskId = jobKioskId;
-      }
-      const jobUpdate = {
-        status: "paid",
-        kioskId: targetKiosk,
-        paymentTime: admin.firestore.FieldValue.serverTimestamp(),
-        printCode,
-        codeCreatedAt: now,
-        retentionStartAt: now,
-        isPrinted: false,
-      };
-      // Coins reserved at checkout are charged now, once (jobs that already have a code are never processed again).
-      const owed = Number(data.coinsToDeduct) || 0;
-      if (owed > 0 && !data.coinsDeducted) {
-        coinsToCharge += owed;
-        jobUpdate.coinsDeducted = true;
-      }
-      batch.update(doc.ref, jobUpdate);
-    });
-    if (coinsToCharge > 0) {
-      batch.update(db.collection("users").doc(userId), {
-        "mimo_coins.balance": admin.firestore.FieldValue.increment(-coinsToCharge),
-        "mimo_coins.total_used": admin.firestore.FieldValue.increment(coinsToCharge),
+      let coinsToCharge = 0;
+      jobsToUpdate.forEach((doc) => {
+        const data = doc.data();
+        const jobKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
+        const targetKiosk = jobKioskId || "CV-001";
+        if (jobKioskId) {
+          directKioskId = jobKioskId;
+        }
+        const jobUpdate = {
+          status: "paid",
+          kioskId: targetKiosk,
+          paymentTime: admin.firestore.FieldValue.serverTimestamp(),
+          printCode,
+          codeCreatedAt: now,
+          retentionStartAt: now,
+          isPrinted: false,
+        };
+        // Coins reserved at checkout are charged now, once (jobs that already have a code are never processed again).
+        const owed = Number(data.coinsToDeduct) || 0;
+        if (owed > 0 && !data.coinsDeducted) {
+          coinsToCharge += owed;
+          jobUpdate.coinsDeducted = true;
+        }
+        tx.update(doc.ref, jobUpdate);
       });
+      if (coinsToCharge > 0) {
+        tx.update(db.collection("users").doc(userId), {
+          "mimo_coins.balance": admin.firestore.FieldValue.increment(-coinsToCharge),
+          "mimo_coins.total_used": admin.firestore.FieldValue.increment(coinsToCharge),
+        });
+      }
+
+      return { status: 200, body: { printCode, directKioskId } };
+    });
+
+    if (outcome.status !== 200) {
+      return res.status(outcome.status).json(outcome.body);
     }
-    await batch.commit();
+
+    // Idempotent re-check: these jobs already had a code from an earlier call, nothing was written just now, so the
+    // receipt e-mail/WhatsApp message (already sent the first time) is not sent again.
+    if (outcome.alreadyIssued) {
+      return res.json(outcome.body);
+    }
+
+    const { printCode, directKioskId } = outcome.body;
 
     // Trigger Email Receipt via Nodemailer
     try {

@@ -1,8 +1,18 @@
 const axios = require("axios");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { CASHFREE_BASE_URL, SECRET_KEY, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const { claimRefund, releaseRefund, refundIdFor, REFUND_BLOCKED_MESSAGES } = require("../services/refund.service");
+
+// Constant-time password comparison: both sides are hashed to a fixed 32-byte SHA-256 digest first, so
+// a length mismatch (almost guaranteed between a real password and an attacker's guess) can never make
+// the comparison short-circuit early and leak timing information about the real password's length.
+const passwordsMatch = (a, b) => {
+  const ha = crypto.createHash("sha256").update(String(a || "")).digest();
+  const hb = crypto.createHash("sha256").update(String(b || "")).digest();
+  return crypto.timingSafeEqual(ha, hb);
+};
 
 // ================= ADMIN AUTH =================
 const postAdminLogin = (req, res) => {
@@ -22,7 +32,7 @@ const postAdminLogin = (req, res) => {
     envAdminEmail &&
     envAdminPassword &&
     reqIdentifier.toLowerCase() === envAdminEmail.toLowerCase() &&
-    reqPassword === envAdminPassword
+    passwordsMatch(reqPassword, envAdminPassword)
   ) {
     const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, SECRET_KEY, { expiresIn: "24h" });
     return res.json({ token, role: "admin", message: "Admin Login Successful" });
@@ -33,7 +43,7 @@ const postAdminLogin = (req, res) => {
     envFinanceEmail &&
     envFinancePassword &&
     reqIdentifier.toLowerCase() === envFinanceEmail.toLowerCase() &&
-    reqPassword === envFinancePassword
+    passwordsMatch(reqPassword, envFinancePassword)
   ) {
     const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, SECRET_KEY, { expiresIn: "24h" });
     return res.json({ token, role: "finance", message: "Finance Login Successful" });

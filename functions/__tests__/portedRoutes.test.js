@@ -6,6 +6,7 @@ const { describe, it, before, after } = require("node:test");
 const assert = require("node:assert");
 const express = require("express");
 
+process.env.JWT_SECRET = "ported-routes-test-secret-fixture-32chars"; // must be >= 32 chars (see src/config/env.js)
 const { admin, db } = require("../src/config/firebase");
 
 // What the Cloud Functions runtime does to every request body before Express sees it:

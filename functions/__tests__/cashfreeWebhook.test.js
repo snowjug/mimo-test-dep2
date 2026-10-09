@@ -9,7 +9,7 @@ const http = require("http");
 const path = require("path");
 
 process.env.CASHFREE_SECRET_KEY = "unit-test-secret";
-process.env.JWT_SECRET = "unit-test-jwt";
+process.env.JWT_SECRET = "unit-test-jwt-secret-fixture-32-chars"; // must be >= 32 chars (see src/config/env.js)
 
 // ---- fake Firestore injected in place of config/firebase ----
 // The controller captures { admin, db } once at import, so these objects are stable and their state is reset per test.
@@ -37,14 +37,18 @@ const orderDoc = { ref: docRef("orders", "o1"), data: () => ({}) };
 const jobDoc = { ref: docRef("print_jobs", "j1"), data: () => ({ pageCount: 3 }) };
 const db = {
   collection: (name) => {
-    let wheres = 0;
+    const filteredFields = [];
     const q = {
       doc: (id) => docRef(name, id),
-      where() { wheres += 1; return q; },
+      where(field) { filteredFields.push(field); return q; },
       limit() { return q; },
       get: async () => {
         if (name === "orders") return snap([orderDoc]);
-        if (name === "print_jobs") return wheres >= 3 ? snap(state.existingCode ? [jobDoc] : []) : snap([jobDoc]);
+        if (name === "print_jobs") {
+          // The duplicate-code guard filters on printCode (scoped by orderId); the plain jobs-to-mark-paid query does not.
+          if (filteredFields.includes("printCode")) return snap(state.existingCode ? [jobDoc] : []);
+          return snap([jobDoc]);
+        }
         return snap([]);
       },
     };
