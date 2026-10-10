@@ -227,8 +227,14 @@ body {
   to   { opacity:0; transform: translateX(100%) scale(.96); max-height: 0; margin-bottom: 0; }
 }
 
-.animate-fadeIn  { animation: fadeIn  .2s ease forwards; }
+.animate-fadeIn  { animation: fadeIn  .2s ease forwards; opacity: 0; }
 .animate-slideIn { animation: slideIn .2s ease forwards; }
+
+/* Tactile feedback: a physical-feeling push on tap/click, and a gentle lift on hover for stat/info cards. */
+.press { transition: transform .12s ease; }
+.press:active { transform: scale(.97); }
+.press-lift { transition: transform .15s ease, box-shadow .15s ease; }
+.press-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 20px -8px rgba(0,0,0,.12); }
 
 /* Skeleton shimmer */
 .skeleton {

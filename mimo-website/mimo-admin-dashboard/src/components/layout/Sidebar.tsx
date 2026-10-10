@@ -13,6 +13,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Activity,
+  Wrench,
 } from 'lucide-react';
 
 export interface NavItemDef {
@@ -40,6 +41,7 @@ const NAV_CORE: NavItemDef[] = [
   { id: 'overview',   label: 'Executive Overview',   icon: LayoutDashboard },
   { id: 'operations', label: 'Print Operations',     icon: Printer, badge: 'LIVE', badgeType: 'live' },
   { id: 'kiosks',     label: 'Kiosk Network',        icon: Cpu },
+  { id: 'technical',  label: 'Technical Workspace',  icon: Wrench },
   { id: 'incidents',  label: 'Incident Management',  icon: AlertTriangle, badgeType: 'alert' },
 ];
 
@@ -80,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return (
       <button
         type="button"
-        onClick={() => onTabChange(item.id)}
+        onClick={() => (item.id === 'technical' ? window.location.assign('/technical') : onTabChange(item.id))}
         title={isCollapsedView ? item.label : undefined}
         className={`w-full flex items-center ${
           isCollapsedView ? 'justify-center px-0 h-10' : 'justify-between px-3 h-10'

@@ -15,6 +15,7 @@ const CouponsPage = lazy(() => import('./pages/Coupons/CouponsPage').then((m) =>
 const FinancePage = lazy(() => import('./pages/Finance/FinancePage').then((m) => ({ default: m.FinancePage })));
 const ConfigurationPage = lazy(() => import('./pages/Configuration/ConfigurationPage').then((m) => ({ default: m.ConfigurationPage })));
 const FinanceApp = lazy(() => import('./pages/Finance/FinanceApp').then((m) => ({ default: m.FinanceApp })));
+const TechnicalApp = lazy(() => import('./pages/Technical/TechnicalApp').then((m) => ({ default: m.TechnicalApp })));
 
 const PageSkeleton = () => (
   <div aria-busy="true" aria-label="Loading" className="space-y-3">
@@ -134,10 +135,14 @@ export default function RootApp() {
   const [isFinanceRoute, setIsFinanceRoute] = useState(() => {
     return window.location.pathname.toLowerCase().startsWith('/finance');
   });
+  const [isTechnicalRoute, setIsTechnicalRoute] = useState(() => {
+    return window.location.pathname.toLowerCase().startsWith('/technical');
+  });
 
   useEffect(() => {
     const handlePopState = () => {
       setIsFinanceRoute(window.location.pathname.toLowerCase().startsWith('/finance'));
+      setIsTechnicalRoute(window.location.pathname.toLowerCase().startsWith('/technical'));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -149,6 +154,18 @@ export default function RootApp() {
         <RangeProvider>
           <Suspense fallback={null}>
             <FinanceApp />
+          </Suspense>
+        </RangeProvider>
+      </ThemeProvider>
+    );
+  }
+
+  if (isTechnicalRoute) {
+    return (
+      <ThemeProvider>
+        <RangeProvider>
+          <Suspense fallback={null}>
+            <TechnicalApp />
           </Suspense>
         </RangeProvider>
       </ThemeProvider>

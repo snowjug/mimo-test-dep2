@@ -14,12 +14,16 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
-const TOKEN_KEYS = ['financeToken', 'adminToken'];
+const TOKEN_KEYS = ['financeToken', 'adminToken', 'technicalToken'];
 const isJwt = (t: string | null): t is string => !!t && t.split('.').length === 3;
 
 api.interceptors.request.use((config) => {
+  // Route-aware: a /technical/* call prefers technicalToken first (so an admin session open in the same
+  // browser never shadows a technical-team member's own session), same idea for /finance and everything else.
+  const isTechnical = (config.url || '').startsWith('/technical');
+  const orderedKeys = isTechnical ? ['technicalToken', ...TOKEN_KEYS.filter((k) => k !== 'technicalToken')] : TOKEN_KEYS;
   // Only attach real JWTs (a leftover non-JWT value must never be sent as a bearer token).
-  const token = TOKEN_KEYS
+  const token = orderedKeys
     .flatMap((k) => [localStorage.getItem(k), sessionStorage.getItem(k)])
     .find(isJwt);
   if (token) {
@@ -32,7 +36,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401 && error.config?.url !== '/admin/login') {
+    if (error?.response?.status === 401 && error.config?.url !== '/admin/login' && error.config?.url !== '/technical/login') {
       TOKEN_KEYS.forEach((k) => {
         localStorage.removeItem(k);
         sessionStorage.removeItem(k);

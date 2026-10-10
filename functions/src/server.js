@@ -21,6 +21,7 @@ app.use(require("./routes/payment.routes"));
 app.use(require("./routes/print.routes"));
 app.use(require("./routes/public.routes"));
 app.use(require("./routes/admin.routes"));
+app.use(require("./routes/technical.routes"));
 app.use(require("./routes/whatsapp.routes"));
 
 // ================= KIOSK SYNC ROUTES (ISOLATED & PROTECTED) =================
