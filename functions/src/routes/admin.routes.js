@@ -5,6 +5,7 @@ const { createLimiters } = require("../middleware/rateLimit");
 const admin = require("../controllers/admin.controller");
 const insights = require("../controllers/adminInsights.controller");
 const kioskCommands = require("../controllers/kioskCommands.controller");
+const adminHr = require("../controllers/adminHr.controller");
 
 const router = express.Router();
 const { loginLimiter } = createLimiters(db);
@@ -34,5 +35,9 @@ router.post("/admin/kiosks/:kioskId/verify", adminAuthMiddleware, kioskCommands.
 router.get("/admin/incidents", adminAuthMiddleware, insights.getAdminIncidents);
 router.post("/admin/refund", adminAuthMiddleware, admin.postAdminRefund);
 router.get("/admin/refund-requests", adminAuthMiddleware, admin.getAdminRefundRequests);
+
+router.get("/admin/employees", adminAuthMiddleware, adminHr.getAdminEmployees);
+router.get("/admin/hr-overview", adminAuthMiddleware, adminHr.getAdminHrOverview);
+router.get("/admin/company-activity", adminAuthMiddleware, adminHr.getAdminCompanyActivity);
 
 module.exports = router;

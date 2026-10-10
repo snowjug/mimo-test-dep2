@@ -70,9 +70,63 @@ const technicalLeadOnly = (req, res, next) => {
   next();
 };
 
+// ================= HR MIDDLEWARE =================
+// Same shape as technicalAuthMiddleware: identity is re-read from Firestore on every request, not trusted
+// from a stale JWT claim, so a deactivated HR account loses access immediately.
+const hrAuthMiddleware = async (req, res, next) => {
+  const token = req.header("Authorization");
+  if (!token) return res.status(401).json({ error: "Access Denied" });
+  try {
+    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    const memberId = verified.hrMemberId;
+    if (!memberId) return res.status(403).json({ error: "Invalid token payload" });
+    const doc = await db.collection("hr_team").doc(memberId).get();
+    if (!doc.exists) return res.status(401).json({ error: "HR account not found" });
+    const data = doc.data();
+    if (data.status === "inactive") return res.status(403).json({ error: "This account has been deactivated" });
+    req.hrMember = { id: memberId, name: data.name, role: data.role, email: data.email };
+    next();
+  } catch (err) {
+    res.status(401).json({ error: "Invalid Token" });
+  }
+};
+
+/** Gate for actions only an HR Lead may perform. Every current HR account is a lead; kept distinct
+ * (rather than letting any hr_team member do everything) so a future hr_staff role is already scoped. */
+const hrLeadOnly = (req, res, next) => {
+  if (req.hrMember?.role !== "hr_lead") {
+    return res.status(403).json({ error: "Forbidden: HR Lead only" });
+  }
+  next();
+};
+
+// ================= MARKETING MIDDLEWARE =================
+// Marketing has no named individuals yet, so this is one shared seat (same identity-reread pattern as
+// the others) rather than the env-var admin/finance pattern — see marketing.controller.js for why.
+const marketingAuthMiddleware = async (req, res, next) => {
+  const token = req.header("Authorization");
+  if (!token) return res.status(401).json({ error: "Access Denied" });
+  try {
+    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    const memberId = verified.marketingMemberId;
+    if (!memberId) return res.status(403).json({ error: "Invalid token payload" });
+    const doc = await db.collection("marketing_team").doc(memberId).get();
+    if (!doc.exists) return res.status(401).json({ error: "Marketing account not found" });
+    const data = doc.data();
+    if (data.status === "inactive") return res.status(403).json({ error: "This account has been deactivated" });
+    req.marketingMember = { id: memberId, name: data.name, role: data.role, email: data.email };
+    next();
+  } catch (err) {
+    res.status(401).json({ error: "Invalid Token" });
+  }
+};
+
 module.exports = {
   adminAuthMiddleware,
   authMiddleware,
   technicalAuthMiddleware,
   technicalLeadOnly,
+  hrAuthMiddleware,
+  hrLeadOnly,
+  marketingAuthMiddleware,
 };
