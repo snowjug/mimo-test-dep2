@@ -4,6 +4,7 @@ const { SECRET_KEY } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const A = require("../services/analytics.service");
 const { loadKiosks } = require("./adminInsights.controller");
+const { recordLogin } = require("../services/loginStreak.service");
 
 const TASK_STATUSES = ["backlog", "assigned", "in_progress", "blocked", "in_review", "completed"];
 const TASK_PRIORITIES = ["low", "medium", "high", "critical"];
@@ -39,6 +40,7 @@ const postTechnicalLogin = async (req, res) => {
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
     const token = jwt.sign({ technicalMemberId: doc.id, role: member.role }, SECRET_KEY, { expiresIn: "12h" });
+    await recordLogin("technical_team", doc.id);
     res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email } });
   } catch (err) {
     res.status(500).json({ error: err.message });
