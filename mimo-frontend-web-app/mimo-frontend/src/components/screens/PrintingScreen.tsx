@@ -29,11 +29,12 @@ export {
   calculatePrintProgress,
   calculateMilestoneBounds,
   stepVisualProgress,
+  getVisualTickDelay,
   type PrintProgressInput,
   type PrintProgressResult,
   type MilestoneBounds,
 } from '../../utils/printProgress';
-import { calculatePrintProgress } from '../../utils/printProgress';
+import { calculatePrintProgress, calculateMilestoneBounds, getVisualTickDelay } from '../../utils/printProgress';
 
 export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   isActive,
@@ -140,11 +141,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     }, 400);
   }, [clearAllTimers, onComplete]);
 
-  // Smooth visual progress tick: advances gradually from 1% towards the milestone ceiling
+  // Smooth visual progress tick: advances gradually towards the milestone ceiling
   const startSmoothTick = useCallback(() => {
     if (tickTimerRef.current) return;
-
-    const baseDelay = 120; // 120ms per 1% increment
 
     const tick = () => {
       if (isCompletingRef.current) return;
@@ -162,11 +161,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         setProgress(next);
       }
 
-      tickTimerRef.current = window.setTimeout(tick, baseDelay);
+      const delay = getVisualTickDelay(progressRef.current, colorMode);
+      tickTimerRef.current = window.setTimeout(tick, delay);
     };
 
-    tickTimerRef.current = window.setTimeout(tick, baseDelay);
-  }, []);
+    const initialDelay = getVisualTickDelay(progressRef.current, colorMode);
+    tickTimerRef.current = window.setTimeout(tick, initialDelay);
+  }, [colorMode]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
@@ -368,6 +369,19 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         animateTo100AndComplete();
       }
     } else if (printCode && !isDemoPrintCode(printCode)) {
+      // Initialize in-flight milestone bounds for active printing immediately
+      const isDuplex = doubleSided === true || doubleSided === 'double';
+      const fallbackSheets = (isDuplex ? Math.ceil(pages / 2) : pages) * copies;
+      const initialTotal = Math.max(1, fallbackSheets);
+      const initialBounds = calculateMilestoneBounds(0, initialTotal);
+
+      milestoneFloorRef.current = initialBounds.floor;
+      milestoneCeilingRef.current = initialBounds.ceiling;
+      progressRef.current = initialBounds.floor;
+      setProgress(initialBounds.floor);
+      setStatusMsg(initialTotal === 1 ? 'Printing document…' : 'Warming up printer…');
+
+      startSmoothTick();
       schedulePoll(200); // Live polling driven by backend sheet progress
     } else {
       startDemoTick(); // Demo mode simulation

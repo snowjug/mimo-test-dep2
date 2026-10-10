@@ -92,6 +92,21 @@ export function stepVisualProgress(
 }
 
 /**
+ * Calculates adaptive tick interval (in ms) for smooth visual progress.
+ * Fast B&W laser (~3.5-4.5s per sheet): 40ms (<70%), 60ms (<85%), 100ms (<90%)
+ * Color inkjet (~20-25s per sheet): 200ms
+ */
+export function getVisualTickDelay(currentProgress: number, colorMode = 'bw'): number {
+  const isColor = colorMode === 'color';
+  if (isColor) {
+    return 200;
+  }
+  if (currentProgress < 70) return 40;
+  if (currentProgress < 85) return 60;
+  return 100;
+}
+
+/**
  * Pure evaluation function for print progress and status messages.
  */
 export function calculatePrintProgress({
@@ -174,7 +189,40 @@ export function calculatePrintProgress({
     };
   }
 
-  // Status 'paid' or initial queue wait
+  // Status 'paid' or initial queue wait while job is already in flight on the printing screen
+  if (previousProgress > 0) {
+    const rawCompleted = Number(sheetsCompleted);
+    const validRaw = !isNaN(rawCompleted) && rawCompleted >= 0 ? rawCompleted : 0;
+    const completed = Math.min(total, Math.max(previousSheetsCompleted, validRaw));
+    const bounds = calculateMilestoneBounds(completed, total);
+    const currentClamped = Math.min(
+      bounds.ceiling,
+      Math.max(bounds.floor, previousProgress)
+    );
+
+    let statusMsg: string;
+    if (total === 1) {
+      statusMsg = 'Printing document…';
+    } else if (completed === 0) {
+      statusMsg = 'Warming up printer…';
+    } else {
+      statusMsg = `Printing sheet ${completed} of ${total}…`;
+    }
+
+    return {
+      progress: currentClamped,
+      milestoneFloor: bounds.floor,
+      milestoneCeiling: bounds.ceiling,
+      statusMsg,
+      sheetsCompleted: completed,
+      totalSheets: total,
+      isPrinting: true,
+      isCompleted: false,
+      isFailed: false,
+    };
+  }
+
+  // Initial queue wait before in-flight progress begins
   return {
     progress: 0,
     milestoneFloor: 0,

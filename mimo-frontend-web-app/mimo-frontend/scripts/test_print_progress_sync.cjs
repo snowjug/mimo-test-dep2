@@ -26,6 +26,7 @@ async function runTests() {
     calculatePrintProgress,
     calculateMilestoneBounds,
     stepVisualProgress,
+    getVisualTickDelay,
   } = await import('../src/utils/printProgress.ts');
 
   // --------------------------------------------------------------------------
@@ -395,8 +396,50 @@ async function runTests() {
     console.log('✅ Passed: stepVisualProgress boundary test.');
   }
 
+  // --------------------------------------------------------------------------
+  // TEST 10: Transient 'paid' polling response while in flight does not freeze progress
+  // --------------------------------------------------------------------------
+  console.log('\n--- TEST 10: Transient paid polling response preserves in-flight bounds ---');
+  {
+    // A single sheet job is in flight at 25%
+    const resTransientPaid = calculatePrintProgress({
+      status: 'paid', // e.g. from delayed read replica
+      isPrinted: false,
+      sheetsCompleted: 0,
+      totalSheets: 1,
+      previousProgress: 25,
+      previousSheetsCompleted: 0,
+      pages: 1,
+      copies: 1,
+    });
+
+    assert.strictEqual(resTransientPaid.progress, 25, 'Progress must not regress to 0% on transient paid response');
+    assert.strictEqual(resTransientPaid.isPrinting, true, 'Job in flight must remain isPrinting: true');
+    assert.strictEqual(resTransientPaid.milestoneCeiling, 90, 'Ceiling must remain 90% and not freeze to 0');
+    assert.strictEqual(resTransientPaid.isCompleted, false);
+    console.log('✅ Passed: Transient paid polling response preserved in-flight bounds without freezing.');
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 11: getVisualTickDelay Adaptive Velocities for B&W Laser vs Color Inkjet
+  // --------------------------------------------------------------------------
+  console.log('\n--- TEST 11: getVisualTickDelay Adaptive Print Velocity ---');
+  {
+    // B&W Laser: 40ms (<70%), 60ms (<85%), 100ms (<90%)
+    assert.strictEqual(getVisualTickDelay(1, 'bw'), 40, 'B&W early progress must tick at 40ms');
+    assert.strictEqual(getVisualTickDelay(50, 'bw'), 40, 'B&W mid progress must tick at 40ms');
+    assert.strictEqual(getVisualTickDelay(70, 'bw'), 60, 'B&W late progress must tick at 60ms');
+    assert.strictEqual(getVisualTickDelay(84, 'bw'), 60, 'B&W late progress must tick at 60ms');
+    assert.strictEqual(getVisualTickDelay(85, 'bw'), 100, 'B&W exit ease must tick at 100ms');
+
+    // Color Inkjet: 200ms
+    assert.strictEqual(getVisualTickDelay(1, 'color'), 200, 'Color early progress must tick at 200ms');
+    assert.strictEqual(getVisualTickDelay(50, 'color'), 200, 'Color mid progress must tick at 200ms');
+    console.log('✅ Passed: getVisualTickDelay produces calibrated velocities for laser and inkjet.');
+  }
+
   console.log('\n================================================================');
-  console.log('🎉 ALL PAPER STATUS & SMOOTH ANIMATION TESTS PASSED (9/9)!');
+  console.log('🎉 ALL PAPER STATUS & SMOOTH ANIMATION TESTS PASSED (11/11)!');
   console.log('================================================================');
 }
 
