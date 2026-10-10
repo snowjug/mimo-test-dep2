@@ -956,7 +956,7 @@ def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=Non
             stalled = clock.time() - last_change
             if (count > count_before and stalled >= 25) or (count == count_before and stalled >= 60):
                 break
-        clock.sleep(1.0)
+        clock.sleep(0.25)
     if last is None:
         return "unknown", None
     printed = last - count_before
@@ -1109,10 +1109,11 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             print(f"⚠️ [SYNC] Could not check error_log for filter crash: {filter_chk_err}")
 
                     if job_ok:
-                        # Physical exit buffer: 4.0s for Color inkjet; 0.0s for B&W laser (already ejected when CUPS clears)
-                        paper_exit_delay = 4.0 if is_color_printer else 0.0
-                        if paper_exit_delay > 0:
-                            print(f"⏳ [SYNC] CUPS confirmed job {job_id}. Waiting {paper_exit_delay}s for Color final sheet physical ejection...")
+                        # Physical exit buffer: sheet-count-aware physical ejection for Color inkjet; 0.0s for B&W laser (gated by PJL)
+                        if is_color_printer:
+                            cups_elapsed = time.time() - start
+                            paper_exit_delay = max(4.0, (total_sheets * 14.0) - cups_elapsed)
+                            print(f"⏳ [SYNC] CUPS confirmed job {job_id} ({total_sheets} sheet(s), {cups_elapsed:.1f}s spool). Waiting {paper_exit_delay:.1f}s for Color physical ejection...")
                             time.sleep(paper_exit_delay)
 
                         verified_fields = {}
