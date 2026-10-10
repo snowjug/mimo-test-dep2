@@ -1,6 +1,7 @@
 const Busboy = require("busboy");
 const { v4: uuidv4 } = require("uuid");
 const { admin, db } = require("../config/firebase");
+const { normalizeOrders } = require("../services/analytics.service");
 
 // ================= PROFILE =================
 const getProfile = async (req, res) => {
@@ -87,12 +88,19 @@ const getMimoStats = async (req, res) => {
         totalPages += (data.pageCount || 0) * (data.printOptions?.copies || 1);
       }
     });
-    const ordersSnapshot = await db.collection("orders").where("userId", "==", userId).get();
-    let totalSpent = 0;
-    ordersSnapshot.forEach(doc => {
-      const data = doc.data();
-      if (data.status === "PAID" || data.status === "SUCCESS") totalSpent += Number(data.amount || 0);
-    });
+    // A real (non-free) paid order lives in `payment_transactions`, not `orders` — `orders` only ever gets
+    // written directly for the 100%-off/free path (see postCreateOrder). Reusing the same merge the admin
+    // revenue dashboard already relies on (analytics.service.js's normalizeOrders) instead of a second,
+    // incomplete copy of this logic — that merge also dedupes an order that appears in both collections.
+    const [ordersSnapshot, txnSnapshot] = await Promise.all([
+      db.collection("orders").where("userId", "==", userId).get(),
+      db.collection("payment_transactions").where("userId", "==", userId).get(),
+    ]);
+    const merged = normalizeOrders(
+      ordersSnapshot.docs.map((d) => d.data()),
+      txnSnapshot.docs.map((d) => d.data())
+    );
+    const totalSpent = merged.reduce((sum, o) => (o.status === "PAID" ? sum + o.amount : sum), 0);
     res.json({ totalDocs, totalPages, totalSpent: Number(totalSpent.toFixed(2)) });
   } catch (err) {
     console.error(err);
