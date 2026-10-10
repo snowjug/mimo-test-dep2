@@ -114,9 +114,14 @@ const WorkSessionCard: React.FC = () => {
             </>
           )}
           {isPaused && (
-            <button disabled={busy} onClick={() => act(() => technical.resumeSession())} className="press flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50">
-              <Play className="size-3.5" /> Resume
-            </button>
+            <>
+              <button disabled={busy} onClick={() => act(() => technical.resumeSession())} className="press flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50">
+                <Play className="size-3.5" /> Resume
+              </button>
+              <button disabled={busy} onClick={() => act(() => technical.endSession())} className="press flex items-center gap-1.5 rounded-full bg-rose-600 px-3.5 py-2 text-[13px] font-semibold text-white disabled:opacity-50">
+                <Square className="size-3.5" /> End
+              </button>
+            </>
           )}
         </div>
       </div>
