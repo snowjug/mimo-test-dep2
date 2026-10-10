@@ -20,6 +20,14 @@
       "destination": "/admin/index.html"
     },
     {
+      "source": "/technical",
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/technical/(.*)",
+      "destination": "/admin/index.html"
+    },
+    {
       "source": "/",
       "destination": "/index.html"
     },
