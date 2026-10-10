@@ -107,10 +107,12 @@ const postFinalizeUpload = async (req, res) => {
             error: `"${f.name}" doesn't look like a real document. If you shared a link, download the actual file first and upload that.`,
           });
         }
-        // Unsupported non-office format: default to 1 or valid client count
-        const rawCount = Number(f.pageCount);
-        const isValidCount = Number.isInteger(rawCount) && rawCount > 0 && Number.isFinite(rawCount);
-        resolvedPageCount = isValidCount ? rawCount : 1;
+        // Unsupported/unrecognised format: there is no server-side way to read a real page count out of
+        // an arbitrary file, so — same principle as the PDF and office-doc branches above — the
+        // client-declared pageCount is never trusted here either. A file we can't verify is billed as 1
+        // page, full stop; trusting any client-supplied number would reopen the exact under-payment gap
+        // those two branches close.
+        resolvedPageCount = 1;
       }
 
       totalPages += resolvedPageCount;
