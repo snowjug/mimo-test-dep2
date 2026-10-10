@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MimoHeader } from "../components/mimo-header";
 import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
-import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, MapPin, Camera } from "lucide-react";
+import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, MapPin, Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { HackathonBanner } from "../components/HackathonBanner";
@@ -892,6 +892,18 @@ export function UploadFile() {
     sessionStorage.removeItem("uploadAmount");
     sessionStorage.removeItem("uploadTotalPages");
   };
+
+  // Hold the whole page (including MimoHeader, which fires its own unguarded /mimo/user fetch) until the
+  // identity bootstrap above has resolved. Without this gate, MimoHeader's request can race ahead with no
+  // token, 401, and trip the global axios interceptor's hard redirect to "/" before the guest session the
+  // user is waiting on even finishes being created.
+  if (!identityReady) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3">
+        <Loader2 className="size-6 animate-spin text-ink-3" />
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 pb-10">
