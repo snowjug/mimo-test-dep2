@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { SECRET_KEY } = require("../config/env");
 const { admin, db } = require("../config/firebase");
+const { recordLogin } = require("../services/loginStreak.service");
 
 const DEPARTMENTS = ["technical", "hr", "marketing", "finance", "admin"];
 const EMPLOYEE_STATUSES = ["onboarding", "active", "offboarded"];
@@ -51,6 +52,7 @@ const postHrLogin = async (req, res) => {
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
     const token = jwt.sign({ hrMemberId: doc.id, role: member.role }, SECRET_KEY, { expiresIn: "12h" });
+    await recordLogin("hr_team", doc.id);
     res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email } });
   } catch (err) {
     res.status(500).json({ error: err.message });

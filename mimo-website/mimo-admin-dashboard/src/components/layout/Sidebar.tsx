@@ -13,9 +13,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Activity,
-  Wrench,
   Users2,
-  Megaphone,
   Building2,
 } from 'lucide-react';
 
@@ -44,9 +42,7 @@ const NAV_CORE: NavItemDef[] = [
   { id: 'overview',   label: 'Executive Overview',   icon: LayoutDashboard },
   { id: 'operations', label: 'Print Operations',     icon: Printer, badge: 'LIVE', badgeType: 'live' },
   { id: 'kiosks',     label: 'Kiosk Network',        icon: Cpu },
-  { id: 'technical',  label: 'Technical Workspace',  icon: Wrench },
-  { id: 'hr',         label: 'HR Workspace',         icon: Users2 },
-  { id: 'marketing',  label: 'Marketing Workspace',  icon: Megaphone },
+  { id: 'mimo-gang',  label: 'MIMO GANG',            icon: Users2 },
   { id: 'incidents',  label: 'Incident Management',  icon: AlertTriangle, badgeType: 'alert' },
 ];
 
@@ -91,12 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return (
       <button
         type="button"
-        onClick={() => (
-          item.id === 'technical' ? window.location.assign('/technical')
-          : item.id === 'hr' ? window.location.assign('/hr')
-          : item.id === 'marketing' ? window.location.assign('/marketing')
-          : onTabChange(item.id)
-        )}
+        onClick={() => onTabChange(item.id)}
         title={isCollapsedView ? item.label : undefined}
         className={`w-full flex items-center ${
           isCollapsedView ? 'justify-center px-0 h-10' : 'justify-between px-3 h-10'

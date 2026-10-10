@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { SECRET_KEY } = require("../config/env");
 const { admin, db } = require("../config/firebase");
+const { recordLogin } = require("../services/loginStreak.service");
 
 const TASK_STATUSES = ["planned", "in_progress", "completed"];
 const TASK_PRIORITIES = ["low", "medium", "high"];
@@ -40,6 +41,7 @@ const postMarketingLogin = async (req, res) => {
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
     const token = jwt.sign({ marketingMemberId: doc.id, role: member.role }, SECRET_KEY, { expiresIn: "12h" });
+    await recordLogin("marketing_team", doc.id);
     res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email } });
   } catch (err) {
     res.status(500).json({ error: err.message });

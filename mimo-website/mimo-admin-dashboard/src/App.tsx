@@ -19,6 +19,7 @@ const TechnicalApp = lazy(() => import('./pages/Technical/TechnicalApp').then((m
 const HrApp = lazy(() => import('./pages/Hr/HrApp').then((m) => ({ default: m.HrApp })));
 const MarketingApp = lazy(() => import('./pages/Marketing/MarketingApp').then((m) => ({ default: m.MarketingApp })));
 const AdminCompanyPage = lazy(() => import('./pages/Company/AdminCompanyPage').then((m) => ({ default: m.AdminCompanyPage })));
+const MimoGangPage = lazy(() => import('./pages/Gang/MimoGangPage').then((m) => ({ default: m.MimoGangPage })));
 
 const PageSkeleton = () => (
   <div aria-busy="true" aria-label="Loading" className="space-y-3">
@@ -48,6 +49,7 @@ function DashboardApp() {
     if (path.includes('finance')) return 'finance';
     if (path.includes('config') || path.includes('setting')) return 'configuration';
     if (path.includes('company')) return 'company';
+    if (path.includes('mimo-gang')) return 'mimo-gang';
     return 'overview';
   };
 
@@ -130,6 +132,7 @@ function DashboardApp() {
       {activeTab === 'finance' && <FinancePage />}
       {activeTab === 'configuration' && <ConfigurationPage />}
       {activeTab === 'company' && <AdminCompanyPage />}
+      {activeTab === 'mimo-gang' && <MimoGangPage />}
       </Suspense>
     </AppShell>
   );
