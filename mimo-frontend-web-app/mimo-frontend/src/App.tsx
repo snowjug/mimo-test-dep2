@@ -9,6 +9,7 @@ import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
 import { CV001Background } from './components/screens/CV001Background';
 import { Adds } from './components/screens/adds/Adds';
 import { isFestivalActive } from './config/festivalConfig';
+import { useAutoUpdate } from './hooks/useAutoUpdate';
 
 
 export type ScreenState =
@@ -67,6 +68,25 @@ function App() {
 
   const toastTimerRef = useRef<number | null>(null);
   const validationTimerRef = useRef<number | null>(null);
+
+  // Strictly verified idle state: Kiosk is on main-interface, no entered code,
+  // no loaded job data, no in-flight network validation, no printing in progress,
+  // no active error/refund screens, no pending validation timers, and no active toast notifications.
+  const isKioskIdle =
+    currentScreen === 'main-interface' &&
+    code === '' &&
+    jobData === null &&
+    !isSubmittingCode &&
+    printStatus === 'idle' &&
+    printError === undefined &&
+    !showRefundBanner &&
+    validationTimerRef.current === null &&
+    toastMsg === '';
+
+  useAutoUpdate({
+    isIdle: isKioskIdle,
+    checkIntervalMs: 60000,
+  });
 
   // ================= TOAST =================
   const showToast = useCallback((msg: string, isError: boolean = false) => {
