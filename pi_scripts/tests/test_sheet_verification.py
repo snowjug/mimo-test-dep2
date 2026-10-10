@@ -98,6 +98,34 @@ class VerifySheets(unittest.TestCase):
         (verdict, printed), _ = self.run_verify([None], expected=3)
         self.assertEqual((verdict, printed), ("unknown", None))
 
+    def test_on_progress_fires_once_per_counter_change_not_per_poll(self):
+        seen = []
+        clock = FakeClock()
+        # 100 repeats (no change) before advancing to 104, then to 108 and 112 (done).
+        with mock.patch.object(L, "read_printer_status", counter_sequence([100, 100, 100, 104, 108, 112])):
+            verdict, printed = L.verify_sheets_printed(
+                "Brother_HL_L5210DN_series", 100, 12, clock=clock, on_progress=seen.append,
+            )
+        self.assertEqual((verdict, printed), ("ok", 12))
+        self.assertEqual(seen, [4, 8, 12], "must fire once per counter advance, not once per poll tick")
+
+    def test_on_progress_never_called_for_zero_or_negative_delta(self):
+        seen = []
+        clock = FakeClock()
+        with mock.patch.object(L, "read_printer_status", counter_sequence([100])):
+            L.verify_sheets_printed("Brother_HL_L5210DN_series", 100, 12, clock=clock, on_progress=seen.append)
+        self.assertEqual(seen, [])
+
+    def test_on_progress_exception_does_not_abort_verification(self):
+        def boom(_n):
+            raise RuntimeError("Firestore write failed")
+        clock = FakeClock()
+        with mock.patch.object(L, "read_printer_status", counter_sequence([100, 104, 108, 112])):
+            verdict, printed = L.verify_sheets_printed(
+                "Brother_HL_L5210DN_series", 100, 12, clock=clock, on_progress=boom,
+            )
+        self.assertEqual((verdict, printed), ("ok", 12))
+
 
 class FakeDoc:
     def __init__(self, status="printing"):
@@ -219,7 +247,21 @@ class WaitForCupsJob(unittest.TestCase):
         report.assert_not_called()
         self.assertEqual(doc.updates[-1]["status"], "completed")
         self.assertEqual((doc.updates[-1]["printVerified"], doc.updates[-1]["sheetsVerified"]), (True, 12))
+        self.assertEqual(doc.updates[-1]["sheetsCompleted"], 12, "frontend progress bar depends on this field")
         self.assertFalse(L.sheet_check_lock("Brother_HL_L5210DN_series").locked())
+
+    def test_sheets_completed_falls_back_to_total_sheets_when_unverified(self):
+        # No sheet_check support (e.g. Epson color): verify_sheets_printed itself is never reached, but
+        # the completion write must still set sheetsCompleted so the frontend never sees it stay unset.
+        doc = FakeDoc()
+        L.active_jobs.add(doc.id)
+        with mock.patch.object(L, "is_printer_online", return_value=(True, "Online")), \
+             mock.patch.object(L.subprocess, "run", side_effect=self.lpstat), \
+             mock.patch.object(L, "firestore", mock.Mock(SERVER_TIMESTAMP="TS")):
+            L.wait_for_cups_job("Brother_HL_L5210DN_series-4400", doc, 60, "Brother_HL_L5210DN_series", 3, 4,
+                                sheet_check=None)
+        self.assertEqual(doc.updates[-1]["status"], "completed")
+        self.assertEqual(doc.updates[-1]["sheetsCompleted"], 12, "total_sheets (3 pages * 4 copies) fallback")
 
     def test_nothing_printed_is_reported_not_completed(self):
         doc, report = self.run_wait(("none", 0))
@@ -237,6 +279,24 @@ class WaitForCupsJob(unittest.TestCase):
         report.assert_not_called()
         self.assertEqual(doc.updates[-1]["status"], "completed")
         self.assertFalse(doc.updates[-1]["printVerified"])
+
+    def test_incremental_sheets_completed_written_during_real_verification(self):
+        # Exercises the real verify_sheets_printed (not mocked away) end to end through
+        # wait_for_cups_job, confirming on_progress is actually wired to a Firestore write.
+        doc = FakeDoc()
+        L.active_jobs.add(doc.id)
+        counts = counter_sequence([100, 104, 108, 112])
+        with mock.patch.object(L, "is_printer_online", return_value=(True, "Online")), \
+             mock.patch.object(L.subprocess, "run", side_effect=self.lpstat), \
+             mock.patch.object(L, "read_printer_status", counts), \
+             mock.patch.object(L, "publish_printer_health"), \
+             mock.patch.object(L, "report_print_failure") as report, \
+             mock.patch.object(L, "firestore", mock.Mock(SERVER_TIMESTAMP="TS")):
+            L.wait_for_cups_job("Brother_HL_L5210DN_series-4400", doc, 60, "Brother_HL_L5210DN_series", 3, 4,
+                                {"count_before": 100, "expected_min": 12})
+        report.assert_not_called()
+        progress_writes = [u["sheetsCompleted"] for u in doc.updates if "sheetsCompleted" in u]
+        self.assertEqual(progress_writes, [4, 8, 12, 12], "3 incremental writes plus the final completion write")
 
 
 class HealthPublish(unittest.TestCase):
