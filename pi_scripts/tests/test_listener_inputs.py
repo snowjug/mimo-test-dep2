@@ -813,6 +813,120 @@ class AutoResumeEligibilityTests(unittest.TestCase):
         self.assertTrue(eligible, reason)
 
 
+class _FakeChangeType:
+    def __init__(self, name):
+        self.name = name
+
+
+class _FakeChange:
+    def __init__(self, type_name, document):
+        self.type = _FakeChangeType(type_name)
+        self.document = document
+
+
+class PrefetchFreshnessTests(ListenerTestCase):
+    def test_fresh_job_is_fresh(self):
+        doc = {"createdAt": datetime.now(timezone.utc)}
+        self.assertTrue(listener._is_prefetch_candidate_fresh(doc))
+
+    def test_old_job_is_not_fresh(self):
+        doc = {"createdAt": datetime.now(timezone.utc) - timedelta(seconds=listener.PREFETCH_MAX_JOB_AGE_SECONDS + 1)}
+        self.assertFalse(listener._is_prefetch_candidate_fresh(doc))
+
+    def test_missing_timestamp_fails_open(self):
+        self.assertTrue(listener._is_prefetch_candidate_fresh({}))
+
+    def test_naive_timestamp_fails_open_instead_of_raising(self):
+        # A naive datetime (no tzinfo) compared against an aware "now" must not raise.
+        doc = {"createdAt": datetime.now() - timedelta(seconds=listener.PREFETCH_MAX_JOB_AGE_SECONDS + 1)}
+        self.assertTrue(listener._is_prefetch_candidate_fresh(doc))
+
+
+# ── Bounded prefetch dispatch: replaces one unbounded thread per snapshot change ────────────────────────────────
+class PrefetchConcurrencyTests(ListenerTestCase):
+    def test_fresh_paid_job_is_submitted_to_bounded_pool(self):
+        snap = FakeSnapshot("jobF1", {"status": "paid", "createdAt": datetime.now(timezone.utc)})
+        fake_pool = mock.Mock(name="prefetch_pool")
+        with mock.patch.object(listener, "_prefetch_pool", fake_pool):
+            listener.on_prefetch_snapshot(None, [_FakeChange("ADDED", snap)], None)
+        fake_pool.submit.assert_called_once_with(listener.prefetch_job, snap)
+
+    def test_stale_backlog_job_is_skipped_on_reconnect(self):
+        # This is the exact scenario that used to cause a download-burst lag spike: Firestore
+        # delivers the whole existing backlog as 'ADDED' changes on listener (re)connect.
+        old = datetime.now(timezone.utc) - timedelta(seconds=listener.PREFETCH_MAX_JOB_AGE_SECONDS + 60)
+        snap = FakeSnapshot("jobF2", {"status": "paid", "createdAt": old})
+        fake_pool = mock.Mock(name="prefetch_pool")
+        with mock.patch.object(listener, "_prefetch_pool", fake_pool):
+            listener.on_prefetch_snapshot(None, [_FakeChange("ADDED", snap)], None)
+        fake_pool.submit.assert_not_called()
+
+    def test_missing_timestamp_still_dispatches(self):
+        snap = FakeSnapshot("jobF3", {"status": "pending"})
+        fake_pool = mock.Mock(name="prefetch_pool")
+        with mock.patch.object(listener, "_prefetch_pool", fake_pool):
+            listener.on_prefetch_snapshot(None, [_FakeChange("ADDED", snap)], None)
+        fake_pool.submit.assert_called_once_with(listener.prefetch_job, snap)
+
+    def test_non_candidate_status_is_ignored(self):
+        snap = FakeSnapshot("jobF4", {"status": "printing", "createdAt": datetime.now(timezone.utc)})
+        fake_pool = mock.Mock(name="prefetch_pool")
+        with mock.patch.object(listener, "_prefetch_pool", fake_pool):
+            listener.on_prefetch_snapshot(None, [_FakeChange("MODIFIED", snap)], None)
+        fake_pool.submit.assert_not_called()
+
+    def test_prefetch_pool_is_bounded(self):
+        self.assertLessEqual(listener._prefetch_pool._max_workers, listener.PREFETCH_MAX_CONCURRENT)
+
+
+# ── Prefetch cache eviction: protects active prints, respects age + size caps ───────────────────────────────────
+class PrefetchCacheCleanupTests(ListenerTestCase):
+    def _touch(self, name, age_seconds, size=10):
+        path = os.path.join(self.cache_dir, name)
+        with open(path, "wb") as fh:
+            fh.write(b"x" * size)
+        mtime = time.time() - age_seconds
+        os.utime(path, (mtime, mtime))
+        return path
+
+    def test_evicts_stale_file_past_max_age(self):
+        path = self._touch("docOld_0.pdf", listener.PREFETCH_CACHE_MAX_AGE_SECONDS + 60)
+        listener.cleanup_prefetch_cache()
+        self.assertFalse(os.path.exists(path))
+
+    def test_keeps_recent_file(self):
+        path = self._touch("docNew_0.pdf", 5)
+        listener.cleanup_prefetch_cache()
+        self.assertTrue(os.path.exists(path))
+
+    def test_never_evicts_file_whose_job_is_active_even_if_stale(self):
+        path = self._touch("docActive_0.pdf", listener.PREFETCH_CACHE_MAX_AGE_SECONDS + 600)
+        listener.active_jobs.add("docActive")
+        self.addCleanup(listener.active_jobs.discard, "docActive")
+        listener.cleanup_prefetch_cache()
+        self.assertTrue(os.path.exists(path), "a file for a job currently being printed must never be evicted")
+
+    def test_ignores_partial_in_progress_downloads(self):
+        path = self._touch(".partial_docX_0.pdf", listener.PREFETCH_CACHE_MAX_AGE_SECONDS + 600)
+        listener.cleanup_prefetch_cache()
+        self.assertTrue(os.path.exists(path), "an in-progress download must never be touched by cleanup")
+
+    def test_enforces_total_size_cap_oldest_first(self):
+        # Three same-size files, all within the age limit, but together over the size cap.
+        old = self._touch("docA_0.pdf", 300, size=100)
+        mid = self._touch("docB_0.pdf", 200, size=100)
+        new = self._touch("docC_0.pdf", 100, size=100)
+        listener.cleanup_prefetch_cache(max_age_seconds=10_000, max_total_bytes=150)
+        self.assertFalse(os.path.exists(old), "oldest file must be evicted first to respect the size cap")
+        self.assertFalse(os.path.exists(mid), "second-oldest must also go once the cap still isn't met")
+        self.assertTrue(os.path.exists(new), "newest file must survive once the cap is satisfied")
+
+    def test_does_not_evict_anything_under_both_caps(self):
+        path = self._touch("docSmall_0.pdf", 5, size=10)
+        listener.cleanup_prefetch_cache()
+        self.assertTrue(os.path.exists(path))
+
+
 class ImportSafetyTests(unittest.TestCase):
     def test_import_does_not_start_listener(self):
         self.assertIsNone(listener.db, "importing must not initialise Firebase")
