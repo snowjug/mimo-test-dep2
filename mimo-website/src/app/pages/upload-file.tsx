@@ -326,6 +326,10 @@ export function UploadFile() {
   const [userName, setUserName] = useState("Admin User");
   const [userStats, setUserStats] = useState({ totalDocs: 0, totalPages: 0, totalSpent: 0 });
   const [uploading, setUploading] = useState(false);
+  // QR-first printing: this is the page a kiosk's QR code points straight at. A brand-new visitor has no
+  // account yet, so before any other API call fires, silently mint a lightweight guest identity (random
+  // display name, no email/password) — the rest of this page, and payment/print after it, then just work.
+  const [identityReady, setIdentityReady] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeUploadsRef = useRef<Map<string, ActiveUpload>>(new Map());
   const cancelledUploadIdsRef = useRef<Set<string>>(new Set());
@@ -333,6 +337,27 @@ export function UploadFile() {
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
+
+  // Runs once, before every other API call on this page. A returning guest or a logged-in user already
+  // has a token and this is a no-op; a brand-new visitor gets a real `users` doc (same shape as a normal
+  // account, just without email/password) so the existing upload/print/payment pipeline works unchanged.
+  useEffect(() => {
+    const ensureIdentity = async () => {
+      const hasToken = sessionStorage.getItem("jwtToken") || localStorage.getItem("jwtToken");
+      if (!hasToken) {
+        try {
+          const res = await api.post("/guest-session");
+          localStorage.setItem("jwtToken", res.data.jwtToken);
+          localStorage.setItem("mimo_user_name", res.data.name);
+          localStorage.setItem("mimo_is_guest", "true");
+        } catch (err) {
+          console.error("Could not start guest session:", err);
+        }
+      }
+      setIdentityReady(true);
+    };
+    ensureIdentity();
+  }, []);
 
   const [activePrintCodes, setActivePrintCodes] = useState<ActivePrintCodeJob[]>([]);
 
@@ -372,6 +397,7 @@ export function UploadFile() {
   };
 
   useEffect(() => {
+    if (!identityReady) return;
     fetchActiveCodes();
 
     const handleFocus = () => {
@@ -382,7 +408,7 @@ export function UploadFile() {
     return () => {
       window.removeEventListener("focus", handleFocus);
     };
-  }, []);
+  }, [identityReady]);
 
   // Poll every 10 seconds while active unused codes exist
   useEffect(() => {
@@ -396,6 +422,7 @@ export function UploadFile() {
   }, [activePrintCodes.length]);
 
   useEffect(() => {
+    if (!identityReady) return;
     const storedName = localStorage.getItem("mimo_user_name");
     if (storedName) setUserName(storedName);
 
@@ -462,7 +489,7 @@ export function UploadFile() {
       }
     };
     fetchData();
-  }, []);
+  }, [identityReady]);
 
   const handleFileSelect = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
