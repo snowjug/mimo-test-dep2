@@ -6,7 +6,7 @@ const { createFakeFirestore } = require("./helpers/fakeFirestore");
 
 const fake = createFakeFirestore();
 fake.install();
-const { getPublicMachines } = require("../src/controllers/publicMachines.controller");
+const { getPublicMachines, getPublicMachine } = require("../src/controllers/publicMachines.controller");
 
 function response() {
   return { code: 200, body: undefined, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
@@ -56,4 +56,35 @@ test("a printer in Paused/Error state marks its machine DEGRADED for discovery",
   await getPublicMachines({}, res);
   const sv002 = res.body.machines.find((m) => m.machineId === "SV-002");
   assert.strictEqual(sv002.liveState, "DEGRADED");
+});
+
+// ================= GET /api/machines/:machineId (QR entry) =================
+test("a QR scan for a known machine returns the same view as the list endpoint", async () => {
+  fake.reset({ system_status: { "CV-001": { lastSeen: new Date() } } });
+  const res = response();
+  await getPublicMachine({ params: { machineId: "CV-001" } }, res);
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.machine.machineId, "CV-001");
+  assert.strictEqual(res.body.machine.displayName, "MIMO 1.0");
+  assert.strictEqual(res.body.machine.online, true);
+  assert.strictEqual(res.body.machine.available, true);
+});
+
+test("a QR scan for an unknown machine ID returns 404, not a default/fallback machine", async () => {
+  fake.reset({});
+  const res = response();
+  await getPublicMachine({ params: { machineId: "SV-999-DOES-NOT-EXIST" } }, res);
+  assert.strictEqual(res.code, 404);
+  assert.ok(res.body.error);
+});
+
+test("a QR scan for a PROVISIONING machine reports unavailable, same as the list endpoint", async () => {
+  fake.reset({
+    machines: { "CV-003": { name: "MIMO 3.0", status: "PROVISIONING", templateId: "mimo-1.0-standard" } },
+  });
+  const res = response();
+  await getPublicMachine({ params: { machineId: "CV-003" } }, res);
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.machine.available, false);
+  assert.strictEqual(res.body.machine.liveState, "PROVISIONING");
 });

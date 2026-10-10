@@ -101,9 +101,61 @@ const postOnboarding = async (req, res) => {
   }
 };
 
+// ================= GUEST SESSION (QR-first entry, no login required) =================
+// A guest is a real `users` doc — same shape register()/google-login() produce, minus email/password — so
+// the entire existing upload/print/payment pipeline (all gated by authMiddleware checking only that the
+// doc exists) works for a guest completely unchanged. isGuest:true is the only marker; there is no separate
+// guest schema to keep in sync. No email means a password-guesser can never reach this account via /login.
+const GUEST_ADJECTIVES = [
+  "Blue", "Quick", "Silver", "Golden", "Swift", "Bright", "Calm", "Bold", "Lucky", "Gentle",
+  "Clever", "Brave", "Sunny", "Misty", "Rapid", "Vivid", "Noble", "Cosmic", "Crimson", "Amber",
+  "Jolly", "Wild", "Steady", "Nimble", "Mighty", "Curious", "Breezy", "Radiant", "Lively", "Dapper",
+];
+const GUEST_NOUNS = [
+  "Falcon", "Panda", "Fox", "Otter", "Eagle", "Tiger", "Wolf", "Heron", "Lynx", "Sparrow",
+  "Dolphin", "Badger", "Hawk", "Rabbit", "Raven", "Comet", "Phoenix", "Koala", "Puma", "Owl",
+  "Stag", "Gecko", "Marlin", "Cobra", "Finch", "Panther", "Robin", "Orca", "Lemur", "Heron",
+];
+const generateGuestName = () => {
+  const adjective = GUEST_ADJECTIVES[Math.floor(Math.random() * GUEST_ADJECTIVES.length)];
+  const noun = GUEST_NOUNS[Math.floor(Math.random() * GUEST_NOUNS.length)];
+  return `${adjective} ${noun}`;
+};
+
+const postGuestSession = async (req, res) => {
+  try {
+    const username = generateGuestName();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const userRef = await db.collection("users").add({
+      username,
+      email: null,
+      mobileNumber: "",
+      password: null,
+      googleUser: false,
+      isGuest: true,
+      createdAt: now,
+      updatedAt: now,
+      accountStatus: "active",
+      totalSpent: 0,
+      totalPagesPrinted: 0,
+      isVerified: false,
+      mimo_coins: { balance: 0, total_earned: 0, total_used: 0 },
+    });
+    await userRef.update({ id: userRef.id });
+    // Short-lived on purpose: a guest's job/file retention is already 24h (same as everyone else), so a
+    // week-long token comfortably covers "come back and check the release code" without lingering forever.
+    const jwtToken = jwt.sign({ userId: userRef.id }, SECRET_KEY, { expiresIn: "7d" });
+    res.json({ jwtToken, name: username, userId: userRef.id, isGuest: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Could not start guest session" });
+  }
+};
+
 module.exports = {
   postRegister,
   postLogin,
   postGoogleLogin,
   postOnboarding,
+  postGuestSession,
 };

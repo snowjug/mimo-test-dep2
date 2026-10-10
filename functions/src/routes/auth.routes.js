@@ -11,5 +11,6 @@ router.post("/register", loginLimiter, auth.postRegister);
 router.post("/login", loginLimiter, auth.postLogin);
 router.post("/google-login", auth.postGoogleLogin);
 router.post("/onboarding", authMiddleware, auth.postOnboarding);
+router.post("/guest-session", loginLimiter, auth.postGuestSession);
 
 module.exports = router;
