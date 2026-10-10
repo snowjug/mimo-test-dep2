@@ -6,6 +6,7 @@ import type {
   JobsResponse,
   KiosksResponse,
   TransactionsResponse,
+  UserGrowthReport,
 } from '../types/insights.types';
 
 const params = (range: DateRangeValue, extra: Record<string, string | number | undefined> = {}) => {
@@ -29,4 +30,7 @@ export const insights = {
 
   incidents: (range: DateRangeValue) =>
     api.get<IncidentsResponse>('/admin/incidents', { params: params(range) }).then((r) => r.data),
+
+  userGrowthReport: (range: DateRangeValue) =>
+    api.get<UserGrowthReport>('/admin/user-growth-report', { params: params(range) }).then((r) => r.data),
 };

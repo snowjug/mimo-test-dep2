@@ -16,6 +16,7 @@ import {
   ArrowUpRight,
   PieChart,
   Receipt,
+  TrendingUp,
 } from 'lucide-react';
 
 export type FinanceTab =
@@ -27,7 +28,8 @@ export type FinanceTab =
   | 'pricing'
   | 'wallet'
   | 'settlements'
-  | 'expenses';
+  | 'expenses'
+  | 'krishna-report';
 
 export interface FinanceSidebarProps {
   activeTab: FinanceTab;
@@ -46,6 +48,7 @@ const NAV_ITEMS = [
   { id: 'wallet',      label: 'Wallet & Credits',       icon: WalletCards },
   { id: 'settlements', label: 'Settlements & Reports',  icon: FileSpreadsheet },
   { id: 'expenses',    label: 'Revenue & Expenses',     icon: Receipt },
+  { id: 'krishna-report', label: 'Special Krishna Demand Report', icon: TrendingUp },
 ];
 
 export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
@@ -129,11 +132,11 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
         <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-[#093765] dark:bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
-              AD
+              VK
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate leading-tight">
-                Admin
+                Vastav Krishna Raj
               </span>
               <span className="text-[10px] text-slate-400 font-medium truncate leading-tight">
                 Finance Manager

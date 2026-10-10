@@ -15,6 +15,7 @@ import { FinanceWalletPage } from './pages/FinanceWalletPage';
 import { FinanceSettlementsPage } from './pages/FinanceSettlementsPage';
 import { FinanceDashboardPage } from './pages/FinanceDashboardPage';
 import { FinanceExpensesPage } from './pages/FinanceExpensesPage';
+import { FinanceKrishnaReportPage } from './pages/FinanceKrishnaReportPage';
 import { FinanceLoginPage } from '../../components/auth/FinanceLoginPage';
 import type { AdminUsersResponse } from '../../types/user.types';
 
@@ -27,6 +28,7 @@ const TAB_PATHS: [string, FinanceTab][] = [
   ['/finance/wallet',     'wallet'],
   ['/finance/settlement', 'settlements'],
   ['/finance/expense',    'expenses'],
+  ['/finance/krishna-report', 'krishna-report'],
 ];
 const tabFromPath = (): FinanceTab => {
   const path = window.location.pathname.toLowerCase();
@@ -70,7 +72,14 @@ export const FinanceApp: React.FC = () => {
   const wantUsers = signedIn && activeTab === 'wallet';
   const users = useLiveQuery(() => (wantUsers ? api.get<AdminUsersResponse>('/admin/users').then((r) => r.data) : Promise.resolve(null)), [wantUsers], { live: false });
 
-  const refreshAll = () => { analytics.refresh(); transactions.refresh(); refunds.refresh(); if (wantUsers) users.refresh(); };
+  const wantGrowthReport = signedIn && activeTab === 'krishna-report';
+  const growthReport = useLiveQuery(
+    () => (wantGrowthReport ? insights.userGrowthReport(current()) : Promise.resolve(null)),
+    [range, wantGrowthReport],
+    { live: live && wantGrowthReport }
+  );
+
+  const refreshAll = () => { analytics.refresh(); transactions.refresh(); refunds.refresh(); if (wantUsers) users.refresh(); if (wantGrowthReport) growthReport.refresh(); };
   const isRefreshing = analytics.fetching || transactions.fetching || refunds.fetching;
   const pendingRefunds = (refunds.data || []).filter((r) => r.status === 'pending').length;
 
@@ -156,6 +165,15 @@ export const FinanceApp: React.FC = () => {
         <FinanceSettlementsPage analytics={analytics.data} transactions={transactions.data?.transactions ?? []} loading={analytics.loading} error={analytics.error} />
       )}
       {activeTab === 'expenses' && <FinanceExpensesPage />}
+      {activeTab === 'krishna-report' && (
+        <FinanceKrishnaReportPage
+          report={growthReport.data}
+          loading={growthReport.loading}
+          error={growthReport.error}
+          updatedAt={growthReport.updatedAt}
+          onRefresh={growthReport.refresh}
+        />
+      )}
     </FinanceLayout>
   );
 };

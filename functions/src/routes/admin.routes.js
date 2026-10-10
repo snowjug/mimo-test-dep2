@@ -6,6 +6,7 @@ const admin = require("../controllers/admin.controller");
 const insights = require("../controllers/adminInsights.controller");
 const kioskCommands = require("../controllers/kioskCommands.controller");
 const adminHr = require("../controllers/adminHr.controller");
+const adminReports = require("../controllers/adminReports.controller");
 
 const router = express.Router();
 const { loginLimiter } = createLimiters(db);
@@ -39,5 +40,6 @@ router.get("/admin/refund-requests", adminAuthMiddleware, admin.getAdminRefundRe
 router.get("/admin/employees", adminAuthMiddleware, adminHr.getAdminEmployees);
 router.get("/admin/hr-overview", adminAuthMiddleware, adminHr.getAdminHrOverview);
 router.get("/admin/company-activity", adminAuthMiddleware, adminHr.getAdminCompanyActivity);
+router.get("/admin/user-growth-report", adminAuthMiddleware, adminReports.getAdminUserGrowthReport);
 
 module.exports = router;

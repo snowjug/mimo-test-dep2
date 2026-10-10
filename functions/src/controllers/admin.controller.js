@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const { CASHFREE_BASE_URL, SECRET_KEY, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const { claimRefund, releaseRefund, refundIdFor, REFUND_BLOCKED_MESSAGES } = require("../services/refund.service");
+const { normalizeOrders } = require("../services/analytics.service");
 
 // Constant-time password comparison: both sides are hashed to a fixed 32-byte SHA-256 digest first, so
 // a length mismatch (almost guaranteed between a real password and an attacker's guess) can never make
@@ -560,26 +561,32 @@ const getAdminRefundRequests = async (req, res) => {
 // ================= ADMIN USERS & CUSTOMER INTELLIGENCE =================
 const getAdminUsers = async (req, res) => {
   try {
-    const [usersSnap, ordersSnap, jobsSnap] = await Promise.all([
+    const [usersSnap, ordersSnap, txnSnap, jobsSnap] = await Promise.all([
       db.collection("users").get(),
       db.collection("orders").get(),
+      db.collection("payment_transactions").get(),
       db.collection("print_jobs").get()
     ]);
 
-    // Aggregate user spending and job statistics
+    // Aggregate user spending and job statistics. Merging orders + payment_transactions (the same helper
+    // the Finance revenue dashboard relies on) matters here specifically: a real, non-free paid order is
+    // written to payment_transactions, not orders (see payment.controller.js's postCreateOrder) — reading
+    // orders alone silently undercounts every real customer's spend and the conversion rate below it.
     const userStats = {};
     const payingUserIds = new Set();
     let totalRevenue = 0;
 
-    ordersSnap.forEach((doc) => {
-      const ord = doc.data();
-      const uid = ord.userId || ord.userEmail || "anonymous";
-      const amt = ord.amount || ord.totals?.totalAmount || 0;
-      if (ord.status === "PAID" || ord.status === "SUCCESS") {
-        totalRevenue += amt;
+    const mergedOrders = normalizeOrders(
+      ordersSnap.docs.map((d) => d.data()),
+      txnSnap.docs.map((d) => d.data())
+    );
+    mergedOrders.forEach((ord) => {
+      const uid = ord.userId || "anonymous";
+      if (ord.status === "PAID") {
+        totalRevenue += ord.amount;
         if (ord.userId) payingUserIds.add(ord.userId);
         if (!userStats[uid]) userStats[uid] = { totalSpend: 0, orderCount: 0, pagesPrinted: 0 };
-        userStats[uid].totalSpend += amt;
+        userStats[uid].totalSpend += ord.amount;
         userStats[uid].orderCount += 1;
       }
     });

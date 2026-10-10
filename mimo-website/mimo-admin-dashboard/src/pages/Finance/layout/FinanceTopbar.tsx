@@ -27,6 +27,8 @@ const TAB_TITLES: Record<FinanceTab, { title: string; breadcrumb: string }> = {
   pricing: { title: 'Pricing & Coupons', breadcrumb: 'Pricing & Coupons' },
   wallet: { title: 'Wallet & Credits', breadcrumb: 'Wallet & Credits' },
   settlements: { title: 'Settlements & Reports', breadcrumb: 'Settlements & Reports' },
+  expenses: { title: 'Revenue & Expenses', breadcrumb: 'Revenue & Expenses' },
+  'krishna-report': { title: 'Special Krishna Demand Report', breadcrumb: 'Krishna Demand Report' },
 };
 
 export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
@@ -121,10 +123,10 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
         {/* Profile Pill */}
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
           <div className="w-8 h-8 rounded-xl bg-[#093765] text-white flex items-center justify-center font-black text-xs shadow-xs">
-            AD
+            VK
           </div>
           <div className="hidden lg:flex flex-col">
-            <span className="text-xs font-black text-slate-900 leading-tight">Admin</span>
+            <span className="text-xs font-black text-slate-900 leading-tight">Vastav Krishna Raj</span>
             <span className="text-[10px] text-slate-400 font-medium leading-tight">Finance Manager</span>
           </div>
         </div>

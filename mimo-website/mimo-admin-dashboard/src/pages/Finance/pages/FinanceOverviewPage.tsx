@@ -53,7 +53,17 @@ import { describeRange, pctChange, bucketLabel } from '../../../lib/dateRange';
 import { clockTime, dateTime, inr, int } from '../../../lib/format';
 import { exportFinancePdf } from '../../../lib/pdfExport';
 import { insights } from '../../../services/insights.service';
+import { pickQuote } from '../quotes';
 import type { Analytics, TransactionRow } from '../../../types/insights.types';
+
+const greeting = () => {
+  const h = new Date().getHours();
+  if (h < 5) return 'Still up';
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  if (h < 21) return 'Good evening';
+  return 'Good night';
+};
 
 export interface FinanceOverviewProps {
   analytics: Analytics | null;
@@ -85,6 +95,7 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
   onNavigateToTab,
 }) => {
   const { range, live } = useRange();
+  const [quote] = useState(pickQuote); // one draw per mount = a new one every refresh
   const [selected, setSelected] = useState<TransactionRow | null>(null);
   const [activeChartTab, setActiveChartTab] = useState<'waterfall' | 'monthly' | 'hourly'>('waterfall');
 
@@ -259,6 +270,16 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
 
   return (
     <div className="space-y-6 animate-fadeIn font-sans pb-12">
+      {/* ── Greeting + quote-of-the-visit ───────────────────────────── */}
+      <div className="pt-1">
+        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+          {greeting()}, Vastav
+        </h1>
+        <p className="mt-1.5 text-[13px] italic leading-relaxed text-slate-500 dark:text-slate-400">
+          &ldquo;{quote.line}&rdquo; <span className="not-italic text-slate-400 dark:text-slate-500">— {quote.by}</span>
+        </p>
+      </div>
+
       {/* ── Top Bar with Live Indicator and Export Options ────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         <div>

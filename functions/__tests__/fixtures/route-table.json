@@ -18,6 +18,7 @@
   "GET /admin/screensaver",
   "GET /admin/settings",
   "GET /admin/transactions",
+  "GET /admin/user-growth-report",
   "GET /admin/users",
   "GET /api/machines",
   "GET /api/machines/:machineId",

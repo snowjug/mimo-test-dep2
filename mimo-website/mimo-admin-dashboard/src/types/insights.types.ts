@@ -223,3 +223,17 @@ export interface IncidentsResponse {
   incidents: Incident[];
   updatedAt: string;
 }
+
+export interface UserGrowthReport {
+  range: { from: string; to: string };
+  totalRegisteredUsers: number;
+  activeUsersInRange: number;
+  currentMonthNewUsers: number;
+  previousMonthNewUsers: number;
+  growthPct: number;
+  dailyAverageUsers: number;
+  conversionRatePct: number;
+  paymentsInRange: number;
+  monthlyPayments: { month: string; total: number }[];
+  updatedAt: string;
+}

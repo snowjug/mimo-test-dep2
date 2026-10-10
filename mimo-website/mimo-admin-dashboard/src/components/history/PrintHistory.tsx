@@ -69,7 +69,9 @@ function printDuration(job: JobRow): number | null {
 
 const JobDetails: React.FC<{ job: JobRow; onRefund?: (job: JobRow) => void }> = ({ job, onRefund }) => {
   const steps = job.timeline ?? [];
-  const canRefund = !!onRefund && job.outcome !== 'refunded' && job.outcome !== 'refund_pending' && job.cost > 0 && !!job.orderId;
+  // A job that actually printed successfully isn't refundable from here — only a customer-reported
+  // failure (via the Incident Center's refund-request flow) or a job that never printed should be.
+  const canRefund = !!onRefund && job.outcome !== 'refunded' && job.outcome !== 'refund_pending' && job.outcome !== 'printed' && job.cost > 0 && !!job.orderId;
   const rawPages = job.pageCount || 1;
   const totalPgs = job.totalPages || (rawPages * (job.copies || 1));
   const sheets = job.sheets ?? (job.duplex ? Math.ceil(rawPages / 2) * (job.copies || 1) : totalPgs);
