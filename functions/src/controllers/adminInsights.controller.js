@@ -471,4 +471,5 @@ module.exports = {
   getAdminJobs,
   getAdminKiosks,
   getAdminIncidents,
+  loadKiosks,
 };

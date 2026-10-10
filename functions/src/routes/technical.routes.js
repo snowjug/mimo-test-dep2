@@ -21,6 +21,8 @@ router.post("/technical/announcements", technicalAuthMiddleware, technicalLeadOn
 
 router.get("/technical/activity", technicalAuthMiddleware, technical.getTechnicalActivity);
 
+router.get("/technical/machines", technicalAuthMiddleware, technical.getTechnicalMachines);
+
 router.post("/technical/work-sessions/start", technicalAuthMiddleware, technical.postWorkSessionStart);
 router.post("/technical/work-sessions/pause", technicalAuthMiddleware, technical.postWorkSessionPause);
 router.post("/technical/work-sessions/resume", technicalAuthMiddleware, technical.postWorkSessionResume);

@@ -33,6 +33,7 @@
   "GET /technical/activity",
   "GET /technical/announcements",
   "GET /technical/daily-reports",
+  "GET /technical/machines",
   "GET /technical/me",
   "GET /technical/tasks",
   "GET /technical/team",

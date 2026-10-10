@@ -3,12 +3,9 @@ import {
   Play, Pause, Square, CheckCircle2, Circle, ChevronRight, ChevronDown,
   AlertTriangle, Megaphone, Activity, Send, X, Cpu, Wifi, WifiOff, Printer, FileText,
 } from 'lucide-react';
-import { useRange } from '../../context/RangeContext';
 import { useLiveQuery, errorMessage } from '../../hooks/useLiveQuery';
-import { insights } from '../../services/insights.service';
-import { technical, TechTask, TaskStatus, TaskPriority, WorkSession, Announcement, ActivityEntry } from '../../services/technical.service';
+import { technical, TechTask, TaskStatus, TaskPriority, WorkSession, Announcement, ActivityEntry, TechMachine } from '../../services/technical.service';
 import { ErrorBanner } from '../../components/insights/InsightBits';
-import type { KioskLive } from '../../types/insights.types';
 import { pickQuote } from './quotes';
 
 const greeting = () => {
@@ -322,10 +319,9 @@ export const TechnicalWorkspace: React.FC<{ me: any; onRefreshMe: () => void }> 
   const blockedCount = activeTasks.filter((t) => t.status === 'blocked').length;
   const overdueCount = activeTasks.filter((t) => t.dueAtMs && t.dueAtMs < Date.now()).length;
 
-  // REAL machine telemetry, same endpoint the Overview/Kiosks admin pages use.
-  const { range, current } = useRange();
-  const kiosks = useLiveQuery(() => insights.kiosks(current()), [range], { live: true, intervalMs: 30000 });
-  const machines: KioskLive[] = kiosks.data?.kiosks ?? [];
+  // REAL machine telemetry — technical-scoped endpoint (health/status only, no revenue).
+  const kiosks = useLiveQuery(() => technical.machines(), [], { live: true, intervalMs: 30000 });
+  const machines: TechMachine[] = kiosks.data?.kiosks ?? [];
 
   const postAnnouncement = async () => {
     if (!newAnnouncement.trim()) return;

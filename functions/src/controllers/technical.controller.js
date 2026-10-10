@@ -2,6 +2,8 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { SECRET_KEY } = require("../config/env");
 const { admin, db } = require("../config/firebase");
+const A = require("../services/analytics.service");
+const { loadKiosks } = require("./adminInsights.controller");
 
 const TASK_STATUSES = ["backlog", "assigned", "in_progress", "blocked", "in_review", "completed"];
 const TASK_PRIORITIES = ["low", "medium", "high", "critical"];
@@ -103,6 +105,15 @@ const getTechnicalTeam = async (req, res) => {
   }
 };
 
+// Sorting newest-first in memory rather than Firestore's own orderBy avoids needing a composite index for
+// every where()+orderBy() combination below — real production Firestore enforces that strictly (the local
+// emulator does not, which is why this only surfaced once real people used it). Result sets here are at
+// most a couple hundred docs, so this costs nothing that matters.
+const sortNewestFirst = (docs, field) => {
+  const ms = (v) => (v?.toMillis ? v.toMillis() : v?._seconds ? v._seconds * 1000 : v ? new Date(v).getTime() : 0);
+  return docs.sort((a, b) => ms(b[field]) - ms(a[field]));
+};
+
 // ================= TASKS =================
 const getTechnicalTasks = async (req, res) => {
   try {
@@ -110,8 +121,8 @@ const getTechnicalTasks = async (req, res) => {
     let query = db.collection("tasks");
     if (assignee === "me") query = query.where("assigneeId", "==", req.technicalMember.id);
     else if (assignee) query = query.where("assigneeId", "==", String(assignee));
-    const snap = await query.orderBy("createdAt", "desc").limit(200).get();
-    const tasks = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const snap = await query.limit(200).get();
+    const tasks = sortNewestFirst(snap.docs.map((d) => ({ id: d.id, ...d.data() })), "createdAt");
     res.json({ tasks });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -240,8 +251,8 @@ const postTechnicalTaskComment = async (req, res) => {
 // ================= ANNOUNCEMENTS =================
 const getTechnicalAnnouncements = async (req, res) => {
   try {
-    const snap = await db.collection("announcements").where("department", "==", "technical").orderBy("createdAt", "desc").limit(20).get();
-    res.json({ announcements: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    const snap = await db.collection("announcements").where("department", "==", "technical").limit(20).get();
+    res.json({ announcements: sortNewestFirst(snap.docs.map((d) => ({ id: d.id, ...d.data() })), "createdAt") });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -268,8 +279,8 @@ const postTechnicalAnnouncement = async (req, res) => {
 // ================= ACTIVITY =================
 const getTechnicalActivity = async (req, res) => {
   try {
-    const snap = await db.collection("activity_log").where("department", "==", "technical").orderBy("createdAt", "desc").limit(50).get();
-    res.json({ activity: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    const snap = await db.collection("activity_log").where("department", "==", "technical").limit(50).get();
+    res.json({ activity: sortNewestFirst(snap.docs.map((d) => ({ id: d.id, ...d.data() })), "createdAt") });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -341,10 +352,29 @@ const getWorkSessionToday = async (req, res) => {
     const snap = await db.collection("work_sessions")
       .where("memberId", "==", req.technicalMember.id)
       .where("startedAt", ">=", admin.firestore.Timestamp.fromDate(startOfDay))
-      .orderBy("startedAt", "desc")
-      .limit(1)
       .get();
-    res.json({ session: snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() } });
+    const sessions = sortNewestFirst(snap.docs.map((d) => ({ id: d.id, ...d.data() })), "startedAt");
+    res.json({ session: sessions[0] || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ================= MACHINES =================
+// Reuses the admin fleet view but strips revenue — technical team needs health/status, not money.
+const getTechnicalMachines = async (req, res) => {
+  try {
+    const range = A.parseRange(req.query);
+    const kiosks = await loadKiosks(range);
+    const sanitized = kiosks.map(({ stats, ...k }) => ({
+      ...k,
+      stats: { jobs: stats.jobs, completed: stats.completed, failed: stats.failed, pages: stats.pages },
+    }));
+    res.json({
+      summary: { total: sanitized.length, online: sanitized.filter((k) => k.online).length, offline: sanitized.filter((k) => !k.online).length },
+      kiosks: sanitized,
+      updatedAt: new Date().toISOString(),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -379,11 +409,11 @@ const getDailyReports = async (req, res) => {
   try {
     const isLead = req.technicalMember.role === "tech_lead";
     const memberId = req.query.memberId;
-    let query = db.collection("daily_reports").orderBy("date", "desc").limit(30);
-    if (!isLead) query = db.collection("daily_reports").where("memberId", "==", req.technicalMember.id).orderBy("date", "desc").limit(30);
-    else if (memberId) query = db.collection("daily_reports").where("memberId", "==", String(memberId)).orderBy("date", "desc").limit(30);
+    let query = db.collection("daily_reports").limit(30);
+    if (!isLead) query = db.collection("daily_reports").where("memberId", "==", req.technicalMember.id).limit(30);
+    else if (memberId) query = db.collection("daily_reports").where("memberId", "==", String(memberId)).limit(30);
     const snap = await query.get();
-    res.json({ reports: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    res.json({ reports: sortNewestFirst(snap.docs.map((d) => ({ id: d.id, ...d.data() })), "date") });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -400,6 +430,7 @@ module.exports = {
   getTechnicalAnnouncements,
   postTechnicalAnnouncement,
   getTechnicalActivity,
+  getTechnicalMachines,
   postWorkSessionStart,
   postWorkSessionPause: postWorkSessionEvent("paused", "paused"),
   postWorkSessionResume: postWorkSessionEvent("resumed", "active"),

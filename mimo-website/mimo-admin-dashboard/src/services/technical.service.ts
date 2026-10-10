@@ -76,6 +76,35 @@ export interface ActivityEntry {
   targetId?: string;
 }
 
+// Same shape as the admin fleet view, minus revenue — technical team gets health/status, not money.
+export interface TechMachine {
+  kioskId: string;
+  name: string;
+  type: 'bw' | 'color';
+  description: string;
+  shortLabel?: string;
+  locationId?: string | null;
+  locationName?: string | null;
+  campusId?: string | null;
+  lifecycleStatus?: string;
+  liveState?: 'AVAILABLE' | 'BUSY' | 'DEGRADED' | 'OFFLINE' | 'PROVISIONING' | 'MAINTENANCE' | 'DECOMMISSIONED';
+  online: boolean;
+  lastSeen: string | null;
+  secondsSinceSeen: number | null;
+  printerStatus: string | null;
+  wifiSignalDbm: number | null;
+  wifiQualityPct: number | null;
+  printers: { key: string; type: 'bw' | 'color'; status: string | null; paperLevel: number | null; paperCapacity: number; paperPct: number | null; tonerLevel: number | null; inkLevel: number | null }[];
+  queue: { paid: number; printing: number };
+  stats: { jobs: number; completed: number; failed: number; pages: number };
+}
+
+export interface MachinesResponse {
+  summary: { total: number; online: number; offline: number };
+  kiosks: TechMachine[];
+  updatedAt: string;
+}
+
 export interface DailyReport {
   id: string;
   memberId: string;
@@ -106,6 +135,8 @@ export const technical = {
   postAnnouncement: (body: string) => api.post('/technical/announcements', { body }).then((r) => r.data),
 
   activity: () => api.get<{ activity: ActivityEntry[] }>('/technical/activity').then((r) => r.data.activity),
+
+  machines: () => api.get<MachinesResponse>('/technical/machines').then((r) => r.data),
 
   sessionToday: () => api.get<{ session: WorkSession | null }>('/technical/work-sessions/today').then((r) => r.data.session),
   startSession: () => api.post('/technical/work-sessions/start').then((r) => r.data),
