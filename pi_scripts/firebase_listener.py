@@ -935,10 +935,14 @@ def expected_min_sheets(page_count, copies, double_sided):
     return per_copy * max(1, int(copies or 1))
 
 
-def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=None, clock=time):
+def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=None, clock=time, on_progress=None):
     """
     After CUPS has handed the job over, poll the page counter until enough sheets came out.
     Returns (verdict, printed): "ok" | "none" (nothing came out) | "short" (stopped early) | "unknown".
+
+    on_progress, if given, is called with the running sheet count every time the printer's own page
+    counter advances (i.e. once per physical sheet, not every poll tick) -- the hook the frontend's
+    sheetsCompleted-driven progress bar needs during a multi-sheet physical print.
     """
     if count_before is None:
         return "unknown", None
@@ -951,6 +955,11 @@ def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=Non
             count = info["pagecount"]
             if last is None or count != last:
                 last, last_change = count, clock.time()
+                if on_progress is not None and count > count_before:
+                    try:
+                        on_progress(count - count_before)
+                    except Exception as e:
+                        print(f"⚠️ [SHEETS] on_progress callback failed: {e}")
             if count - count_before >= expected_min:
                 return "ok", count - count_before
             stalled = clock.time() - last_change
@@ -1119,7 +1128,10 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                         verified_fields = {}
                         if sheet_check:
                             expected = sheet_check["expected_min"]
-                            verdict, printed = verify_sheets_printed(printer_name, sheet_check["count_before"], expected)
+                            verdict, printed = verify_sheets_printed(
+                                printer_name, sheet_check["count_before"], expected,
+                                on_progress=lambda n: safe_update(doc_ref, {"sheetsCompleted": n}),
+                            )
                             print(f"🔢 [SHEETS] {job_id}: {verdict} — page counter moved {printed} (needs at least {expected}).")
                             if verdict in ("none", "short"):
                                 info = read_printer_status(printer_name)
@@ -1141,6 +1153,10 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             "isPrinted": True,
                             "printerStatus": "Printed",
                             "paperSheetsUsed": total_sheets,
+                            # Guaranteed final value regardless of sheet_check support (e.g. Epson color has
+                            # no page-counter polling, so this is its only sheetsCompleted write) -- the
+                            # frontend's progress UI depends on this field and must never see it stay unset.
+                            "sheetsCompleted": verified_fields.get("sheetsVerified", total_sheets),
                             "printedAt": firestore.SERVER_TIMESTAMP,
                             **verified_fields,
                         })
@@ -1928,12 +1944,56 @@ def process_job(doc_snapshot):
 
 _seen_first_snapshot = False
 
+# ── Self-healing job watch ──
+# The Firestore watch's underlying gRPC stream can go silent on a flaky connection without the SDK
+# surfacing an error or reconnecting on its own, so no further job updates ever arrive until the whole
+# process restarts. LISTENER_STALE_THRESHOLD_SECONDS bounds how long we'll wait with zero snapshots
+# before proactively unsubscribing and reattaching -- generous enough to not fire during a genuinely
+# quiet period, short enough to recover within the same shift.
+LISTENER_STALE_THRESHOLD_SECONDS = int(os.environ.get("LISTENER_STALE_THRESHOLD_SECONDS", "900"))
+_last_snapshot_at = time.time()
+_watch_lock = threading.Lock()
+query_watch = None  # set in __main__, monitored/replaced by _ensure_job_watch_alive()
+
+
+def _attach_job_watch():
+    query = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
+    return query.on_snapshot(on_snapshot)
+
+
+def _ensure_job_watch_alive():
+    """Call periodically (from heartbeat_loop). Reattaches the job watch if it's gone stale.
+
+    Resubscribing is safe by construction: on_snapshot's own is_reconnect_snapshot guard already treats
+    every job delivered on the first callback after a (re)attach as backlog, not as a new job, so a
+    spurious reattach never double-processes or unexpectedly resumes anything.
+    """
+    global query_watch, _last_snapshot_at
+    if time.time() - _last_snapshot_at < LISTENER_STALE_THRESHOLD_SECONDS:
+        return
+    with _watch_lock:
+        if time.time() - _last_snapshot_at < LISTENER_STALE_THRESHOLD_SECONDS:
+            return  # another thread already recovered it
+        print(f"⚠️ [WATCH] No job snapshot in over {LISTENER_STALE_THRESHOLD_SECONDS}s — reattaching listener.")
+        try:
+            if query_watch is not None:
+                query_watch.unsubscribe()
+        except Exception as e:
+            print(f"⚠️ [WATCH] unsubscribe() failed (continuing anyway): {e}")
+        try:
+            query_watch = _attach_job_watch()
+            _last_snapshot_at = time.time()
+            print("✅ [WATCH] Listener reattached.")
+        except Exception as e:
+            print(f"❌ [WATCH] Reattach failed: {e}")
+
 
 def on_snapshot(col_snapshot, changes, read_time):
     """See pi-listener/firebase_listener.py's on_snapshot for the full rationale: the first callback
     after (re)connecting delivers every already-matching job as 'ADDED', which without this guard fires
     them unattended the instant the Pi comes back online, not just genuinely new jobs."""
-    global _seen_first_snapshot
+    global _seen_first_snapshot, _last_snapshot_at
+    _last_snapshot_at = time.time()
     is_reconnect_snapshot = not _seen_first_snapshot
     _seen_first_snapshot = True
 
@@ -2046,6 +2106,10 @@ def heartbeat_loop():
                 last_health = time.time()
         except Exception as e:
             print(f"⚠️ Printer health check failed: {e}")
+        try:
+            _ensure_job_watch_alive()
+        except Exception as e:
+            print(f"⚠️ [WATCH] Health check failed: {e}")
         time.sleep(120)
 
 def reset_printer_usb(printer_name):
@@ -2556,8 +2620,7 @@ if __name__ == "__main__":
     print(f"📡 Edge Pre-Fetch Cache Active: {PRE_FETCH_DIR}")
     print(f"📡 Waiting for jobs (status: 'printing', kioskId: '{KIOSK_ID}')...")
 
-    query = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'printing')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
-    query_watch = query.on_snapshot(on_snapshot)
+    query_watch = _attach_job_watch()
 
     query_prefetch = db.collection('print_jobs').where(filter=FieldFilter('status', '==', 'paid')).where(filter=FieldFilter('kioskId', '==', KIOSK_ID))
     query_prefetch_watch = query_prefetch.on_snapshot(on_prefetch_snapshot)
