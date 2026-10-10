@@ -3,7 +3,7 @@ import { Loader2, AlertCircle, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
 export interface StaffLoginProps {
-  variant: 'admin' | 'finance' | 'technical';
+  variant: 'admin' | 'finance' | 'technical' | 'hr' | 'marketing';
   onLogin: (email: string, pass: string) => Promise<void>;
   loading: boolean;
   error: string;
@@ -32,6 +32,24 @@ const COPY = {
     portal: 'Technical',
     title: 'Sign in to Technical',
     subtitle: 'Tasks, machines, work sessions and team updates.',
+    placeholder: 'you@mimo.internal',
+    switchLabel: 'Need Admin Portal?',
+    switchText: 'Go to Admin',
+    switchHref: '/admin',
+  },
+  hr: {
+    portal: 'HR',
+    title: 'Sign in to HR',
+    subtitle: 'Employees, attendance, leave and onboarding.',
+    placeholder: 'you@mimo.internal',
+    switchLabel: 'Need Admin Portal?',
+    switchText: 'Go to Admin',
+    switchHref: '/admin',
+  },
+  marketing: {
+    portal: 'Marketing',
+    title: 'Sign in to Marketing',
+    subtitle: 'Campaigns and content, tracked in one place.',
     placeholder: 'you@mimo.internal',
     switchLabel: 'Need Admin Portal?',
     switchText: 'Go to Admin',

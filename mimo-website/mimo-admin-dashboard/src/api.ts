@@ -14,14 +14,20 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
-const TOKEN_KEYS = ['financeToken', 'adminToken', 'technicalToken'];
+const TOKEN_KEYS = ['financeToken', 'adminToken', 'technicalToken', 'hrToken', 'marketingToken'];
+const ROUTE_PREFIX_TOKEN: Record<string, string> = {
+  '/technical': 'technicalToken',
+  '/hr': 'hrToken',
+  '/marketing': 'marketingToken',
+};
 const isJwt = (t: string | null): t is string => !!t && t.split('.').length === 3;
 
 api.interceptors.request.use((config) => {
-  // Route-aware: a /technical/* call prefers technicalToken first (so an admin session open in the same
-  // browser never shadows a technical-team member's own session), same idea for /finance and everything else.
-  const isTechnical = (config.url || '').startsWith('/technical');
-  const orderedKeys = isTechnical ? ['technicalToken', ...TOKEN_KEYS.filter((k) => k !== 'technicalToken')] : TOKEN_KEYS;
+  // Route-aware: a /technical|/hr|/marketing call prefers its own token first (so an admin session open in
+  // the same browser never shadows a department member's own session), same idea for /finance.
+  const url = config.url || '';
+  const preferred = Object.entries(ROUTE_PREFIX_TOKEN).find(([prefix]) => url.startsWith(prefix))?.[1];
+  const orderedKeys = preferred ? [preferred, ...TOKEN_KEYS.filter((k) => k !== preferred)] : TOKEN_KEYS;
   // Only attach real JWTs (a leftover non-JWT value must never be sent as a bearer token).
   const token = orderedKeys
     .flatMap((k) => [localStorage.getItem(k), sessionStorage.getItem(k)])
@@ -32,11 +38,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+const LOGIN_URLS = ['/admin/login', '/technical/login', '/hr/login', '/marketing/login'];
+
 // Expired/invalid session: clear it and fall back to the login screen instead of a silently empty dashboard.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401 && error.config?.url !== '/admin/login' && error.config?.url !== '/technical/login') {
+    if (error?.response?.status === 401 && !LOGIN_URLS.includes(error.config?.url)) {
       TOKEN_KEYS.forEach((k) => {
         localStorage.removeItem(k);
         sessionStorage.removeItem(k);

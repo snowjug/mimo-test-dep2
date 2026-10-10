@@ -16,6 +16,9 @@ const FinancePage = lazy(() => import('./pages/Finance/FinancePage').then((m) =>
 const ConfigurationPage = lazy(() => import('./pages/Configuration/ConfigurationPage').then((m) => ({ default: m.ConfigurationPage })));
 const FinanceApp = lazy(() => import('./pages/Finance/FinanceApp').then((m) => ({ default: m.FinanceApp })));
 const TechnicalApp = lazy(() => import('./pages/Technical/TechnicalApp').then((m) => ({ default: m.TechnicalApp })));
+const HrApp = lazy(() => import('./pages/Hr/HrApp').then((m) => ({ default: m.HrApp })));
+const MarketingApp = lazy(() => import('./pages/Marketing/MarketingApp').then((m) => ({ default: m.MarketingApp })));
+const AdminCompanyPage = lazy(() => import('./pages/Company/AdminCompanyPage').then((m) => ({ default: m.AdminCompanyPage })));
 
 const PageSkeleton = () => (
   <div aria-busy="true" aria-label="Loading" className="space-y-3">
@@ -44,6 +47,7 @@ function DashboardApp() {
     if (path.includes('analytic')) return 'analytics';
     if (path.includes('finance')) return 'finance';
     if (path.includes('config') || path.includes('setting')) return 'configuration';
+    if (path.includes('company')) return 'company';
     return 'overview';
   };
 
@@ -125,6 +129,7 @@ function DashboardApp() {
       {activeTab === 'coupons' && <CouponsPage />}
       {activeTab === 'finance' && <FinancePage />}
       {activeTab === 'configuration' && <ConfigurationPage />}
+      {activeTab === 'company' && <AdminCompanyPage />}
       </Suspense>
     </AppShell>
   );
@@ -138,11 +143,19 @@ export default function RootApp() {
   const [isTechnicalRoute, setIsTechnicalRoute] = useState(() => {
     return window.location.pathname.toLowerCase().startsWith('/technical');
   });
+  const [isHrRoute, setIsHrRoute] = useState(() => {
+    return window.location.pathname.toLowerCase().startsWith('/hr');
+  });
+  const [isMarketingRoute, setIsMarketingRoute] = useState(() => {
+    return window.location.pathname.toLowerCase().startsWith('/marketing');
+  });
 
   useEffect(() => {
     const handlePopState = () => {
       setIsFinanceRoute(window.location.pathname.toLowerCase().startsWith('/finance'));
       setIsTechnicalRoute(window.location.pathname.toLowerCase().startsWith('/technical'));
+      setIsHrRoute(window.location.pathname.toLowerCase().startsWith('/hr'));
+      setIsMarketingRoute(window.location.pathname.toLowerCase().startsWith('/marketing'));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -166,6 +179,30 @@ export default function RootApp() {
         <RangeProvider>
           <Suspense fallback={null}>
             <TechnicalApp />
+          </Suspense>
+        </RangeProvider>
+      </ThemeProvider>
+    );
+  }
+
+  if (isHrRoute) {
+    return (
+      <ThemeProvider>
+        <RangeProvider>
+          <Suspense fallback={null}>
+            <HrApp />
+          </Suspense>
+        </RangeProvider>
+      </ThemeProvider>
+    );
+  }
+
+  if (isMarketingRoute) {
+    return (
+      <ThemeProvider>
+        <RangeProvider>
+          <Suspense fallback={null}>
+            <MarketingApp />
           </Suspense>
         </RangeProvider>
       </ThemeProvider>

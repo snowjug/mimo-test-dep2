@@ -14,6 +14,9 @@ import {
   PanelLeftOpen,
   Activity,
   Wrench,
+  Users2,
+  Megaphone,
+  Building2,
 } from 'lucide-react';
 
 export interface NavItemDef {
@@ -42,7 +45,13 @@ const NAV_CORE: NavItemDef[] = [
   { id: 'operations', label: 'Print Operations',     icon: Printer, badge: 'LIVE', badgeType: 'live' },
   { id: 'kiosks',     label: 'Kiosk Network',        icon: Cpu },
   { id: 'technical',  label: 'Technical Workspace',  icon: Wrench },
+  { id: 'hr',         label: 'HR Workspace',         icon: Users2 },
+  { id: 'marketing',  label: 'Marketing Workspace',  icon: Megaphone },
   { id: 'incidents',  label: 'Incident Management',  icon: AlertTriangle, badgeType: 'alert' },
+];
+
+const NAV_COMPANY: NavItemDef[] = [
+  { id: 'company',    label: 'Company Overview',     icon: Building2 },
 ];
 
 const NAV_ANALYTICS: NavItemDef[] = [
@@ -82,7 +91,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return (
       <button
         type="button"
-        onClick={() => (item.id === 'technical' ? window.location.assign('/technical') : onTabChange(item.id))}
+        onClick={() => (
+          item.id === 'technical' ? window.location.assign('/technical')
+          : item.id === 'hr' ? window.location.assign('/hr')
+          : item.id === 'marketing' ? window.location.assign('/marketing')
+          : onTabChange(item.id)
+        )}
         title={isCollapsedView ? item.label : undefined}
         className={`w-full flex items-center ${
           isCollapsedView ? 'justify-center px-0 h-10' : 'justify-between px-3 h-10'
@@ -216,6 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* ── SECTION 2: NAVIGATION GROUPS ──────────────────────────── */}
       <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4 ${isCollapsedView ? 'px-2' : 'px-3'}`}>
         <Section label="Core" items={NAV_CORE} />
+        <Section label="Company" items={NAV_COMPANY} />
         <Section label="Analytics" items={NAV_ANALYTICS} />
         <Section label="Finance" items={NAV_FINANCE} />
         <Section label="Settings" items={NAV_SETTINGS} />
