@@ -8,8 +8,9 @@ import os
 import tempfile
 import zipfile
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import requests
 
 try:
@@ -31,6 +32,19 @@ PRE_FETCH_DIR = "/tmp/mimo_pre_fetch"
 # Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
 IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
 
+# ── Prefetch tuning (bounded pool + cache eviction) ──
+# Caps simultaneous prefetch downloads so a Firestore reconnect backlog can't spawn
+# dozens of unbounded threads at once (root cause of the Pi lag/resource-exhaustion issue).
+PREFETCH_MAX_CONCURRENT = int(os.environ.get("PREFETCH_MAX_CONCURRENT", "2"))
+# Skip prefetching jobs that have been sitting in paid/pending for a long time already
+# (e.g. a stale backlog delivered as a burst of 'ADDED' changes on listener reconnect).
+PREFETCH_MAX_JOB_AGE_SECONDS = int(os.environ.get("PREFETCH_MAX_JOB_AGE_SECONDS", "1200"))
+# Cache eviction: remove prefetched files once they're this old...
+PREFETCH_CACHE_MAX_AGE_SECONDS = int(os.environ.get("PREFETCH_CACHE_MAX_AGE_SECONDS", "1800"))
+# ...or once the cache directory exceeds this total size, oldest files first.
+PREFETCH_CACHE_MAX_BYTES = int(os.environ.get("PREFETCH_CACHE_MAX_BYTES", str(150 * 1024 * 1024)))
+PREFETCH_CACHE_CLEANUP_INTERVAL_SECONDS = int(os.environ.get("PREFETCH_CACHE_CLEANUP_INTERVAL_SECONDS", "300"))
+
 # Mapping of CUPS printer names to their USB Vendor/Product IDs
 PRINTER_USB_IDS = {
     # SV-002 / pi
@@ -44,6 +58,11 @@ PRINTER_USB_IDS = {
     "Brother_IPP": "04f9:0503",
     "Brother": "04f9:0503"
 }
+
+# Bounded pool for background prefetch downloads. Replaces unbounded
+# threading.Thread(...)-per-snapshot-change, which could spawn one thread per
+# backlog document on every Firestore listener (re)connect.
+_prefetch_pool = ThreadPoolExecutor(max_workers=PREFETCH_MAX_CONCURRENT, thread_name_prefix="prefetch")
 
 def ensure_work_dirs():
     os.makedirs(TEMP_DIR, exist_ok=True)
@@ -2320,12 +2339,88 @@ def prefetch_job(doc_snapshot):
         except Exception as e:
             print(f"⚠️ [PRE-FETCH] Failed to pre-fetch file {f_idx+1} of job {doc_id}: {e}")
 
+def _is_prefetch_candidate_fresh(doc, max_age_seconds=PREFETCH_MAX_JOB_AGE_SECONDS):
+    """Whether a paid/pending job is still worth prefetching.
+
+    Firestore's on_snapshot delivers every currently-matching document as an 'ADDED'
+    change on initial attach and on every reconnect -- not just genuinely-new ones.
+    Without this check, a backlog of jobs sitting in paid/pending state at reconnect
+    time (WiFi blip, Pi reboot, daily restart) would enqueue every one of them at once.
+    Fails open (returns True) when there's no usable timestamp, since the bounded pool
+    already caps concurrency regardless.
+    """
+    started_at = doc.get("createdAt") or doc.get("updatedAt")
+    if not started_at:
+        return True
+    now = datetime.now(started_at.tzinfo) if getattr(started_at, "tzinfo", None) else datetime.now(timezone.utc)
+    try:
+        age = (now - started_at).total_seconds()
+    except TypeError:
+        return True
+    return age <= max_age_seconds
+
 def on_prefetch_snapshot(doc_snapshot, changes, read_time):
     for change in changes:
         if change.type.name in ['ADDED', 'MODIFIED']:
             doc = change.document.to_dict()
-            if doc.get("status") in ["paid", "pending"]:
-                threading.Thread(target=prefetch_job, args=(change.document,), daemon=True).start()
+            if doc.get("status") in ["paid", "pending"] and _is_prefetch_candidate_fresh(doc):
+                # Bounded pool, not a raw thread-per-change: caps simultaneous downloads
+                # so a reconnect backlog can't spawn an unbounded burst at once.
+                _prefetch_pool.submit(prefetch_job, change.document)
+
+def cleanup_prefetch_cache(now=None, max_age_seconds=PREFETCH_CACHE_MAX_AGE_SECONDS, max_total_bytes=PREFETCH_CACHE_MAX_BYTES):
+    """Evict stale/excess prefetch cache files.
+
+    Safe because process_job's own finally block already removes every file it used
+    (cache-sourced or not) immediately after each print attempt -- only prefetched-but-
+    never-claimed files (abandoned orders) stick around long enough to be evicted here.
+    Never removes a file whose job is currently mid-print (tracked in active_jobs) or a
+    partial/in-progress download (.partial_ prefix).
+    """
+    now = now if now is not None else time.time()
+    try:
+        entries = []
+        for name in os.listdir(PRE_FETCH_DIR):
+            if name.startswith(".partial_"):
+                continue
+            path = os.path.join(PRE_FETCH_DIR, name)
+            if not os.path.isfile(path):
+                continue
+            try:
+                stat = os.stat(path)
+            except OSError:
+                continue
+            doc_id = os.path.splitext(name)[0].rsplit("_", 1)[0]
+            if doc_id in active_jobs:
+                continue
+            entries.append((path, stat.st_mtime, stat.st_size))
+
+        kept = []
+        for path, mtime, size in entries:
+            age = now - mtime
+            if age > max_age_seconds:
+                _safe_remove(path)
+                print(f"🧹 [PRE-FETCH] Evicted stale cache file (age {int(age)}s): {path}")
+            else:
+                kept.append((path, mtime, size))
+
+        total_bytes = sum(size for _, _, size in kept)
+        if total_bytes > max_total_bytes:
+            kept.sort(key=lambda entry: entry[1])  # oldest first
+            for path, _mtime, size in kept:
+                if total_bytes <= max_total_bytes:
+                    break
+                _safe_remove(path)
+                total_bytes -= size
+                print(f"🧹 [PRE-FETCH] Evicted cache file to stay under size cap: {path}")
+    except Exception as e:
+        print(f"⚠️ [PRE-FETCH] Cache cleanup failed: {e}")
+
+def prefetch_cache_cleanup_loop():
+    time.sleep(60)
+    while True:
+        cleanup_prefetch_cache()
+        time.sleep(PREFETCH_CACHE_CLEANUP_INTERVAL_SECONDS)
 
 def keep_warm_loop():
     # Wait 60 seconds after startup before first ping to allow systems to settle
@@ -2453,6 +2548,7 @@ if __name__ == "__main__":
     threading.Thread(target=heartbeat_loop, daemon=True).start()
     threading.Thread(target=watchdog_loop, daemon=True).start()
     threading.Thread(target=keep_warm_loop, daemon=True).start()
+    threading.Thread(target=prefetch_cache_cleanup_loop, daemon=True).start()
 
     print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
     print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")
