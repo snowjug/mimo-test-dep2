@@ -184,10 +184,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         <header className="sticky top-0 z-30 bg-slate-50/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md dark:bg-slate-950/85">
           <div className="flex h-14 items-center justify-between">
             <div className="min-w-0">
-              <p className="text-[12px] font-medium text-slate-500 dark:text-slate-400">
-                MIMO Admin{fleet ? `, ${fleet.online} of ${fleet.total} kiosks online` : ''}
-              </p>
-              <h1 className="-mt-0.5 truncate text-[22px] font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+              <h1 className="truncate text-[22px] font-semibold tracking-tight text-slate-900 dark:text-slate-50">
                 {TITLES[activeTab] ?? 'Admin'}
               </h1>
             </div>

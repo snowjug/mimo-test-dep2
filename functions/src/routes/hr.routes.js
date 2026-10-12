@@ -23,6 +23,7 @@ router.post("/hr/leave-requests", hrAuthMiddleware, hr.postLeaveRequest);
 router.patch("/hr/leave-requests/:requestId", hrAuthMiddleware, hr.patchLeaveRequest);
 
 router.get("/hr/activity", hrAuthMiddleware, hr.getHrActivity);
+router.get("/hr/company-updates", hrAuthMiddleware, hr.getHrCompanyUpdates);
 
 router.patch("/hr/profile", hrAuthMiddleware, hr.patchHrProfile);
 router.post("/hr/profile/document/:docType", hrAuthMiddleware, hr.postHrProfileDocument);

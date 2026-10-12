@@ -327,6 +327,52 @@ const getHrActivity = async (req, res) => {
   }
 };
 
+/** Company-wide view for the HR dashboard's main page: the latest activity across every department
+ * (not just HR's own), plus every technical/HR/marketing member with their currently-assigned,
+ * not-yet-completed task(s) and who assigned each one. Read-only -- HR can see who's working on
+ * what without being able to change it (that stays with the tech lead / admin). */
+const getHrCompanyUpdates = async (req, res) => {
+  try {
+    const [techSnap, hrSnap, mktSnap, tasksSnap, mktTasksSnap, activitySnap] = await Promise.all([
+      db.collection("technical_team").get(),
+      db.collection("hr_team").get(),
+      db.collection("marketing_team").get(),
+      db.collection("tasks").get(),
+      db.collection("marketing_tasks").get(),
+      db.collection("activity_log").limit(100).get(),
+    ]);
+
+    const tasks = tasksSnap.docs.map((d) => d.data());
+    const mktTasks = mktTasksSnap.docs.map((d) => d.data());
+
+    const memberRow = (doc, department) => {
+      const m = doc.data();
+      const current = tasks
+        .filter((t) => t.assigneeId === doc.id && t.status !== "completed")
+        .map((t) => ({ title: t.title, assignedBy: t.creatorName || null, status: t.status }));
+      return { id: doc.id, name: m.name, role: m.role, department, currentTasks: current };
+    };
+
+    const members = [
+      ...techSnap.docs.map((d) => memberRow(d, "technical")),
+      ...hrSnap.docs.map((d) => memberRow(d, "hr")),
+      ...mktSnap.docs.map((d) => {
+        const m = d.data();
+        const current = mktTasks
+          .filter((t) => t.status !== "completed")
+          .map((t) => ({ title: t.title, assignedBy: t.createdByName || null, status: t.status }));
+        return { id: d.id, name: m.name, role: m.role, department: "marketing", currentTasks: current };
+      }),
+    ];
+
+    const updates = sortNewestFirst(activitySnap.docs.map((d) => ({ id: d.id, ...d.data() })), "createdAt").slice(0, 20);
+
+    res.json({ members, updates });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 const patchHrProfile = async (req, res) => {
   try {
     const result = await profile.updateMemberProfile(req, "hr_team", req.hrMember.id);
@@ -393,4 +439,5 @@ module.exports = {
   postLeaveRequest,
   patchLeaveRequest,
   getHrActivity,
+  getHrCompanyUpdates,
 };
