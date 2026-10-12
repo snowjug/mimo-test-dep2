@@ -20,6 +20,7 @@ import {
   Building2,
   User,
   MessageCircle,
+  Megaphone,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
@@ -65,6 +66,7 @@ const TITLES: Record<string, string> = {
   'mimo-gang': 'MIMO GANG',
   company: 'Company Overview',
   chat: 'Team Chat',
+  advertisements: 'Advertisements',
 };
 
 const TABS = [
@@ -75,13 +77,14 @@ const TABS = [
 ];
 
 const MORE = [
-  { id: 'analytics',     label: 'Analytics',          icon: BarChart2 },
-  { id: 'users',         label: 'Customers',          icon: Users },
-  { id: 'finance',       label: 'Finance',            icon: IndianRupee },
-  { id: 'mimo-gang',     label: 'MIMO GANG',          icon: Users2 },
-  { id: 'company',       label: 'Company Overview',   icon: Building2 },
-  { id: 'chat',          label: 'Team Chat',          icon: MessageCircle },
-  { id: 'configuration', label: 'Configuration',      icon: Settings },
+  { id: 'analytics',       label: 'Analytics',          icon: BarChart2 },
+  { id: 'users',           label: 'Customers',          icon: Users },
+  { id: 'finance',         label: 'Finance',            icon: IndianRupee },
+  { id: 'mimo-gang',       label: 'MIMO GANG',          icon: Users2 },
+  { id: 'company',         label: 'Company Overview',   icon: Building2 },
+  { id: 'chat',            label: 'Team Chat',          icon: MessageCircle },
+  { id: 'advertisements',  label: 'Advertisements',     icon: Megaphone },
+  { id: 'configuration',   label: 'Configuration',      icon: Settings },
 ];
 
 /** Bottom sheet used for "More" and the alerts list. */
