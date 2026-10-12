@@ -33,11 +33,15 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ value, onChange }) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [previewSrc, setPreviewSrc] = useState(value || '');
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
   // keep preview in sync when parent changes value
-  useEffect(() => { setPreviewSrc(value); }, [value]);
+  useEffect(() => {
+    setPreviewSrc(value);
+    if (!value) setDimensions(null);
+  }, [value]);
 
   const uploadFile = async (file: File) => {
     setError('');
@@ -66,6 +70,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ value, onChange }) => {
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Upload failed. Try again.');
       setPreviewSrc(value); // revert preview
+      if (!value) setDimensions(null);
     } finally {
       setUploading(false);
     }
@@ -107,7 +112,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ value, onChange }) => {
         onDragLeave={onDragLeave}
         onClick={() => !uploading && inputRef.current?.click()}
         className={`relative flex items-center justify-center border-2 border-dashed rounded-xl transition-all cursor-pointer
-          ${previewSrc ? 'h-36 border-slate-200 dark:border-slate-700' : 'h-28 border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500'}
+          ${previewSrc ? 'h-40 border-slate-200 dark:border-slate-700' : 'h-28 border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500'}
           bg-slate-50 dark:bg-slate-800/60 overflow-hidden`}
       >
         {previewSrc ? (
@@ -116,7 +121,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ value, onChange }) => {
               src={previewSrc}
               alt="Ad preview"
               className="w-full h-full object-contain"
-              onError={() => { setPreviewSrc(''); }}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+              }}
+              onError={() => { setPreviewSrc(''); setDimensions(null); }}
             />
             {/* Change overlay */}
             <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-all flex items-center justify-center group">
@@ -146,7 +155,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ value, onChange }) => {
         {previewSrc && !uploading && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onChange(''); setPreviewSrc(''); }}
+            onClick={(e) => { e.stopPropagation(); onChange(''); setPreviewSrc(''); setDimensions(null); }}
             className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors z-10"
             title="Remove image"
           >
@@ -154,6 +163,27 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ value, onChange }) => {
           </button>
         )}
       </div>
+
+      {/* Dimensions badge & format guide */}
+      {dimensions && (
+        <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
+          <span className="font-medium">
+            {dimensions.width} × {dimensions.height} px
+            {' · '}
+            {dimensions.width > dimensions.height * 1.2
+              ? 'Landscape'
+              : dimensions.height > dimensions.width * 1.2
+              ? 'Portrait / Poster'
+              : 'Square'}
+          </span>
+          <span className="text-indigo-600 dark:text-indigo-400">
+            {dimensions.width > dimensions.height ? 'Shows as full banner' : 'Shows as card poster'}
+          </span>
+        </div>
+      )}
+      <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+        💡 Format tips: Images without a caption display full-width. Images with a caption display as a poster alongside the text.
+      </p>
 
       {error && (
         <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400">{error}</p>
@@ -207,7 +237,13 @@ const AdForm: React.FC<{
     e.preventDefault();
     setError('');
     setLoading(true);
-    try { await onSubmit(values); }
+    try {
+      const trimmedLink = values.link?.trim() || '';
+      const cleanLink = trimmedLink
+        ? (/^https?:\/\//i.test(trimmedLink) ? trimmedLink : `https://${trimmedLink}`)
+        : '';
+      await onSubmit({ ...values, link: cleanLink });
+    }
     catch (err: any) { setError(err?.response?.data?.error || 'Something went wrong'); }
     finally { setLoading(false); }
   };
@@ -227,13 +263,13 @@ const AdForm: React.FC<{
         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
           <Link size={13} /> Link URL <span className="text-slate-400 font-normal">(optional — opens when user taps)</span>
         </label>
-        <input type="url" value={values.link} onChange={set('link')} placeholder="https://example.com" className={inputCls} />
+        <input type="text" value={values.link} onChange={set('link')} placeholder="https://example.com" className={inputCls} />
       </div>
 
       {/* Caption */}
       <div>
         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-          <AlignLeft size={13} /> Caption <span className="text-slate-400 font-normal">(optional)</span>
+          <AlignLeft size={13} /> Caption <span className="text-slate-400 font-normal">(optional — leave empty for full-width banner)</span>
         </label>
         <textarea rows={3} value={values.caption} onChange={set('caption')} placeholder="Event title or short description…" className={`${inputCls} resize-none`} />
       </div>
@@ -257,24 +293,47 @@ const AdForm: React.FC<{
 
 // ─── Preview Card ─────────────────────────────────────────────────────────────
 
-const AdPreviewCard: React.FC<{ ad: Ad }> = ({ ad }) => (
-  <div className="flex gap-3 overflow-hidden rounded-[16px] bg-slate-100 dark:bg-slate-800 p-3 max-w-xs">
-    {ad.imageUrl && (
-      <div className="shrink-0 overflow-hidden rounded-[10px] w-24 h-36">
-        <img src={ad.imageUrl} alt="" className="w-full h-full object-cover" />
-      </div>
-    )}
-    <div className="flex min-w-0 flex-1 flex-col py-1 gap-1">
-      {ad.caption && <p className="text-[15px] font-semibold leading-tight text-slate-900 dark:text-slate-100">{ad.caption}</p>}
-      {ad.link && (
-        <a href={ad.link} target="_blank" rel="noopener noreferrer" className="text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 truncate">
-          <ExternalLink size={11} /> {ad.link}
-        </a>
+const AdPreviewCard: React.FC<{ ad: Ad }> = ({ ad }) => {
+  const hasImage = Boolean(ad.imageUrl);
+  const hasCaption = Boolean(ad.caption);
+
+  return (
+    <div className="overflow-hidden rounded-[20px] bg-slate-100 dark:bg-slate-800 select-none max-w-sm border border-slate-200 dark:border-slate-700">
+      {/* CASE 1: Banner mode (image only, no caption) */}
+      {hasImage && !hasCaption ? (
+        <div className="p-2.5">
+          <div className="w-full overflow-hidden rounded-[14px] bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+            <img src={ad.imageUrl!} alt="" className="w-full max-h-48 object-cover rounded-[14px]" />
+          </div>
+        </div>
+      ) : (
+        /* CASE 2: Card mode (image + caption, or caption only) */
+        <div className="flex items-center gap-3 p-3">
+          {hasImage && (
+            <div className="shrink-0 overflow-hidden rounded-[12px] bg-slate-200 dark:bg-slate-700 w-24 h-32 flex items-center justify-center">
+              <img src={ad.imageUrl!} alt="" className="w-full h-full object-cover" />
+            </div>
+          )}
+          {hasCaption && (
+            <div className="flex min-w-0 flex-1 flex-col py-0.5 gap-1">
+              <p className="text-[15px] font-semibold leading-tight text-slate-900 dark:text-slate-100 line-clamp-3">
+                {ad.caption}
+              </p>
+              {ad.link && (
+                <span className="text-[11px] text-indigo-600 dark:text-indigo-400 flex items-center gap-1 truncate">
+                  <ExternalLink size={10} /> {ad.link}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       )}
-      {!ad.imageUrl && !ad.caption && <p className="text-sm text-slate-400 italic">Empty ad</p>}
+      {!hasImage && !hasCaption && (
+        <p className="p-4 text-sm text-slate-400 italic text-center">Empty ad</p>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
