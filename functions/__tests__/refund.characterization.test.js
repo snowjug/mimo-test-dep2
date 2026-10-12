@@ -71,6 +71,19 @@ test.describe("autoRefundJob: print_jobs/{jobId} becomes `failed`", () => {
     assert.strictEqual(refundCalls().length, 0);
   });
 
+  test("a WhatsApp order with a resolved cfOrderId refunds against that Cashfree order id, not the link_id (P0.4/P0.5 refund-target fix)", async () => {
+    fake.reset(orders({ cfOrderId: "CFPay_real_order_123" }));
+    await autoRefundJob.run(failing());
+    assert.match(refundCalls()[0].url, /\/orders\/CFPay_real_order_123\/refunds$/);
+    assert.strictEqual(fake.data("orders").o1.refundStatus, "SUCCESS");
+  });
+
+  test("an order with no cfOrderId (ordinary website order) still refunds against its own orderId", async () => {
+    fake.reset(orders());
+    await autoRefundJob.run(failing());
+    assert.match(refundCalls()[0].url, /\/orders\/order_1\/refunds$/);
+  });
+
   test("an order that is not found in `orders` is looked up in `payment_transactions`", async () => {
     fake.reset({ payment_transactions: { t1: { orderId: "order_1", userId: "u1", amount: 40 } } });
     await autoRefundJob.run(failing());

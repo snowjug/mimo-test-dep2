@@ -84,15 +84,42 @@ const getWaPaySuccess = async (req, res) => {
       if (cfStatus.data.link_status === "PAID") {
         printCode = await generateUniquePrintCode(db);
         const now = admin.firestore.FieldValue.serverTimestamp();
+
+        // Resolve Cashfree's own order_id for this payment. Refunds (autoRefundJob, /kiosk/report-failure)
+        // call POST /orders/{order_id}/refunds -- but our `orderId` here is the Payment Link's link_id, and
+        // Cashfree assigns a SEPARATE, auto-generated order_id to the actual order created when the customer
+        // pays (confirmed via Cashfree's docs: GET /links/{link_id}/orders returns it, link_id != order_id).
+        // Calling the refund endpoint with the link_id instead of this resolved order_id would 404.
+        let cfOrderId = null;
+        try {
+          const ordersRes = await axios.get(`${CASHFREE_BASE_URL}/links/${orderId}/orders`, { headers: cashfreeHeaders });
+          const paidOrder = (Array.isArray(ordersRes.data) ? ordersRes.data : []).find(o => o.order_status === "PAID") || ordersRes.data?.[0];
+          cfOrderId = paidOrder?.order_id || null;
+        } catch (resolveErr) {
+          console.error("[WA-PAY-SUCCESS] Failed to resolve Cashfree order_id for refund eligibility:", resolveErr.response?.data || resolveErr.message);
+        }
+
         const batch = db.batch();
         waJobs.forEach(d => batch.update(d.ref, {
           status: "paid",
           printCode,
           codeCreatedAt: now,
           paymentTime: now,
-          retentionStartAt: now
+          retentionStartAt: now,
+          ...(cfOrderId ? { cfOrderId } : {})
         }));
         await batch.commit();
+
+        // Mark the payment_transactions record PAID and store the resolved order id refund calls need --
+        // without this, refund logic has no way to learn the real Cashfree order_id later.
+        const txSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).limit(1).get();
+        if (!txSnap.empty) {
+          await txSnap.docs[0].ref.update({
+            status: "PAID",
+            paidAt: now,
+            ...(cfOrderId ? { cfOrderId } : {})
+          });
+        }
 
         // Notify on WhatsApp with native order card
         const waSession = await db.collection("whatsapp_sessions").where("jobId", "==", waJobs.docs[0]?.id).get();
