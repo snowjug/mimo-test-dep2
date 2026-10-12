@@ -374,7 +374,7 @@ export function Payment() {
 
       <ActionBarSpacer size={116} />
       <ActionBar>
-        <PrimaryButton onClick={handlePayment} loading={isProcessing}>
+        <PrimaryButton data-tour="payment-pay-button" onClick={handlePayment} loading={isProcessing}>
           {totalAmount > 0 ? (
             <>
               <Lock className="size-4" /> Pay ₹{totalAmount.toFixed(2)}
