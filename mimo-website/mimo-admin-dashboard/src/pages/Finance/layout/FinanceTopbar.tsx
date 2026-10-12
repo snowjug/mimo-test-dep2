@@ -17,6 +17,9 @@ export interface FinanceTopbarProps {
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   onOpenMobileMenu?: () => void;
+  onOpenProfile?: () => void;
+  profileName?: string | null;
+  profileAvatarUrl?: string | null;
 }
 
 const TAB_TITLES: Record<FinanceTab, { title: string; breadcrumb: string }> = {
@@ -29,6 +32,7 @@ const TAB_TITLES: Record<FinanceTab, { title: string; breadcrumb: string }> = {
   settlements: { title: 'Settlements & Reports', breadcrumb: 'Settlements & Reports' },
   expenses: { title: 'Revenue & Expenses', breadcrumb: 'Revenue & Expenses' },
   'krishna-report': { title: 'Special Krishna Demand Report', breadcrumb: 'Krishna Demand Report' },
+  chat: { title: 'Team Chat', breadcrumb: 'Team Chat' },
 };
 
 export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
@@ -39,6 +43,9 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
   searchQuery = '',
   onSearchChange,
   onOpenMobileMenu,
+  onOpenProfile,
+  profileName,
+  profileAvatarUrl,
 }) => {
   const current = TAB_TITLES[activeTab] || { title: 'Finance', breadcrumb: 'Overview' };
   const { range, setRange } = useRange();
@@ -121,15 +128,24 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
         </div>
 
         {/* Profile Pill */}
-        <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-          <div className="w-8 h-8 rounded-xl bg-[#093765] text-white flex items-center justify-center font-black text-xs shadow-xs">
-            VK
-          </div>
-          <div className="hidden lg:flex flex-col">
-            <span className="text-xs font-black text-slate-900 leading-tight">Vastav Krishna Raj</span>
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="flex items-center gap-2 pl-2 border-l border-slate-200 cursor-pointer"
+          title="My profile"
+        >
+          {profileAvatarUrl ? (
+            <img src={profileAvatarUrl} alt={profileName || 'Finance'} className="w-8 h-8 rounded-xl object-cover" />
+          ) : (
+            <div className="w-8 h-8 rounded-xl bg-[#093765] text-white flex items-center justify-center font-black text-xs shadow-xs">
+              {(profileName || 'Finance').slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <div className="hidden lg:flex flex-col text-left">
+            <span className="text-xs font-black text-slate-900 leading-tight">{profileName || 'Finance'}</span>
             <span className="text-[10px] text-slate-400 font-medium leading-tight">Finance Manager</span>
           </div>
-        </div>
+        </button>
       </div>
     </header>
   );

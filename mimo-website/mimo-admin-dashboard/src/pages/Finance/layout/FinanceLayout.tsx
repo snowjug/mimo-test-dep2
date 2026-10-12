@@ -32,6 +32,9 @@ export interface FinanceLayoutProps {
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   pendingRefundsCount?: number;
+  onOpenProfile?: () => void;
+  profileName?: string | null;
+  profileAvatarUrl?: string | null;
   children: React.ReactNode;
 }
 
@@ -45,7 +48,8 @@ const TITLES: Record<FinanceTab, string> = {
   wallet: 'Wallet & Credits',
   settlements: 'Settlements & Reports',
   expenses: 'Revenue & Expenses',
-};
+  chat: 'Team Chat',
+} as Record<FinanceTab, string>;
 
 const TABS: { id: FinanceTab; label: string; icon: React.ElementType }[] = [
   { id: 'dashboard',    label: 'Dashboard', icon: PieChart },
@@ -72,6 +76,9 @@ export const FinanceLayout: React.FC<FinanceLayoutProps> = ({
   searchQuery = '',
   onSearchChange,
   pendingRefundsCount = 0,
+  onOpenProfile,
+  profileName,
+  profileAvatarUrl,
   children,
 }) => {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -95,6 +102,9 @@ export const FinanceLayout: React.FC<FinanceLayoutProps> = ({
           isRefreshing={isRefreshing}
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
+          onOpenProfile={onOpenProfile}
+          profileName={profileName}
+          profileAvatarUrl={profileAvatarUrl}
         />
         <main className="finance-main">
           <div className="mx-auto w-full max-w-[1600px] space-y-6">{children}</div>

@@ -39,6 +39,22 @@ const adminAuthMiddleware = (req, res, next) => {
   }
 };
 
+/** Accepts either an admin or a finance token -- for the shared role-profile/chat endpoints both
+ * roles use. adminAuthMiddleware alone rejects finance (its token carries isAdmin: false by design,
+ * see admin.controller.js's postAdminLogin), so this is additive and doesn't touch that behavior. */
+const staffAuthMiddleware = (req, res, next) => {
+  const token = req.header("Authorization");
+  if (!token) return res.status(401).json({ error: "Access Denied" });
+  try {
+    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    if (!verified.isAdmin && verified.role !== "finance") return res.status(403).json({ error: "Forbidden" });
+    req.staff = { role: verified.isAdmin ? "admin" : "finance", email: verified.email };
+    next();
+  } catch (err) {
+    res.status(401).json({ error: "Invalid Token" });
+  }
+};
+
 // ================= TECHNICAL TEAM MIDDLEWARE =================
 // Separate from adminAuthMiddleware on purpose: a technical team member's identity (who they are,
 // which tasks are theirs) matters for this system, not just "is this an admin". The JWT carries only
@@ -123,6 +139,7 @@ const marketingAuthMiddleware = async (req, res, next) => {
 
 module.exports = {
   adminAuthMiddleware,
+  staffAuthMiddleware,
   authMiddleware,
   technicalAuthMiddleware,
   technicalLeadOnly,

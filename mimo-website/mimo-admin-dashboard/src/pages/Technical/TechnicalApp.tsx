@@ -1,17 +1,27 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { LogOut, Wrench, Users2, Loader2 } from 'lucide-react';
+import { LogOut, Wrench, Users2, Loader2, MessageCircle } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { technical } from '../../services/technical.service';
+import { memberProfileServiceFor } from '../../services/profile.service';
 import { TechnicalLoginPage } from '../../components/auth/TechnicalLoginPage';
 import { TechnicalWorkspace } from './TechnicalWorkspace';
 import { TechnicalTeamPage } from './TechnicalTeamPage';
+import { ChatPanel } from '../../components/shared/ChatPanel';
+import { ProfileModal } from '../../components/shared/ProfileModal';
+import { ProfileCompletionBanner } from '../../components/shared/ProfileCompletionBanner';
 
-type Tab = 'workspace' | 'team';
+type Tab = 'workspace' | 'team' | 'chat';
 
 interface Me {
-  member: { id: string; name: string; role: 'tech_lead' | 'tech_member'; email: string; skills: string[] };
+  member: {
+    id: string; name: string; role: 'tech_lead' | 'tech_member'; email: string; skills: string[];
+    avatarUrl?: string | null; dob?: string | null;
+    joiningLetterUrl?: string | null; collegeIdUrl?: string | null; citizenshipIdUrl?: string | null;
+  };
   stats: { activeTasks: number; completedTasks: number; overdueTasks: number; completionRate: number | null; avgCompletionHours: number | null };
 }
+
+const technicalProfile = memberProfileServiceFor('/technical');
 
 /**
  * Technical portal: its own login (separate from Admin/Finance — team members sign in with their own
@@ -25,6 +35,7 @@ export const TechnicalApp: React.FC = () => {
   const [me, setMe] = useState<Me | null>(null);
   const [meLoading, setMeLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('workspace');
+  const [showProfile, setShowProfile] = useState(false);
 
   const loadMe = useCallback(async () => {
     setMeLoading(true);
@@ -92,11 +103,32 @@ export const TechnicalApp: React.FC = () => {
                     <Users2 className="size-3.5" /> Team
                   </button>
                 )}
+                <button
+                  onClick={() => setTab('chat')}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${tab === 'chat' ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)]'}`}
+                >
+                  <MessageCircle className="size-3.5" /> Chat
+                </button>
               </nav>
             )}
 
             <div className="flex items-center gap-2">
-              {me && <span className="hidden text-[13px] font-medium text-[var(--text-2)] sm:inline">{me.member.name}</span>}
+              {me && (
+                <button
+                  onClick={() => setShowProfile(true)}
+                  className="press flex items-center gap-2 rounded-full pl-1 pr-2.5 py-1 hover:bg-[var(--surface-2)]"
+                  title="My profile"
+                >
+                  {me.member.avatarUrl ? (
+                    <img src={me.member.avatarUrl} alt={me.member.name} className="size-6 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex size-6 items-center justify-center rounded-full bg-indigo-500/10 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                      {me.member.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="hidden text-[13px] font-medium text-[var(--text-2)] sm:inline">{me.member.name}</span>
+                </button>
+              )}
               <button onClick={toggleTheme} className="press flex size-8 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)]" aria-label="Toggle theme">
                 {isDark ? '☀️' : '🌙'}
               </button>
@@ -111,6 +143,7 @@ export const TechnicalApp: React.FC = () => {
               {me.member.role === 'tech_lead' && (
                 <button onClick={() => setTab('team')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'team' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>Team</button>
               )}
+              <button onClick={() => setTab('chat')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'chat' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>Chat</button>
             </nav>
           )}
         </header>
@@ -121,8 +154,25 @@ export const TechnicalApp: React.FC = () => {
           </div>
         ) : tab === 'workspace' ? (
           <TechnicalWorkspace me={me} onRefreshMe={loadMe} />
-        ) : (
+        ) : tab === 'team' ? (
           <TechnicalTeamPage currentMemberId={me.member.id} />
+        ) : (
+          <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6">
+            <ChatPanel basePath="/technical" selfId={me.member.id} title="Technical Team Chat" />
+          </div>
+        )}
+
+        {me && !showProfile && (
+          <ProfileCompletionBanner profile={{ id: me.member.id, ...me.member }} onComplete={() => setShowProfile(true)} />
+        )}
+        {showProfile && me && (
+          <ProfileModal
+            profile={{ id: me.member.id, ...me.member, avatarUrl: me.member.avatarUrl || null, dob: me.member.dob || null }}
+            onClose={() => setShowProfile(false)}
+            onSave={async (fields, avatar) => { await technicalProfile.update(fields, avatar); await loadMe(); }}
+            onChangePassword={(cur, next) => technicalProfile.changePassword(cur, next)}
+            onUploadDocument={async (docType, file) => { const r = await technicalProfile.uploadDocument(docType, file); await loadMe(); return r; }}
+          />
         )}
       </div>
     </div>

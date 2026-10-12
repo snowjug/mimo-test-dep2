@@ -15,6 +15,7 @@ import {
   Info,
   CheckCircle2,
   AlertTriangle,
+  User,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import type { Incident } from '../../types/insights.types';
@@ -30,6 +31,9 @@ export interface HeaderProps {
   /** Live open incidents from /admin/incidents (drives the bell). */
   alerts?: Incident[];
   onOpenMobileNav: () => void;
+  onOpenProfile?: () => void;
+  profileName?: string | null;
+  profileAvatarUrl?: string | null;
 }
 
 interface NotificationItem {
@@ -51,6 +55,9 @@ export const Header: React.FC<HeaderProps> = ({
   incidentCount = 0,
   alerts = [],
   onOpenMobileNav,
+  onOpenProfile,
+  profileName,
+  profileAvatarUrl,
 }) => {
   const { isDark, toggleTheme } = useTheme();
   const [searchVal, setSearchVal] = useState('');
@@ -287,11 +294,15 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => setShowUserMenu(v => !v)}
             className="flex items-center gap-2 p-1 sm:px-2.5 sm:py-1 rounded-xl border border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all cursor-pointer"
           >
-            <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 text-white flex items-center justify-center text-xs font-bold shadow-xs">
-              AD
-            </div>
+            {profileAvatarUrl ? (
+              <img src={profileAvatarUrl} alt={profileName || 'Admin'} className="w-7 h-7 rounded-xl object-cover" />
+            ) : (
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 text-white flex items-center justify-center text-xs font-bold shadow-xs">
+                {(profileName || 'Admin').slice(0, 2).toUpperCase()}
+              </div>
+            )}
             <div className="hidden md:block text-left">
-              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-tight">Admin</p>
+              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-tight">{profileName || 'Admin'}</p>
               <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono leading-none">Superadmin</p>
             </div>
             <ChevronDown size={13} className="hidden sm:block text-slate-400" />
@@ -300,9 +311,20 @@ export const Header: React.FC<HeaderProps> = ({
           {showUserMenu && (
             <div className="absolute right-0 mt-2 w-52 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 animate-fadeIn">
               <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800 mb-1">
-                <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Admin User</p>
+                <p className="text-xs font-bold text-slate-900 dark:text-slate-100">{profileName || 'Admin User'}</p>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">admin@mimo.in</p>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenProfile?.();
+                  setShowUserMenu(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              >
+                <User size={14} />
+                My Profile
+              </button>
               <button
                 type="button"
                 onClick={() => {

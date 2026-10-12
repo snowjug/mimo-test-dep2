@@ -26,6 +26,8 @@ export interface TechTask {
   relatedMachine: string | null;
   tags: string[];
   comments: TechTaskComment[];
+  proofScreenshotUrl?: string | null;
+  proofNote?: string | null;
   createdAt: string | { _seconds: number };
   updatedAt: string | { _seconds: number };
   completedAt: (string | { _seconds: number }) | null;
@@ -129,6 +131,15 @@ export const technical = {
     api.post<{ id: string }>('/technical/tasks', body).then((r) => r.data),
   updateTask: (taskId: string, body: Partial<Pick<TechTask, 'status' | 'priority' | 'assigneeId' | 'title' | 'description'>> & { dueAtMs?: number | null }) =>
     api.patch(`/technical/tasks/${taskId}`, body).then((r) => r.data),
+  /** Same endpoint, multipart: lets a status change (typically marking a task complete) carry a pasted/
+   * attached screenshot as proof of work, alongside the usual fields. */
+  updateTaskWithProof: (taskId: string, body: { status?: TaskStatus; proofNote?: string }, screenshot: File) => {
+    const form = new FormData();
+    if (body.status) form.append('status', body.status);
+    if (body.proofNote) form.append('proofNote', body.proofNote);
+    form.append('screenshot', screenshot);
+    return api.patch(`/technical/tasks/${taskId}`, form, { headers: { 'Content-Type': 'multipart/form-data' } }).then((r) => r.data);
+  },
   commentOnTask: (taskId: string, body: string) => api.post<{ comment: TechTaskComment }>(`/technical/tasks/${taskId}/comments`, { body }).then((r) => r.data),
 
   announcements: () => api.get<{ announcements: Announcement[] }>('/technical/announcements').then((r) => r.data.announcements),

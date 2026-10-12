@@ -18,6 +18,10 @@ import { FinanceExpensesPage } from './pages/FinanceExpensesPage';
 import { FinanceKrishnaReportPage } from './pages/FinanceKrishnaReportPage';
 import { FinanceLoginPage } from '../../components/auth/FinanceLoginPage';
 import type { AdminUsersResponse } from '../../types/user.types';
+import { staffProfileService, StaffProfile } from '../../services/profile.service';
+import { ProfileModal } from '../../components/shared/ProfileModal';
+import { ProfileCompletionBanner } from '../../components/shared/ProfileCompletionBanner';
+import { ChatPanel } from '../../components/shared/ChatPanel';
 
 const TAB_PATHS: [string, FinanceTab][] = [
   ['/finance/dashboard',   'dashboard'],
@@ -47,6 +51,9 @@ export const FinanceApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<FinanceTab>(tabFromPath);
   const [globalSearch, setGlobalSearch] = useState('');
   const { range, current, live } = useRange();
+  const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const loadStaffProfile = () => staffProfileService.get().then(setStaffProfile).catch(() => {});
 
   const handleTabChange = (tab: FinanceTab) => {
     setActiveTab(tab);
@@ -58,6 +65,8 @@ export const FinanceApp: React.FC = () => {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+
+  useEffect(() => { if (token) loadStaffProfile(); }, [token]);
 
   // Queries only run once signed in; they re-run when the date range changes and poll while the range includes today.
   const signedIn = !!token;
@@ -119,6 +128,9 @@ export const FinanceApp: React.FC = () => {
       searchQuery={globalSearch}
       onSearchChange={setGlobalSearch}
       pendingRefundsCount={pendingRefunds}
+      onOpenProfile={() => setShowProfile(true)}
+      profileName={staffProfile?.name}
+      profileAvatarUrl={staffProfile?.avatarUrl}
     >
       {activeTab === 'dashboard' && (
         <FinanceDashboardPage
@@ -172,6 +184,19 @@ export const FinanceApp: React.FC = () => {
           error={growthReport.error}
           updatedAt={growthReport.updatedAt}
           onRefresh={growthReport.refresh}
+        />
+      )}
+      {activeTab === 'chat' && <ChatPanel basePath="/staff" selfId="finance" title="Finance Team Chat" />}
+
+      {staffProfile && !showProfile && (
+        <ProfileCompletionBanner profile={staffProfile} onComplete={() => setShowProfile(true)} />
+      )}
+      {showProfile && (
+        <ProfileModal
+          profile={staffProfile || { name: '', avatarUrl: null, dob: null }}
+          onClose={() => setShowProfile(false)}
+          onSave={async (fields, avatar) => { await staffProfileService.update(fields, avatar); await loadStaffProfile(); }}
+          onUploadDocument={async (docType, file) => { const r = await staffProfileService.uploadDocument(docType, file); await loadStaffProfile(); return r; }}
         />
       )}
     </FinanceLayout>

@@ -1,5 +1,5 @@
 const express = require("express");
-const { adminAuthMiddleware } = require("../middleware/auth");
+const { adminAuthMiddleware, staffAuthMiddleware } = require("../middleware/auth");
 const { db } = require("../config/firebase");
 const { createLimiters } = require("../middleware/rateLimit");
 const admin = require("../controllers/admin.controller");
@@ -54,5 +54,13 @@ router.patch("/admin/gang/marketing-tasks/:taskId", adminAuthMiddleware, adminGa
 router.patch("/admin/gang/employees/:employeeId", adminAuthMiddleware, adminGang.patchAdminEmployee);
 router.patch("/admin/gang/employees/:employeeId/onboarding", adminAuthMiddleware, adminGang.patchAdminEmployeeOnboarding);
 router.patch("/admin/gang/leave-requests/:requestId", adminAuthMiddleware, adminGang.patchAdminLeaveRequest);
+
+// Shared role-level profile/chat for Admin and Finance (both use a single shared login per role, not
+// individual accounts -- see admin.controller.js's env-var-based postAdminLogin).
+router.get("/staff/profile", staffAuthMiddleware, admin.getStaffProfile);
+router.patch("/staff/profile", staffAuthMiddleware, admin.patchStaffProfile);
+router.post("/staff/profile/document/:docType", staffAuthMiddleware, admin.postStaffProfileDocument);
+router.get("/staff/chat", staffAuthMiddleware, admin.getStaffChatMessages);
+router.post("/staff/chat", staffAuthMiddleware, admin.postStaffChatMessage);
 
 module.exports = router;

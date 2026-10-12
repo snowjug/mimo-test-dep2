@@ -3,6 +3,8 @@ const bcrypt = require("bcryptjs");
 const { SECRET_KEY } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const { recordLogin } = require("../services/loginStreak.service");
+const profile = require("./profile.controller");
+const chat = require("./chat.controller");
 
 const TASK_STATUSES = ["planned", "in_progress", "completed"];
 const TASK_PRIORITIES = ["low", "medium", "high"];
@@ -42,7 +44,7 @@ const postMarketingLogin = async (req, res) => {
 
     const token = jwt.sign({ marketingMemberId: doc.id, role: member.role }, SECRET_KEY, { expiresIn: "30d" });
     await recordLogin("marketing_team", doc.id);
-    res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email } });
+    res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email, avatarUrl: member.avatarUrl || null, dob: member.dob || null, joiningLetterUrl: member.joiningLetterUrl || null, collegeIdUrl: member.collegeIdUrl || null, citizenshipIdUrl: member.citizenshipIdUrl || null } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -51,10 +53,12 @@ const postMarketingLogin = async (req, res) => {
 const getMarketingMe = async (req, res) => {
   try {
     const { id, name, role, email } = req.marketingMember;
+    const memberDoc = await db.collection("marketing_team").doc(id).get();
+    const memberData = memberDoc.exists ? memberDoc.data() : {};
     const tasksSnap = await db.collection("marketing_tasks").get();
     const tasks = tasksSnap.docs.map((d) => d.data());
     res.json({
-      member: { id, name, role, email },
+      member: { id, name, role, email, avatarUrl: memberData.avatarUrl || null, dob: memberData.dob || null, joiningLetterUrl: memberData.joiningLetterUrl || null, collegeIdUrl: memberData.collegeIdUrl || null, citizenshipIdUrl: memberData.citizenshipIdUrl || null },
       stats: {
         planned: tasks.filter((t) => t.status === "planned").length,
         inProgress: tasks.filter((t) => t.status === "in_progress").length,
@@ -136,10 +140,63 @@ const patchMarketingTask = async (req, res) => {
   }
 };
 
+const patchMarketingProfile = async (req, res) => {
+  try {
+    const result = await profile.updateMemberProfile(req, "marketing_team", req.marketingMember.id);
+    res.json({ member: result });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const postMarketingProfileDocument = async (req, res) => {
+  try {
+    const result = await profile.uploadMemberDocument(req, "marketing_team", req.marketingMember.id, req.params.docType);
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const postMarketingChangePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    await profile.changeMemberPassword("marketing_team", req.marketingMember.id, currentPassword, newPassword);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const getMarketingChatMessages = async (req, res) => {
+  try {
+    res.json({ messages: await chat.getChatMessages("marketing") });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const postMarketingChatMessage = async (req, res) => {
+  try {
+    const member = req.marketingMember;
+    const memberDoc = await db.collection("marketing_team").doc(member.id).get();
+    const avatarUrl = memberDoc.exists ? memberDoc.data().avatarUrl || null : null;
+    const message = await chat.postChatMessage(req, "marketing", { id: member.id, name: member.name, avatarUrl });
+    res.json({ message });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   postMarketingLogin,
   getMarketingMe,
   getMarketingTasks,
   postMarketingTask,
   patchMarketingTask,
+  patchMarketingProfile,
+  postMarketingProfileDocument,
+  postMarketingChangePassword,
+  getMarketingChatMessages,
+  postMarketingChatMessage,
 };

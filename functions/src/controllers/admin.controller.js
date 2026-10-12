@@ -5,6 +5,8 @@ const { CASHFREE_BASE_URL, SECRET_KEY, cashfreeHeaders } = require("../config/en
 const { admin, db } = require("../config/firebase");
 const { claimRefund, releaseRefund, refundIdFor, REFUND_BLOCKED_MESSAGES } = require("../services/refund.service");
 const { normalizeOrders } = require("../services/analytics.service");
+const profile = require("./profile.controller");
+const chat = require("./chat.controller");
 
 // Constant-time password comparison: both sides are hashed to a fixed 32-byte SHA-256 digest first, so
 // a length mismatch (almost guaranteed between a real password and an attacker's guess) can never make
@@ -656,6 +658,55 @@ const getAdminUsers = async (req, res) => {
   }
 };
 
+const getStaffProfile = async (req, res) => {
+  try {
+    res.json({ profile: await profile.getRoleProfile(req.staff.role) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const postStaffProfileDocument = async (req, res) => {
+  try {
+    const result = await profile.uploadRoleDocument(req, req.staff.role, req.params.docType);
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const patchStaffProfile = async (req, res) => {
+  try {
+    const result = await profile.updateRoleProfile(req, req.staff.role);
+    res.json({ profile: result });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const getStaffChatMessages = async (req, res) => {
+  try {
+    res.json({ messages: await chat.getChatMessages(req.staff.role) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const postStaffChatMessage = async (req, res) => {
+  try {
+    const roleProfile = await profile.getRoleProfile(req.staff.role);
+    const senderName = roleProfile.name || (req.staff.role === "admin" ? "Admin" : "Finance");
+    const message = await chat.postChatMessage(req, req.staff.role, {
+      id: req.staff.role,
+      name: senderName,
+      avatarUrl: roleProfile.avatarUrl || null,
+    });
+    res.json({ message });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   postAdminLogin,
   getAdminCoupons,
@@ -674,5 +725,10 @@ module.exports = {
   postAdminRefund,
   getAdminRefundRequests,
   getAdminUsers,
+  getStaffProfile,
+  patchStaffProfile,
+  postStaffProfileDocument,
+  getStaffChatMessages,
+  postStaffChatMessage,
 };
 

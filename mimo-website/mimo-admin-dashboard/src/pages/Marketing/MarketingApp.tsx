@@ -1,14 +1,26 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2, Megaphone, MessageCircle } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { marketing } from '../../services/marketing.service';
+import { memberProfileServiceFor } from '../../services/profile.service';
 import { MarketingLoginPage } from '../../components/auth/MarketingLoginPage';
 import { MarketingWorkspace } from './MarketingWorkspace';
+import { ChatPanel } from '../../components/shared/ChatPanel';
+import { ProfileModal } from '../../components/shared/ProfileModal';
+import { ProfileCompletionBanner } from '../../components/shared/ProfileCompletionBanner';
+
+type Tab = 'workspace' | 'chat';
 
 interface Me {
-  member: { id: string; name: string; role: string; email: string };
+  member: {
+    id: string; name: string; role: string; email: string;
+    avatarUrl?: string | null; dob?: string | null;
+    joiningLetterUrl?: string | null; collegeIdUrl?: string | null; citizenshipIdUrl?: string | null;
+  };
   stats: { planned: number; inProgress: number; completed: number };
 }
+
+const marketingProfile = memberProfileServiceFor('/marketing');
 
 /** Marketing portal: one shared seat (no named individuals yet), one page. Same shell pattern as the
  * Technical/Finance portals, just without the tab nav since there's only one thing to show. */
@@ -19,6 +31,8 @@ export const MarketingApp: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [me, setMe] = useState<Me | null>(null);
   const [meLoading, setMeLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>('workspace');
+  const [showProfile, setShowProfile] = useState(false);
 
   const loadMe = useCallback(async () => {
     setMeLoading(true);
@@ -64,7 +78,31 @@ export const MarketingApp: React.FC = () => {
               <span className="text-[16px] font-black tracking-tight text-[#093765] dark:text-white">MIMO</span>
               <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--text-2)]">Marketing</span>
             </div>
+
+            {me && (
+              <nav className="hidden items-center gap-1 rounded-full bg-[var(--surface-2)] p-1 sm:flex">
+                <button onClick={() => setTab('workspace')} className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${tab === 'workspace' ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)]'}`}>
+                  <Megaphone className="size-3.5" /> Workspace
+                </button>
+                <button onClick={() => setTab('chat')} className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${tab === 'chat' ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)]'}`}>
+                  <MessageCircle className="size-3.5" /> Chat
+                </button>
+              </nav>
+            )}
+
             <div className="flex items-center gap-2">
+              {me && (
+                <button onClick={() => setShowProfile(true)} className="press flex items-center gap-2 rounded-full pl-1 pr-2.5 py-1 hover:bg-[var(--surface-2)]" title="My profile">
+                  {me.member.avatarUrl ? (
+                    <img src={me.member.avatarUrl} alt={me.member.name} className="size-6 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex size-6 items-center justify-center rounded-full bg-indigo-500/10 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                      {me.member.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="hidden text-[13px] font-medium text-[var(--text-2)] sm:inline">{me.member.name}</span>
+                </button>
+              )}
               <button onClick={toggleTheme} className="press flex size-8 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)]" aria-label="Toggle theme">
                 {isDark ? '☀️' : '🌙'}
               </button>
@@ -73,14 +111,37 @@ export const MarketingApp: React.FC = () => {
               </button>
             </div>
           </div>
+          {me && (
+            <nav className="flex items-center gap-1 overflow-x-auto px-4 pb-2 sm:hidden">
+              <button onClick={() => setTab('workspace')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'workspace' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>Workspace</button>
+              <button onClick={() => setTab('chat')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'chat' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>Chat</button>
+            </nav>
+          )}
         </header>
 
         {meLoading || !me ? (
           <div className="flex min-h-[60dvh] items-center justify-center">
             <Loader2 className="size-6 animate-spin text-[var(--text-3)]" />
           </div>
-        ) : (
+        ) : tab === 'workspace' ? (
           <MarketingWorkspace me={me} />
+        ) : (
+          <div className="mx-auto max-w-[800px] px-4 py-6 sm:px-6">
+            <ChatPanel basePath="/marketing" selfId={me.member.id} title="Marketing Team Chat" />
+          </div>
+        )}
+
+        {me && !showProfile && (
+          <ProfileCompletionBanner profile={{ id: me.member.id, ...me.member }} onComplete={() => setShowProfile(true)} />
+        )}
+        {showProfile && me && (
+          <ProfileModal
+            profile={{ id: me.member.id, ...me.member, avatarUrl: me.member.avatarUrl || null, dob: me.member.dob || null }}
+            onClose={() => setShowProfile(false)}
+            onSave={async (fields, avatar) => { await marketingProfile.update(fields, avatar); await loadMe(); }}
+            onChangePassword={(cur, next) => marketingProfile.changePassword(cur, next)}
+            onUploadDocument={async (docType, file) => { const r = await marketingProfile.uploadDocument(docType, file); await loadMe(); return r; }}
+          />
         )}
       </div>
     </div>

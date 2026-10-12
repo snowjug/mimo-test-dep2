@@ -13,4 +13,10 @@ router.get("/marketing/tasks", marketingAuthMiddleware, marketing.getMarketingTa
 router.post("/marketing/tasks", marketingAuthMiddleware, marketing.postMarketingTask);
 router.patch("/marketing/tasks/:taskId", marketingAuthMiddleware, marketing.patchMarketingTask);
 
+router.patch("/marketing/profile", marketingAuthMiddleware, marketing.patchMarketingProfile);
+router.post("/marketing/profile/document/:docType", marketingAuthMiddleware, marketing.postMarketingProfileDocument);
+router.post("/marketing/change-password", marketingAuthMiddleware, marketing.postMarketingChangePassword);
+router.get("/marketing/chat", marketingAuthMiddleware, marketing.getMarketingChatMessages);
+router.post("/marketing/chat", marketingAuthMiddleware, marketing.postMarketingChatMessage);
+
 module.exports = router;
