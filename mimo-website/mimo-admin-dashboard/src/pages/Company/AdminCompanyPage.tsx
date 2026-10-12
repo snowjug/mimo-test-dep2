@@ -48,8 +48,7 @@ export const AdminCompanyPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[22px] font-bold tracking-tight text-slate-900 dark:text-slate-50">Company overview</h1>
-        <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">Headcount, attendance and leave across every department — read-only, owned by HR.</p>
+        <p className="text-[13px] text-slate-500 dark:text-slate-400">Headcount, attendance and leave across every department — read-only, owned by HR.</p>
       </div>
 
       {error && <ErrorBanner message={error} onRetry={load} />}

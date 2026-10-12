@@ -32,6 +32,7 @@
   "GET /hr/activity",
   "GET /hr/attendance",
   "GET /hr/chat",
+  "GET /hr/company-updates",
   "GET /hr/employees",
   "GET /hr/leave-requests",
   "GET /hr/me",

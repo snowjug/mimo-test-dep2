@@ -60,6 +60,20 @@ export interface HrActivityEntry {
   createdAt: string | { _seconds: number };
 }
 
+export interface MemberCurrentTask {
+  title: string;
+  assignedBy: string | null;
+  status: string;
+}
+
+export interface CompanyMember {
+  id: string;
+  name: string;
+  role: string;
+  department: 'technical' | 'hr' | 'marketing';
+  currentTasks: MemberCurrentTask[];
+}
+
 export const hr = {
   login: (email: string, password: string) =>
     api.post<{ token: string; member: { id: string; name: string; role: 'hr_lead' | 'hr_staff'; email: string } }>('/hr/login', { email, password }).then((r) => r.data),
@@ -88,4 +102,5 @@ export const hr = {
     api.patch(`/hr/leave-requests/${requestId}`, { status, decisionNote }).then((r) => r.data),
 
   activity: () => api.get<{ activity: HrActivityEntry[] }>('/hr/activity').then((r) => r.data.activity),
+  companyUpdates: () => api.get<{ members: CompanyMember[]; updates: HrActivityEntry[] }>('/hr/company-updates').then((r) => r.data),
 };

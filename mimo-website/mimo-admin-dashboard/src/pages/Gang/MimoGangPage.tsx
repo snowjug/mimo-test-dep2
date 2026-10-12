@@ -99,14 +99,20 @@ const NewTechTaskModal: React.FC<{ members: Employee[]; onClose: () => void; onC
   );
 };
 
-const TechTaskRow: React.FC<{ task: TechTask; onChange: () => void }> = ({ task, onChange }) => {
+const TechTaskRow: React.FC<{ task: TechTask; members: Employee[]; onChange: () => void }> = ({ task, members, onChange }) => {
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const status = TECH_STATUS[task.status];
+  const due = task.dueAtMs ? new Date(task.dueAtMs).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : null;
 
   const setStatus = async (s: TaskStatus) => {
     setBusy(true);
     try { await adminGang.updateTechnicalTask(task.id, { status: s }); onChange(); } finally { setBusy(false); }
+  };
+  const reassign = async (assigneeId: string) => {
+    if (!assigneeId || assigneeId === task.assigneeId) return;
+    setBusy(true);
+    try { await adminGang.updateTechnicalTask(task.id, { assigneeId }); onChange(); } finally { setBusy(false); }
   };
 
   return (
@@ -115,24 +121,45 @@ const TechTaskRow: React.FC<{ task: TechTask; onChange: () => void }> = ({ task,
         <span className={`size-2 shrink-0 rounded-full ${status.dot}`} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{task.title}</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">{status.label} · {task.assigneeName}{task.creatorName && ` · assigned by ${task.creatorName}`}</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">{task.assigneeName}</span>
+            {task.creatorName && <> &middot; by {task.creatorName}</>}
+            <> &middot; {status.label}</>
+            {due && <> &middot; Due {due}</>}
+          </p>
         </div>
         {expanded ? <ChevronDown className="size-4 text-slate-400" /> : <ChevronRight className="size-4 text-slate-400" />}
       </button>
       {expanded && (
-        <div className="flex flex-wrap gap-1.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-4 py-3">
-          {TECH_STATUS_ORDER.map((s) => (
-            <button
-              key={s}
-              disabled={busy || s === task.status}
-              onClick={() => setStatus(s)}
-              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold disabled:cursor-default ${
-                s === task.status ? `${TECH_STATUS[s].dot} text-white` : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-              }`}
+        <div className="space-y-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-4 py-3">
+          <div>
+            <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">Status</p>
+            <div className="flex flex-wrap gap-1.5">
+              {TECH_STATUS_ORDER.map((s) => (
+                <button
+                  key={s}
+                  disabled={busy || s === task.status}
+                  onClick={() => setStatus(s)}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold disabled:cursor-default ${
+                    s === task.status ? `${TECH_STATUS[s].dot} text-white` : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  {TECH_STATUS[s].label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">Reassign</p>
+            <select
+              disabled={busy}
+              value={task.assigneeId}
+              onChange={(e) => reassign(e.target.value)}
+              className="h-9 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-xs outline-none disabled:opacity-50"
             >
-              {TECH_STATUS[s].label}
-            </button>
-          ))}
+              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
         </div>
       )}
     </div>
@@ -166,7 +193,7 @@ const TechnicalTab: React.FC<{ employees: Employee[]; streaks: LoginStreaks }> =
         ) : tasks.length === 0 ? (
           <p className="px-4 py-8 text-center text-xs text-slate-400">No technical tasks yet.</p>
         ) : (
-          tasks.map((t) => <TechTaskRow key={t.id} task={t} onChange={load} />)
+          tasks.map((t) => <TechTaskRow key={t.id} task={t} members={members} onChange={load} />)
         )}
       </div>
       {showNew && <NewTechTaskModal members={members} onClose={() => setShowNew(false)} onCreated={load} />}

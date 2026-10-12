@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, FileText, Users2, UserPlus, CalendarClock } from 'lucide-react';
-import { hr, HrActivityEntry } from '../../services/hr.service';
+import { Loader2, FileText, Users2, UserPlus, CalendarClock, Wrench, Megaphone, UserCircle2 } from 'lucide-react';
+import { hr, CompanyMember, HrActivityEntry } from '../../services/hr.service';
 import { ErrorBanner } from '../../components/insights/InsightBits';
 import { errorMessage } from '../../hooks/useLiveQuery';
+
+const DEPT_ICON: Record<CompanyMember['department'], React.ElementType> = { technical: Wrench, hr: Users2, marketing: Megaphone };
+const DEPT_LABEL: Record<CompanyMember['department'], string> = { technical: 'Technical', hr: 'HR', marketing: 'Marketing' };
 
 const toMs = (v: any): number => (v?.toMillis ? v.toMillis() : v?._seconds ? v._seconds * 1000 : v ? new Date(v).getTime() : 0);
 const fmtAgo = (v: any) => {
@@ -30,10 +33,16 @@ interface Me {
 
 export const HrOverview: React.FC<{ me: Me }> = ({ me }) => {
   const [activity, setActivity] = useState<HrActivityEntry[] | null>(null);
+  const [members, setMembers] = useState<CompanyMember[] | null>(null);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    try { setActivity(await hr.activity()); setError(''); } catch (err) { setError(errorMessage(err)); }
+    try {
+      const data = await hr.companyUpdates();
+      setActivity(data.updates);
+      setMembers(data.members);
+      setError('');
+    } catch (err) { setError(errorMessage(err)); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -65,7 +74,7 @@ export const HrOverview: React.FC<{ me: Me }> = ({ me }) => {
       <div>
         <div className="mb-3 flex items-center gap-2">
           <FileText className="size-4 text-[var(--text-3)]" />
-          <h2 className="text-[13px] font-semibold text-[var(--text-2)]">Recent HR activity</h2>
+          <h2 className="text-[13px] font-semibold text-[var(--text-2)]">Latest updates</h2>
         </div>
         <div className="divide-y divide-[var(--border)] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           {activity === null ? (
@@ -79,6 +88,48 @@ export const HrOverview: React.FC<{ me: Me }> = ({ me }) => {
                 <p className="text-[12.5px] leading-snug text-[var(--text-2)]"><span className="font-medium text-[var(--text-1)]">{a.actorName}</span> {a.description} <span className="text-[var(--text-3)]">· {fmtAgo(a.createdAt)}</span></p>
               </div>
             ))
+          )}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center gap-2">
+          <UserCircle2 className="size-4 text-[var(--text-3)]" />
+          <h2 className="text-[13px] font-semibold text-[var(--text-2)]">Team &amp; current assignments</h2>
+        </div>
+        <div className="divide-y divide-[var(--border)] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+          {members === null ? (
+            <div className="flex justify-center py-10"><Loader2 className="size-5 animate-spin text-[var(--text-3)]" /></div>
+          ) : (
+            members.map((m) => {
+              const DeptIcon = DEPT_ICON[m.department];
+              return (
+                <div key={m.id} className="flex items-start gap-3 px-4 py-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[11px] font-bold text-[var(--text-2)]">
+                    {m.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[13px] font-semibold text-[var(--text-1)]">{m.name}</p>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-3)]">
+                        <DeptIcon className="size-2.5" /> {DEPT_LABEL[m.department]}
+                      </span>
+                    </div>
+                    {m.currentTasks.length === 0 ? (
+                      <p className="mt-0.5 text-[11.5px] text-[var(--text-3)]">No tasks currently assigned.</p>
+                    ) : (
+                      <div className="mt-1 space-y-0.5">
+                        {m.currentTasks.map((t, i) => (
+                          <p key={i} className="truncate text-[11.5px] text-[var(--text-2)]">
+                            {t.title}{t.assignedBy && <span className="text-[var(--text-3)]"> · by {t.assignedBy}</span>}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
