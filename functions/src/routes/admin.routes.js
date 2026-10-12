@@ -8,6 +8,7 @@ const kioskCommands = require("../controllers/kioskCommands.controller");
 const adminHr = require("../controllers/adminHr.controller");
 const adminReports = require("../controllers/adminReports.controller");
 const adminGang = require("../controllers/adminGang.controller");
+const ads = require("../controllers/ads.controller");
 
 const router = express.Router();
 const { loginLimiter } = createLimiters(db);
@@ -54,6 +55,13 @@ router.patch("/admin/gang/marketing-tasks/:taskId", adminAuthMiddleware, adminGa
 router.patch("/admin/gang/employees/:employeeId", adminAuthMiddleware, adminGang.patchAdminEmployee);
 router.patch("/admin/gang/employees/:employeeId/onboarding", adminAuthMiddleware, adminGang.patchAdminEmployeeOnboarding);
 router.patch("/admin/gang/leave-requests/:requestId", adminAuthMiddleware, adminGang.patchAdminLeaveRequest);
+
+// ── AD / ANNOUNCEMENT MANAGEMENT ─────────────────────────────────────────
+router.get("/admin/ads", adminAuthMiddleware, ads.getAdminAds);
+router.post("/admin/ads", adminAuthMiddleware, ads.postAdminAd);
+router.patch("/admin/ads/:adId", adminAuthMiddleware, ads.patchAdminAd);
+router.delete("/admin/ads/:adId", adminAuthMiddleware, ads.deleteAdminAd);
+router.post("/admin/ads/reorder", adminAuthMiddleware, ads.postAdminAdsReorder);
 
 // Shared role-level profile/chat for Admin and Finance (both use a single shared login per role, not
 // individual accounts -- see admin.controller.js's env-var-based postAdminLogin).

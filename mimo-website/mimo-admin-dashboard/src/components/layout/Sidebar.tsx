@@ -15,6 +15,7 @@ import {
   Activity,
   Users2,
   Building2,
+  Megaphone,
 } from 'lucide-react';
 
 export interface NavItemDef {
@@ -51,9 +52,10 @@ const NAV_COMPANY: NavItemDef[] = [
 ];
 
 const NAV_ANALYTICS: NavItemDef[] = [
-  { id: 'analytics',  label: 'Analytics & Reports',  icon: BarChart2 },
-  { id: 'users',      label: 'Customers',            icon: Users },
-  { id: 'coupons',    label: 'Coupon Codes',         icon: Ticket },
+  { id: 'analytics',       label: 'Analytics & Reports',   icon: BarChart2 },
+  { id: 'users',           label: 'Customers',             icon: Users },
+  { id: 'coupons',         label: 'Coupon Codes',          icon: Ticket },
+  { id: 'advertisements',  label: 'Advertisements',        icon: Megaphone },
 ];
 
 const NAV_FINANCE: NavItemDef[] = [

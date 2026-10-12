@@ -1,6 +1,7 @@
 const express = require("express");
 const public = require("../controllers/public.controller");
 const { getPublicMachines, getPublicMachine } = require("../controllers/publicMachines.controller");
+const { getPublicAds } = require("../controllers/ads.controller");
 
 const router = express.Router();
 
@@ -10,5 +11,6 @@ router.get("/api/screensaver", public.getApiScreensaver);
 router.get("/api/stats", public.getApiStats);
 router.get("/api/machines", getPublicMachines);
 router.get("/api/machines/:machineId", getPublicMachine);
+router.get("/api/ads", getPublicAds);
 
 module.exports = router;
