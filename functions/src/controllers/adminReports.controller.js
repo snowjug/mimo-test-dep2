@@ -28,6 +28,7 @@ const getAdminUserGrowthReport = async (req, res) => {
     // excluded from "registered users", same distinction the QR-first flow itself draws.
     const realUsers = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((u) => !u.isGuest);
     const totalRegisteredUsers = realUsers.length;
+    const totalGuestUsers = usersSnap.size - totalRegisteredUsers;
 
     const toMs = (v) => (v?.toMillis ? v.toMillis() : v?._seconds ? v._seconds * 1000 : v ? new Date(v).getTime() : null);
 
@@ -80,6 +81,7 @@ const getAdminUserGrowthReport = async (req, res) => {
     res.json({
       range: { from: new Date(range.from).toISOString(), to: new Date(range.to).toISOString() },
       totalRegisteredUsers,
+      totalGuestUsers,
       activeUsersInRange,
       currentMonthNewUsers,
       previousMonthNewUsers,

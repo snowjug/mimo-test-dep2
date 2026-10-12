@@ -29,23 +29,28 @@ api.interceptors.request.use((config) => {
   const preferred = Object.entries(ROUTE_PREFIX_TOKEN).find(([prefix]) => url.startsWith(prefix))?.[1];
   const orderedKeys = preferred ? [preferred, ...TOKEN_KEYS.filter((k) => k !== preferred)] : TOKEN_KEYS;
   // Only attach real JWTs (a leftover non-JWT value must never be sent as a bearer token).
-  const token = orderedKeys
-    .flatMap((k) => [localStorage.getItem(k), sessionStorage.getItem(k)])
-    .find(isJwt);
-  if (token) {
+  const usedKey = orderedKeys.find((k) => isJwt(localStorage.getItem(k)) || isJwt(sessionStorage.getItem(k)));
+  if (usedKey) {
+    const token = (localStorage.getItem(usedKey) || sessionStorage.getItem(usedKey)) as string;
     config.headers.Authorization = `Bearer ${token}`;
+    // Stashed so the response interceptor knows exactly which portal's session actually failed —
+    // a 401 on one portal's token must never log the other four out of sessions that are still valid.
+    (config as any).__tokenKey = usedKey;
   }
   return config;
 });
 
 const LOGIN_URLS = ['/admin/login', '/technical/login', '/hr/login', '/marketing/login'];
 
-// Expired/invalid session: clear it and fall back to the login screen instead of a silently empty dashboard.
+// Expired/invalid session: clear only that portal's token and fall back to its login screen, instead of a
+// silently empty dashboard — and without touching the other four portals' still-valid sessions.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error?.response?.status === 401 && !LOGIN_URLS.includes(error.config?.url)) {
-      TOKEN_KEYS.forEach((k) => {
+      const failedKey = error.config?.__tokenKey as string | undefined;
+      const keysToClear = failedKey ? [failedKey] : TOKEN_KEYS;
+      keysToClear.forEach((k) => {
         localStorage.removeItem(k);
         sessionStorage.removeItem(k);
       });

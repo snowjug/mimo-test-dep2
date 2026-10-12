@@ -227,6 +227,7 @@ export interface IncidentsResponse {
 export interface UserGrowthReport {
   range: { from: string; to: string };
   totalRegisteredUsers: number;
+  totalGuestUsers: number;
   activeUsersInRange: number;
   currentMonthNewUsers: number;
   previousMonthNewUsers: number;

@@ -4,6 +4,7 @@ export interface AdminUserItem {
   email: string;
   mobileNumber: string;
   googleUser: boolean;
+  isGuest: boolean;
   totalSpend: number;
   orderCount: number;
   pagesPrinted: number;
@@ -13,6 +14,8 @@ export interface AdminUserItem {
 
 export interface AdminUserMetrics {
   totalUsers: number;
+  registeredUsers: number;
+  guestUsers: number;
   activeCustomers: number;
   conversionRate: number;
   avgRevenuePerUser: number;

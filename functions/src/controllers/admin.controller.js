@@ -35,7 +35,7 @@ const postAdminLogin = (req, res) => {
     reqIdentifier.toLowerCase() === envAdminEmail.toLowerCase() &&
     passwordsMatch(reqPassword, envAdminPassword)
   ) {
-    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, SECRET_KEY, { expiresIn: "24h" });
+    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, SECRET_KEY, { expiresIn: "30d" });
     return res.json({ token, role: "admin", message: "Admin Login Successful" });
   }
 
@@ -46,7 +46,7 @@ const postAdminLogin = (req, res) => {
     reqIdentifier.toLowerCase() === envFinanceEmail.toLowerCase() &&
     passwordsMatch(reqPassword, envFinancePassword)
   ) {
-    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, SECRET_KEY, { expiresIn: "24h" });
+    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, SECRET_KEY, { expiresIn: "30d" });
     return res.json({ token, role: "finance", message: "Finance Login Successful" });
   }
 
@@ -616,6 +616,7 @@ const getAdminUsers = async (req, res) => {
         email: u.email || "No Email",
         mobileNumber: u.mobileNumber || u.phoneNumber || "—",
         googleUser: Boolean(u.googleUser),
+        isGuest: Boolean(u.isGuest),
         mimoCoins: null,
         totalSpend: Number(stats.totalSpend.toFixed(2)),
         orderCount: stats.orderCount,
@@ -629,13 +630,19 @@ const getAdminUsers = async (req, res) => {
     userList.sort((a, b) => b.totalSpend - a.totalSpend);
 
     const totalUsers = usersSnap.size;
+    const guestUsers = userList.filter((u) => u.isGuest).length;
+    const registeredUsers = totalUsers - guestUsers;
     const activeCustomers = payingUserIds.size;
-    const conversionRate = totalUsers > 0 ? Number(((activeCustomers / totalUsers) * 100).toFixed(1)) : 0;
+    // Conversion is measured against people who actually registered, not the walk-up guest count
+    // (a guest who never creates an account was never a conversion candidate in the first place).
+    const conversionRate = registeredUsers > 0 ? Number(((activeCustomers / registeredUsers) * 100).toFixed(1)) : 0;
     const avgRevenuePerUser = totalUsers > 0 ? Number((totalRevenue / totalUsers).toFixed(2)) : 0;
 
     res.json({
       metrics: {
         totalUsers,
+        registeredUsers,
+        guestUsers,
         activeCustomers,
         conversionRate,
         avgRevenuePerUser,

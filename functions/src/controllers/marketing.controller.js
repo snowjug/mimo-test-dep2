@@ -40,7 +40,7 @@ const postMarketingLogin = async (req, res) => {
     const ok = await bcrypt.compare(password, member.passwordHash || "");
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-    const token = jwt.sign({ marketingMemberId: doc.id, role: member.role }, SECRET_KEY, { expiresIn: "12h" });
+    const token = jwt.sign({ marketingMemberId: doc.id, role: member.role }, SECRET_KEY, { expiresIn: "30d" });
     await recordLogin("marketing_team", doc.id);
     res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email } });
   } catch (err) {

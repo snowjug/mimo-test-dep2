@@ -3,7 +3,7 @@ import React from 'react';
 /** GitHub-style login-streak heatmap. `dates` is a sorted array of "YYYY-MM-DD" strings (days this person
  * logged in). Shows the trailing `weeks` weeks, newest on the right — same reading direction as GitHub's
  * own contribution graph, just scoped to the data we actually have (login activity, not commits). */
-export const ContributionGraph: React.FC<{ dates: string[]; weeks?: number }> = ({ dates, weeks = 14 }) => {
+export const ContributionGraph: React.FC<{ dates: string[]; weeks?: number }> = ({ dates, weeks = 10 }) => {
   const dateSet = new Set(dates);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -34,8 +34,8 @@ export const ContributionGraph: React.FC<{ dates: string[]; weeks?: number }> = 
   })();
 
   return (
-    <div className="inline-flex items-center gap-2" title={`${dates.length} login${dates.length === 1 ? '' : 's'} in the last ${weeks} weeks`}>
-      <div className="flex gap-[3px]">
+    <div className="flex max-w-full items-center gap-2 overflow-x-auto" title={`${dates.length} login${dates.length === 1 ? '' : 's'} in the last ${weeks} weeks`}>
+      <div className="flex shrink-0 gap-[3px]">
         {columns.map((col, ci) => (
           <div key={ci} className="flex flex-col gap-[3px]">
             {col.map((d, di) => {
