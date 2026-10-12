@@ -91,6 +91,24 @@ test("unsigned or wrongly signed webhooks are rejected and touch nothing", async
   }
 });
 
+test("a tampered/malformed timestamp invalidates the signature and is rejected (P0.1 regression)", async () => {
+  fake = resetFake();
+  // A real signature is bound to the exact timestamp string it was computed over (HMAC(timestamp + body)).
+  // Modeling an attacker who intercepts a legitimate delivery and corrupts/replaces the timestamp header
+  // without the secret: the signature no longer matches the (now different) timestamp, so this must reject
+  // exactly like any other signature mismatch -- there is no code path that trusts the header on its own.
+  const raw = Buffer.from(JSON.stringify(successEvent));
+  const originalTimestamp = "1700000000";
+  const validSignatureForOriginalTimestamp = sign(originalTimestamp, raw.toString("utf8"));
+  const res = response();
+  await postCashfreeWebhook({
+    headers: { "x-webhook-timestamp": "not-a-timestamp", "x-webhook-signature": validSignatureForOriginalTimestamp },
+    rawBody: raw, body: successEvent,
+  }, res);
+  assert.strictEqual(res.code, 403);
+  assert.strictEqual(fake.log.batchCommits + fake.log.updates.length + fake.log.sets.length + fake.store.size, 0, "no database writes");
+});
+
 test("a body without raw bytes is rejected", async () => {
   const res = response();
   await postCashfreeWebhook({ headers: {}, body: successEvent }, res);

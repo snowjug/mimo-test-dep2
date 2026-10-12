@@ -1,5 +1,6 @@
 const axios = require("axios");
-const { CASHFREE_BASE_URL, WA_ACCESS_TOKEN, WA_VERIFY_TOKEN, cashfreeHeaders } = require("../config/env");
+const crypto = require("crypto");
+const { CASHFREE_BASE_URL, WA_ACCESS_TOKEN, WA_APP_SECRET, WA_VERIFY_TOKEN, cashfreeHeaders } = require("../config/env");
 const { _askForCoupon, _finalizePayment, sendWhatsAppButtons, sendWhatsAppList, sendWhatsAppMessage, sendWhatsAppOrderCard, waContext } = require("../services/whatsapp.service");
 const { admin, db } = require("../config/firebase");
 const { getPDFDocument } = require("../services/pdf.service");
@@ -18,21 +19,27 @@ async function listOrderableDestinations() {
 }
 
 // ================= WHATSAPP HOSTED CHECKOUT PAGE =================
-// This serves a self-contained payment page for users coming from WhatsApp links.
-// It bypasses the React frontend (which requires sessionStorage/login).
+// Fallback entry point: the primary path sends Cashfree's own hosted link_url directly to the user (see
+// whatsapp.service.js), but if the native WhatsApp order-card message fails to send (observed in sandbox,
+// possible in production on any WhatsApp API hiccup), the text fallback links here instead.
+//
+// WhatsApp orders are created via Cashfree's Payment Links API (POST /links, see _finalizePayment), not
+// the Orders API -- so this must read the order back via GET /links/{id}, exactly like the already-correct
+// getWaPaySuccess below. Payment Links are entirely Cashfree-hosted (no payment_session_id, no SDK checkout
+// call applies to this product), so once we confirm the link is still payable we simply redirect to
+// Cashfree's own page -- the same page the primary path already sends users to directly.
 const getWaPay = async (req, res) => {
   try {
     const orderId = req.params.orderId;
 
-    // Fetch the order from Cashfree to get the payment_session_id
-    const cfRes = await axios.get(`${CASHFREE_BASE_URL}/orders/${orderId}`, {
+    const cfRes = await axios.get(`${CASHFREE_BASE_URL}/links/${orderId}`, {
       headers: cashfreeHeaders
     });
 
-    const paymentSessionId = cfRes.data.payment_session_id;
-    const orderStatus = cfRes.data.order_status;
+    const linkStatus = cfRes.data.link_status;
+    const linkUrl = cfRes.data.link_url;
 
-    if (orderStatus === "PAID") {
+    if (linkStatus === "PAID") {
       return res.send(`
         <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
         <title>Mimo - Already Paid</title>
@@ -41,7 +48,7 @@ const getWaPay = async (req, res) => {
       `);
     }
 
-    if (!paymentSessionId) {
+    if (!linkUrl || linkStatus === "EXPIRED" || linkStatus === "CANCELLED") {
       return res.status(400).send(`
         <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
         <title>Mimo - Link Expired</title>
@@ -50,53 +57,7 @@ const getWaPay = async (req, res) => {
       `);
     }
 
-    const cashfreeMode = process.env.CASHFREE_ENV === "production" ? "production" : "sandbox";
-    const returnUrl = `https://api-upqxuj7evq-uc.a.run.app/wa-pay-success/${orderId}`;
-
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Mimo Secure Payment</title>
-        <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%); }
-          .card { background: white; border-radius: 20px; padding: 40px 30px; text-align: center; box-shadow: 0 20px 60px rgba(9,55,101,0.12); max-width: 380px; width: 90%; }
-          .logo { width: 60px; height: 60px; background: #093765; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px; }
-          h2 { color: #093765; font-size: 22px; font-weight: 800; margin-bottom: 8px; }
-          p { color: #64748b; font-size: 14px; margin-bottom: 28px; line-height: 1.5; }
-          .loader { border: 3px solid #e2e8f0; border-top: 3px solid #093765; border-radius: 50%; width: 36px; height: 36px; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .status { font-size: 13px; color: #94a3b8; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="logo">🖨️</div>
-          <h2>Mimo Secure Checkout</h2>
-          <p>Loading your payment page...<br>Please do not close this window.</p>
-          <div class="loader"></div>
-          <p class="status">Order ID: ${orderId}</p>
-        </div>
-        <script>
-          window.addEventListener('load', function() {
-            try {
-              const cashfree = Cashfree({ mode: "${cashfreeMode}" });
-              cashfree.checkout({
-                paymentSessionId: "${paymentSessionId}",
-                redirectTarget: "_self"
-              });
-            } catch(e) {
-              document.querySelector('p').textContent = 'Failed to load payment. Please try again.';
-              document.querySelector('.loader').style.display = 'none';
-            }
-          });
-        </script>
-      </body>
-      </html>
-    `);
+    return res.redirect(302, linkUrl);
   } catch (err) {
     console.error("[WA PAY ERROR]", err.response?.data || err.message);
     res.status(500).send(`
@@ -183,9 +144,35 @@ const getWhatsappWebhook = (req, res) => {
   res.sendStatus(403);
 };
 
+// Meta signs every webhook delivery: X-Hub-Signature-256: sha256=<hex HMAC-SHA256(rawBody, app secret)>.
+// Mirrors isValidCashfreeSignature's shape: constant-time comparison, fails closed on anything missing.
+const isValidWhatsAppSignature = (rawBody, header, secret) => {
+  if (!header || !secret) return false;
+  const prefix = "sha256=";
+  if (!header.startsWith(prefix)) return false;
+  const expected = prefix + crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const a = Buffer.from(header);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
+
 // ================= WHATSAPP BOT MESSAGE HANDLER (Option B) =================
 const postWhatsappWebhook = async (req, res) => {
   try {
+    const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.isBuffer(req.body) ? req.body : null;
+    if (!rawBody) {
+      console.warn("[WHATSAPP WEBHOOK] rejected: request body not available");
+      return res.sendStatus(400);
+    }
+    if (!WA_APP_SECRET) {
+      console.error("[WHATSAPP WEBHOOK] WA_APP_SECRET is not configured; cannot verify webhooks");
+      return res.sendStatus(500);
+    }
+    const signatureHeader = req.headers["x-hub-signature-256"];
+    if (!isValidWhatsAppSignature(rawBody, signatureHeader, WA_APP_SECRET)) {
+      console.warn(`[WHATSAPP WEBHOOK] rejected: ${signatureHeader ? "signature mismatch" : "missing X-Hub-Signature-256"}`);
+      return res.sendStatus(403);
+    }
     const body = req.body;
     if (body.object !== "whatsapp_business_account") return res.sendStatus(200);
 
