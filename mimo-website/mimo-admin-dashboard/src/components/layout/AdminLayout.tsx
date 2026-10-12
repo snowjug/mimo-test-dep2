@@ -21,6 +21,7 @@ import {
   User,
   MessageCircle,
   Megaphone,
+  Ticket,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
@@ -61,6 +62,7 @@ const TITLES: Record<string, string> = {
   incidents: 'Incidents',
   analytics: 'Analytics',
   users: 'Customers',
+  coupons: 'Coupon Codes',
   finance: 'Finance',
   configuration: 'Configuration',
   'mimo-gang': 'MIMO GANG',
@@ -79,6 +81,7 @@ const TABS = [
 const MORE = [
   { id: 'analytics',       label: 'Analytics',          icon: BarChart2 },
   { id: 'users',           label: 'Customers',          icon: Users },
+  { id: 'coupons',         label: 'Coupon Codes',       icon: Ticket },
   { id: 'finance',         label: 'Finance',            icon: IndianRupee },
   { id: 'mimo-gang',       label: 'MIMO GANG',          icon: Users2 },
   { id: 'company',         label: 'Company Overview',   icon: Building2 },
@@ -253,7 +256,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => onTabChange(m.id)}
+                    onClick={() => { onTabChange(m.id); setSheet(null); }}
                     className="flex min-h-[52px] w-full items-center gap-3 border-t border-slate-200 px-4 text-left first:border-t-0 active:bg-slate-200 dark:border-slate-700/60 dark:active:bg-slate-800"
                   >
                     <Icon size={20} strokeWidth={1.75} className="text-slate-500 dark:text-slate-400" />
