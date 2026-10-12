@@ -24,4 +24,10 @@ router.patch("/hr/leave-requests/:requestId", hrAuthMiddleware, hr.patchLeaveReq
 
 router.get("/hr/activity", hrAuthMiddleware, hr.getHrActivity);
 
+router.patch("/hr/profile", hrAuthMiddleware, hr.patchHrProfile);
+router.post("/hr/profile/document/:docType", hrAuthMiddleware, hr.postHrProfileDocument);
+router.post("/hr/change-password", hrAuthMiddleware, hr.postHrChangePassword);
+router.get("/hr/chat", hrAuthMiddleware, hr.getHrChatMessages);
+router.post("/hr/chat", hrAuthMiddleware, hr.postHrChatMessage);
+
 module.exports = router;

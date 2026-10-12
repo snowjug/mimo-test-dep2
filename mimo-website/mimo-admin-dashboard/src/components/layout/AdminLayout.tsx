@@ -18,6 +18,8 @@ import {
   X,
   Users2,
   Building2,
+  User,
+  MessageCircle,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
@@ -26,6 +28,9 @@ import { defaultRange } from '../../lib/dateRange';
 import { timeAgo } from '../../lib/format';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { staffProfileService, StaffProfile } from '../../services/profile.service';
+import { ProfileModal } from '../shared/ProfileModal';
+import { ProfileCompletionBanner } from '../shared/ProfileCompletionBanner';
 
 /** Email stored in the admin JWT (display only; the API verifies the token). */
 const emailFromToken = (): string | undefined => {
@@ -59,6 +64,7 @@ const TITLES: Record<string, string> = {
   configuration: 'Configuration',
   'mimo-gang': 'MIMO GANG',
   company: 'Company Overview',
+  chat: 'Team Chat',
 };
 
 const TABS = [
@@ -74,6 +80,7 @@ const MORE = [
   { id: 'finance',       label: 'Finance',            icon: IndianRupee },
   { id: 'mimo-gang',     label: 'MIMO GANG',          icon: Users2 },
   { id: 'company',       label: 'Company Overview',   icon: Building2 },
+  { id: 'chat',          label: 'Team Chat',          icon: MessageCircle },
   { id: 'configuration', label: 'Configuration',      icon: Settings },
 ];
 
@@ -119,6 +126,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const alerts = incidentsQ.data?.incidents ?? [];
   const userEmail = emailFromToken();
 
+  const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const loadStaffProfile = () => staffProfileService.get().then(setStaffProfile).catch(() => {});
+  useEffect(() => { loadStaffProfile(); }, []);
+
   useEffect(() => {
     setSheet(null);
     document.getElementById('admin-scroll')?.scrollTo(0, 0);
@@ -156,6 +168,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             incidentCount={incidentCount}
             alerts={alerts}
             onOpenMobileNav={() => {}}
+            onOpenProfile={() => setShowProfile(true)}
+            profileName={staffProfile?.name}
+            profileAvatarUrl={staffProfile?.avatarUrl}
           />
           <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 p-4 transition-colors duration-150 dark:bg-slate-950 sm:p-6 lg:p-8">
             <div className="mx-auto w-full max-w-7xl space-y-6">{children}</div>
@@ -250,6 +265,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             </div>
 
             <div className="mt-4 overflow-hidden rounded-[20px] bg-slate-100 dark:bg-slate-800/60">
+              <button
+                type="button"
+                onClick={() => { setSheet(null); setShowProfile(true); }}
+                className="flex min-h-[52px] w-full items-center gap-3 px-4 text-left active:bg-slate-200 dark:active:bg-slate-800"
+              >
+                <User size={20} strokeWidth={1.75} className="text-slate-500 dark:text-slate-400" />
+                <span className="flex-1 text-[16px] text-slate-900 dark:text-slate-100">My Profile</span>
+                <ChevronRight size={16} className="text-slate-400" />
+              </button>
               {onResetMetrics && (
                 <button
                   type="button"
@@ -311,6 +335,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           </Sheet>
         )}
       </div>
+
+      {staffProfile && !showProfile && (
+        <ProfileCompletionBanner profile={staffProfile} onComplete={() => setShowProfile(true)} />
+      )}
+      {showProfile && (
+        <ProfileModal
+          profile={staffProfile || { name: '', avatarUrl: null, dob: null }}
+          onClose={() => setShowProfile(false)}
+          onSave={async (fields, avatar) => { await staffProfileService.update(fields, avatar); await loadStaffProfile(); }}
+          onUploadDocument={async (docType, file) => { const r = await staffProfileService.uploadDocument(docType, file); await loadStaffProfile(); return r; }}
+        />
+      )}
     </div>
   );
 };

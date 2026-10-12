@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Play, Pause, Square, CheckCircle2, Circle, ChevronRight, ChevronDown,
-  AlertTriangle, Megaphone, Activity, Send, X, Cpu, Wifi, WifiOff, Printer, FileText,
+  AlertTriangle, Megaphone, Activity, Send, X, Cpu, Wifi, WifiOff, Printer, FileText, Camera,
 } from 'lucide-react';
 import { useLiveQuery, errorMessage } from '../../hooks/useLiveQuery';
 import { technical, TechTask, TaskStatus, TaskPriority, WorkSession, Announcement, ActivityEntry, TechMachine } from '../../services/technical.service';
@@ -153,10 +153,31 @@ const TaskRow: React.FC<{ task: TechTask; expanded: boolean; onToggle: () => voi
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const overdue = task.dueAtMs && task.dueAtMs < Date.now() && task.status !== 'completed';
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const proofInputRef = React.useRef<HTMLInputElement>(null);
+
+  const pickProof = (f: File | null) => {
+    setProofFile(f);
+    setProofPreview(f ? URL.createObjectURL(f) : null);
+  };
+  const onProofPaste = (e: React.ClipboardEvent) => {
+    const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith('image/'));
+    const file = item?.getAsFile();
+    if (file) pickProof(file);
+  };
 
   const nextStatus = async (s: TaskStatus) => {
     setBusy(true);
-    try { await technical.updateTask(task.id, { status: s }); onChange(); } finally { setBusy(false); }
+    try {
+      if (proofFile) {
+        await technical.updateTaskWithProof(task.id, { status: s }, proofFile);
+        pickProof(null);
+      } else {
+        await technical.updateTask(task.id, { status: s });
+      }
+      onChange();
+    } finally { setBusy(false); }
   };
   const submitComment = async () => {
     if (!comment.trim()) return;
@@ -199,6 +220,36 @@ const TaskRow: React.FC<{ task: TechTask; expanded: boolean; onToggle: () => voi
               </button>
             ))}
           </div>
+
+          <div
+            onPaste={onProofPaste}
+            tabIndex={0}
+            className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-2.5 text-[11.5px] text-[var(--text-3)] focus:outline-none focus:border-[var(--primary)]"
+          >
+            {proofPreview ? (
+              <div className="flex items-center gap-2">
+                <img src={proofPreview} alt="Proof of work preview" className="h-14 rounded-lg border border-[var(--border)] object-contain" />
+                <div className="flex-1">
+                  <p className="font-semibold text-[var(--text-2)]">Screenshot attached — change status to send it as proof.</p>
+                  <button onClick={() => pickProof(null)} className="mt-0.5 text-rose-500 font-semibold cursor-pointer">Remove</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Camera className="size-3.5 shrink-0" />
+                <span>Click here and paste (Ctrl/Cmd+V) a screenshot as proof of work, or</span>
+                <button onClick={() => proofInputRef.current?.click()} className="font-semibold text-[var(--primary)] cursor-pointer">upload one</button>
+                <input ref={proofInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickProof(e.target.files?.[0] || null)} />
+              </div>
+            )}
+          </div>
+
+          {task.proofScreenshotUrl && (
+            <div className="rounded-xl bg-[var(--surface)] p-2.5">
+              <p className="mb-1.5 text-[11px] font-bold text-[var(--text-3)] uppercase">Proof of work</p>
+              <img src={task.proofScreenshotUrl} alt="Proof of work" className="max-h-48 rounded-lg border border-[var(--border)] object-contain" />
+            </div>
+          )}
 
           {task.comments.length > 0 && (
             <div className="space-y-2 rounded-xl bg-[var(--surface)] p-3">

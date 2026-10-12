@@ -32,4 +32,10 @@ router.get("/technical/work-sessions/today", technicalAuthMiddleware, technical.
 router.post("/technical/daily-reports", technicalAuthMiddleware, technical.postDailyReport);
 router.get("/technical/daily-reports", technicalAuthMiddleware, technical.getDailyReports);
 
+router.patch("/technical/profile", technicalAuthMiddleware, technical.patchTechnicalProfile);
+router.post("/technical/profile/document/:docType", technicalAuthMiddleware, technical.postTechnicalProfileDocument);
+router.post("/technical/change-password", technicalAuthMiddleware, technical.postTechnicalChangePassword);
+router.get("/technical/chat", technicalAuthMiddleware, technical.getTechnicalChatMessages);
+router.post("/technical/chat", technicalAuthMiddleware, technical.postTechnicalChatMessage);
+
 module.exports = router;

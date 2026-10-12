@@ -3,6 +3,8 @@ const bcrypt = require("bcryptjs");
 const { SECRET_KEY } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const { recordLogin } = require("../services/loginStreak.service");
+const profile = require("./profile.controller");
+const chat = require("./chat.controller");
 
 const DEPARTMENTS = ["technical", "hr", "marketing", "finance", "admin"];
 const EMPLOYEE_STATUSES = ["onboarding", "active", "offboarded"];
@@ -53,7 +55,7 @@ const postHrLogin = async (req, res) => {
 
     const token = jwt.sign({ hrMemberId: doc.id, role: member.role }, SECRET_KEY, { expiresIn: "30d" });
     await recordLogin("hr_team", doc.id);
-    res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email } });
+    res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email, avatarUrl: member.avatarUrl || null, dob: member.dob || null, joiningLetterUrl: member.joiningLetterUrl || null, collegeIdUrl: member.collegeIdUrl || null, citizenshipIdUrl: member.citizenshipIdUrl || null } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -70,7 +72,7 @@ const getHrMe = async (req, res) => {
     const leaveSnap = await db.collection("leave_requests").where("status", "==", "pending").get();
 
     res.json({
-      member: { id, name: member.name, role: member.role, email: member.email },
+      member: { id, name: member.name, role: member.role, email: member.email, avatarUrl: member.avatarUrl || null, dob: member.dob || null, joiningLetterUrl: member.joiningLetterUrl || null, collegeIdUrl: member.collegeIdUrl || null, citizenshipIdUrl: member.citizenshipIdUrl || null },
       stats: {
         totalEmployees: employees.filter((e) => e.status !== "offboarded").length,
         onboarding: employees.filter((e) => e.status === "onboarding").length,
@@ -325,9 +327,62 @@ const getHrActivity = async (req, res) => {
   }
 };
 
+const patchHrProfile = async (req, res) => {
+  try {
+    const result = await profile.updateMemberProfile(req, "hr_team", req.hrMember.id);
+    res.json({ member: result });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const postHrProfileDocument = async (req, res) => {
+  try {
+    const result = await profile.uploadMemberDocument(req, "hr_team", req.hrMember.id, req.params.docType);
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const postHrChangePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    await profile.changeMemberPassword("hr_team", req.hrMember.id, currentPassword, newPassword);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const getHrChatMessages = async (req, res) => {
+  try {
+    res.json({ messages: await chat.getChatMessages("hr") });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const postHrChatMessage = async (req, res) => {
+  try {
+    const member = req.hrMember;
+    const memberDoc = await db.collection("hr_team").doc(member.id).get();
+    const avatarUrl = memberDoc.exists ? memberDoc.data().avatarUrl || null : null;
+    const message = await chat.postChatMessage(req, "hr", { id: member.id, name: member.name, avatarUrl });
+    res.json({ message });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   postHrLogin,
   getHrMe,
+  patchHrProfile,
+  postHrProfileDocument,
+  postHrChangePassword,
+  getHrChatMessages,
+  postHrChatMessage,
   getEmployees,
   postEmployee,
   patchEmployee,

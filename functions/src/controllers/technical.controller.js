@@ -5,6 +5,9 @@ const { admin, db } = require("../config/firebase");
 const A = require("../services/analytics.service");
 const { loadKiosks } = require("./adminInsights.controller");
 const { recordLogin } = require("../services/loginStreak.service");
+const { parseMultipartForm, uploadBufferToStorage } = require("../services/mediaUpload.service");
+const profile = require("./profile.controller");
+const chat = require("./chat.controller");
 
 const TASK_STATUSES = ["backlog", "assigned", "in_progress", "blocked", "in_review", "completed"];
 const TASK_PRIORITIES = ["low", "medium", "high", "critical"];
@@ -41,7 +44,7 @@ const postTechnicalLogin = async (req, res) => {
 
     const token = jwt.sign({ technicalMemberId: doc.id, role: member.role }, SECRET_KEY, { expiresIn: "30d" });
     await recordLogin("technical_team", doc.id);
-    res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email } });
+    res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email, avatarUrl: member.avatarUrl || null, dob: member.dob || null, joiningLetterUrl: member.joiningLetterUrl || null, collegeIdUrl: member.collegeIdUrl || null, citizenshipIdUrl: member.citizenshipIdUrl || null } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -65,7 +68,7 @@ const getTechnicalMe = async (req, res) => {
     const avgCompletionMs = completionTimes.length ? completionTimes.reduce((a, b) => a + b, 0) / completionTimes.length : null;
 
     res.json({
-      member: { id, name: member.name, role: member.role, email: member.email, skills: member.skills || [], joinedAt: member.joinedAt || null },
+      member: { id, name: member.name, role: member.role, email: member.email, skills: member.skills || [], joinedAt: member.joinedAt || null, avatarUrl: member.avatarUrl || null, dob: member.dob || null, joiningLetterUrl: member.joiningLetterUrl || null, collegeIdUrl: member.collegeIdUrl || null, citizenshipIdUrl: member.citizenshipIdUrl || null },
       stats: {
         activeTasks: active.length,
         completedTasks: completed.length,
@@ -94,6 +97,7 @@ const getTechnicalTeam = async (req, res) => {
           id: d.id,
           name: m.name,
           role: m.role,
+          avatarUrl: m.avatarUrl || null,
           skills: m.skills || [],
           activeTasks: active.length,
           blockedTasks: blocked,
@@ -182,8 +186,27 @@ const patchTechnicalTask = async (req, res) => {
     const isLead = req.technicalMember.role === "tech_lead";
     if (!isOwner && !isLead) return res.status(403).json({ error: "You can only update your own tasks" });
 
+    // A completion (or any update) can carry proof-of-work: a pasted/attached screenshot alongside the
+    // usual JSON fields. Multipart requests get their fields merged into req.body so every existing
+    // req.body.X read below keeps working unchanged; a plain JSON request skips this entirely.
+    let proofScreenshotFile = null;
+    if ((req.headers["content-type"] || "").startsWith("multipart/form-data")) {
+      const parsed = await parseMultipartForm(req, "screenshot");
+      req.body = { ...(parsed && parsed.fields), ...req.body };
+      proofScreenshotFile = parsed && parsed.file;
+    }
+
     const update = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     const changes = [];
+
+    if (proofScreenshotFile) {
+      update.proofScreenshotUrl = await uploadBufferToStorage("proof-of-work/technical", req.technicalMember.id, proofScreenshotFile);
+      changes.push("attached proof-of-work screenshot");
+    }
+    if (req.body.proofNote !== undefined) {
+      update.proofNote = String(req.body.proofNote).trim().slice(0, 1000);
+      changes.push("added proof-of-work note");
+    }
 
     if (req.body.status !== undefined) {
       if (!TASK_STATUSES.includes(req.body.status)) return res.status(400).json({ error: "Invalid status" });
@@ -421,10 +444,63 @@ const getDailyReports = async (req, res) => {
   }
 };
 
+const patchTechnicalProfile = async (req, res) => {
+  try {
+    const result = await profile.updateMemberProfile(req, "technical_team", req.technicalMember.id);
+    res.json({ member: result });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const postTechnicalProfileDocument = async (req, res) => {
+  try {
+    const result = await profile.uploadMemberDocument(req, "technical_team", req.technicalMember.id, req.params.docType);
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const postTechnicalChangePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    await profile.changeMemberPassword("technical_team", req.technicalMember.id, currentPassword, newPassword);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const getTechnicalChatMessages = async (req, res) => {
+  try {
+    res.json({ messages: await chat.getChatMessages("technical") });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const postTechnicalChatMessage = async (req, res) => {
+  try {
+    const member = req.technicalMember;
+    const memberDoc = await db.collection("technical_team").doc(member.id).get();
+    const avatarUrl = memberDoc.exists ? memberDoc.data().avatarUrl || null : null;
+    const message = await chat.postChatMessage(req, "technical", { id: member.id, name: member.name, avatarUrl });
+    res.json({ message });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   postTechnicalLogin,
   getTechnicalMe,
   getTechnicalTeam,
+  patchTechnicalProfile,
+  postTechnicalProfileDocument,
+  postTechnicalChangePassword,
+  getTechnicalChatMessages,
+  postTechnicalChatMessage,
   getTechnicalTasks,
   postTechnicalTask,
   patchTechnicalTask,

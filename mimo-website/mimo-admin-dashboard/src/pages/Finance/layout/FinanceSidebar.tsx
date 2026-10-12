@@ -17,6 +17,7 @@ import {
   PieChart,
   Receipt,
   TrendingUp,
+  MessageCircle,
 } from 'lucide-react';
 
 export type FinanceTab =
@@ -29,7 +30,8 @@ export type FinanceTab =
   | 'wallet'
   | 'settlements'
   | 'expenses'
-  | 'krishna-report';
+  | 'krishna-report'
+  | 'chat';
 
 export interface FinanceSidebarProps {
   activeTab: FinanceTab;
@@ -49,6 +51,7 @@ const NAV_ITEMS = [
   { id: 'settlements', label: 'Settlements & Reports',  icon: FileSpreadsheet },
   { id: 'expenses',    label: 'Revenue & Expenses',     icon: Receipt },
   { id: 'krishna-report', label: 'Special Krishna Demand Report', icon: TrendingUp },
+  { id: 'chat',         label: 'Team Chat',              icon: MessageCircle },
 ];
 
 export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({

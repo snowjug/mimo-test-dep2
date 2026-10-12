@@ -1,25 +1,36 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { LogOut, Loader2, LayoutDashboard, Users2, CalendarCheck, CalendarClock } from 'lucide-react';
+import { LogOut, Loader2, LayoutDashboard, Users2, CalendarCheck, CalendarClock, MessageCircle } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { hr } from '../../services/hr.service';
+import { memberProfileServiceFor } from '../../services/profile.service';
 import { HrLoginPage } from '../../components/auth/HrLoginPage';
 import { HrOverview } from './HrOverview';
 import { HrEmployees } from './HrEmployees';
 import { HrAttendance } from './HrAttendance';
 import { HrLeave } from './HrLeave';
+import { ChatPanel } from '../../components/shared/ChatPanel';
+import { ProfileModal } from '../../components/shared/ProfileModal';
+import { ProfileCompletionBanner } from '../../components/shared/ProfileCompletionBanner';
 
-type Tab = 'overview' | 'employees' | 'attendance' | 'leave';
+type Tab = 'overview' | 'employees' | 'attendance' | 'leave' | 'chat';
 const TABS: { value: Tab; label: string; icon: React.ElementType }[] = [
   { value: 'overview', label: 'Overview', icon: LayoutDashboard },
   { value: 'employees', label: 'Employees', icon: Users2 },
   { value: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { value: 'leave', label: 'Leave', icon: CalendarClock },
+  { value: 'chat', label: 'Chat', icon: MessageCircle },
 ];
 
 interface Me {
-  member: { id: string; name: string; role: 'hr_lead' | 'hr_staff'; email: string };
+  member: {
+    id: string; name: string; role: 'hr_lead' | 'hr_staff'; email: string;
+    avatarUrl?: string | null; dob?: string | null;
+    joiningLetterUrl?: string | null; collegeIdUrl?: string | null; citizenshipIdUrl?: string | null;
+  };
   stats: { totalEmployees: number; onboarding: number; pendingLeaveRequests: number };
 }
+
+const hrProfile = memberProfileServiceFor('/hr');
 
 /** HR portal: its own login, its own shell, same structure as the Technical/Finance/Marketing portals. */
 export const HrApp: React.FC = () => {
@@ -30,6 +41,7 @@ export const HrApp: React.FC = () => {
   const [me, setMe] = useState<Me | null>(null);
   const [meLoading, setMeLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('overview');
+  const [showProfile, setShowProfile] = useState(false);
 
   const loadMe = useCallback(async () => {
     setMeLoading(true);
@@ -91,7 +103,18 @@ export const HrApp: React.FC = () => {
             )}
 
             <div className="flex items-center gap-2">
-              {me && <span className="hidden text-[13px] font-medium text-[var(--text-2)] sm:inline">{me.member.name}</span>}
+              {me && (
+                <button onClick={() => setShowProfile(true)} className="press flex items-center gap-2 rounded-full pl-1 pr-2.5 py-1 hover:bg-[var(--surface-2)]" title="My profile">
+                  {me.member.avatarUrl ? (
+                    <img src={me.member.avatarUrl} alt={me.member.name} className="size-6 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex size-6 items-center justify-center rounded-full bg-indigo-500/10 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                      {me.member.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="hidden text-[13px] font-medium text-[var(--text-2)] sm:inline">{me.member.name}</span>
+                </button>
+              )}
               <button onClick={toggleTheme} className="press flex size-8 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)]" aria-label="Toggle theme">
                 {isDark ? '☀️' : '🌙'}
               </button>
@@ -121,8 +144,25 @@ export const HrApp: React.FC = () => {
           <HrEmployees />
         ) : tab === 'attendance' ? (
           <HrAttendance />
-        ) : (
+        ) : tab === 'leave' ? (
           <HrLeave />
+        ) : (
+          <div className="mx-auto max-w-[800px] px-4 py-6 sm:px-6">
+            <ChatPanel basePath="/hr" selfId={me.member.id} title="HR Team Chat" />
+          </div>
+        )}
+
+        {me && !showProfile && (
+          <ProfileCompletionBanner profile={{ id: me.member.id, ...me.member }} onComplete={() => setShowProfile(true)} />
+        )}
+        {showProfile && me && (
+          <ProfileModal
+            profile={{ id: me.member.id, ...me.member, avatarUrl: me.member.avatarUrl || null, dob: me.member.dob || null }}
+            onClose={() => setShowProfile(false)}
+            onSave={async (fields, avatar) => { await hrProfile.update(fields, avatar); await loadMe(); }}
+            onChangePassword={(cur, next) => hrProfile.changePassword(cur, next)}
+            onUploadDocument={async (docType, file) => { const r = await hrProfile.uploadDocument(docType, file); await loadMe(); return r; }}
+          />
         )}
       </div>
     </div>
