@@ -59,9 +59,10 @@ router.patch("/admin/gang/leave-requests/:requestId", adminAuthMiddleware, admin
 // ── AD / ANNOUNCEMENT MANAGEMENT ─────────────────────────────────────────
 router.get("/admin/ads", adminAuthMiddleware, ads.getAdminAds);
 router.post("/admin/ads", adminAuthMiddleware, ads.postAdminAd);
+router.post("/admin/ads/upload-image", adminAuthMiddleware, ads.postAdminAdImage);
+router.post("/admin/ads/reorder", adminAuthMiddleware, ads.postAdminAdsReorder);
 router.patch("/admin/ads/:adId", adminAuthMiddleware, ads.patchAdminAd);
 router.delete("/admin/ads/:adId", adminAuthMiddleware, ads.deleteAdminAd);
-router.post("/admin/ads/reorder", adminAuthMiddleware, ads.postAdminAdsReorder);
 
 // Shared role-level profile/chat for Admin and Finance (both use a single shared login per role, not
 // individual accounts -- see admin.controller.js's env-var-based postAdminLogin).
