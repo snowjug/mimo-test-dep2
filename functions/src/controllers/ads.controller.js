@@ -1,4 +1,5 @@
 const { admin, db } = require("../config/firebase");
+const { parseMultipartForm, uploadBufferToStorage } = require("../services/mediaUpload.service");
 
 const ADS_COLLECTION = "ads";
 
@@ -22,11 +23,40 @@ const serializeAd = (id, data) => ({
   updatedAt: toMs(data.updatedAt),
 });
 
+/** Fetches all ads without relying on a Firestore composite index. */
+const fetchAllAds = async () => {
+  const snap = await db.collection(ADS_COLLECTION).get();
+  return snap.docs
+    .map((d) => serializeAd(d.id, d.data()))
+    .sort((a, b) => a.order - b.order);
+};
+
+// ─── ADMIN: upload image to Firebase Storage ──────────────────────────────────
+const postAdminAdImage = async (req, res) => {
+  try {
+    const parsed = await parseMultipartForm(req, "image");
+    if (!parsed || !parsed.file) {
+      return res.status(400).json({ error: "No image uploaded" });
+    }
+
+    const { file } = parsed;
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+    if (!allowedTypes.includes(file.mimeType)) {
+      return res.status(400).json({ error: "Only JPEG, PNG, GIF, WebP, or SVG images are allowed" });
+    }
+
+    const url = await uploadBufferToStorage("ads", `ad_${Date.now()}`, file);
+    res.json({ imageUrl: url });
+  } catch (err) {
+    if (err.status === 413) return res.status(413).json({ error: "Image too large (max 10 MB)" });
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // ─── ADMIN: list all ads ─────────────────────────────────────────────────────
 const getAdminAds = async (req, res) => {
   try {
-    const snap = await db.collection(ADS_COLLECTION).orderBy("order", "asc").get();
-    const ads = snap.docs.map((d) => serializeAd(d.id, d.data()));
+    const ads = await fetchAllAds();
     res.json({ ads });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -39,11 +69,11 @@ const postAdminAd = async (req, res) => {
     const { imageUrl, link, caption } = req.body;
 
     // Get current max order
-    const snap = await db.collection(ADS_COLLECTION).orderBy("order", "desc").limit(1).get();
-    const maxOrder = snap.empty ? 0 : (snap.docs[0].data().order || 0) + 1;
+    const all = await fetchAllAds();
+    const maxOrder = all.length > 0 ? Math.max(...all.map((a) => a.order)) + 1 : 0;
 
     const now = admin.firestore.FieldValue.serverTimestamp();
-    const docData = {
+    const ref = await db.collection(ADS_COLLECTION).add({
       imageUrl: sanitize(imageUrl || ""),
       link: sanitize(link || ""),
       caption: sanitize(caption || ""),
@@ -51,9 +81,7 @@ const postAdminAd = async (req, res) => {
       order: maxOrder,
       createdAt: now,
       updatedAt: now,
-    };
-
-    const ref = await db.collection(ADS_COLLECTION).add(docData);
+    });
     res.status(201).json({ id: ref.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -96,20 +124,17 @@ const deleteAdminAd = async (req, res) => {
   }
 };
 
-// ─── ADMIN: reorder ads (accepts array of { id, order }) ─────────────────────
+// ─── ADMIN: reorder ads ───────────────────────────────────────────────────────
 const postAdminAdsReorder = async (req, res) => {
   try {
-    const { items } = req.body; // [{ id, order }]
+    const { items } = req.body;
     if (!Array.isArray(items)) return res.status(400).json({ error: "items must be an array" });
 
     const batch = db.batch();
     const now = admin.firestore.FieldValue.serverTimestamp();
     for (const item of items) {
       if (!item.id || typeof item.order !== "number") continue;
-      batch.update(db.collection(ADS_COLLECTION).doc(item.id), {
-        order: item.order,
-        updatedAt: now,
-      });
+      batch.update(db.collection(ADS_COLLECTION).doc(item.id), { order: item.order, updatedAt: now });
     }
     await batch.commit();
     res.json({ success: true });
@@ -118,24 +143,21 @@ const postAdminAdsReorder = async (req, res) => {
   }
 };
 
-// ─── PUBLIC: get active ads (no auth required) ───────────────────────────────
+// ─── PUBLIC: get active ads ───────────────────────────────────────────────────
 const getPublicAds = async (req, res) => {
   try {
-    const snap = await db
-      .collection(ADS_COLLECTION)
-      .where("isActive", "==", true)
-      .orderBy("order", "asc")
-      .get();
-    const ads = snap.docs.map((d) => serializeAd(d.id, d.data()));
-    // Only expose safe fields to the public
-    const safe = ads.map(({ id, imageUrl, link, caption }) => ({ id, imageUrl, link, caption }));
-    res.json({ ads: safe });
+    const all = await fetchAllAds();
+    const active = all
+      .filter((a) => a.isActive)
+      .map(({ id, imageUrl, link, caption }) => ({ id, imageUrl, link, caption }));
+    res.json({ ads: active });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
 module.exports = {
+  postAdminAdImage,
   getAdminAds,
   postAdminAd,
   patchAdminAd,
