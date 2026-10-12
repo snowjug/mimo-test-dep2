@@ -89,15 +89,16 @@ export function Group({
   children,
   className,
   bodyClassName,
+  ...rest
 }: {
   title?: React.ReactNode;
   footer?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   bodyClassName?: string;
-}) {
+} & React.ComponentProps<"section">) {
   return (
-    <section className={cn("mt-6", className)}>
+    <section className={cn("mt-6", className)} {...rest}>
       {title && <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-3">{title}</h2>}
       <div className={cn("overflow-hidden rounded-[20px] bg-surface", bodyClassName)}>{children}</div>
       {footer && <p className="mt-2 px-1 text-[13px] leading-snug text-ink-3">{footer}</p>}
