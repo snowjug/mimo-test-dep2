@@ -107,6 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
     coupons: { label: 'Coupon Codes', desc: 'Student discounts & promo vouchers' },
     finance: { label: 'MIMO Finance Center', desc: 'Revenue intelligence, refunds & tariffs' },
     configuration: { label: 'System Configuration', desc: 'Platform settings & hardware thresholds' },
+    advertisements: { label: 'Advertisements', desc: 'Manage customer-facing announcements & ads' },
   }[activeTab] || { label: 'Command Center', desc: 'MIMO Platform' };
 
   return (
