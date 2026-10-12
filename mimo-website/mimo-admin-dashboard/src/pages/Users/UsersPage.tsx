@@ -33,7 +33,7 @@ export const UsersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'ALL' | 'PAYING' | 'FREE'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'PAYING' | 'FREE' | 'GUEST' | 'REGISTERED'>('ALL');
   const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null);
   const [sortBy, setSortBy] = useState<'spend' | 'orders' | 'date'>('spend');
 
@@ -73,6 +73,10 @@ export const UsersPage: React.FC = () => {
       list = list.filter((u) => u.isPayingCustomer);
     } else if (filterType === 'FREE') {
       list = list.filter((u) => !u.isPayingCustomer);
+    } else if (filterType === 'GUEST') {
+      list = list.filter((u) => u.isGuest);
+    } else if (filterType === 'REGISTERED') {
+      list = list.filter((u) => !u.isGuest);
     }
 
     if (sortBy === 'spend') {
@@ -147,7 +151,13 @@ export const UsersPage: React.FC = () => {
             {loading ? '...' : metrics?.totalUsers || 0}
           </p>
           <p className="text-[11px] text-[var(--text-3)] font-medium mt-1">
-            Accounts registered on campus
+            {loading ? 'Accounts registered on campus' : (
+              <>
+                <span className="text-indigo-500 font-bold">{metrics?.registeredUsers ?? 0} registered</span>
+                {' · '}
+                <span className="text-amber-500 font-bold">{metrics?.guestUsers ?? 0} guest</span>
+              </>
+            )}
           </p>
         </div>
 
@@ -222,18 +232,18 @@ export const UsersPage: React.FC = () => {
           {/* Filter Pills */}
           <div className="flex items-center gap-2 overflow-x-auto">
             <div className="flex items-center p-1 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
-              {(['ALL', 'PAYING', 'FREE'] as const).map((type) => (
+              {(['ALL', 'PAYING', 'FREE', 'REGISTERED', 'GUEST'] as const).map((type) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => setFilterType(type)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     filterType === type
                       ? 'bg-[var(--surface)] text-[var(--primary)] shadow-xs'
                       : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
                   }`}
                 >
-                  {type === 'ALL' ? 'All' : type === 'PAYING' ? 'Paying Customers' : 'Free Users'}
+                  {type === 'ALL' ? 'All' : type === 'PAYING' ? 'Paying' : type === 'FREE' ? 'Free' : type === 'REGISTERED' ? 'Registered' : 'Guest'}
                 </button>
               ))}
             </div>
@@ -313,16 +323,23 @@ export const UsersPage: React.FC = () => {
 
                     {/* Status Badge */}
                     <td className="py-3.5 px-4">
-                      {u.isPayingCustomer ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          <CheckCircle2 size={11} />
-                          Customer
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                          Free Account
-                        </span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {u.isPayingCustomer ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            <CheckCircle2 size={11} />
+                            Customer
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                            Free Account
+                          </span>
+                        )}
+                        {u.isGuest && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                            Guest
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Orders Count */}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Wrench, Megaphone, Users2, Plus, X, Loader2, ChevronRight, ChevronDown,
-  Check, Ban, CheckCircle2, Circle, UserPlus, UserMinus,
+  Check, Ban, CheckCircle2, Circle, UserPlus, UserMinus, CalendarClock, Flame,
 } from 'lucide-react';
 import { adminCompany } from '../../services/adminCompany.service';
 import { adminGang, LoginStreaks } from '../../services/adminGang.service';
@@ -37,11 +37,11 @@ const MemberStrip: React.FC<{ members: Employee[]; streaks: LoginStreaks }> = ({
     {members.map((m) => {
       const key = streakKey(m);
       return (
-        <div key={m.id} className="flex items-center gap-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2">
+        <div key={m.id} className="flex w-full items-center gap-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 sm:w-auto">
           <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300">
             {m.name.slice(0, 2).toUpperCase()}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{m.name}</p>
             <ContributionGraph dates={key ? streaks[key] || [] : []} />
           </div>
@@ -334,6 +334,38 @@ const HrTab: React.FC<{ employees: Employee[]; streaks: LoginStreaks; onEmployee
 
   return (
     <div>
+      {/* HR Pulse: the daily-glance strip — what needs attention right now, across the whole company. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
+        <div className={`rounded-xl border p-3 ${leaveRequests.length > 0 ? 'border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'}`}>
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+            <CalendarClock className="size-3.5" /> Needs action
+          </div>
+          <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{loadingLeave ? '—' : leaveRequests.length}</p>
+          <p className="text-[11px] text-slate-500">pending leave request{leaveRequests.length === 1 ? '' : 's'}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <UserPlus className="size-3.5" /> Onboarding
+          </div>
+          <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{onboarding.length}</p>
+          <p className="text-[11px] text-slate-500">in progress, company-wide</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <Users2 className="size-3.5" /> Active staff
+          </div>
+          <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{active.length}</p>
+          <p className="text-[11px] text-slate-500">across tech, HR &amp; marketing</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <Flame className="size-3.5" /> HR team
+          </div>
+          <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{hrMembers.length}</p>
+          <p className="text-[11px] text-slate-500">logged-in streaks below</p>
+        </div>
+      </div>
+
       <MemberStrip members={hrMembers} streaks={streaks} />
 
       <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Pending leave requests</p>

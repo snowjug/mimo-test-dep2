@@ -53,7 +53,16 @@ export const FinanceKrishnaReportPage: React.FC<FinanceKrishnaReportProps> = ({ 
           value={r ? int(r.totalRegisteredUsers) : '—'}
           icon={<Users className="w-4 h-4" />}
           loading={loading}
-          comparisonText="All-time, real accounts"
+          comparisonText="All-time, real accounts (excludes guests)"
+        />
+        <FinanceMetricCard
+          title="Guest Sessions"
+          value={r ? int(r.totalGuestUsers) : '—'}
+          icon={<Users className="w-4 h-4" />}
+          iconBgColor="bg-amber-50"
+          iconColor="text-amber-600"
+          loading={loading}
+          comparisonText="Walk-up QR scans, never registered"
         />
         <FinanceMetricCard
           title="Active Users"

@@ -16,6 +16,8 @@ import {
   RefreshCcw,
   ChevronRight,
   X,
+  Users2,
+  Building2,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
@@ -55,6 +57,8 @@ const TITLES: Record<string, string> = {
   users: 'Customers',
   finance: 'Finance',
   configuration: 'Configuration',
+  'mimo-gang': 'MIMO GANG',
+  company: 'Company Overview',
 };
 
 const TABS = [
@@ -65,10 +69,12 @@ const TABS = [
 ];
 
 const MORE = [
-  { id: 'analytics',     label: 'Analytics',     icon: BarChart2 },
-  { id: 'users',         label: 'Customers',     icon: Users },
-  { id: 'finance',       label: 'Finance',       icon: IndianRupee },
-  { id: 'configuration', label: 'Configuration', icon: Settings },
+  { id: 'analytics',     label: 'Analytics',          icon: BarChart2 },
+  { id: 'users',         label: 'Customers',          icon: Users },
+  { id: 'finance',       label: 'Finance',            icon: IndianRupee },
+  { id: 'mimo-gang',     label: 'MIMO GANG',          icon: Users2 },
+  { id: 'company',       label: 'Company Overview',   icon: Building2 },
+  { id: 'configuration', label: 'Configuration',      icon: Settings },
 ];
 
 /** Bottom sheet used for "More" and the alerts list. */
