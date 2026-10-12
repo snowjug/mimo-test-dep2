@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ActionBar, ActionBarSpacer, AppBar, ChoiceRow, Group, PrimaryButton, Row, Segmented, StatusPill, Stepper, inputClass } from "../components/mimo/ui";
-import { FileText, X } from "lucide-react";
+import { CircleHelp, FileText, X } from "lucide-react";
 import api from "../api";
+import { useTour } from "../utils/tour-context";
 
 interface UploadedFile {
   name: string;
@@ -98,6 +99,7 @@ const generatePageRange = (selectedPages: number[], maxPages: number): string =>
 
 export function PrintOptions() {
   const navigate = useNavigate();
+  const { start: startTour } = useTour();
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [copies, setCopies] = useState(1);
   const [colorMode, setColorMode] = useState("bw");
@@ -470,7 +472,26 @@ export function PrintOptions() {
 
   return (
     <div className="min-h-[100dvh]">
-      <AppBar title="Print settings" onBack={() => navigate("/upload", { state: { returnFromOptions: true } })} />
+      <AppBar
+        title="Print settings"
+        onBack={() => navigate("/upload", { state: { returnFromOptions: true } })}
+        trailing={
+          <button
+            type="button"
+            onClick={() => {
+              // Consistent with the header's "How to print" button: always restarts the full tour from
+              // step 1, which lives on the upload page -- clicking this here without navigating first
+              // would silently show nothing, since the active step wouldn't match this route.
+              navigate("/upload");
+              startTour();
+            }}
+            aria-label="Show the how-to-print tutorial"
+            className="press flex size-10 items-center justify-center rounded-full text-ink-2 active:bg-surface-2"
+          >
+            <CircleHelp className="size-[22px]" strokeWidth={1.75} />
+          </button>
+        }
+      />
 
       <main className="px-4">
         <Group title="Printer">

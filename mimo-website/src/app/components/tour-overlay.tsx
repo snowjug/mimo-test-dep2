@@ -144,7 +144,7 @@ function TourCard({
  * pointer events, so the spotlighted element (and the rest of the page) stays genuinely interactive --
  * a real upload or a real tap on Continue is what naturally advances a new user through the tour. */
 export function TourOverlay() {
-  const { active, stepIndex, steps, start, next, prev, skip, close } = useTour();
+  const { active, stepIndex, steps, start, next, prev, skip, close, goTo } = useTour();
   const location = useLocation();
 
   // Offer the tour to a genuinely new visitor the first time they land on the upload page (home) --
@@ -166,6 +166,38 @@ export function TourOverlay() {
   const step = steps[stepIndex];
   const onThisPage = active && Boolean(step) && location.pathname === step.path;
   const rect = useTargetRect(onThisPage ? step.selector : null);
+
+  // Keep the tour aligned to real navigation: if the active step's page no longer matches where the
+  // user actually is (e.g. stepIndex is still on "/upload" but they already navigated on to
+  // "/print-options" via the real Continue button), jump to the first step that belongs to the page
+  // they're actually on, rather than sitting hidden on a step they've already passed. Complementary to
+  // the same-page skip-ahead above, which only handles mismatched elements WITHIN the current page.
+  useEffect(() => {
+    if (!active || !step || step.path === location.pathname) return;
+    const matchIndex = steps.findIndex((s) => s.path === location.pathname);
+    if (matchIndex !== -1) goTo(matchIndex);
+  }, [active, location.pathname, step, steps, goTo]);
+
+  // Some steps on the same page are mutually exclusive in the real DOM -- e.g. the upload page shows
+  // either the empty dropzone (step 1's target) OR the file list + Continue button (step 2's target),
+  // never both, depending on whether the user already has files. A user who restarts the tour while
+  // already past that point (already has files) would otherwise get stuck forever on a step whose target
+  // can never appear. After a brief grace period (in case the element is just about to mount), look ahead
+  // for a later step on the SAME route whose target already exists in the real DOM, and jump to it --
+  // this reflects the real UI state rather than forcing a step that no longer applies.
+  useEffect(() => {
+    if (!onThisPage || rect) return;
+    const t = setTimeout(() => {
+      for (let i = stepIndex + 1; i < steps.length; i++) {
+        if (steps[i].path !== step.path) break;
+        if (document.querySelector(steps[i].selector)) {
+          goTo(i);
+          return;
+        }
+      }
+    }, 900);
+    return () => clearTimeout(t);
+  }, [onThisPage, rect, stepIndex, step, steps, goTo]);
 
   useEffect(() => {
     if (!onThisPage) return;
