@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
-import { TourOverlay } from "./tour-overlay";
 
 export function DashboardLayout() {
 
@@ -166,7 +165,6 @@ export function DashboardLayout() {
           <Outlet />
         </main>
       </div>
-      <TourOverlay />
     </div>
   );
 }

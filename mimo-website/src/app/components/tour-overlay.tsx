@@ -146,16 +146,18 @@ function TourCard({
 export function TourOverlay() {
   const { active, stepIndex, steps, start, next, prev, skip, close } = useTour();
   const location = useLocation();
-  const hasAutoOffered = useRef(false);
 
-  // Offer the tour once to a genuinely new visitor, the first real navigation that lands them on the
-  // upload page (home) -- re-evaluated on every route change (unlike a check at the App root, which only
-  // runs once per full page load and would miss a client-side navigation from e.g. /login to /).
+  // Offer the tour to a genuinely new visitor the first time they land on the upload page (home) --
+  // re-evaluated on every route change (unlike a check at the App root, which only runs once per full
+  // page load and would miss a client-side navigation from e.g. /login to /upload). No extra "already
+  // offered" ref guard here: `active` and hasTourCompleted() already make this fully idempotent on their
+  // own -- once started, `active` blocks a re-trigger; once closed/skipped/finished, completion blocks it
+  // permanently. (A ref guard was tried first but is wrong under React 18 StrictMode in dev: the effect's
+  // first of its two intentional invocations sets the ref before its own timeout fires, so the second,
+  // surviving invocation would see the ref already set and silently skip scheduling anything.)
   useEffect(() => {
-    if (hasAutoOffered.current) return;
-    if (location.pathname !== "/") return;
+    if (location.pathname !== "/upload") return;
     if (active || hasTourCompleted()) return;
-    hasAutoOffered.current = true;
     // Give the page a beat to finish its own identity/data bootstrap before dimming it.
     const t = setTimeout(() => start(), 600);
     return () => clearTimeout(t);
