@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "./app/components/ui/sonner";
 import { Login } from "./app/pages/login";
 import { ScreenSkeleton } from "./app/components/mimo/screen-skeleton";
+import { TourProvider } from "./app/utils/tour-context";
+import { TourOverlay } from "./app/components/tour-overlay";
 
 // Every screen except the entry (login) is split into its own chunk so the first paint only
 // downloads what the login screen needs. pdf-lib, Firebase Storage and the text editor load on demand.
@@ -30,34 +32,37 @@ export default function App() {
   }, []);
 
   return (
-    <BrowserRouter>
-      <div className="app-column">
-        <Suspense fallback={<ScreenSkeleton />}>
-          <Routes>
-            <Route path="/" element={<Login />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/upload" element={<UploadFile />} />
-            <Route path="/print-options" element={<PrintOptions />} />
-            <Route path="/payment" element={<Payment />} />
-            <Route path="/payment-verify" element={<PaymentVerify />} />
-            <Route path="/print-code" element={<PrintCode />} />
-            <Route path="/user-profile" element={<UserProfile />} />
-            <Route path="/settings" element={<PrinterSettings />} />
-            <Route path="/onboarding" element={<OnboardingName />} />
-            <Route path="/blank-pages" element={<BlankPages />} />
-            <Route path="/direct-success" element={<DirectSuccess />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/*" element={<AdminDashboard />} />
-            <Route path="/finance" element={<AdminDashboard />} />
-            <Route path="/finance/*" element={<AdminDashboard />} />
-            <Route path="/text-editor" element={<TextEditor />} />
-            <Route path="/find-machine" element={<FindMachine />} />
-            <Route path="/document-scanner" element={<DocumentScanner />} />
-          </Routes>
-        </Suspense>
-      </div>
-      <Toaster />
-    </BrowserRouter>
+    <TourProvider>
+      <BrowserRouter>
+        <div className="app-column">
+          <Suspense fallback={<ScreenSkeleton />}>
+            <Routes>
+              <Route path="/" element={<Login />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/upload" element={<UploadFile />} />
+              <Route path="/print-options" element={<PrintOptions />} />
+              <Route path="/payment" element={<Payment />} />
+              <Route path="/payment-verify" element={<PaymentVerify />} />
+              <Route path="/print-code" element={<PrintCode />} />
+              <Route path="/user-profile" element={<UserProfile />} />
+              <Route path="/settings" element={<PrinterSettings />} />
+              <Route path="/onboarding" element={<OnboardingName />} />
+              <Route path="/blank-pages" element={<BlankPages />} />
+              <Route path="/direct-success" element={<DirectSuccess />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/*" element={<AdminDashboard />} />
+              <Route path="/finance" element={<AdminDashboard />} />
+              <Route path="/finance/*" element={<AdminDashboard />} />
+              <Route path="/text-editor" element={<TextEditor />} />
+              <Route path="/find-machine" element={<FindMachine />} />
+              <Route path="/document-scanner" element={<DocumentScanner />} />
+            </Routes>
+          </Suspense>
+        </div>
+        <TourOverlay />
+        <Toaster />
+      </BrowserRouter>
+    </TourProvider>
   );
 }

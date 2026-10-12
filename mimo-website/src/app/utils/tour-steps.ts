@@ -14,14 +14,14 @@ export type TourStep = {
 export const TOUR_STEPS: TourStep[] = [
   {
     id: "upload",
-    path: "/",
+    path: "/upload",
     selector: '[data-tour="upload-dropzone"]',
     title: "Upload your document",
     body: "Tap here to add a PDF, Word, PowerPoint, Excel, text file, or photo.",
   },
   {
     id: "upload-continue",
-    path: "/",
+    path: "/upload",
     selector: '[data-tour="upload-continue"]',
     title: "Continue",
     body: "Once your files are ready, tap Continue to choose how they're printed.",
