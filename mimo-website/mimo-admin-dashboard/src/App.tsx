@@ -21,6 +21,7 @@ const MarketingApp = lazy(() => import('./pages/Marketing/MarketingApp').then((m
 const AdminCompanyPage = lazy(() => import('./pages/Company/AdminCompanyPage').then((m) => ({ default: m.AdminCompanyPage })));
 const MimoGangPage = lazy(() => import('./pages/Gang/MimoGangPage').then((m) => ({ default: m.MimoGangPage })));
 const AdminChatPage = lazy(() => import('./pages/Chat/AdminChatPage').then((m) => ({ default: m.AdminChatPage })));
+const AdvertisementsPage = lazy(() => import('./pages/Advertisements/AdvertisementsPage').then((m) => ({ default: m.AdvertisementsPage })));
 
 const PageSkeleton = () => (
   <div aria-busy="true" aria-label="Loading" className="space-y-3">
@@ -52,6 +53,7 @@ function DashboardApp() {
     if (path.includes('company')) return 'company';
     if (path.includes('mimo-gang')) return 'mimo-gang';
     if (path.includes('chat')) return 'chat';
+    if (path.includes('advertisements') || path.includes('ads')) return 'advertisements';
     return 'overview';
   };
 
@@ -136,6 +138,7 @@ function DashboardApp() {
       {activeTab === 'company' && <AdminCompanyPage />}
       {activeTab === 'mimo-gang' && <MimoGangPage />}
       {activeTab === 'chat' && <AdminChatPage />}
+      {activeTab === 'advertisements' && <AdvertisementsPage />}
       </Suspense>
     </AppShell>
   );

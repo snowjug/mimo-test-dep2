@@ -5,7 +5,7 @@ import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, Text
 import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, MapPin, Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
-import { HackathonBanner } from "../components/HackathonBanner";
+import { AdBanner } from "../components/AdBanner";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 
@@ -1118,7 +1118,7 @@ export function UploadFile() {
         </section>
       )}
 
-      {files.length === 0 && <HackathonBanner />}
+      {files.length === 0 && <AdBanner />}
 
       {files.length > 0 && (
         <>
