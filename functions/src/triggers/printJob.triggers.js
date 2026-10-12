@@ -55,11 +55,17 @@ exports.autoRefundJob = onDocumentUpdated("print_jobs/{jobId}", async (event) =>
       return;
     }
 
+    // WhatsApp (Payment Links) orders store the real Cashfree order_id separately as `cfOrderId` --
+    // our own `orderId` is the link_id, which Cashfree's refund endpoint does not accept (see
+    // getWaPaySuccess, where cfOrderId is resolved via GET /links/{id}/orders). Website orders never
+    // set cfOrderId, so this falls back to `orderId`, which already IS their real Cashfree order_id.
+    const refundTargetOrderId = orderData.cfOrderId || orderId;
+
     try {
       // 2. Call Cashfree Refunds API
       const refundId = refundIdFor("refund_auto", orderId);
       const response = await axios.post(
-        `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+        `${CASHFREE_BASE_URL}/orders/${refundTargetOrderId}/refunds`,
         {
           refund_amount: refundAmount,
           refund_id: refundId,

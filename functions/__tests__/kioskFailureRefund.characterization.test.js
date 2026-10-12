@@ -68,6 +68,13 @@ test("a free order (amount 0) is marked failed without touching the gateway", as
   assert.strictEqual(refundCalls().length, 0);
 });
 
+test("a WhatsApp order with a resolved cfOrderId refunds against that Cashfree order id, not the link_id (P0.4/P0.5 refund-target fix)", async () => {
+  fake.reset(world({ order: { cfOrderId: "CFPay_real_order_123" } }));
+  const res = await report({});
+  assert.strictEqual(res.body.refunded, true);
+  assert.match(refundCalls()[0].url, /\/orders\/CFPay_real_order_123\/refunds$/);
+});
+
 test("a paid order is refunded in full: job becomes refunded, order REFUNDED with refundStatus SUCCESS, a refunds record is written", async () => {
   const res = await report({});
   assert.deepStrictEqual(res.body, { refunded: true, refundId: "autorefund_job1", amount: 25, error: null });

@@ -423,6 +423,11 @@ function createKioskRouter(dependencies) {
 
       let ordSnap = null;
       let orderAmount = 0;
+      // WhatsApp (Payment Links) orders store the real Cashfree order_id separately as `cfOrderId`
+      // (resolved in getWaPaySuccess via GET /links/{id}/orders) -- our own `orderId` is the link_id,
+      // which Cashfree's refund endpoint does not accept. Website orders never set cfOrderId, so this
+      // falls back to `orderId`, which already IS their real Cashfree order_id.
+      let refundTargetOrderId = orderId;
       if (orderId) {
         let snap = await db.collection("orders").where("orderId", "==", orderId).get();
         if (snap.empty) snap = await db.collection("payment_transactions").where("orderId", "==", orderId).get();
@@ -430,6 +435,7 @@ function createKioskRouter(dependencies) {
           ordSnap = snap;
           const od = snap.docs[0].data();
           orderAmount = od.amount || od.totals?.totalAmount || od.totalCost || od.order_amount || od.price || 0;
+          refundTargetOrderId = od.cfOrderId || orderId;
         }
       }
 
@@ -454,7 +460,7 @@ function createKioskRouter(dependencies) {
       if (axios && CASHFREE_BASE_URL) {
         try {
           const cfRes = await axios.post(
-            `${CASHFREE_BASE_URL}/orders/${orderId}/refunds`,
+            `${CASHFREE_BASE_URL}/orders/${refundTargetOrderId}/refunds`,
             {
               refund_amount: orderAmount,
               refund_id: refundId,
