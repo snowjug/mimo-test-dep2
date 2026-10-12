@@ -85,9 +85,20 @@ export function AdBanner() {
     dragStartX.current = null;
   };
 
+function normalizeUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+  const hasImage = Boolean(current.imageUrl);
+  const hasCaption = Boolean(current.caption);
+
   const AdContent = (
     <div
-      className="flex gap-4 overflow-hidden rounded-[20px] bg-surface p-3 relative select-none"
+      className="relative overflow-hidden rounded-[20px] bg-surface select-none transition-shadow"
       /* Touch */
       onTouchStart={(e) => onDragStart(e.touches[0].clientX)}
       onTouchEnd={(e) => onDragEnd(e.changedTouches[0].clientX)}
@@ -95,34 +106,55 @@ export function AdBanner() {
       onMouseDown={(e) => onDragStart(e.clientX)}
       onMouseUp={(e) => onDragEnd(e.clientX)}
     >
-      {/* Image */}
-      {current.imageUrl && (
-        <div className="shrink-0 overflow-hidden rounded-[12px]" aria-hidden="true">
-          <img
-            src={current.imageUrl}
-            alt=""
-            width={96}
-            height={144}
-            loading="lazy"
-            decoding="async"
-            className="h-36 w-24 object-cover"
-            draggable={false}
-          />
+      {/* CASE 1: Banner mode (image only, no caption) */}
+      {hasImage && !hasCaption ? (
+        <div className="p-2 sm:p-2.5">
+          <div className="w-full overflow-hidden rounded-[14px] bg-ink-4/5 flex items-center justify-center">
+            <img
+              src={current.imageUrl!}
+              alt="Announcement banner"
+              loading="lazy"
+              decoding="async"
+              className="w-full max-h-56 sm:max-h-64 object-cover rounded-[14px]"
+              draggable={false}
+            />
+          </div>
         </div>
-      )}
+      ) : (
+        /* CASE 2: Card mode (image + caption, or caption only) */
+        <div className="flex items-center gap-3.5 sm:gap-4 p-3 sm:p-3.5">
+          {hasImage && (
+            <div className="shrink-0 overflow-hidden rounded-[12px] bg-ink-4/10 w-24 sm:w-28 h-32 sm:h-36 flex items-center justify-center" aria-hidden="true">
+              <img
+                src={current.imageUrl!}
+                alt=""
+                width={112}
+                height={144}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+                draggable={false}
+              />
+            </div>
+          )}
 
-      {/* Caption */}
-      {current.caption && (
-        <div className="flex min-w-0 flex-1 flex-col py-1">
-          <p className="mt-0.5 text-[17px] font-semibold leading-tight tracking-tight text-ink">
-            {current.caption}
-          </p>
+          {hasCaption && (
+            <div className="flex min-w-0 flex-1 flex-col py-1">
+              <p className="text-[16px] sm:text-[17px] font-semibold leading-snug tracking-tight text-ink line-clamp-4">
+                {current.caption}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
       {/* Dot indicators (only when >1 ad) */}
       {ads.length > 1 && (
-        <div className="absolute bottom-3 right-3 flex gap-1.5" role="tablist" aria-label="Advertisement slides">
+        <div
+          className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface/85 backdrop-blur-md shadow-xs border border-ink-4/10"
+          role="tablist"
+          aria-label="Advertisement slides"
+        >
           {ads.map((_, i) => (
             <button
               key={i}
@@ -141,17 +173,19 @@ export function AdBanner() {
     </div>
   );
 
+  const cleanLink = normalizeUrl(current.link);
+
   return (
     <section aria-label="Advertisement" className="mt-8">
       <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-3">Announcements</h2>
 
       {/* Wrap in <a> only if a link is present */}
-      {current.link ? (
+      {cleanLink ? (
         <a
-          href={current.link}
+          href={cleanLink}
           target="_blank"
           rel="noopener noreferrer"
-          className="block"
+          className="block transition-transform active:scale-[0.99]"
           aria-label={current.caption ?? "View announcement"}
         >
           {AdContent}
