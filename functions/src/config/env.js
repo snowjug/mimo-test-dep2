@@ -5,6 +5,19 @@ const WA_PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || "1178360992020211";
 const WA_ACCESS_TOKEN = process.env.WA_ACCESS_TOKEN || "";
 
 const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || "mimo_webhook_verify_2024";
+if (!process.env.WA_VERIFY_TOKEN) {
+  // Known value, not a secret the signature check depends on (that's WA_APP_SECRET below) -- this one is
+  // only used for Meta's one-time GET handshake when the webhook URL is (re)configured in the Meta dashboard.
+  // Flagged rather than silently removed: if production has never set its own WA_VERIFY_TOKEN, Meta's
+  // dashboard is configured to send exactly this value, and swapping it out would break the handshake
+  // without a coordinated change on both sides. See the security audit report for the rotation plan.
+  console.warn("[SECURITY] WA_VERIFY_TOKEN is not set; using the known in-source default. Rotate this (set a real env var AND update the Meta dashboard to match) when convenient.");
+}
+
+// WhatsApp (Meta) signs every webhook delivery: X-Hub-Signature-256 = sha256=<hex HMAC-SHA256(rawBody, secret)>,
+// using the app's Secret (not the access token or verify token). No fallback: a missing secret means the
+// signature check fails closed (see postWhatsappWebhook), it never silently accepts unsigned requests.
+const WA_APP_SECRET = process.env.WA_APP_SECRET || "";
 
 // JWT_SECRET has no fallback: a weak/guessable/default signing key lets anyone forge admin tokens.
 // This module runs at Cloud Functions cold start, so throwing here fails the deploy/boot loudly and
@@ -25,7 +38,9 @@ const CASHFREE_BASE_URL = process.env.CASHFREE_ENV === "production"
 const cashfreeHeaders = {
   "Content-Type": "application/json",
   "x-client-id": process.env.CASHFREE_APP_ID || "test_app_id",
-  "x-client-secret": process.env.CASHFREE_SECRET_KEY || "test_secret_key",
+  // No hardcoded fallback: a missing key must make outbound Cashfree calls fail (401 from Cashfree),
+  // never silently send a known, source-controlled value as the API credential.
+  "x-client-secret": process.env.CASHFREE_SECRET_KEY || "",
   "x-api-version": "2023-08-01",
 };
 
@@ -40,6 +55,7 @@ module.exports = {
   INTERNAL_CONVERTER_SECRET,
   SECRET_KEY,
   WA_ACCESS_TOKEN,
+  WA_APP_SECRET,
   WA_PHONE_NUMBER_ID,
   WA_VERIFY_TOKEN,
   cashfreeHeaders,

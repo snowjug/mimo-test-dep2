@@ -296,6 +296,12 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
     const printCode = await generateUniquePrintCode(db);
     const now = admin.firestore.FieldValue.serverTimestamp();
     const targetKioskId = session.kioskId || session.destination || "SV-002";
+    // Record the ₹0 transaction so refund/failure logic (autoRefundJob, /kiosk/report-failure) has a real
+    // document to read -- without this, a WhatsApp order has no orders/payment_transactions record at all,
+    // and a genuinely-paid order further down would get silently misread as "free, no refund needed".
+    await db.collection("payment_transactions").doc().set({
+      orderId, userId: `wa:${from}`, amount: 0, createdAt: now, status: "PAID", paymentMethod: "whatsapp_free",
+    });
     await db.collection("print_jobs").doc(session.jobId).update({
       orderId,
       colorMode: session.colorMode,
@@ -335,6 +341,15 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
       }
     }, { headers: cashfreeHeaders });
 
+    // Same reasoning as the free-order branch above: this is the record autoRefundJob and
+    // /kiosk/report-failure both look up by orderId to find the real paid amount. The Cashfree webhook
+    // (postCashfreeWebhook) already updates any orders/payment_transactions doc matching this orderId to
+    // PAID on success -- it needs this doc to exist first, which until now it never did for WhatsApp.
+    await db.collection("payment_transactions").doc().set({
+      orderId, userId: `wa:${from}`, amount: totalAmount, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: "INITIATED", paymentMethod: "whatsapp_link",
+    });
+
     const targetKioskId = session.kioskId || session.destination || "SV-002";
     await db.collection("print_jobs").doc(session.jobId).update({
       orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: totalAmount, printDestination: targetKioskId, kioskId: targetKioskId, couponUsed: couponCode || null
@@ -344,15 +359,18 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
 
     const paymentLink = cfRes.data.link_url;
 
-    const bodyText = `🧾 *ORDER PAID* (#${orderId.slice(-6)})
+    // Labeled as a payment request, not a confirmation: payment has not happened yet at this point
+    // (the Cashfree link was just created), so this must never read as "paid" -- see the brief's
+    // "never tell the customer that payment succeeded unless the backend has verified it" requirement.
+    const bodyText = `🧾 *ORDER SUMMARY* (#${orderId.slice(-6)})
 ━━━━━━━━━━━━━━━━━
 📄 *File:* ${session.fileName}
 🔢 *Copies:* ${session.copies}
 🎨 *Type:* ${session.colorMode === "color" ? "Color" : "B&W"}
 ━━━━━━━━━━━━━━━━━
-💰 *Amount Paid:* ₹${totalAmount.toFixed(2)}
+💰 *Amount Due:* ₹${totalAmount.toFixed(2)}
 
-✨ Thank you for using Mimo Printing!`;
+Tap *Pay Now* below to complete your order.`;
     await sendWhatsAppCTAButton(from, bodyText, "Pay Now", paymentLink);
   } catch (cfErr) {
     console.error("[WHATSAPP BOT] Cashfree order creation failed:", cfErr.response?.data || cfErr.message);
