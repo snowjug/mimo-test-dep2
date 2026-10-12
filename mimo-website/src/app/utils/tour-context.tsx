@@ -21,6 +21,7 @@ type TourContextValue = {
   prev: () => void;
   skip: () => void;
   close: () => void;
+  goTo: (index: number) => void;
 };
 
 const TourContext = createContext<TourContextValue | null>(null);
@@ -81,9 +82,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const prev = useCallback(() => setStepIndex((i) => Math.max(0, i - 1)), []);
   const skip = useCallback(() => finish(), [finish]);
   const close = useCallback(() => finish(), [finish]);
+  const goTo = useCallback((index: number) => setStepIndex(Math.max(0, Math.min(index, TOUR_STEPS.length - 1))), []);
 
   return (
-    <TourContext.Provider value={{ active, stepIndex, steps: TOUR_STEPS, start, next, prev, skip, close }}>
+    <TourContext.Provider value={{ active, stepIndex, steps: TOUR_STEPS, start, next, prev, skip, close, goTo }}>
       {children}
     </TourContext.Provider>
   );
