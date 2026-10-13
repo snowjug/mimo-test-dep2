@@ -14,7 +14,7 @@
     "test:coverage:money": "c8 --check-coverage --per-file --lines 88 --branches 84 --include src/controllers/payment.controller.js node --test __tests__/*.test.js",
     "test:coverage:supporting": "c8 --check-coverage --per-file --lines 60 --branches 55 --include src/services/whatsapp.service.js --include src/controllers/public.controller.js node --test __tests__/*.test.js",
     "test:coverage:payment-services": "c8 --check-coverage --per-file --lines 90 --branches 70 --include src/services/refund.service.js --include src/services/printCode.service.js --include src/services/pricing.service.js node --test __tests__/*.test.js",
-    "test:emulator": "firebase emulators:exec --config __tests__/emulator/firebase.emulator.json --only firestore --project demo-mimo-emulator \"node --test __tests__/emulator/orders.emulator.js\""
+    "test:emulator": "firebase emulators:exec --config __tests__/emulator/firebase.emulator.json --only firestore --project demo-mimo-emulator \"node --test __tests__/emulator/orders.emulator.js __tests__/emulator/storageCleanup.emulator.js\""
   },
   "keywords": [],
   "author": "",

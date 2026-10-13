@@ -7,6 +7,7 @@ const { admin, db } = require("../config/firebase");
 const A = require("../services/analytics.service");
 const { resolveRefunds, cashfreeRefundFetcher } = require("../services/refundSync.service");
 const R = require("../services/machineRegistry.service");
+const C = require("../services/issueCategories.service");
 
 // Cashfree refund lookups for the history (manual refunds made in the Cashfree app). Tests swap this out.
 let fetchCashfreeRefunds = (orderId) => {
@@ -82,7 +83,9 @@ const getAdminAnalytics = async (req, res) => {
   try {
     const range = A.parseRange(req.query);
     const compare = req.query.compare !== "0";
-    res.json(await A.getAnalytics(db, Timestamp, range, { compare }));
+    // The registry (falls back to the built-in defaults on its own) decides which machines get a row.
+    const machines = await R.loadMachinesMap(db);
+    res.json(await A.getAnalytics(db, Timestamp, range, { compare, machines }));
   } catch (err) {
     fail(res, err, "analytics");
   }
@@ -472,6 +475,59 @@ const getAdminFinanceSheetData = async (req, res) => {
   }
 };
 
+// ─────────────────────────────── GET /admin/issues ───────────────────────────────
+/**
+ * Dated, deduplicated issue history for the selected range (see services/issueCategories.service.js for the
+ * categories, evidence basis and dedupe rules), plus problems that exist right now in a separate `current` list
+ * that never counts toward the range. Read-only; carries no customer contact details.
+ * Query: from, to, tzOffset, category, kioskId, source, limit (1-500, default 200), current=0 to skip live alerts.
+ */
+const getAdminIssues = async (req, res) => {
+  try {
+    const range = A.parseRange(req.query);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 500);
+    const wantCategory = req.query.category ? String(req.query.category) : null;
+    const wantKiosk = req.query.kioskId ? String(req.query.kioskId) : null;
+    const wantSource = req.query.source ? String(req.query.source) : null;
+    const withCurrent = req.query.current !== "0";
+
+    const [jobSnap, refundReqs, machines, kiosks] = await Promise.all([
+      db.collection("print_jobs")
+        .where("createdAt", ">=", Timestamp.fromMillis(range.from))
+        .where("createdAt", "<", Timestamp.fromMillis(range.to))
+        .orderBy("createdAt", "desc")
+        .limit(A.MAX_DOCS_PER_COLLECTION + 1)
+        .get(),
+      A.loadRefundRequests(db, Timestamp, range.from, range.to),
+      R.loadMachinesMap(db),
+      withCurrent ? loadKiosks(range) : Promise.resolve([]),
+    ]);
+    const jobs = A.normalizeJobs(jobSnap.docs.slice(0, A.MAX_DOCS_PER_COLLECTION).map((d) => ({ id: d.id, ...d.data() })));
+    const all = A.issuesInRange({ jobs, refundRequests: refundReqs.requests, machines }, range);
+    const counts = C.countIssues(all);
+
+    const filtered = all.filter((i) =>
+      (!wantCategory || i.category === wantCategory) &&
+      (!wantKiosk || i.kioskId === wantKiosk) &&
+      (!wantSource || i.source === wantSource));
+    const issues = filtered.slice(0, limit).map(({ rangeMs, ...rest }) => rest);
+
+    res.json({
+      range: { from: A.iso(range.from), to: A.iso(range.to) },
+      categories: C.ISSUE_CATEGORIES,
+      total: filtered.length,
+      truncated: filtered.length > limit || jobSnap.docs.length > A.MAX_DOCS_PER_COLLECTION || refundReqs.truncated,
+      partial: refundReqs.partial,
+      counts: { byCategory: counts.byCategory, bySource: counts.bySource, total: counts.total },
+      issues,
+      current: C.currentAlerts(kiosks, { paperLowPct: PAPER_LOW_PCT, supplyLowPct: TONER_LOW_PCT }),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    fail(res, err, "issues");
+  }
+};
+
 module.exports = {
   jobTimeline,
   jobOutcome,
@@ -484,6 +540,7 @@ module.exports = {
   getAdminJobs,
   getAdminKiosks,
   getAdminIncidents,
+  getAdminIssues,
   loadKiosks,
   getAdminFinanceSheetData,
 };

@@ -41,7 +41,23 @@ export interface SeriesPoint {
   orders: number;
   jobs: number;
   pages: number;
+  /** Legacy definition (failed + refunded statuses); kept for the finance portal. */
   failed: number;
+  /** Reporting outcome (one per job, see Reporting). Absent on older API responses. */
+  successful?: number;
+  reportFailed?: number;
+  issues?: number;
+}
+
+export interface KioskReporting {
+  successful: number;
+  failed: number;
+  /** successful + failed */
+  attempts: number;
+  failureRate: number | null;
+  issues: number;
+  /** true once attempts >= Reporting.minAttemptsToRank */
+  rankable: boolean;
 }
 
 export interface KioskBreakdown {
@@ -49,17 +65,69 @@ export interface KioskBreakdown {
   name: string;
   type: 'bw' | 'color';
   description: string;
+  shortLabel?: string;
+  lifecycleStatus?: string;
   jobs: number;
   completed: number;
   failed: number;
   pages: number;
   revenue: number;
+  reporting?: KioskReporting;
+}
+
+export type IssueCategoryId = 'paper' | 'printer' | 'network' | 'payment' | 'print_failure' | 'timeout' | 'machine_pi' | 'ink_toner' | 'other';
+/** exact: the system's own fixed message · inferred: matched from failure text · customer: raised by a customer · unknown: no usable reason */
+export type IssueBasis = 'exact' | 'inferred' | 'customer' | 'unknown';
+export type IssueSource = 'job_failure' | 'customer_report' | 'refund_request';
+
+export interface IssueCategoryCount { category: IssueCategoryId; label: string; count: number }
+
+/** One consistent set of dashboard KPIs. Every job is in exactly one outcome bucket. */
+export interface Reporting {
+  jobs: {
+    total: number;
+    successful: number;
+    failed: number;
+    /** Refunded without ever printing or failing; not part of the success rate. */
+    refundedUnprinted: number;
+    inProgress: number;
+    abandoned: number;
+    unknown: number;
+    /** successful / (successful + failed); null when none finished */
+    successRate: number | null;
+    pages: number;
+  };
+  revenue: { net: number; gross: number; refunded: number; refundCount: number };
+  issues: {
+    total: number;
+    detected: number;
+    customerReported: number;
+    payment: number;
+    byCategory: IssueCategoryCount[];
+    bySource: Record<IssueSource, number>;
+    /** Refund requests could not be fully read, so payment issues may be missing. */
+    partial: boolean;
+  };
+  minAttemptsToRank: number;
+}
+
+export interface ProblemMachine {
+  kioskId: string;
+  name: string;
+  shortLabel: string | null;
+  attempts: number;
+  failed: number;
+  failureRate: number;
+  issues: number;
 }
 
 export interface Analytics {
   range: { from: string; to: string; granularity: 'hour' | 'day'; tzOffset: number; dateBasis?: 'created' | 'payment' };
   current: Summary;
   previous: { from: string; to: string; summary: Summary } | null;
+  /** Absent on API versions before the Phase 1 reporting upgrade. */
+  reporting?: Reporting;
+  problemMachines?: ProblemMachine[];
   series: SeriesPoint[];
   byKiosk: KioskBreakdown[];
   unassignedRevenue: number;
@@ -363,4 +431,65 @@ export interface FinanceSheetResponse {
   cached: boolean;
   lastSyncedAt: string;
   syncError?: string | null;
+}
+export interface IssueRelated {
+  type: 'customer_report' | 'refund_request';
+  at: string | null;
+  label?: string | null;
+  verdict?: string | null;
+  note?: string | null;
+  status?: string | null;
+  jobIds?: string[];
+  requestId?: string;
+}
+
+export interface IssueRow {
+  id: string;
+  category: IssueCategoryId;
+  basis: IssueBasis;
+  source: IssueSource;
+  severity: 'high' | 'medium' | 'low';
+  kioskId: string | null;
+  machineName: string | null;
+  at: string | null;
+  jobId: string | null;
+  jobIds: string[];
+  orderId: string | null;
+  title: string;
+  evidence: {
+    printerStatus?: string | null;
+    printVerified?: boolean;
+    sheetsVerified?: number | null;
+    verdict?: string | null;
+    note?: string | null;
+    status?: string | null;
+    amount?: number | null;
+    reason?: string | null;
+  };
+  related: IssueRelated[];
+}
+
+/** A problem that exists right now; never part of a date range's totals. */
+export interface CurrentAlert {
+  id: string;
+  category: IssueCategoryId;
+  basis: IssueBasis;
+  severity: 'high' | 'medium' | 'low';
+  kioskId: string;
+  machineName: string;
+  at: string | null;
+  title: string;
+  evidence: Record<string, unknown>;
+}
+
+export interface IssuesResponse {
+  range: { from: string; to: string };
+  categories: { id: IssueCategoryId; label: string }[];
+  total: number;
+  truncated: boolean;
+  partial: boolean;
+  counts: { total: number; byCategory: IssueCategoryCount[]; bySource: Record<IssueSource, number> };
+  issues: IssueRow[];
+  current: CurrentAlert[];
+  updatedAt: string;
 }

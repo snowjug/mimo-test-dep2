@@ -37,6 +37,7 @@ router.post("/admin/kiosks/:kioskId/refill-paper", adminAuthMiddleware, kioskCom
 router.post("/admin/kiosks/:kioskId/verify", adminAuthMiddleware, kioskCommands.postAdminKioskVerify);
 router.get("/admin/incidents", adminAuthMiddleware, insights.getAdminIncidents);
 router.get("/admin/finance-sheet", financeOrAdminAuthMiddleware, insights.getAdminFinanceSheetData);
+router.get("/admin/issues", adminAuthMiddleware, insights.getAdminIssues);
 router.post("/admin/refund", adminAuthMiddleware, admin.postAdminRefund);
 router.get("/admin/refund-requests", adminAuthMiddleware, admin.getAdminRefundRequests);
 
