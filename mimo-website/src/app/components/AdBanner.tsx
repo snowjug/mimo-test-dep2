@@ -149,57 +149,86 @@ export function AdBanner() {
     startTimer(count);
   };
 
-  // ── Drag / swipe handlers — the track follows the pointer live, not just a post-hoc gesture check ──
-  const onDragStart = (clientX: number) => {
+  const dragStartY = useRef<number | null>(null);
+  const isVerticalScrollRef = useRef<boolean>(false);
+
+  // ── Drag / swipe handlers with vertical scroll preservation ──
+  const onDragStart = (clientX: number, clientY?: number) => {
     dragStartX.current = clientX;
+    dragStartY.current = clientY ?? null;
+    isVerticalScrollRef.current = false;
     didDragRef.current = false;
     setIsDragging(true);
   };
-  const onDragMove = (clientX: number, count: number) => {
+  const onDragMove = (clientX: number, clientY: number | undefined, count: number) => {
     if (dragStartX.current === null) return;
+    if (isVerticalScrollRef.current) return;
+
+    if (dragStartY.current !== null && clientY !== undefined) {
+      const deltaY = Math.abs(clientY - dragStartY.current);
+      const deltaX = Math.abs(clientX - dragStartX.current);
+      if (deltaY > deltaX && deltaY > 8) {
+        isVerticalScrollRef.current = true;
+        setDragOffset(0);
+        return;
+      }
+    }
+
     const delta = clientX - dragStartX.current;
     if (Math.abs(delta) > 4) didDragRef.current = true;
-    // Resist dragging past the ends when there's only one slide (nothing to reveal).
     setDragOffset(count > 1 ? delta : delta * 0.2);
   };
   const onDragEnd = (count: number) => {
     if (dragStartX.current === null) return;
-    if (Math.abs(dragOffset) > 40) goTo(index + (dragOffset < 0 ? 1 : -1), count);
+    if (!isVerticalScrollRef.current && Math.abs(dragOffset) > 40) {
+      goTo(index + (dragOffset < 0 ? 1 : -1), count);
+    }
     dragStartX.current = null;
+    dragStartY.current = null;
+    isVerticalScrollRef.current = false;
     setDragOffset(0);
     setIsDragging(false);
   };
 
-  // Nothing to show while loading or when there are no ads
-  if (!ads || ads.length === 0) return null;
+  const fallbackAds: Ad[] = [
+    {
+      id: "mimo-campus-banner",
+      imageUrl: "/images/mimo-campus-banner.jpg",
+      link: "https://wa.me/919364028349?text=Namastey%20MIMO,%20I%20want%20to%20partner%20with%20MIMO%20at%20my%20campus!",
+      caption: null,
+    },
+  ];
+
+  const activeAds = ads && ads.length > 0 ? ads : fallbackAds;
 
   const trackPercentOffset = -index * 100;
   const dragPercent = trackRef.current?.clientWidth ? (dragOffset / trackRef.current.clientWidth) * 100 : 0;
 
   return (
-    <section aria-label="Advertisement" className="mt-8">
-      <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-3">Announcements</h2>
+    <section aria-label="Advertisement" className="mt-3.5 sm:mt-4">
+      <h2 className="mb-1.5 px-1 text-[13px] font-medium text-ink-3">Announcements</h2>
 
       <div
-        className="relative overflow-hidden rounded-[20px] bg-surface select-none"
-        style={{ height: trackHeight, transition: isDragging ? undefined : "height 300ms ease" }}
+        className="relative overflow-hidden rounded-[20px] bg-surface select-none touch-pan-y"
+        style={{ height: trackHeight, touchAction: "pan-y", transition: isDragging ? undefined : "height 300ms ease" }}
       >
         <div
           ref={trackRef}
-          className="flex"
+          className="flex touch-pan-y"
           style={{
+            touchAction: "pan-y",
             transform: `translateX(calc(${trackPercentOffset}% + ${dragPercent}%))`,
             transition: isDragging ? "none" : "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
-          onTouchStart={(e) => onDragStart(e.touches[0].clientX)}
-          onTouchMove={(e) => onDragMove(e.touches[0].clientX, ads.length)}
-          onTouchEnd={() => onDragEnd(ads.length)}
-          onMouseDown={(e) => onDragStart(e.clientX)}
-          onMouseMove={(e) => { if (dragStartX.current !== null) onDragMove(e.clientX, ads.length); }}
-          onMouseUp={() => onDragEnd(ads.length)}
-          onMouseLeave={() => { if (dragStartX.current !== null) onDragEnd(ads.length); }}
+          onTouchStart={(e) => onDragStart(e.touches[0].clientX, e.touches[0].clientY)}
+          onTouchMove={(e) => onDragMove(e.touches[0].clientX, e.touches[0].clientY, activeAds.length)}
+          onTouchEnd={() => onDragEnd(activeAds.length)}
+          onMouseDown={(e) => onDragStart(e.clientX, e.clientY)}
+          onMouseMove={(e) => { if (dragStartX.current !== null) onDragMove(e.clientX, e.clientY, activeAds.length); }}
+          onMouseUp={() => onDragEnd(activeAds.length)}
+          onMouseLeave={() => { if (dragStartX.current !== null) onDragEnd(activeAds.length); }}
         >
-          {ads.map((ad, i) => {
+          {activeAds.map((ad, i) => {
             const slideLink = normalizeUrl(ad.link);
             const slide = (
               <div ref={(el) => { slideRefs.current[i] = el; }} className="w-full shrink-0">

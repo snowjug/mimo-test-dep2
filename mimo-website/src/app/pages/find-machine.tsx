@@ -18,8 +18,8 @@ interface MachineLocation {
 
 /** Hand-shot photos for the machines we have them for. Not registry data, so it stays a local map keyed by machineId. */
 const MACHINE_IMAGES: Record<string, string> = {
-  "CV-001": "/images/machines/cv-raman-block-780.jpg",
-  "SV-002": "/images/machines/central-library-780.jpg",
+  "CV-001": "/images/machines/mimo-1-cvraman.jpg",
+  "SV-002": "/images/machines/mimo-2-library.jpg",
 };
 
 /** Same four machines as before, used only until the /api/machines fetch resolves (and if it fails). */
@@ -98,7 +98,7 @@ export function FindMachine() {
             name: m.displayName,
             location: m.locationName || "",
             details: m.details || "",
-            image: MACHINE_IMAGES[m.machineId] ?? null,
+            image: MACHINE_IMAGES[m.machineId] ?? (m.capabilities?.colour ? MACHINE_IMAGES["SV-002"] : MACHINE_IMAGES["CV-001"]),
             colour: Boolean(m.capabilities?.colour),
             isAvailable: m.available,
             latitude: m.latitude ?? undefined,
@@ -134,7 +134,7 @@ export function FindMachine() {
 
         <div className="flex flex-col gap-4">
           {live.map((m, i) => (
-            <article key={m.id} className="rise-in overflow-hidden rounded-[20px] bg-surface" style={{ animationDelay: `${i * 60}ms` }}>
+            <article key={m.id} className="rise-in overflow-hidden rounded-[20px] bg-surface border border-hairline shadow-xs" style={{ animationDelay: `${i * 60}ms` }}>
               {m.image && (
                 <img
                   src={m.image}
