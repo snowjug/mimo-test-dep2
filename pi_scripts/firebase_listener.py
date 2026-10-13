@@ -1304,12 +1304,17 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
         cmd.extend(file_paths)
 
         # ── Final pre-lp gate: every file handed to CUPS must be a strictly valid PDF with >= 1 page ──
-        # No failure is reported here; the caller (process_job) reports it once when this returns False.
+        # No failure is reported here; the caller (process_job) reports it once when this returns False --
+        # but it previously always used a generic "CUPS error on Pi" message, discarding gate_reason, the
+        # actually-useful detail computed right here. Returning it alongside False lets the caller use the
+        # real reason instead (confirmed in production, 2026-10-13: job tr5VvvOw5tz88NqCpkxw showed only
+        # "CUPS error on Pi" with the real validate_pdf_strict reason never surfaced anywhere). A 2-tuple is
+        # still `is not None` and `is not True`, so this stays compatible with the caller's existing checks.
         for file_path in file_paths:
             gate_ok, gate_pages, gate_reason = validate_pdf_strict(file_path)
             if not gate_ok or not gate_pages or gate_pages < 1:
                 print(f"❌ Final pre-print check failed, not sending to CUPS: {gate_reason}")
-                return False
+                return False, gate_reason
 
         # ── Sheet check (Brother lasers): read the page counter first, and never print into a toner/drum stop ──
         if doc_ref and not is_color:
@@ -1384,6 +1389,15 @@ def print_file(file_paths, copies=1, page_range=None, printer_name=BW_PRINTER_NA
 
 DOWNLOAD_ATTEMPTS = 3
 DOWNLOAD_RETRY_DELAYS_SEC = (2, 5)
+
+# A download that completes with no exception can still be truncated (e.g. a flaky connection closes the
+# stream early without the GCS SDK or requests raising) -- validate_input_file catches that, but previously
+# a validation failure was treated as final with no retry, even though it's the exact same class of
+# transient problem DOWNLOAD_ATTEMPTS already exists to handle for exception-raising failures. Confirmed in
+# production (2026-10-13): two jobs failed outright with "PDF is truncated (no %%EOF marker)" on their only
+# download attempt. This retries the WHOLE download (fresh bytes, not just re-validating the same file).
+VALIDATION_RETRY_ATTEMPTS = 2
+VALIDATION_RETRY_DELAY_SEC = 2
 
 
 def download_file(file_url, file_name, dest_dir=None, temp_prefix=None):
@@ -1641,12 +1655,21 @@ def process_job(doc_snapshot):
                     print(f"⚠️ [CACHE INVALID] Cached file {cache_path} rejected ({cache_reason}). Purging and downloading again...")
                     _safe_remove(cache_path)
             if path is None:
-                path = download_file(f_url, f_name)
-                if not path:
-                    return f, None, f"Failed to download {f_name}"
-                fresh_ok, fresh_reason = validate_input_file(path)
-                if not fresh_ok:
+                fresh_ok, fresh_reason = False, None
+                for validation_attempt in range(1, VALIDATION_RETRY_ATTEMPTS + 1):
+                    path = download_file(f_url, f_name)
+                    if not path:
+                        return f, None, f"Failed to download {f_name}"
+                    fresh_ok, fresh_reason = validate_input_file(path)
+                    if fresh_ok:
+                        break
                     _safe_remove(path)
+                    path = None
+                    if validation_attempt < VALIDATION_RETRY_ATTEMPTS:
+                        print(f"⚠️ [VALIDATION] {f_name} downloaded but failed validation ({fresh_reason}); "
+                              f"re-downloading (attempt {validation_attempt + 1}/{VALIDATION_RETRY_ATTEMPTS})...")
+                        time.sleep(VALIDATION_RETRY_DELAY_SEC)
+                if not fresh_ok:
                     return f, None, f"Downloaded file is invalid: {fresh_reason}"
             # Pre-flight compression (currently a no-op, but keep the hook)
             if path.lower().endswith(".pdf"):
@@ -1921,7 +1944,8 @@ def process_job(doc_snapshot):
             })
             print(f"🎉 Job {doc_id} marked as completed (sync mode).")
         else:
-            report_print_failure(doc_ref, "CUPS error on Pi")
+            specific_reason = result[1] if isinstance(result, tuple) and len(result) > 1 and result[1] else None
+            report_print_failure(doc_ref, specific_reason or "CUPS error on Pi")
 
             
     except Exception as e:
