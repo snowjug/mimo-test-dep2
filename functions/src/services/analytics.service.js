@@ -11,6 +11,7 @@
  *  - A refunded order has refundStatus "SUCCESS" (auto refund) or status "REFUNDED" (admin refund).
  *  - print_jobs carry kioskId, status, pageCount, printOptions {copies, colorMode, doubleSided}, createdAt, orderId.
  */
+const { reportingOutcome, summarizeJobOutcomes, buildIssues, countIssues } = require("./issueCategories.service");
 
 // The two production machines. Any other id that reports a heartbeat and looks like a kiosk id is added at runtime.
 const KNOWN_KIOSKS = {
@@ -25,6 +26,8 @@ const DONE_JOB_STATUSES = new Set(["completed", "printed"]);
 const QUEUED_JOB_STATUSES = ["paid", "printing"];
 
 const MAX_DOCS_PER_COLLECTION = 5000;
+// A machine needs this many finished jobs (successful + failed) in the range before it is ranked as problematic.
+const MIN_ATTEMPTS_TO_RANK = 10;
 const MAX_RANGE_DAYS = 400;
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -205,6 +208,13 @@ function normalizeJobs(jobDocs = []) {
       printerStatus: d.printerStatus || null,
       isPrinted: d.isPrinted === true,
       refundStatus: d.refundStatus || null,
+      // Reporting-only evidence (issueCategories.service.js): never shown as customer data.
+      failedAtMs: toMillis(d.failedAt),
+      printedAtMs: toMillis(d.printedAt),
+      printCode: d.printCode || null,
+      printVerified: d.printVerified === true,
+      sheetsVerified: d.sheetsVerified ?? null,
+      customerIssue: d.customerIssue && typeof d.customerIssue === "object" ? d.customerIssue : null,
     };
   });
 }
@@ -280,13 +290,15 @@ function bucketKey(ms, offsetMs, granularity) {
   return granularity === "hour" ? `${day}T${pad(d.getUTCHours())}` : day;
 }
 
-function buildSeries({ orders, jobs }, range) {
+function buildSeries({ orders, jobs }, range, { issues = null } = {}) {
   const step = range.granularity === "hour" ? HOUR_MS : DAY_MS;
   const rows = new Map();
   // Pre-fill every bucket so the chart has no gaps.
   const first = Math.floor((range.from + range.offsetMs) / step) * step - range.offsetMs;
   for (let t = first; t < range.to; t += step) {
-    rows.set(bucketKey(t, range.offsetMs, range.granularity), { key: bucketKey(t, range.offsetMs, range.granularity), start: iso(t), revenue: 0, refunds: 0, orders: 0, jobs: 0, pages: 0, failed: 0 });
+    // successful / reportFailed / issues use the reporting outcome (issueCategories.service.js); `failed` keeps its
+    // original meaning for the finance portal.
+    rows.set(bucketKey(t, range.offsetMs, range.granularity), { key: bucketKey(t, range.offsetMs, range.granularity), start: iso(t), revenue: 0, refunds: 0, orders: 0, jobs: 0, pages: 0, failed: 0, successful: 0, reportFailed: 0, issues: 0 });
   }
   const at = (ms) => rows.get(bucketKey(ms, range.offsetMs, range.granularity));
   for (const o of orders) {
@@ -311,17 +323,43 @@ function buildSeries({ orders, jobs }, range) {
     row.jobs += 1;
     if (isDone(j)) row.pages += j.pages;
     if (isFailed(j)) row.failed += 1;
+    const outcome = reportingOutcome(j);
+    if (outcome === "successful") row.successful += 1;
+    if (outcome === "failed") row.reportFailed += 1;
+  }
+  for (const i of issues || []) {
+    const row = Number.isFinite(i.rangeMs) && at(i.rangeMs);
+    if (row) row.issues += 1;
   }
   return [...rows.values()];
 }
 
-function breakdowns({ orders, jobs }, range) {
+const emptyKioskReporting = () => ({ successful: 0, failed: 0, attempts: 0, failureRate: null, issues: 0, rankable: false });
+
+/**
+ * Per-machine, payment-method, status, mode and hour breakdowns.
+ * `machines` (optional) is the registry map from machineRegistry.service.loadMachinesMap: when given, every
+ * non-DECOMMISSIONED machine gets a row (decommissioned ones only when they have jobs in the range) and rows are
+ * sorted by id. Without it the rows are seeded from KNOWN_KIOSKS exactly as before.
+ * `issues` (optional) are the deduplicated issues of the range, counted per machine.
+ */
+function breakdowns({ orders, jobs }, range, { machines = null, issues = null } = {}) {
   const paid = orders.filter((o) => PAID_STATUSES.has(o.status));
 
   const jobByOrder = new Map(jobs.filter((j) => j.orderId).map((j) => [j.orderId, j]));
-  const kiosks = new Map(Object.entries(KNOWN_KIOSKS).map(([id, k]) => [id, { kioskId: id, ...k, jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0 }]));
+  const seed = machines
+    ? [...machines.entries()].filter(([, m]) => m.status !== "DECOMMISSIONED").map(([id, m]) => [id, {
+      name: m.name || id, type: m.type || "bw", description: m.description || "", shortLabel: m.shortLabel || id.slice(0, 2), lifecycleStatus: m.status || "ACTIVE",
+    }])
+    : Object.entries(KNOWN_KIOSKS);
+  const kiosks = new Map(seed.map(([id, k]) => [id, { kioskId: id, ...k, jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0, reporting: emptyKioskReporting() }]));
   const kioskRow = (id) => {
-    if (!kiosks.has(id)) kiosks.set(id, { kioskId: id, name: id, type: "bw", description: "", jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0 });
+    if (!kiosks.has(id)) {
+      const m = machines && machines.get(id);
+      kiosks.set(id, m
+        ? { kioskId: id, name: m.name || id, type: m.type || "bw", description: m.description || "", shortLabel: m.shortLabel || id.slice(0, 2), lifecycleStatus: m.status || "ACTIVE", jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0, reporting: emptyKioskReporting() }
+        : { kioskId: id, name: id, type: "bw", description: "", jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0, reporting: emptyKioskReporting() });
+    }
     return kiosks.get(id);
   };
   let unassignedRevenue = 0;
@@ -331,6 +369,18 @@ function breakdowns({ orders, jobs }, range) {
     row.jobs += 1;
     if (isDone(j)) { row.completed += 1; row.pages += j.pages; }
     if (isFailed(j)) row.failed += 1;
+    const outcome = reportingOutcome(j);
+    if (outcome === "successful") row.reporting.successful += 1;
+    if (outcome === "failed") row.reporting.failed += 1;
+  }
+  for (const i of issues || []) {
+    if (i.kioskId) kioskRow(i.kioskId).reporting.issues += 1;
+  }
+  for (const row of kiosks.values()) {
+    const r = row.reporting;
+    r.attempts = r.successful + r.failed;
+    r.failureRate = r.attempts ? round2((r.failed / r.attempts) * 100) : null;
+    r.rankable = r.attempts >= MIN_ATTEMPTS_TO_RANK;
   }
   for (const o of paid) {
     const kid = jobByOrder.get(o.orderId)?.kioskId;
@@ -364,8 +414,17 @@ function breakdowns({ orders, jobs }, range) {
     byHour[new Date(j.createdAtMs + range.offsetMs).getUTCHours()].jobs += 1;
   }
 
+  const byKiosk = [...kiosks.values()];
+  if (machines) byKiosk.sort((a, b) => (a.kioskId < b.kioskId ? -1 : a.kioskId > b.kioskId ? 1 : 0));
+  // Ranked only with enough attempts, so one failed print on a quiet machine can't top the list.
+  const problemMachines = byKiosk
+    .filter((k) => k.reporting.rankable)
+    .sort((a, b) => b.reporting.failureRate - a.reporting.failureRate || b.reporting.failed - a.reporting.failed || b.reporting.attempts - a.reporting.attempts)
+    .map((k) => ({ kioskId: k.kioskId, name: k.name, shortLabel: k.shortLabel || null, attempts: k.reporting.attempts, failed: k.reporting.failed, failureRate: k.reporting.failureRate, issues: k.reporting.issues }));
+
   return {
-    byKiosk: [...kiosks.values()],
+    byKiosk,
+    problemMachines,
     unassignedRevenue,
     byPaymentMethod: [...methods.values()].sort((a, b) => b.amount - a.amount),
     byStatus: [...statuses.entries()].map(([status, count]) => ({ status, count })),
@@ -395,6 +454,48 @@ async function loadWindow(db, Timestamp, fromMs, toMs) {
     jobs: data(jobs),
     refunds: data(refunds),
     truncated: [orders, txns, jobs, refunds].some((s) => s.docs.length > MAX_DOCS_PER_COLLECTION),
+  };
+}
+
+/**
+ * Refund requests filed inside [fromMs, toMs), read-only, for the Payment issue category. A failure here never
+ * breaks the analytics response: the issues are then flagged partial instead.
+ */
+async function loadRefundRequests(db, Timestamp, fromMs, toMs) {
+  try {
+    const snap = await db.collection("refund_requests")
+      .where("requestedAt", ">=", Timestamp.fromMillis(fromMs))
+      .where("requestedAt", "<", Timestamp.fromMillis(toMs))
+      .limit(MAX_DOCS_PER_COLLECTION + 1)
+      .get();
+    return {
+      requests: snap.docs.slice(0, MAX_DOCS_PER_COLLECTION).map((d) => ({ id: d.id, ...d.data() })),
+      truncated: snap.docs.length > MAX_DOCS_PER_COLLECTION,
+      partial: false,
+    };
+  } catch (err) {
+    console.error("[ANALYTICS] refund-request load failed:", err.message);
+    return { requests: [], truncated: false, partial: true };
+  }
+}
+
+/** Issues of a window: deduplicated (issueCategories.service.js) and limited to those that belong to the range. */
+function issuesInRange({ jobs, refundRequests, machines }, range) {
+  return buildIssues({ jobs, refundRequests, machines: machines || new Map() })
+    .filter((i) => Number.isFinite(i.rangeMs) && i.rangeMs >= range.from && i.rangeMs < range.to);
+}
+
+/**
+ * The admin dashboard's KPIs, all from one consistent definition. Job numbers use the mutually exclusive
+ * reporting outcome; revenue is copied from the trusted summary (orders + payment_transactions + refunds), so the
+ * money figures are identical to `current`. `current` itself is unchanged for the finance portal.
+ */
+function buildReporting({ jobs, summary, issues, issuesPartial = false }) {
+  return {
+    jobs: summarizeJobOutcomes(jobs),
+    revenue: { net: summary.netRevenue, gross: summary.revenue, refunded: summary.refundedAmount, refundCount: summary.refundCount },
+    issues: { ...countIssues(issues), partial: issuesPartial },
+    minAttemptsToRank: MIN_ATTEMPTS_TO_RANK,
   };
 }
 
@@ -430,13 +531,20 @@ function refundsAsOrders(refundDocs = [], knownOrderIds = new Set()) {
     }));
 }
 
-/** Full analytics payload for the admin dashboard / finance portal. */
-async function getAnalytics(db, Timestamp, range, { compare = true } = {}) {
-  const window = await loadWindow(db, Timestamp, range.from, range.to);
+/**
+ * Full analytics payload for the admin dashboard / finance portal.
+ * `machines` (optional): registry map; drives byKiosk instead of KNOWN_KIOSKS when given.
+ */
+async function getAnalytics(db, Timestamp, range, { compare = true, machines = null } = {}) {
+  const [window, refundReqs] = await Promise.all([
+    loadWindow(db, Timestamp, range.from, range.to),
+    loadRefundRequests(db, Timestamp, range.from, range.to),
+  ]);
   const orders = normalizeOrders(window.orders, window.txns, window.refunds);
   orders.push(...normalizeOrders(refundsAsOrders(window.refunds, new Set(orders.map((o) => o.orderId)))));
   const jobs = normalizeJobs(window.jobs);
   const newUsers = await countNewUsers(db, Timestamp, range.from, range.to);
+  const issues = issuesInRange({ jobs, refundRequests: refundReqs.requests, machines }, range);
 
   let previous = null;
   if (compare) {
@@ -451,12 +559,14 @@ async function getAnalytics(db, Timestamp, range, { compare = true } = {}) {
     };
   }
 
+  const current = summarize({ orders, jobs, newUsers, truncated: window.truncated, fromMs: range.from, toMs: range.to });
   return {
     range: { from: iso(range.from), to: iso(range.to), granularity: range.granularity, tzOffset: range.tzOffset, dateBasis: range.dateBasis || "created" },
-    current: summarize({ orders, jobs, newUsers, truncated: window.truncated, fromMs: range.from, toMs: range.to }),
+    current,
     previous,
-    series: buildSeries({ orders, jobs }, range),
-    ...breakdowns({ orders, jobs }, range),
+    reporting: buildReporting({ jobs, summary: current, issues, issuesPartial: refundReqs.partial || refundReqs.truncated }),
+    series: buildSeries({ orders, jobs }, range, { issues }),
+    ...breakdowns({ orders, jobs }, range, { machines, issues }),
     truncated: window.truncated,
     metadata: {
       dateBasis: range.dateBasis || "created",
@@ -480,6 +590,7 @@ module.exports = {
   KIOSK_ID_PATTERN,
   QUEUED_JOB_STATUSES,
   MAX_DOCS_PER_COLLECTION,
+  MIN_ATTEMPTS_TO_RANK,
   parseRange,
   httpError,
   toMillis,
@@ -492,6 +603,9 @@ module.exports = {
   buildSeries,
   breakdowns,
   loadWindow,
+  loadRefundRequests,
+  issuesInRange,
+  buildReporting,
   getAnalytics,
   isDone,
   isFailed,

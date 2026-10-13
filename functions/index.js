@@ -10,7 +10,8 @@ exports.api = onRequest({ cors: true, maxInstances: 50, memory: "512MiB", secret
 Object.assign(
   exports,
   require("./src/triggers/printJob.triggers"),
-  require("./src/triggers/retention.trigger")
+  require("./src/triggers/retention.trigger"),
+  require("./src/triggers/orphanStorage.trigger")
 );
 // printTimeout.trigger also exports a plain runPrintTimeoutSweep() for direct unit testing —
 // only the wrapped Cloud Function itself should be deployed.
