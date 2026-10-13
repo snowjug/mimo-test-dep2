@@ -12,6 +12,7 @@ const { scheduledPrintTimeoutSweep } = require("../src/triggers/printTimeout.tri
 const triggers = {
   ...require("../src/triggers/printJob.triggers"),
   ...require("../src/triggers/retention.trigger"),
+  ...require("../src/triggers/orphanStorage.trigger"),
   scheduledPrintTimeoutSweep,
 };
 
@@ -20,13 +21,14 @@ const EXPECTED = {
   autoRefundJob: ["us-central1", "print_jobs/{jobId}"],
   autoCleanupStorageJob: ["us-central1", "print_jobs/{jobId}"],
   scheduledFileRetentionCleanup: ["us-central1", "every 1 hours"],
+  scheduledOrphanStorageCleanup: ["us-central1", "20 * * * *"], // NEW on branch fix/storage-lifecycle-cleanup: not deployed anywhere yet
   sendFailureNotification: ["asia-south1", "print_jobs/{jobId}"],
   printerHardwareNotification: ["asia-south1", "hardware/printers"],
   colourPaperUsageNotification: ["asia-south1", "print_jobs/{jobId}"],
   scheduledPrintTimeoutSweep: ["us-central1", "every 2 minutes"],
 };
 
-test("the exported triggers are exactly the seven deployed ones", () => {
+test("the exported triggers are exactly the seven deployed ones plus the new orphan-storage sweep (not yet deployed)", () => {
   assert.deepStrictEqual(Object.keys(triggers).sort(), Object.keys(EXPECTED).sort());
 });
 

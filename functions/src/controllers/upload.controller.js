@@ -3,13 +3,54 @@ const axios = require("axios");
 const { SUPPORTED_OFFICE_EXTENSIONS, callOfficeConverter } = require("../services/converter.service");
 const { admin, db } = require("../config/firebase");
 const { getPDFDocument } = require("../services/pdf.service");
-const { isStoragePathReferencedByOtherActiveJob } = require("../services/storage.service");
+const {
+  extractStoragePath, validateCustomerPath, loadActiveReferenceIndex, isReferencedByOther,
+  deleteObject, cleanupJobObjects, buildCleanupUpdate,
+} = require("../services/storage.service");
 
 // Smallest size a real uploaded document can have. Anything smaller with an unrecognised type is not a document.
 const MIN_REAL_FILE_BYTES = 256;
 
+// Uploads are cleaned up 24 h after they were written (see docs/deployment/STORAGE_CLEANUP.md). A cart item can outlive its file
+// (open tab, stale session), so refuse to create a payable job for an object that is already gone. Only a definite "does not
+// exist" answer blocks the request; any other storage problem leaves the existing behaviour untouched.
+async function findMissingUploadedFile(files) {
+  try {
+    if (typeof admin.storage !== "function") return null;
+    const bucket = admin.storage().bucket();
+    for (const f of files) {
+      const p = extractStoragePath(f.url, bucket.name);
+      if (!p || !validateCustomerPath(p).ok) continue;
+      const [exists] = await bucket.file(p).exists();
+      if (exists === false) return f;
+    }
+  } catch (err) {
+    console.warn("[FINALIZE-UPLOAD] upload existence check skipped:", String(err && err.message).slice(0, 120));
+  }
+  return null;
+}
+
+// Converted PDFs written during a batch that then failed would otherwise be stranded (no job ever references them).
+// Best effort and never throws; an object another active job references is left alone.
+async function discardGeneratedArtifacts(paths) {
+  if (!paths.length || typeof admin.storage !== "function") return;
+  try {
+    const bucket = admin.storage().bucket();
+    const index = await loadActiveReferenceIndex(db, bucket.name);
+    if (!index.complete) return;
+    for (const p of paths) {
+      if (!validateCustomerPath(p).ok || isReferencedByOther(index, p, null)) continue;
+      const r = await deleteObject(bucket, p);
+      if (r.outcome === "failed") console.warn("[FINALIZE-UPLOAD] could not discard a partial conversion output; the orphan sweep will retry:", r.error);
+    }
+  } catch (err) {
+    console.warn("[FINALIZE-UPLOAD] discarding partial conversion output failed:", String(err && err.message).slice(0, 120));
+  }
+}
+
 // ================= FINAL UPLOAD (Serverless with Verified Office Conversion) =================
 const postFinalizeUpload = async (req, res) => {
+  const generatedPaths = []; // converted PDFs written by this request (cleaned up if the request does not end in jobs)
   try {
     const { files } = req.body;
     if (!files || files.length === 0) return res.status(400).json({ error: "No files provided" });
@@ -23,6 +64,17 @@ const postFinalizeUpload = async (req, res) => {
     }
 
     const userId = req.user.id || req.user.userId;
+
+    const goneFile = await findMissingUploadedFile(files);
+    if (goneFile) {
+      return res.status(400).json({ error: `"${goneFile.name}" is no longer stored (uploads are removed after 24 hours). Please upload it again.` });
+    }
+
+    // If the batch fails after some conversions succeeded, those outputs are discarded (see failEarly).
+    const failEarly = async (status, body) => {
+      await discardGeneratedArtifacts(generatedPaths);
+      return res.status(status).json(body);
+    };
 
     // Phase 1: Validate and convert required files BEFORE performing any database writes.
     // If any conversion fails, return HTTP 422 immediately with 0 jobs written to Firestore.
@@ -52,7 +104,7 @@ const postFinalizeUpload = async (req, res) => {
           pdfBuffer = Buffer.from(pdfRes.data);
         } catch (downloadErr) {
           console.error(`[FINALIZE-UPLOAD ERROR] Failed to download '${f.name}' for page count verification:`, downloadErr.message);
-          return res.status(400).json({
+          return failEarly(400, {
             error: `Failed to read "${f.name}" for verification. Please re-upload and try again.`
           });
         }
@@ -67,7 +119,7 @@ const postFinalizeUpload = async (req, res) => {
           resolvedPageCount = verifiedCount;
         } catch (pdfErr) {
           console.error(`[FINALIZE-UPLOAD ERROR] Could not read PDF '${f.name}' with pdf-lib:`, pdfErr.message);
-          return res.status(400).json({
+          return failEarly(400, {
             error: `"${f.name}" couldn't be read. It might be corrupted, password-protected, or not a valid PDF. Please save it as a standard PDF and try again.`
           });
         }
@@ -89,11 +141,12 @@ const postFinalizeUpload = async (req, res) => {
           printableFileUrl = conv.fileUrl; // Converted PDF becomes the printable file!
           printableMimetype = "application/pdf";
           convertedStoragePath = conv.storagePath;
+          if (convertedStoragePath) generatedPaths.push(convertedStoragePath);
           console.log(`[FINALIZE-UPLOAD] Office conversion succeeded for '${f.name}': ${resolvedPageCount} pages, printable PDF: ${printableFileUrl}`);
         } catch (convErr) {
           console.error(`[FINALIZE-UPLOAD ERROR] Conversion failed for '${f.name}':`, convErr.message);
           // CRITICAL: Fail fast. Do NOT create a payable job with unverified pageCount!
-          return res.status(422).json({
+          return failEarly(422, {
             error: `Failed to process document '${f.name}': ${convErr.message}. Please ensure the file is valid and try again.`
           });
         }
@@ -103,7 +156,7 @@ const postFinalizeUpload = async (req, res) => {
         // document is never this small, so refuse it now, before a payable job exists, instead of letting it fail at the kiosk.
         const reportedSize = Number(f.size);
         if (Number.isFinite(reportedSize) && reportedSize < MIN_REAL_FILE_BYTES) {
-          return res.status(400).json({
+          return failEarly(400, {
             error: `"${f.name}" doesn't look like a real document. If you shared a link, download the actual file first and upload that.`,
           });
         }
@@ -172,6 +225,7 @@ const postFinalizeUpload = async (req, res) => {
     });
   } catch (err) {
     console.error("Error finalizing upload:", err);
+    await discardGeneratedArtifacts(generatedPaths);
     res.status(500).json({ error: err.message });
   }
 };
@@ -319,6 +373,10 @@ const postCreateBlankJob = async (req, res, next) => {
 };
 
 // ================= REMOVE ABANDONED FILE =================
+// The customer removed a file from the cart. Its job can never be paid for, and its objects are deleted now. The Firestore
+// record says exactly what happened: `fileDeleted: true` only when every object was deleted or verified missing; otherwise
+// cleanupState/cleanupRemaining/cleanupNextAttemptAt are set and the hourly retention sweep finishes the job (removedByUser
+// jobs are retried immediately, without waiting for the 24 h age).
 const deleteRemoveFile = async (req, res) => {
   try {
     const { fileUrl } = req.body;
@@ -340,66 +398,30 @@ const deleteRemoveFile = async (req, res) => {
     const bucket = admin.storage().bucket();
     const batch = db.batch();
     const now = admin.firestore.FieldValue.serverTimestamp();
+    let index;
+    try {
+      index = await loadActiveReferenceIndex(db, bucket.name);
+    } catch (idxErr) {
+      console.error("Failed to load reference index for remove-file:", idxErr);
+      return res.status(500).json({ error: "Storage reference index unavailable; cannot safely remove file" });
+    }
+
+    if (!index || !index.complete) {
+      console.error("Reference index incomplete for remove-file; aborting to prevent unsafe deletion");
+      return res.status(500).json({ error: "Storage reference index incomplete; please retry later" });
+    }
+
+    let allComplete = true;
 
     for (const doc of jobsSnapshot.docs) {
       const data = doc.data();
-      const rawPaths = [
-        data.fileUrl,
-        data.originalFileUrl,
-        data.convertedStoragePath
-      ].filter(Boolean);
-
-      for (const raw of rawPaths) {
-        let filePath = "";
-        if (raw.startsWith("gs://")) {
-          const bucketName = bucket.name;
-          filePath = raw.replace(`gs://${bucketName}/`, "");
-        } else if (raw.includes("firebasestorage.googleapis.com")) {
-          try {
-            const urlObj = new URL(raw);
-            const pathParts = urlObj.pathname.split("/o/");
-            if (pathParts.length > 1) {
-              filePath = decodeURIComponent(pathParts[1].split("?")[0]);
-            }
-          } catch (_) {}
-        } else if (raw.includes("storage.googleapis.com")) {
-          try {
-            const urlObj = new URL(raw);
-            const pathname = decodeURIComponent(urlObj.pathname);
-            const bucketName = bucket.name;
-            const prefix = `/${bucketName}/`;
-            if (pathname.startsWith(prefix)) {
-              filePath = pathname.slice(prefix.length);
-            } else if (pathname.startsWith("/")) {
-              filePath = pathname.slice(1);
-            }
-          } catch (_) {}
-        } else if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
-          filePath = raw;
-        }
-
-        // Never delete shared template files
-        const isTemplate = filePath.toLowerCase().includes("templates/blank_a4.pdf") ||
-                           filePath.toLowerCase().includes("templates/mimo_graph.pdf") ||
-                           filePath.toLowerCase().startsWith("templates/");
-
-        if (filePath && !isTemplate) {
-          // Check if another active job still references this path globally across all users
-          const isReferenced = await isStoragePathReferencedByOtherActiveJob(db, filePath, doc.id);
-
-          if (!isReferenced) {
-            await bucket.file(filePath).delete().catch((e) => {
-              if (e.code !== 404) console.error("[REMOVE-FILE] Storage delete error:", e.message);
-            });
-          }
-        }
-      }
-
-      // Preserve document record in Firestore with status: "cleaned", fileDeleted: true
+      // Shared objects and templates are never deleted (see cleanupJobObjects); a job record is always preserved.
+      const result = await cleanupJobObjects({ db, bucket, jobId: doc.id, data, mode: "immediate", index });
+      if (!result.complete) allComplete = false;
+      const update = buildCleanupUpdate(result, { FieldValue: admin.firestore.FieldValue, attemptsSoFar: Number(data.cleanupAttempts) || 0 });
       batch.update(doc.ref, {
+        ...update,
         status: "cleaned",
-        fileDeleted: true,
-        fileDeletedAt: now,
         removedByUser: true,
         updatedAt: now
       });
@@ -407,7 +429,10 @@ const deleteRemoveFile = async (req, res) => {
 
     await batch.commit();
 
-    res.json({ message: "File successfully deleted from cloud" });
+    res.json({
+      message: allComplete ? "File successfully deleted from cloud" : "File removed. Cloud cleanup will finish shortly.",
+      cleanupPending: !allComplete
+    });
   } catch (err) {
     console.error("Error removing file:", err);
     res.status(500).json({ error: "Failed to remove file" });
