@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { MimoCoinsDisplay } from "./mimo-coins-display";
 import { CircleHelp, MapPin, Gift } from "lucide-react";
 import { Wordmark } from "./mimo/ui";
@@ -35,8 +35,20 @@ export function ProfileButton({ name }: { name: string }) {
 /** Home header: wordmark, how-to, location, coins and profile. */
 export function MimoHeader() {
   const navigate = useNavigate();
-  const { start: startTour } = useTour();
+  const location = useLocation();
+  const { start: startTour, steps } = useTour();
   const [name, setName] = useState(() => localStorage.getItem("mimo_user_name") || "");
+
+  const handleHowToPrint = () => {
+    // If the current route has matching tour steps, start the tour right here!
+    const matchIndex = steps.findIndex((s) => s.path === location.pathname);
+    if (matchIndex !== -1) {
+      startTour(matchIndex);
+    } else {
+      navigate("/upload");
+      startTour(0);
+    }
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -72,7 +84,7 @@ export function MimoHeader() {
 
           <button
             type="button"
-            onClick={() => { navigate("/upload"); startTour(); }}
+            onClick={handleHowToPrint}
             aria-label="Show the how-to-print tutorial"
             className="press flex items-center gap-1 rounded-full bg-blue-50/80 px-2.5 py-1 text-[11px] font-semibold text-brand transition-colors active:bg-blue-100"
           >

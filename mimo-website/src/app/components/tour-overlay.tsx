@@ -209,6 +209,14 @@ export function TourOverlay() {
   }, [onThisPage, rect, stepIndex, step, steps, goTo]);
 
   useEffect(() => {
+    if (!onThisPage || !step) return;
+    const el = document.querySelector(step.selector);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [onThisPage, stepIndex, step]);
+
+  useEffect(() => {
     if (!onThisPage) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -225,6 +233,15 @@ export function TourOverlay() {
   if (!onThisPage || !rect) return null;
 
   const pad = 8;
+  const isLastOnThisPage = stepIndex === steps.length - 1 || (steps[stepIndex + 1] && steps[stepIndex + 1].path !== location.pathname);
+
+  const handleNext = () => {
+    if (isLastOnThisPage) {
+      close();
+    } else {
+      next();
+    }
+  };
 
   return (
     <>
@@ -246,8 +263,8 @@ export function TourOverlay() {
         body={step.body}
         index={stepIndex}
         total={steps.length}
-        isLast={stepIndex === steps.length - 1}
-        onNext={next}
+        isLast={isLastOnThisPage}
+        onNext={handleNext}
         onPrev={prev}
         onSkip={skip}
         onClose={close}

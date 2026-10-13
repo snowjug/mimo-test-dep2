@@ -450,13 +450,18 @@ export function PrintOptions() {
         </div>
 
         {/* Decorative Mascot illustration */}
-        <div className="flex size-[68px] shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-500/10 via-sky-500/15 to-indigo-500/10 border border-blue-100 shadow-xs">
-          <span className="text-[34px]" aria-hidden>🤖</span>
+        <div className="relative size-[76px] sm:size-[84px] shrink-0">
+          <img
+            src="/images/mimo-mascot.png"
+            alt="MIMO"
+            className="size-full object-contain drop-shadow-md select-none pointer-events-none"
+            draggable={false}
+          />
         </div>
       </div>
 
       {/* ── Choose a printer ── */}
-      <section className="mb-5" aria-label="Choose a printer">
+      <section className="mb-5" aria-label="Choose a printer" data-tour="print-options-printer">
         <h2 className="mb-2 text-[15px] font-bold text-ink">Choose a printer</h2>
         <div className="grid grid-cols-2 gap-3" role="radiogroup">
           {printers.map((p) => {
@@ -499,7 +504,7 @@ export function PrintOptions() {
       </section>
 
       {/* ── Print options ── */}
-      <section className="mb-5" aria-label="Print options">
+      <section className="mb-5" aria-label="Print options" data-tour="print-options-group">
         <h2 className="mb-2 text-[15px] font-bold text-ink">Print options</h2>
         <div className="grid grid-cols-2 gap-3">
           {/* Card 1: Copies */}
@@ -783,7 +788,7 @@ export function PrintOptions() {
       </section>
 
       {/* ── Price summary ── */}
-      <section className="mb-6" aria-label="Price summary">
+      <section className="mb-6" aria-label="Price summary" data-tour="print-options-summary">
         <div className="rounded-[20px] bg-surface p-4 border border-hairline shadow-xs">
           <div className="mb-3.5 flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-[8px] bg-rose-50 text-rose-500">
@@ -841,26 +846,28 @@ export function PrintOptions() {
       </section>
 
       {/* ── Bottom Sticky Action Bar ── */}
-      <div className="fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
-        <div className="mx-auto flex max-w-[480px] items-center justify-between gap-4">
-          <div>
-            <span className="block text-[12px] font-medium text-ink-3 leading-none">Total</span>
-            <span className="text-[26px] font-extrabold leading-tight tabular-nums text-brand">
-              ₹{totalCost.toFixed(2)}
-            </span>
-          </div>
+      <div className="fixed inset-x-0 bottom-0 z-40 pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[440px] border-t border-hairline bg-white/95 backdrop-blur-md px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-lg">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="block text-[12px] font-medium text-ink-3 leading-none">Total</span>
+              <span className="text-[26px] font-extrabold leading-tight tabular-nums text-brand">
+                ₹{totalCost.toFixed(2)}
+              </span>
+            </div>
 
-          <button
-            type="button"
-            disabled={files.length === 0 || hasSelectionError || !directKioskId}
-            onClick={handleContinue}
-            className="press flex items-center justify-center gap-2 rounded-full bg-brand hover:bg-brand-press px-7 py-3.5 text-[16px] font-bold text-white shadow-md shadow-brand/20 transition-all disabled:opacity-50 disabled:pointer-events-none"
-          >
-            Continue to pay
-            <span className="flex size-6 items-center justify-center rounded-full bg-white/20 text-white">
-              <ChevronRight className="size-4" strokeWidth={2.5} />
-            </span>
-          </button>
+            <button
+              type="button"
+              disabled={files.length === 0 || hasSelectionError || !directKioskId}
+              onClick={handleContinue}
+              className="press flex items-center justify-center gap-2 rounded-full bg-brand hover:bg-brand-press px-7 py-3.5 text-[16px] font-bold text-white shadow-md shadow-brand/20 transition-all disabled:opacity-50 disabled:pointer-events-none"
+            >
+              Continue to pay
+              <span className="flex size-6 items-center justify-center rounded-full bg-white/20 text-white">
+                <ChevronRight className="size-4" strokeWidth={2.5} />
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
