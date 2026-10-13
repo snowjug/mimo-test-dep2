@@ -27,11 +27,18 @@ export const TOUR_STEPS: TourStep[] = [
     body: "Once your files are ready, tap Continue to choose how they're printed.",
   },
   {
+    id: "print-options-printer",
+    path: "/print-options",
+    selector: '[data-tour="print-options-printer"]',
+    title: "Choose your machine",
+    body: "Pick MIMO 1.0 or MIMO 2.0 — colour-capable machines are marked below.",
+  },
+  {
     id: "print-options",
     path: "/print-options",
     selector: '[data-tour="print-options-group"]',
     title: "Choose how you want it printed",
-    body: "Pick the machine, copies, colour and sides.",
+    body: "Pick copies, colour and sides.",
   },
   {
     id: "print-summary",
