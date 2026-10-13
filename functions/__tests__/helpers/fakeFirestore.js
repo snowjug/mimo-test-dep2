@@ -105,15 +105,29 @@ function createFakeFirestore(seed = {}, { strictTransactions = false } = {}) {
     };
   }
 
-  function query(colName, filters = [], order = null, max = Infinity) {
+  function query(colName, filters = [], order = null, max = Infinity, after = null) {
     const q = {
-      where: (field, op, value) => query(colName, [...filters, { field, op, value }], order, max),
-      orderBy: (field, dir = "asc") => query(colName, filters, { field, dir }, max),
-      limit: (n) => query(colName, filters, order, n),
+      where: (field, op, value) => query(colName, [...filters, { field, op, value }], order, max, after),
+      orderBy: (field, dir = "asc") => query(colName, filters, { field, dir }, max, after),
+      limit: (n) => query(colName, filters, order, n, after),
+      // cursor: a document id (or snapshot) for orderBy("__name__"), as the real SDK accepts
+      startAfter: (v) => query(colName, filters, order, max, typeof v === "object" && v !== null && v.id !== undefined ? v.id : v),
       get: async () => {
         state.log.reads += 1;
         let docs = [...col(colName).entries()].filter(([, d]) => filters.every((f) => applyOps(f.op, getPath(d, f.field), f.value)));
-        if (order) docs.sort(([, a], [, b]) => (getPath(a, order.field) > getPath(b, order.field) ? 1 : -1) * (order.dir === "desc" ? -1 : 1));
+        if (order && order.field === "__name__") {
+          docs.sort(([a], [b]) => (a > b ? 1 : a < b ? -1 : 0) * (order.dir === "desc" ? -1 : 1));
+          if (after !== null) docs = docs.filter(([id]) => (order.dir === "desc" ? id < after : id > after));
+        } else if (order) {
+          docs.sort(([, a], [, b]) => (getPath(a, order.field) > getPath(b, order.field) ? 1 : -1) * (order.dir === "desc" ? -1 : 1));
+          if (after !== null) {
+            const afterIdx = docs.findIndex(([id]) => id === after);
+            if (afterIdx >= 0) docs = docs.slice(afterIdx + 1);
+          }
+        } else {
+          docs.sort(([a], [b]) => (a > b ? 1 : a < b ? -1 : 0));
+          if (after !== null) docs = docs.filter(([id]) => id > after);
+        }
         docs = docs.slice(0, max).map(([id]) => snapDoc(colName, id));
         return { empty: docs.length === 0, size: docs.length, docs, forEach: (fn) => docs.forEach(fn) };
       },

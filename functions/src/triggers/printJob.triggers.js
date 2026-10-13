@@ -2,7 +2,8 @@ const axios = require("axios");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { CASHFREE_BASE_URL, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
-const { discoverStoragePaths, isProtectedTemplate, isStoragePathReferencedByOtherActiveJob } = require("../services/storage.service");
+const { RETENTION_MS } = require("../services/storage.service");
+const { cleanJobDocument } = require("../services/storageCleanup.service");
 const { getTransporter } = require("../services/email.service");
 const { sendWhatsAppButtons } = require("../services/whatsapp.service");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
@@ -106,61 +107,22 @@ exports.autoCleanupStorageJob = onDocumentUpdated("print_jobs/{jobId}", async (e
     const jobId = event.params.jobId;
     console.log(`[STORAGE] Print job ${jobId} completed. Cleaning up files...`);
 
-    const bucket = admin.storage().bucket();
-    const storagePaths = discoverStoragePaths(afterData, bucket.name);
-
-    let allSucceeded = true;
-    let failureError = null;
-
-    for (const p of storagePaths) {
-      // 1. Template protection guard
-      if (isProtectedTemplate(p)) {
-        console.log(`[STORAGE] Protected template skipped: ${p} for job ${jobId}`);
-        continue;
-      }
-
-      // 2. Global active cross-job reference check
-      const isReferenced = await isStoragePathReferencedByOtherActiveJob(db, p, jobId);
-      if (isReferenced) {
-        console.log(`[STORAGE] Preserving active referenced path: ${p} for job ${jobId}`);
-        continue;
-      }
-
-      // 3. Physical Storage deletion
-      try {
-        await bucket.file(p).delete();
-        console.log(`[STORAGE] Successfully deleted ${p} for job ${jobId}`);
-      } catch (err) {
-        if (err.code === 404) {
-          console.log(`[STORAGE] Object already absent (404): ${p} for job ${jobId}`);
-        } else {
-          console.error(`[STORAGE ERROR] Failed to delete ${p} for job ${jobId}:`, err.message);
-          allSucceeded = false;
-          failureError = err.message;
-        }
-      }
-    }
-
-    const docRef = db.collection("print_jobs").doc(jobId);
-    if (allSucceeded) {
-      try {
-        await docRef.update({
-          fileDeleted: true,
-          fileDeletedAt: admin.firestore.FieldValue.serverTimestamp(),
-          cleanupState: "completed"
+    // Policy A: a confirmed successful print releases every customer file of the job. The outcome of each object is
+    // recorded truthfully (fileDeleted only when nothing is left); a failure is retried by scheduledFileRetentionCleanup
+    // and never touches the print result, payment or refund state.
+    try {
+      if (afterData.fileDeleted === true) {
+        console.log(`[STORAGE] Print job ${jobId} already cleaned, nothing to do`);
+      } else {
+        const result = await cleanJobDocument({
+          db, admin, bucket: admin.storage().bucket(),
+          ref: db.collection("print_jobs").doc(jobId), jobId, data: afterData,
+          mode: "immediate", nowMs: Date.now(), retentionMs: RETENTION_MS,
         });
-        console.log(`[STORAGE] Print job ${jobId} cleanup metadata updated: fileDeleted=true`);
-      } catch (updateErr) {
-        console.error(`[STORAGE ERROR] Failed to update cleanup metadata for ${jobId}:`, updateErr.message);
+        console.log(`[STORAGE] Print job ${jobId} cleanup: complete=${result.complete} outcomes=${JSON.stringify(result.counts)}`);
       }
-    } else {
-      try {
-        await docRef.update({
-          cleanupState: "failed",
-          cleanupError: failureError || "Partial immediate deletion failure"
-        });
-        console.log(`[STORAGE] Print job ${jobId} marked cleanupState=failed for scheduler retry`);
-      } catch (_) {}
+    } catch (cleanupErr) {
+      console.error(`[STORAGE ERROR] Cleanup of print job ${jobId} threw (will be retried by the scheduler):`, String(cleanupErr && cleanupErr.message).slice(0, 200));
     }
 
     // Send WhatsApp Acknowledgement + "Need More Prints" button

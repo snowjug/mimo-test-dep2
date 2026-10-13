@@ -7,12 +7,14 @@ import { insights } from '../../services/insights.service';
 import { DateRangePicker } from '../../components/ui/DateRangePicker';
 import { LiveIndicator } from '../../components/ui/LiveIndicator';
 import { Delta, ErrorBanner, PeriodComparison, TrendChart, TruncatedNote } from '../../components/insights/InsightBits';
-import { describeRange } from '../../lib/dateRange';
+import { bucketLabel, describeRange } from '../../lib/dateRange';
 import { inr, int, pct } from '../../lib/format';
 import { exportAnalyticsPdf } from '../../lib/pdfExport';
 import type { Analytics } from '../../types/insights.types';
 
 const COLORS = ['#093765', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#8FB3DC'];
+const OK_COLOR = '#10b981';
+const FAIL_COLOR = '#f43f5e';
 
 const Card: React.FC<{ title: string; subtitle?: string; className?: string; children: React.ReactNode }> = ({ title, subtitle, className = '', children }) => (
   <section className={`p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs ${className}`}>
@@ -37,6 +39,22 @@ export const AnalyticsPage: React.FC = () => {
     { name: 'Double-sided', value: a.modes.duplex.pages },
     { name: 'Single-sided', value: a.modes.simplex.pages },
   ].filter((m) => m.value > 0) : [];
+  // `reporting` is absent if the dashboard is newer than the deployed API; tiles then show "—" instead of guessing.
+  const rep = a?.reporting;
+  const outcomeSeries = a && rep ? a.series.map((p) => ({ label: bucketLabel(p.key), successful: p.successful ?? 0, failed: p.reportFailed ?? 0, issues: p.issues ?? 0 })) : [];
+  const anyOutcome = outcomeSeries.some((p) => p.successful > 0 || p.failed > 0);
+  const issueBars = rep ? rep.issues.byCategory.filter((c) => c.count > 0).sort((x, y) => y.count - x.count) : [];
+  const unranked = a && rep ? a.byKiosk.filter((k) => k.reporting && !k.reporting.rankable && k.reporting.attempts > 0) : [];
+  const dash = '—';
+  const kpis = [
+    { label: 'Net revenue', value: rep ? inr(rep.revenue.net) : dash, sub: rep ? `${inr(rep.revenue.gross)} gross · ${inr(rep.revenue.refunded)} refunded` : undefined, cur: rep?.revenue.net, prev: a?.previous?.summary.netRevenue },
+    { label: 'Total print jobs', value: rep ? int(rep.jobs.total) : dash, sub: rep ? `${int(rep.jobs.inProgress)} in progress · ${int(rep.jobs.abandoned)} never collected` : undefined },
+    { label: 'Successful jobs', value: rep ? int(rep.jobs.successful) : dash, sub: rep ? `${int(rep.jobs.pages)} pages printed` : undefined },
+    { label: 'Failed jobs', value: rep ? int(rep.jobs.failed) : dash, sub: rep && rep.jobs.refundedUnprinted > 0 ? `+${int(rep.jobs.refundedUnprinted)} refunded before printing` : undefined, tone: rep && rep.jobs.failed > 0 ? 'text-rose-600' : undefined },
+    { label: 'Success rate', value: rep ? pct(rep.jobs.successRate) : dash, sub: 'Successful ÷ (successful + failed)' },
+    { label: 'Pages printed', value: rep ? int(rep.jobs.pages) : dash, sub: a ? `${int(a.current.bwPages)} B&W · ${int(a.current.colorPages)} colour` : undefined },
+    { label: 'Issues', value: rep ? int(rep.issues.total) : dash, sub: rep ? `${rep.issues.detected} detected · ${rep.issues.customerReported} reported · ${rep.issues.payment} payment` : undefined },
+  ];
 
   return (
     <div className="space-y-6 animate-fadeIn font-sans select-none">
@@ -59,19 +77,88 @@ export const AnalyticsPage: React.FC = () => {
       <TruncatedNote show={a?.truncated} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Revenue', value: a ? inr(a.current.revenue) : '', cur: a?.current.revenue, prev: a?.previous?.summary.revenue },
-          { label: 'Pages printed', value: a ? int(a.current.pages) : '', cur: a?.current.pages, prev: a?.previous?.summary.pages },
-          { label: 'Print success rate', value: a ? pct(a.current.successRate) : '', cur: null, prev: null },
-          { label: 'Avg order value', value: a ? inr(a.current.avgOrderValue) : '', cur: a?.current.avgOrderValue, prev: a?.previous?.summary.avgOrderValue },
-        ].map((k) => (
-          <div key={k.label} className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+        {kpis.map((k) => (
+          <div key={k.label} className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0">
             <span className="text-xs font-bold text-[var(--text-2)]">{k.label}</span>
-            {q.loading ? <div className="skeleton h-8 w-24 mt-3" /> : <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)] mt-2 tabular-nums">{k.value}</p>}
-            <div className="mt-1.5 min-h-[16px]">{!q.loading && k.cur !== null && k.cur !== undefined && <Delta current={k.cur} previous={k.prev} />}</div>
+            {q.loading ? <div className="skeleton h-8 w-24 mt-3" /> : <p className={`text-2xl sm:text-3xl font-black mt-2 tabular-nums ${k.tone ?? 'text-[var(--text-1)]'}`}>{k.value}</p>}
+            {!q.loading && k.sub && <p className="mt-1 truncate text-[11px] text-[var(--text-3)]">{k.sub}</p>}
+            {!q.loading && k.cur !== undefined && k.cur !== null && <div className="mt-1.5 min-h-[16px]"><Delta current={k.cur} previous={k.prev} /></div>}
           </div>
         ))}
       </div>
+      {rep?.issues.partial && <p className="text-[11px] text-amber-600">Refund requests could not be fully loaded, so payment issues may be undercounted.</p>}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <Card title="Successful vs failed jobs" subtitle={a ? `${a.range.granularity === 'hour' ? 'Hourly' : 'Daily'}, by when the job was created · in-progress and refunded-before-printing jobs are not shown` : undefined}>
+          {!a ? <div className="skeleton h-56" /> : !rep || !anyOutcome ? <NoData /> : (
+            <div style={{ height: 240 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={outcomeSeries} margin={{ left: -20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b833" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} />
+                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip contentStyle={{ borderRadius: 12, fontSize: 12 }} />
+                  <Bar dataKey="successful" name="Successful" stackId="o" fill={OK_COLOR} isAnimationActive={false} />
+                  <Bar dataKey="failed" name="Failed" stackId="o" fill={FAIL_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+
+        <Card title="Issues by category" subtitle="Deduplicated issues in this period. Categories from failure text are inferred; see Incidents for the evidence.">
+          {!a ? <div className="skeleton h-56" /> : !rep || issueBars.length === 0 ? <NoData text={rep ? 'No issues in this period' : undefined} /> : (
+            <div style={{ height: Math.max(120, issueBars.length * 34) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={issueBars} layout="vertical" margin={{ left: 10, right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b833" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: 12, fontSize: 12 }} />
+                  <Bar dataKey="count" name="Issues" fill="#f59e0b" radius={[0, 4, 4, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <Card title="Most problematic machines" subtitle={rep ? `Failure rate = failed ÷ (successful + failed). Ranked only with at least ${rep.minAttemptsToRank} finished jobs in this period.` : undefined}>
+        {!a ? <div className="skeleton h-24" /> : !rep ? <NoData /> : (
+          <>
+            {(a.problemMachines ?? []).length === 0 ? <NoData text="No machine has enough finished jobs in this period to rank" /> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-[var(--text-3)]">
+                      <th className="py-2 pr-3 font-bold">#</th><th className="py-2 pr-3 font-bold">Machine</th>
+                      <th className="py-2 pr-3 font-bold text-right">Failure rate</th><th className="py-2 pr-3 font-bold text-right">Failed</th>
+                      <th className="py-2 pr-3 font-bold text-right">Finished jobs</th><th className="py-2 font-bold text-right">Issues</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(a.problemMachines ?? []).map((m, i) => (
+                      <tr key={m.kioskId} className="border-t border-[var(--border)] text-[var(--text-2)]">
+                        <td className="py-2 pr-3 tabular-nums">{i + 1}</td>
+                        <td className="py-2 pr-3"><b className="text-[var(--text-1)]">{m.name}</b> <span className="font-mono text-[var(--text-3)]">{m.kioskId}</span></td>
+                        <td className={`py-2 pr-3 text-right font-bold tabular-nums ${m.failureRate > 0 ? 'text-rose-600' : 'text-[var(--text-1)]'}`}>{pct(m.failureRate)}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">{int(m.failed)}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">{int(m.attempts)}</td>
+                        <td className="py-2 text-right tabular-nums">{int(m.issues)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {unranked.length > 0 && (
+              <p className="mt-3 text-[11px] text-[var(--text-3)]">
+                Too few jobs to rank: {unranked.map((k) => `${k.name} (${k.reporting!.failed} failed of ${k.reporting!.attempts})`).join(' · ')}
+              </p>
+            )}
+          </>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <Card className="xl:col-span-2" title="Trend" subtitle={a ? `${a.range.granularity === 'hour' ? 'Hourly' : 'Daily'} totals for the selected dates` : undefined}>
@@ -124,7 +211,7 @@ export const AnalyticsPage: React.FC = () => {
           )}
         </Card>
 
-        <Card title="Peak hours" subtitle="Print jobs by hour of day (your local time)" className="lg:col-span-2">
+        <Card title="Peak hours" subtitle="Print jobs by hour of day (India time, IST)" className="lg:col-span-2">
           {!a ? <div className="skeleton h-56" /> : hours.length === 0 ? <NoData /> : (
             <div style={{ height: 220 }}>
               <ResponsiveContainer width="100%" height="100%">

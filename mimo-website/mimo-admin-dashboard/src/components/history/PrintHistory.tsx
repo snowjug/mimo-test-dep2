@@ -3,11 +3,10 @@ import { Check, X, IndianRupee, Loader2, Clock, ChevronDown, MessageSquareWarnin
 import type { JobOutcome, JobRow } from '../../types/insights.types';
 import { clockTime, duration, inr } from '../../lib/format';
 
-/* ── Machine badge: M1 / M2 in a grey circle; a colour print on M2 is blue ── */
-const MACHINE_SHORT: Record<string, string> = { 'CV-001': 'M1', 'SV-002': 'M2' };
-
+/* ── Machine badge: the registry's short label (M1, M2, …) in a grey circle; a colour print is blue ── */
 export const MachineBadge: React.FC<{ kioskId: string; color?: boolean; shortLabel?: string | null }> = ({ kioskId, color, shortLabel }) => {
-  const label = shortLabel || MACHINE_SHORT[kioskId] || (kioskId === 'Unassigned' ? '–' : kioskId.slice(0, 2));
+  // shortLabel comes from the machine registry (GET /admin/jobs destinationShortLabel, GET /admin/kiosks shortLabel).
+  const label = shortLabel || (kioskId === 'Unassigned' ? '–' : kioskId.slice(0, 2));
   return (
     <span
       title={`${kioskId}${color ? ' · colour' : ' · black & white'}`}

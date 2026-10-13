@@ -120,20 +120,15 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
         );
         if (isMounted && res?.current) {
           setLaunchMonthData({
-            revenue: res.current.revenue || 295.90,
-            pages: res.current.pages || 168,
-            orders: res.current.orders || 55,
+            revenue: res.current.revenue || 0,
+            pages: res.current.pages || 0,
+            orders: res.current.orders || 0,
             refunds: res.current.refundedAmount || 0,
           });
         }
       } catch {
         if (isMounted) {
-          setLaunchMonthData({
-            revenue: 295.90,
-            pages: 168,
-            orders: 55,
-            refunds: 0,
-          });
+          setLaunchMonthData(null);
         }
       } finally {
         if (isMounted) setLoadingLaunch(false);
@@ -159,7 +154,7 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
     0
   );
   const refundedTransactions = transactions.filter((t) => t.status === 'REFUNDED');
-  const refundedTxnAmount = refundedTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+  const refundedTxnAmount = refundedTransactions.reduce((sum, t) => sum + (Number(t.refundAmount || t.amount) || 0), 0);
   
   const totalGross = cur?.revenue ?? 0;
   const totalRefunded = cur?.refundedAmount !== undefined ? cur.refundedAmount : Math.max(refundReqAmount, refundedTxnAmount);
@@ -189,32 +184,45 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
     });
   }, [a]);
 
-  // Monthly Progression (Launch Month 1 to Present)
+  // Verified Progression (Only verified baseline and active range, without fake numbers)
   const monthlyProgression = useMemo(() => {
-    return [
-      { month: 'Apr (Launch)', Revenue: 120.00, NetRevenue: 120.00, Pages: 65, Orders: 22 },
-      { month: 'May 2026', Revenue: 295.90, NetRevenue: 295.90, Pages: 168, Orders: 55 },
-      { month: 'Jun 2026', Revenue: 480.50, NetRevenue: 480.50, Pages: 240, Orders: 82 },
-      { month: 'Jul 2026', Revenue: 620.00, NetRevenue: 620.00, Pages: 310, Orders: 95 },
-      { month: 'Aug 2026', Revenue: 890.70, NetRevenue: 860.70, Pages: 385, Orders: 110 },
-      { month: 'Sep 2026', Revenue: 1180.40, NetRevenue: 1145.40, Pages: 490, Orders: 138 },
-      { month: 'Oct (Current)', Revenue: Math.max(totalGross, 1409.60), NetRevenue: Math.max(netRevenue, 1374.60), Pages: Math.max(cur?.pages || 0, 418), Orders: Math.max(cur?.orders || 0, 161) },
-    ];
-  }, [totalGross, netRevenue, cur]);
+    const list: { month: string; Revenue: number; NetRevenue: number; Pages: number; Orders: number }[] = [];
+    if (launchMonthData && launchMonthData.revenue > 0) {
+      list.push({
+        month: 'May 2026 (Launch)',
+        Revenue: launchMonthData.revenue,
+        NetRevenue: Math.max(0, launchMonthData.revenue - (launchMonthData.refunds || 0)),
+        Pages: launchMonthData.pages,
+        Orders: launchMonthData.orders,
+      });
+    }
+    if (cur && totalGross > 0) {
+      list.push({
+        month: 'Current Range',
+        Revenue: totalGross,
+        NetRevenue: netRevenue,
+        Pages: cur.pages || 0,
+        Orders: cur.orders || 0,
+      });
+    }
+    return list;
+  }, [launchMonthData, totalGross, netRevenue, cur]);
 
   // Launch Growth Comparisons
   const launchBenchmark = useMemo(() => {
-    const lRev = launchMonthData?.revenue || 295.90;
-    const lPages = launchMonthData?.pages || 168;
-    const lOrders = launchMonthData?.orders || 55;
+    const lRev = launchMonthData?.revenue || 0;
+    const lPages = launchMonthData?.pages || 0;
+    const lOrders = launchMonthData?.orders || 0;
 
-    const revMultiplier = lRev > 0 ? (totalGross / lRev) : 1;
-    const revGrowthPct = lRev > 0 ? Math.round(((totalGross - lRev) / lRev) * 100) : 0;
+    const hasBaseline = lRev > 0;
+    const revMultiplier = hasBaseline ? (totalGross / lRev).toFixed(1) : '—';
+    const revGrowthPct = hasBaseline ? Math.round(((totalGross - lRev) / lRev) * 100) : 0;
     const pageGrowthPct = lPages > 0 ? Math.round((((cur?.pages || 0) - lPages) / lPages) * 100) : 0;
     const orderGrowthPct = lOrders > 0 ? Math.round((((cur?.orders || 0) - lOrders) / lOrders) * 100) : 0;
 
     return {
-      revMultiplier: revMultiplier.toFixed(1),
+      hasBaseline,
+      revMultiplier,
       revGrowthPct,
       pageGrowthPct,
       orderGrowthPct,
@@ -321,49 +329,49 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
       </div>
 
       {error && <ErrorBanner message={error} onRetry={onRefresh} />}
-      <TruncatedNote show={a?.truncated} />
+      <TruncatedNote show={Boolean(a?.truncated || a?.current?.completeness === 'PARTIAL_RECORDS_TRUNCATED')} />
 
       {/* ── SECTION 1: EXECUTIVE FINANCIAL MATRIX (6 Cards) ────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
-        {/* Gross Billings */}
+        {/* Gross Collections */}
         <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase">Gross Billings</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase">Gross Collections</span>
             <IndianRupee className="w-4 h-4 text-indigo-500" />
           </div>
           <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white truncate">
             {cur ? inr(totalGross) : '—'}
           </p>
           <span className="text-[10px] text-slate-500 mt-1 block truncate">
-            {cur ? `${cur.orders} orders` : 'Loading...'}
+            {cur ? `${cur.orders} paid orders` : 'Loading...'}
           </span>
         </div>
 
-        {/* Refunds Deducted */}
+        {/* Completed Refunds */}
         <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase">Refunds</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase">Completed Refunds</span>
             <RotateCcw className="w-4 h-4 text-rose-500" />
           </div>
           <p className="text-lg sm:text-2xl font-black text-rose-600 dark:text-rose-400 truncate">
             {cur ? inr(totalRefunded) : '—'}
           </p>
           <span className="text-[10px] text-rose-500/80 font-semibold mt-1 block truncate">
-            {totalGross > 0 ? `${((totalRefunded / totalGross) * 100).toFixed(1)}% loss` : '0% loss'}
+            {totalGross > 0 ? `${((totalRefunded / totalGross) * 100).toFixed(1)}% of gross` : '0%'}
           </span>
         </div>
 
-        {/* Net Realized Revenue */}
+        {/* Net Customer Collections */}
         <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs ring-1 ring-emerald-500/20">
           <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Net Revenue</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Net Collections</span>
             <TrendingUp className="w-4 h-4 text-emerald-500" />
           </div>
           <p className="text-lg sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate">
             {cur ? inr(netRevenue) : '—'}
           </p>
           <span className="text-[10px] text-emerald-600/80 font-semibold mt-1 block truncate">
-            In bank
+            Retained funds
           </span>
         </div>
 
@@ -404,11 +412,23 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
           <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white truncate">
             {cur && cur.orders + cur.failedPayments > 0
               ? `${Math.round((cur.orders / (cur.orders + cur.failedPayments)) * 100)}%`
-              : '98.5%'}
+              : '—'}
           </p>
           <span className="text-[10px] text-slate-500 mt-1 block truncate">
             {cur?.failedPayments || 0} failed
           </span>
+        </div>
+      </div>
+
+      {/* Accounting & Settlement Architecture Note */}
+      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
+        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+        <div className="space-y-0.5">
+          <p className="font-bold">Customer Collections vs. Bank Settlements</p>
+          <p className="text-[11px] opacity-90">
+            Metrics above reflect verified customer payments and completed refunds in Firestore. Bank payouts reflect Cashfree settlement cycles (T+1/T+2) after gateway fee deductions (MDR ~1.9% + GST).
+            {a?.current?.whatsappAudit?.confirmedJobs ? ` Note: ${a.current.whatsappAudit.confirmedJobs} WhatsApp print jobs are tracked on kiosks but lack dedicated Firestore transaction records.` : ''}
+          </p>
         </div>
       </div>
 
@@ -427,11 +447,11 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
                     Launch Month (May 2026) vs Today Benchmark
                   </h3>
                   <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 shrink-0">
-                    {launchBenchmark.revMultiplier}x
+                    {launchBenchmark.hasBaseline ? `${launchBenchmark.revMultiplier}x` : '—'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300">
-                  Comparing current performance against 1st working month of MIMO.
+                  {launchBenchmark.hasBaseline ? 'Comparing current performance against 1st working month of MIMO.' : 'Historical May 2026 baseline data not available.'}
                 </p>
               </div>
             </div>
@@ -440,8 +460,14 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
                 Total Revenue Expansion
               </span>
               <span className="text-lg sm:text-xl font-black text-emerald-400 flex items-center sm:justify-end gap-1">
-                <ArrowUpRight size={18} />
-                +{launchBenchmark.revGrowthPct}%
+                {launchBenchmark.hasBaseline ? (
+                  <>
+                    <ArrowUpRight size={18} />
+                    +{launchBenchmark.revGrowthPct}%
+                  </>
+                ) : (
+                  '—'
+                )}
               </span>
             </div>
           </div>
@@ -449,20 +475,20 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mt-4">
             <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">M1 Revenue</span>
-              <p className="text-lg sm:text-xl font-black text-white mt-1">{inr(launchBenchmark.lRev)}</p>
-              <span className="text-[10px] text-slate-400 mt-0.5 block">Baseline in May 2026</span>
+              <p className="text-lg sm:text-xl font-black text-white mt-1">{launchBenchmark.hasBaseline ? inr(launchBenchmark.lRev) : '—'}</p>
+              <span className="text-[10px] text-slate-400 mt-0.5 block">{launchBenchmark.hasBaseline ? 'Baseline in May 2026' : 'Unreconciled'}</span>
             </div>
 
             <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Revenue</span>
               <p className="text-lg sm:text-xl font-black text-emerald-400 mt-1">{inr(totalGross)}</p>
-              <span className="text-[10px] text-emerald-300/80 font-bold mt-0.5 block">+{launchBenchmark.revGrowthPct}% Growth</span>
+              <span className="text-[10px] text-emerald-300/80 font-bold mt-0.5 block">{launchBenchmark.hasBaseline ? `+${launchBenchmark.revGrowthPct}% Growth` : 'Active window'}</span>
             </div>
 
             <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Print Volume</span>
               <p className="text-lg sm:text-xl font-black text-white mt-1">{int(cur?.pages ?? 0)} pgs</p>
-              <span className="text-[10px] text-indigo-300 font-bold mt-0.5 block">vs {launchBenchmark.lPages} in M1</span>
+              <span className="text-[10px] text-indigo-300 font-bold mt-0.5 block">{launchBenchmark.hasBaseline ? `vs ${launchBenchmark.lPages} in M1` : 'Active window'}</span>
             </div>
 
             <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">

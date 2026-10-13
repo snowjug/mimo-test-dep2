@@ -10,7 +10,7 @@ import { ErrorBanner } from '../../components/insights/InsightBits';
 import { ConfirmDialog, EmptyState } from '../../components/ui/shared';
 import { describeRange } from '../../lib/dateRange';
 import { dateTime, inr, timeAgo, tsToIso } from '../../lib/format';
-import type { Incident } from '../../types/insights.types';
+import type { Incident, IssueBasis, IssueRow, IssueSource } from '../../types/insights.types';
 
 interface RefundRequest {
   id: string;
@@ -116,6 +116,8 @@ export const IncidentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = (
         )}
       </section>
 
+      <IssueHistory />
+
       <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs p-5">
         <h2 className="text-sm font-bold text-[var(--text-1)]">Refund requests</h2>
         <p className="text-xs text-[var(--text-3)] mt-0.5 mb-4">Customers who reported a paid order that did not print, plus auto-refunds that failed.</p>
@@ -150,5 +152,102 @@ export const IncidentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = (
       <ConfirmDialog open={!!confirm} title="Approve this refund?" description={confirm ? `${inr(confirm.amount)} will be refunded to the customer through Cashfree for order ${confirm.orderId}. This cannot be undone.` : ''}
         confirmLabel="Refund now" loading={busy} onConfirm={approve} onCancel={() => setConfirm(null)} />
     </div>
+  );
+};
+
+const BASIS_LABEL: Record<IssueBasis, string> = {
+  exact: 'System message',
+  inferred: 'Inferred from failure text',
+  customer: 'Customer-raised',
+  unknown: 'No usable reason',
+};
+const SOURCE_LABEL: Record<IssueSource, string> = {
+  job_failure: 'Detected',
+  customer_report: 'Customer report',
+  refund_request: 'Refund request',
+};
+const HISTORY_LIMIT = 500;
+const HISTORY_PAGE = 25;
+
+/**
+ * Dated, deduplicated issue history for the selected range (GET /admin/issues). Read-only: actions on refunds stay
+ * in the Refund requests section. Live alerts are already listed under Open incidents, so they are not fetched here.
+ */
+const IssueHistory: React.FC = () => {
+  const { range, current, live } = useRange();
+  const q = useLiveQuery(() => insights.issues(current(), { limit: HISTORY_LIMIT, current: 0 }), [range], { live, intervalMs: 60000 });
+  const [category, setCategory] = useState<string>('ALL');
+  const [machine, setMachine] = useState<string>('ALL');
+  const [shown, setShown] = useState(HISTORY_PAGE);
+  const all: IssueRow[] = q.data?.issues ?? [];
+
+  const machines = [...new Map(all.filter((i) => i.kioskId).map((i) => [i.kioskId as string, i.machineName || (i.kioskId as string)])).entries()].sort(([a], [b]) => a.localeCompare(b));
+  const rows = all.filter((i) => (category === 'ALL' || i.category === category) && (machine === 'ALL' || i.kioskId === machine));
+  const chip = (on: boolean) => `shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${on ? 'bg-[var(--text-1)] text-[var(--bg)]' : 'bg-[var(--surface)] text-[var(--text-2)] border border-[var(--border)] hover:bg-[var(--surface-2)]'}`;
+
+  return (
+    <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+      <div className="px-5 pt-5">
+        <h2 className="text-sm font-bold text-[var(--text-1)]">Issue history</h2>
+        <p className="text-xs text-[var(--text-3)] mt-0.5">
+          Every problem in {describeRange(range).toLowerCase()}, counted once. Detected issues come from the machine; customer reports and refund requests are not proven by it.
+        </p>
+      </div>
+      {q.error && <div className="px-5 pt-3"><ErrorBanner message={q.error} onRetry={q.refresh} /></div>}
+      {q.data && (q.data.truncated || q.data.partial) && (
+        <p className="px-5 pt-2 text-[11px] text-amber-600">
+          {q.data.truncated ? `Showing the newest ${all.length} of ${q.data.total} issues. Narrow the dates to see the rest. ` : ''}
+          {q.data.partial ? 'Refund requests could not be fully loaded.' : ''}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2 px-5 pt-3">
+        <button type="button" className={chip(category === 'ALL')} onClick={() => { setCategory('ALL'); setShown(HISTORY_PAGE); }}>All ({q.data?.counts.total ?? 0})</button>
+        {(q.data?.counts.byCategory ?? []).filter((c) => c.count > 0).map((c) => (
+          <button key={c.category} type="button" className={chip(category === c.category)} onClick={() => { setCategory(c.category); setShown(HISTORY_PAGE); }}>{c.label} ({c.count})</button>
+        ))}
+        {machines.length > 1 && <span className="hidden w-px self-stretch bg-[var(--border)] sm:block" />}
+        {machines.length > 1 && [['ALL', 'All machines'] as [string, string], ...machines].map(([id, name]) => (
+          <button key={id} type="button" title={id === 'ALL' ? undefined : id} className={chip(machine === id)} onClick={() => { setMachine(id); setShown(HISTORY_PAGE); }}>{name}</button>
+        ))}
+      </div>
+      {q.loading ? <div className="p-5"><div className="skeleton h-32" /></div> : rows.length === 0 ? (
+        <p className="px-5 py-8 text-center text-xs font-semibold text-[var(--text-3)]">No issues match in this period.</p>
+      ) : (
+        <ul className="p-3 sm:p-5 space-y-2">
+          {rows.slice(0, shown).map((i) => {
+            const evidence = i.evidence.printerStatus || i.evidence.note || i.evidence.reason || null;
+            return (
+              <li key={i.id} className="p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/40">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase border ${SEV[i.severity]}`}>{i.severity}</span>
+                  <p className="text-sm font-bold text-[var(--text-1)] min-w-0 break-words">{i.title}</p>
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                  {i.at ? `${dateTime(i.at)} · ` : ''}{SOURCE_LABEL[i.source]} · {BASIS_LABEL[i.basis]}{i.kioskId ? ` · ${i.machineName || i.kioskId}` : ''}
+                </p>
+                {evidence && <p className="mt-1 text-xs text-[var(--text-2)] break-words">“{evidence}”</p>}
+                {i.evidence.verdict && <p className="mt-0.5 text-[11px] text-[var(--text-3)]">Machine verdict: {i.evidence.verdict.replace(/_/g, ' ')}</p>}
+                {i.source === 'job_failure' && i.evidence.printVerified && <p className="mt-0.5 text-[11px] text-[var(--text-3)]">Printer counted {i.evidence.sheetsVerified ?? 0} sheet(s)</p>}
+                {(i.jobId || i.orderId) && (
+                  <p className="mt-0.5 text-[11px] text-[var(--text-3)] font-mono break-all">
+                    {i.jobIds.length > 1 ? `Jobs ${i.jobIds.join(', ')}` : i.jobId ? `Job ${i.jobId}` : ''}{i.orderId ? `${i.jobId ? ' · ' : ''}Order ${i.orderId}` : ''}
+                  </p>
+                )}
+                {i.related.length > 0 && (
+                  <p className="mt-0.5 text-[11px] text-[var(--text-3)]">
+                    Also: {i.related.map((r) => (r.type === 'customer_report' ? `customer report${r.label ? ` (${r.label})` : ''}` : `refund request${r.status ? ` (${r.status})` : ''}`)).join(' · ')}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {rows.length > shown && (
+        <button type="button" onClick={() => setShown((n) => n + HISTORY_PAGE)} className="w-full border-t border-[var(--border)] py-3 text-sm font-semibold text-[var(--primary)] hover:bg-[var(--surface-2)]">
+          Show more ({rows.length - shown} left)
+        </button>
+      )}
+    </section>
   );
 };
