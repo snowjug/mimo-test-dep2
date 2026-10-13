@@ -206,7 +206,7 @@ export function PrintCode() {
             <p className="text-[14px] font-semibold text-ink-3">You're all set!</p>
 
             {/* 4 large code digits */}
-            <div className="mt-3 flex items-center gap-2.5">
+            <div className="mt-3 flex items-center gap-2.5" data-tour="print-code-display">
               {codeDigits.map((digit, i) => (
                 <div
                   key={i}
@@ -232,9 +232,14 @@ export function PrintCode() {
             <p className="mt-2 text-[12px] text-ink-3">Enter this code on the MIMO keypad.</p>
           </div>
 
-          {/* 3D Mascot Illustration */}
-          <div className="flex size-[88px] shrink-0 items-center justify-center rounded-[26px] bg-gradient-to-br from-blue-500/10 via-sky-500/15 to-indigo-500/10 border border-blue-100 shadow-sm ml-2">
-            <span className="text-[44px]" aria-hidden>🤖</span>
+          {/* 3D MIMO Mascot */}
+          <div className="relative size-[90px] sm:size-[100px] shrink-0 ml-2">
+            <img
+              src="/images/mimo-mascot.png"
+              alt="MIMO"
+              className="size-full object-contain drop-shadow-md select-none pointer-events-none"
+              draggable={false}
+            />
           </div>
         </div>
       </div>
@@ -376,8 +381,8 @@ export function PrintCode() {
       </section>
 
       {/* ── Sticky Bottom Action Bar ── */}
-      <div className="fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
-        <div className="mx-auto max-w-[480px]">
+      <div className="fixed inset-x-0 bottom-0 z-40 pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[440px] border-t border-hairline bg-white/95 backdrop-blur-md px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-lg">
           <button
             type="button"
             onClick={handleDone}

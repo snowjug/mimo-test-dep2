@@ -272,8 +272,13 @@ export function Payment() {
         </div>
 
         {/* Decorative Mascot */}
-        <div className="flex size-[68px] shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-500/10 via-sky-500/15 to-indigo-500/10 border border-blue-100 shadow-xs">
-          <span className="text-[34px]" aria-hidden>🤖</span>
+        <div className="relative size-[76px] sm:size-[84px] shrink-0">
+          <img
+            src="/images/mimo-mascot.png"
+            alt="MIMO"
+            className="size-full object-contain drop-shadow-md select-none pointer-events-none"
+            draggable={false}
+          />
         </div>
       </div>
 
@@ -520,10 +525,11 @@ export function Payment() {
       </section>
 
       {/* ── Sticky Bottom Action Bar ── */}
-      <div className="fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
-        <div className="mx-auto max-w-[480px]">
+      <div className="fixed inset-x-0 bottom-0 z-40 pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[440px] border-t border-hairline bg-white/95 backdrop-blur-md px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-lg">
           <button
             type="button"
+            data-tour="payment-pay-button"
             disabled={isProcessing}
             onClick={handlePayment}
             className="press flex w-full items-center justify-center gap-2.5 rounded-full bg-brand hover:bg-brand-press py-4 text-[16px] font-bold text-white shadow-lg shadow-brand/20 transition-all disabled:opacity-60"

@@ -16,7 +16,7 @@ type TourContextValue = {
   active: boolean;
   stepIndex: number;
   steps: TourStep[];
-  start: () => void;
+  start: (initialIndex?: number) => void;
   next: () => void;
   prev: () => void;
   skip: () => void;
@@ -64,8 +64,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const start = useCallback(() => {
-    setStepIndex(0);
+  const start = useCallback((initialIndex = 0) => {
+    setStepIndex(initialIndex);
     setActive(true);
   }, []);
 

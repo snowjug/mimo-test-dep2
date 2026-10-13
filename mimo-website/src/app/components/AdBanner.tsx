@@ -97,8 +97,26 @@ function AdSlide({ ad }: { ad: Ad }) {
  * - Opens the ad link in a new tab when tapped (if a link is configured) -- suppressed after an actual
  *   drag so a swipe never accidentally triggers the link.
  */
+const DEFAULT_CAMPUS_ADS: Ad[] = [
+  {
+    id: "mimo-advertise-banner",
+    imageUrl: "/images/mimo-advertise-banner.png",
+    link: "https://wa.me/919364028349?text=Namastey%20MIMO,%20I%20want%20to%20partner%20with%20MIMO%20at%20my%20campus!",
+    caption: null,
+  },
+  {
+    id: "mimo-campus-banner",
+    imageUrl: "/images/mimo-campus-banner.jpg",
+    link: "https://wa.me/919364028349?text=Namastey%20MIMO,%20I%20want%20to%20partner%20with%20MIMO%20at%20my%20campus!",
+    caption: null,
+  },
+];
+
 export function AdBanner() {
   const ads = useAds();
+  const activeAds = ads && ads.length > 0 
+    ? (ads.some((a) => a.id === "mimo-advertise-banner") ? ads : [...DEFAULT_CAMPUS_ADS, ...ads])
+    : DEFAULT_CAMPUS_ADS;
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -125,12 +143,11 @@ export function AdBanner() {
   };
 
   useEffect(() => {
-    if (!ads || ads.length === 0) return;
     setIndex(0);
-    startTimer(ads.length);
+    startTimer(activeAds.length);
     return clearTimer;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ads?.length]);
+  }, [activeAds.length]);
 
   // Keep the container's height in sync with whichever slide is active, animated via CSS so switching
   // between a tall banner-mode ad and a shorter card-mode one doesn't jump instantly.
@@ -142,7 +159,7 @@ export function AdBanner() {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [index, ads?.length]);
+  }, [index, activeAds.length]);
 
   const goTo = (i: number, count: number) => {
     setIndex(wrap(i, count));
@@ -190,17 +207,6 @@ export function AdBanner() {
     setIsDragging(false);
   };
 
-  const fallbackAds: Ad[] = [
-    {
-      id: "mimo-campus-banner",
-      imageUrl: "/images/mimo-campus-banner.jpg",
-      link: "https://wa.me/919364028349?text=Namastey%20MIMO,%20I%20want%20to%20partner%20with%20MIMO%20at%20my%20campus!",
-      caption: null,
-    },
-  ];
-
-  const activeAds = ads && ads.length > 0 ? ads : fallbackAds;
-
   const trackPercentOffset = -index * 100;
   const dragPercent = trackRef.current?.clientWidth ? (dragOffset / trackRef.current.clientWidth) * 100 : 0;
 
@@ -209,24 +215,19 @@ export function AdBanner() {
       <h2 className="mb-1.5 px-1 text-[13px] font-medium text-ink-3">Announcements</h2>
 
       <div
-        className="relative overflow-hidden rounded-[20px] bg-surface select-none touch-pan-y"
-        style={{ height: trackHeight, touchAction: "pan-y", transition: isDragging ? undefined : "height 300ms ease" }}
+        className="relative overflow-hidden rounded-[20px] bg-surface select-none border border-hairline shadow-xs"
+        style={{ height: trackHeight, transition: isDragging ? undefined : "height 300ms ease" }}
       >
         <div
           ref={trackRef}
-          className="flex touch-pan-y"
+          className="flex"
           style={{
-            touchAction: "pan-y",
             transform: `translateX(calc(${trackPercentOffset}% + ${dragPercent}%))`,
             transition: isDragging ? "none" : "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
-          onTouchStart={(e) => onDragStart(e.touches[0].clientX, e.touches[0].clientY)}
-          onTouchMove={(e) => onDragMove(e.touches[0].clientX, e.touches[0].clientY, activeAds.length)}
-          onTouchEnd={() => onDragEnd(activeAds.length)}
-          onMouseDown={(e) => onDragStart(e.clientX, e.clientY)}
-          onMouseMove={(e) => { if (dragStartX.current !== null) onDragMove(e.clientX, e.clientY, activeAds.length); }}
-          onMouseUp={() => onDragEnd(activeAds.length)}
-          onMouseLeave={() => { if (dragStartX.current !== null) onDragEnd(activeAds.length); }}
+          onTouchStart={activeAds.length > 1 ? (e) => onDragStart(e.touches[0].clientX, e.touches[0].clientY) : undefined}
+          onTouchMove={activeAds.length > 1 ? (e) => onDragMove(e.touches[0].clientX, e.touches[0].clientY, activeAds.length) : undefined}
+          onTouchEnd={activeAds.length > 1 ? () => onDragEnd(activeAds.length) : undefined}
         >
           {activeAds.map((ad, i) => {
             const slideLink = normalizeUrl(ad.link);
@@ -257,12 +258,12 @@ export function AdBanner() {
           })}
         </div>
 
-        {ads.length > 1 && (
+        {activeAds.length > 1 && (
           <>
             <button
               type="button"
               aria-label="Previous announcement"
-              onClick={(e) => { e.stopPropagation(); goTo(index - 1, ads.length); }}
+              onClick={(e) => { e.stopPropagation(); goTo(index - 1, activeAds.length); }}
               className="press absolute left-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-xs backdrop-blur-md border border-ink-4/10 active:bg-surface"
             >
               <ChevronLeft className="size-4" />
@@ -270,7 +271,7 @@ export function AdBanner() {
             <button
               type="button"
               aria-label="Next announcement"
-              onClick={(e) => { e.stopPropagation(); goTo(index + 1, ads.length); }}
+              onClick={(e) => { e.stopPropagation(); goTo(index + 1, activeAds.length); }}
               className="press absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-xs backdrop-blur-md border border-ink-4/10 active:bg-surface"
             >
               <ChevronRight className="size-4" />
@@ -281,14 +282,14 @@ export function AdBanner() {
               role="tablist"
               aria-label="Advertisement slides"
             >
-              {ads.map((_, i) => (
+              {activeAds.map((_, i) => (
                 <button
                   key={i}
                   type="button"
                   role="tab"
                   aria-selected={i === index}
                   aria-label={`Slide ${i + 1}`}
-                  onClick={(e) => { e.stopPropagation(); goTo(i, ads.length); }}
+                  onClick={(e) => { e.stopPropagation(); goTo(i, activeAds.length); }}
                   className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
                     i === index ? "w-4 bg-brand" : "w-1.5 bg-ink-4 opacity-40"
                   }`}
