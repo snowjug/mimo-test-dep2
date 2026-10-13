@@ -874,9 +874,14 @@ export function UploadFile() {
           </p>
         </div>
 
-        {/* 3D Robot Mascot */}
-        <div className="flex size-[64px] sm:size-[72px] shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-500/10 via-sky-500/15 to-indigo-500/10 border border-blue-100/80 shadow-xs">
-          <span className="text-[34px] sm:text-[38px]" aria-hidden>🤖</span>
+        {/* 3D MIMO Mascot */}
+        <div className="relative size-[76px] sm:size-[84px] shrink-0">
+          <img
+            src="/images/mimo-mascot.png?v=3"
+            alt="MIMO Mascot"
+            className="size-full object-contain drop-shadow-md select-none pointer-events-none"
+            draggable={false}
+          />
         </div>
       </div>
 
@@ -1162,16 +1167,19 @@ export function UploadFile() {
           </div>
 
           {/* Continue summary illustration */}
-          <div className="mt-6 flex flex-col items-center gap-1 py-4">
-            <div className="flex size-16 items-center justify-center rounded-[20px] bg-brand-soft text-brand text-[32px]">
+          <div className="mt-4 flex flex-col items-center gap-1 py-3">
+            <div className="flex size-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand text-[28px]">
               📄
             </div>
-            <p className="mt-2 text-[14px] text-ink-3">
+            <p className="mt-1 text-[13px] font-medium text-ink-3">
               {displayTotalPages} {displayTotalPages === 1 ? "page" : "pages"} in total
             </p>
           </div>
 
-          <ActionBarSpacer size={140} />
+          {/* Ad banner on Selected files view */}
+          <AdBanner />
+
+          <ActionBarSpacer size={160} />
           <ActionBar>
             <PrimaryButton
               data-tour="upload-continue"

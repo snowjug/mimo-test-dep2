@@ -233,10 +233,10 @@ export function PrintCode() {
           </div>
 
           {/* 3D MIMO Mascot */}
-          <div className="relative size-[90px] sm:size-[100px] shrink-0 ml-2">
+          <div className="relative size-[92px] sm:size-[104px] shrink-0 ml-2">
             <img
-              src="/images/mimo-mascot.png"
-              alt="MIMO"
+              src="/images/mimo-mascot.png?v=3"
+              alt="MIMO Mascot"
               className="size-full object-contain drop-shadow-md select-none pointer-events-none"
               draggable={false}
             />
@@ -261,21 +261,22 @@ export function PrintCode() {
           </div>
 
           {/* Stepper track */}
-          <div className="relative mb-6 px-4">
-            {/* Background line */}
-            <div className="absolute left-8 right-8 top-1/2 -translate-y-1/2 h-1 bg-surface-2 rounded-full" />
-            {/* Progress line */}
-            <div
-              className="absolute left-8 top-1/2 -translate-y-1/2 h-1 bg-brand rounded-full transition-all duration-500"
-              style={{
-                width: `${Math.min(100, Math.max(0, (printProgress / 100) * 80))}%`,
-              }}
-            />
+          <div className="relative mb-3 px-4">
+            {/* Background line connecting center of Step 1 (34px) to Step 3 (parent width - 34px) */}
+            <div className="absolute left-[34px] right-[34px] top-[18px] -translate-y-1/2 h-[3px] bg-surface-2 rounded-full overflow-hidden">
+              {/* Progress line */}
+              <div
+                className="h-full bg-brand rounded-full transition-all duration-500 ease-out"
+                style={{
+                  width: `${Math.min(100, Math.max(0, printProgress))}%`,
+                }}
+              />
+            </div>
 
             <div className="relative flex items-center justify-between">
               {/* Step 1: Paid */}
               <div className="flex flex-col items-center">
-                <span className="flex size-9 items-center justify-center rounded-full bg-brand text-white shadow-xs">
+                <span className="relative z-10 flex size-9 items-center justify-center rounded-full bg-brand text-white shadow-xs">
                   <Check className="size-4" strokeWidth={3} />
                 </span>
                 <span className="mt-1.5 text-[12px] font-semibold text-ink">Paid</span>
@@ -284,31 +285,94 @@ export function PrintCode() {
               {/* Step 2: Printing */}
               <div className="flex flex-col items-center">
                 <span
-                  className={`flex size-9 items-center justify-center rounded-full transition-colors ${
-                    printStatus === "printing" || printStatus === "completed"
+                  className={`relative z-10 flex size-9 items-center justify-center rounded-full transition-all ${
+                    printStatus === "completed"
                       ? "bg-brand text-white shadow-xs"
+                      : printStatus === "printing"
+                      ? "bg-brand text-white shadow-xs ring-4 ring-brand/20 animate-pulse"
+                      : printProgress > 0
+                      ? "bg-blue-50 text-brand border border-blue-200/80 shadow-xs"
                       : "bg-surface-2 text-ink-4 border border-hairline"
                   }`}
                 >
-                  <Printer className="size-4" />
+                  {printStatus === "completed" ? (
+                    <Check className="size-4" strokeWidth={3} />
+                  ) : (
+                    <Printer className="size-4" />
+                  )}
                 </span>
-                <span className="mt-1.5 text-[12px] font-semibold text-ink-3">Printing</span>
+                <span
+                  className={`mt-1.5 text-[12px] transition-colors ${
+                    printStatus === "printing"
+                      ? "font-bold text-brand"
+                      : printStatus === "completed" || printProgress > 0
+                      ? "font-semibold text-ink"
+                      : "font-semibold text-ink-3"
+                  }`}
+                >
+                  Printing
+                </span>
               </div>
 
               {/* Step 3: Done */}
               <div className="flex flex-col items-center">
                 <span
-                  className={`flex size-9 items-center justify-center rounded-full transition-colors ${
+                  className={`relative z-10 flex size-9 items-center justify-center rounded-full transition-all ${
                     printStatus === "completed"
-                      ? "bg-emerald-500 text-white shadow-xs"
+                      ? "bg-emerald-500 text-white shadow-xs ring-4 ring-emerald-100"
                       : "bg-surface-2 text-ink-4 border border-hairline"
                   }`}
                 >
-                  <FileText className="size-4" />
+                  {printStatus === "completed" ? (
+                    <Check className="size-4" strokeWidth={3} />
+                  ) : (
+                    <FileText className="size-4" />
+                  )}
                 </span>
-                <span className="mt-1.5 text-[12px] font-semibold text-ink-3">Done</span>
+                <span
+                  className={`mt-1.5 text-[12px] transition-colors ${
+                    printStatus === "completed"
+                      ? "font-bold text-emerald-700"
+                      : "font-semibold text-ink-3"
+                  }`}
+                >
+                  Done
+                </span>
               </div>
             </div>
+          </div>
+
+          {/* Real-time status caption */}
+          <div className="pt-2 border-t border-hairline flex items-center justify-between text-[12px]">
+            <div className="flex items-center gap-1.5 text-ink-3">
+              {printStatus === "printing" ? (
+                <>
+                  <span className="relative flex size-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-brand" />
+                  </span>
+                  <span className="font-medium text-ink">
+                    {sheetsInfo && sheetsInfo.total > 0
+                      ? `Printing sheet ${sheetsInfo.completed} of ${sheetsInfo.total}…`
+                      : "Printing in progress at kiosk…"}
+                  </span>
+                </>
+              ) : printStatus === "completed" ? (
+                <span className="font-semibold text-emerald-700">✓ All pages printed! Please collect from tray.</span>
+              ) : printStatus === "failed" ? (
+                <span className="font-semibold text-rose-600">Print stopped unexpectedly.</span>
+              ) : (
+                <>
+                  <span className="size-2 rounded-full bg-brand/70" />
+                  <span className="text-ink-2 font-medium">Ready. Waiting for MIMO kiosk to start…</span>
+                </>
+              )}
+            </div>
+            {sheetsInfo && sheetsInfo.total > 0 && (
+              <span className="text-ink-4 tabular-nums">
+                {sheetsInfo.completed}/{sheetsInfo.total} sheets
+              </span>
+            )}
           </div>
 
           {/* Refund CTA if failed */}

@@ -157,14 +157,22 @@
     font-size: var(--font-size);
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   body {
     @apply bg-canvas text-ink antialiased;
     font-family: var(--font-sans);
-    min-height: 100dvh;
-    overflow-x: clip;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
     -webkit-overflow-scrolling: touch;
+  }
+
+  #root {
+    min-height: 100%;
   }
 
   h1, h2, h3, h4 {
@@ -195,28 +203,27 @@
 
 @layer components {
   /*
-   * The customer app is designed for phones first; every phone rule below stays exactly as it
-   * was. At desktop widths (1024px+) the column widens into a real task-app layout instead of a
-   * phone card floating in empty space: MimoHeader/AppBar break out to full viewport width with a
-   * background band, and their content (plus ActionBar) re-centres at this same width so the whole
-   * page still reads as one aligned column, just a roomier one. See mimo/ui.tsx and mimo-header.tsx.
+   * Consistent, premium mobile-first phone container.
+   * On mobile devices (<=440px), fills 100% width edge-to-edge.
+   * On larger screens / resized windows, stays as a centered phone preview with soft shadows.
    */
   .app-column {
     width: 100%;
     max-width: 440px;
     margin-inline: auto;
+    min-height: 100vh;
     min-height: 100dvh;
     position: relative;
     background: var(--canvas);
   }
 
   @media (min-width: 480px) {
-    .app-column { box-shadow: 0 0 0 1px var(--hairline); }
-    body { background: var(--surface-2); }
-  }
-
-  @media (min-width: 1024px) {
-    .app-column { max-width: 768px; box-shadow: none; }
+    .app-column {
+      box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--hairline);
+    }
+    body {
+      background: #f1f5f9;
+    }
   }
 
   .pad-safe-bottom { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
