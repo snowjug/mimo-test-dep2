@@ -494,7 +494,7 @@ export function PrintOptions() {
       />
 
       <main className="px-4">
-        <Group title="Printer">
+        <Group data-tour="print-options-printer" title="Printer">
           <div role="radiogroup" aria-label="Printer">
             {printers.map((p) => (
               <ChoiceRow key={p.id} label={p.name} detail={p.detail} selected={directKioskId === p.id} onSelect={() => selectPrinter(p.id)} />

@@ -167,16 +167,25 @@ export function TourOverlay() {
   const onThisPage = active && Boolean(step) && location.pathname === step.path;
   const rect = useTargetRect(onThisPage ? step.selector : null);
 
-  // Keep the tour aligned to real navigation: if the active step's page no longer matches where the
-  // user actually is (e.g. stepIndex is still on "/upload" but they already navigated on to
-  // "/print-options" via the real Continue button), jump to the first step that belongs to the page
-  // they're actually on, rather than sitting hidden on a step they've already passed. Complementary to
-  // the same-page skip-ahead above, which only handles mismatched elements WITHIN the current page.
+  // Keep the tour aligned to real navigation: if the user's ACTUAL route changes while the active step
+  // still points at the page they just left (e.g. they clicked the real Continue button and genuinely
+  // navigated from "/upload" to "/print-options"), jump to the first step belonging to the page they're
+  // now on. Deliberately triggered ONLY by `location.pathname` changing (a real navigation), not by
+  // `stepIndex`/`step` -- a stale, buggy version of this effect also re-ran whenever the user clicked the
+  // tour's own Next button, which advances stepIndex locally onto a step for a page they have NOT
+  // actually navigated to yet. That made it "helpfully" snap stepIndex straight back to an earlier step
+  // still matching the CURRENT page, which looked like Next doing nothing or going backwards in a loop.
+  // Reading the current step via a ref (not a dependency) avoids re-triggering on stepIndex changes.
+  const stepRef = useRef(step);
+  stepRef.current = step;
   useEffect(() => {
-    if (!active || !step || step.path === location.pathname) return;
+    if (!active) return;
+    const current = stepRef.current;
+    if (!current || current.path === location.pathname) return;
     const matchIndex = steps.findIndex((s) => s.path === location.pathname);
     if (matchIndex !== -1) goTo(matchIndex);
-  }, [active, location.pathname, step, steps, goTo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes `step`; see comment above.
+  }, [active, location.pathname, steps, goTo]);
 
   // Some steps on the same page are mutually exclusive in the real DOM -- e.g. the upload page shows
   // either the empty dropzone (step 1's target) OR the file list + Continue button (step 2's target),
