@@ -18,6 +18,12 @@ service firebase.storage {
     match /profiles/{allPaths=**} { allow read, write: if true; }
     match /screensaver/{allPaths=**} { allow read, write: if true; }
     match /templates/{allPaths=**} { allow read, write: if true; }
+    // Ads are written ONLY server-side (ads.controller.js's postAdminAdImage, via the Admin SDK, which
+    // already bypasses these rules entirely) -- never directly from a browser, unlike the paths above.
+    // So this only needs read, not write: granting write here would let anyone write arbitrary files to
+    // this path directly via the client Storage SDK, bypassing the backend's MIME-type/size validation.
+    // Read must be public: the customer-facing AdBanner loads these images unauthenticated.
+    match /ads/{allPaths=**} { allow read: if true; allow write: if false; }
     match /{allPaths=**} { allow read, write: if false; }
   }
 }
