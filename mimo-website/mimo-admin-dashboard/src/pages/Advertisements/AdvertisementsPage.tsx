@@ -201,6 +201,161 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ value, onChange }) => {
   );
 };
 
+// ─── Multi Image Uploader (New Ad only — picks several photos, one ad per photo) ──────────────
+
+interface MultiImageUploaderProps {
+  value: string[];
+  /** Atomic add/remove instead of a computed-array onChange: several uploads can finish in the same
+   * tick, and each one reading `value` to compute `[...value, url]` would race -- whichever finishes
+   * last silently overwrites what the other just added. The parent applies these as functional state
+   * updates (`setImageUrls(prev => ...)`), which React guarantees run in true order against the latest
+   * state regardless of timing, so no completion is ever lost. */
+  onAdd: (url: string) => void;
+  onRemove: (url: string) => void;
+}
+
+/** One independently-tracked upload so a slow/failed file doesn't block the others. */
+type PendingUpload = { localId: string; previewSrc: string; status: 'uploading' | 'done' | 'error'; error?: string };
+
+const MultiImageUploader: React.FC<MultiImageUploaderProps> = ({ value, onAdd, onRemove }) => {
+  const [pending, setPending] = useState<PendingUpload[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  const uploadOne = async (file: File) => {
+    const localId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const previewSrc = URL.createObjectURL(file);
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setPending((p) => [...p, { localId, previewSrc, status: 'error', error: 'Unsupported type' }]);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setPending((p) => [...p, { localId, previewSrc, status: 'error', error: 'Over 10 MB' }]);
+      return;
+    }
+
+    setPending((p) => [...p, { localId, previewSrc, status: 'uploading' }]);
+    try {
+      const form = new FormData();
+      form.append('image', file);
+      const r = await api.post<{ imageUrl: string }>('/admin/ads/upload-image', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setPending((p) => p.map((u) => (u.localId === localId ? { ...u, status: 'done' } : u)));
+      onAdd(r.data.imageUrl);
+    } catch (err: any) {
+      setPending((p) => p.map((u) => (u.localId === localId ? { ...u, status: 'error', error: err?.response?.data?.error || 'Upload failed' } : u)));
+    }
+  };
+
+  const uploadFiles = (files: FileList | File[]) => {
+    Array.from(files).forEach((f) => uploadOne(f));
+  };
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) uploadFiles(e.target.files);
+    e.target.value = '';
+  };
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    dropRef.current?.classList.remove('ring-2', 'ring-indigo-400');
+    if (e.dataTransfer.files?.length) uploadFiles(e.dataTransfer.files);
+  };
+  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); dropRef.current?.classList.add('ring-2', 'ring-indigo-400'); };
+  const onDragLeave = () => dropRef.current?.classList.remove('ring-2', 'ring-indigo-400');
+
+  const removeUploaded = (url: string) => onRemove(url);
+  const dismissFailed = (localId: string) => setPending((p) => p.filter((u) => u.localId !== localId));
+
+  const anyUploading = pending.some((u) => u.status === 'uploading');
+  const failed = pending.filter((u) => u.status === 'error');
+
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+        <ImageIcon size={13} /> Images <span className="text-slate-400 font-normal">(optional — pick one or several)</span>
+      </label>
+
+      <div
+        ref={dropRef}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onClick={() => inputRef.current?.click()}
+        className="flex h-28 items-center justify-center rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 bg-slate-50 dark:bg-slate-800/60 cursor-pointer transition-all"
+      >
+        <div className="flex flex-col items-center gap-2 text-slate-400 dark:text-slate-500 select-none">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+            <Upload size={18} className="text-slate-400" />
+          </div>
+          <div className="text-center">
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Click or drag images here</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">JPEG, PNG, GIF, WebP · max 10 MB each · multiple allowed</p>
+          </div>
+        </div>
+      </div>
+
+      {(value.length > 0 || pending.length > 0) && (
+        <div className="mt-2.5 grid grid-cols-4 gap-2">
+          {value.map((url) => (
+            <div key={url} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 group">
+              <img src={url} alt="" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); removeUploaded(url); }}
+                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/55 hover:bg-black/75 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remove"
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+          {pending.filter((u) => u.status === 'uploading').map((u) => (
+            <div key={u.localId} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <img src={u.previewSrc} alt="" className="w-full h-full object-cover opacity-50" />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                <Loader2 size={16} className="animate-spin text-white" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {failed.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {failed.map((u) => (
+            <div key={u.localId} className="flex items-center justify-between gap-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-2.5 py-1.5">
+              <span>{u.error}</span>
+              <button type="button" onClick={() => dismissFailed(u.localId)} className="text-rose-400 hover:text-rose-600 cursor-pointer"><X size={12} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {value.length > 1 && (
+        <p className="mt-1.5 text-[11px] text-indigo-600 dark:text-indigo-400">
+          {value.length} images selected — one ad will be created per image, all sharing the link and caption below.
+        </p>
+      )}
+      <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+        💡 Format tips: Images without a caption display full-width. Images with a caption display as a poster alongside the text.
+      </p>
+
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept={ALLOWED_TYPES.join(',')}
+        onChange={onFileChange}
+        className="hidden"
+        aria-label="Upload ad images"
+        disabled={anyUploading}
+      />
+    </div>
+  );
+};
+
 // ─── Modal ───────────────────────────────────────────────────────────────────
 
 const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => (
@@ -225,8 +380,15 @@ const AdForm: React.FC<{
   onSubmit: (v: FormValues) => Promise<void>;
   onCancel: () => void;
   submitLabel: string;
-}> = ({ initial, onSubmit, onCancel, submitLabel }) => {
+  /** New Ad only: lets the admin pick several photos at once. When more than one image ends up
+   * selected, `onSubmitMultiple` is called instead of `onSubmit` (one ad gets created per image,
+   * all sharing the same link/caption). Picking exactly one (or zero) images still goes through the
+   * normal single-ad `onSubmit` path unchanged. */
+  allowMultiple?: boolean;
+  onSubmitMultiple?: (imageUrls: string[], v: Omit<FormValues, 'imageUrl'>) => Promise<void>;
+}> = ({ initial, onSubmit, onCancel, submitLabel, allowMultiple, onSubmitMultiple }) => {
   const [values, setValues] = useState<FormValues>(initial);
+  const [imageUrls, setImageUrls] = useState<string[]>(initial.imageUrl ? [initial.imageUrl] : []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -242,7 +404,11 @@ const AdForm: React.FC<{
       const cleanLink = trimmedLink
         ? (/^https?:\/\//i.test(trimmedLink) ? trimmedLink : `https://${trimmedLink}`)
         : '';
-      await onSubmit({ ...values, link: cleanLink });
+      if (allowMultiple && imageUrls.length > 1 && onSubmitMultiple) {
+        await onSubmitMultiple(imageUrls, { link: cleanLink, caption: values.caption });
+      } else {
+        await onSubmit({ ...values, link: cleanLink, imageUrl: imageUrls[0] || '' });
+      }
     }
     catch (err: any) { setError(err?.response?.data?.error || 'Something went wrong'); }
     finally { setLoading(false); }
@@ -253,10 +419,18 @@ const AdForm: React.FC<{
   return (
     <form onSubmit={handle} className="space-y-4">
       {/* Image upload */}
-      <ImageUploader
-        value={values.imageUrl}
-        onChange={(url) => setValues((v) => ({ ...v, imageUrl: url }))}
-      />
+      {allowMultiple ? (
+        <MultiImageUploader
+          value={imageUrls}
+          onAdd={(url) => setImageUrls((prev) => [...prev, url])}
+          onRemove={(url) => setImageUrls((prev) => prev.filter((u) => u !== url))}
+        />
+      ) : (
+        <ImageUploader
+          value={imageUrls[0] || ''}
+          onChange={(url) => setImageUrls(url ? [url] : [])}
+        />
+      )}
 
       {/* Link */}
       <div>
@@ -284,7 +458,7 @@ const AdForm: React.FC<{
         </button>
         <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center gap-2">
           {loading && <Loader2 size={14} className="animate-spin" />}
-          {submitLabel}
+          {allowMultiple && imageUrls.length > 1 ? `Create ${imageUrls.length} Ads` : submitLabel}
         </button>
       </div>
     </form>
@@ -363,6 +537,18 @@ export const AdvertisementsPage: React.FC = () => {
 
   const handleCreate = async (values: FormValues) => {
     await api.post('/admin/ads', values);
+    setShowCreate(false);
+    fetchAds();
+  };
+
+  /** Several photos picked at once: one ad per photo, all sharing the same link/caption. Created
+   * sequentially (not Promise.all) so each new ad's `order` -- computed server-side from the current
+   * max -- reflects the ones created just before it in this same batch, keeping them in a stable,
+   * predictable sequence instead of a race on whichever request's "current max order" read wins. */
+  const handleCreateMultiple = async (imageUrls: string[], values: Omit<FormValues, 'imageUrl'>) => {
+    for (const imageUrl of imageUrls) {
+      await api.post('/admin/ads', { ...values, imageUrl });
+    }
     setShowCreate(false);
     fetchAds();
   };
@@ -520,7 +706,14 @@ export const AdvertisementsPage: React.FC = () => {
       {/* Modals */}
       {showCreate && (
         <Modal title="New Advertisement" onClose={() => setShowCreate(false)}>
-          <AdForm initial={{ imageUrl: '', link: '', caption: '' }} onSubmit={handleCreate} onCancel={() => setShowCreate(false)} submitLabel="Create Ad" />
+          <AdForm
+            initial={{ imageUrl: '', link: '', caption: '' }}
+            onSubmit={handleCreate}
+            onSubmitMultiple={handleCreateMultiple}
+            allowMultiple
+            onCancel={() => setShowCreate(false)}
+            submitLabel="Create Ad"
+          />
         </Modal>
       )}
       {editAd && (

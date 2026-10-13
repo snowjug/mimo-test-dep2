@@ -33,12 +33,7 @@ export function DirectSuccess() {
         <Row label="Printer" value={<span className="block max-w-[200px] truncate">{destination}</span>} />
       </Group>
 
-      <section className="mt-8" aria-label="Sponsored">
-        <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-3">Sponsored</h2>
-        <div className="flex min-h-[100px] items-center justify-center overflow-hidden rounded-[20px] bg-surface p-2">
-          <AdSenseBlock className="min-h-[100px] w-full overflow-hidden rounded-[14px]" />
-        </div>
-      </section>
+      <AdSenseBlock className="min-h-[100px] rounded-[20px] bg-surface p-2" />
 
       <div className="mt-8">
         <PrimaryButton onClick={() => navigate("/")}>Print something else</PrimaryButton>
