@@ -99,14 +99,8 @@ function AdSlide({ ad }: { ad: Ad }) {
  */
 export function AdBanner() {
   const ads = useAds();
+  const activeAds = ads ?? [];
 
-  // Strictly use only ads managed via the admin dashboard.
-  // Never append or fallback to extra hardcoded banners.
-  if (!ads || ads.length === 0) {
-    return null;
-  }
-
-  const activeAds = ads;
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -199,6 +193,10 @@ export function AdBanner() {
 
   const trackPercentOffset = -index * 100;
   const dragPercent = trackRef.current?.clientWidth ? (dragOffset / trackRef.current.clientWidth) * 100 : 0;
+
+  if (activeAds.length === 0) {
+    return null;
+  }
 
   return (
     <section aria-label="Advertisement" className="mt-3.5 sm:mt-4">
