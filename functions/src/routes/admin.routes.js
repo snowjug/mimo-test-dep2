@@ -1,5 +1,5 @@
 const express = require("express");
-const { adminAuthMiddleware } = require("../middleware/auth");
+const { adminAuthMiddleware, financeOrAdminAuthMiddleware } = require("../middleware/auth");
 const admin = require("../controllers/admin.controller");
 const insights = require("../controllers/adminInsights.controller");
 const kioskCommands = require("../controllers/kioskCommands.controller");
@@ -28,6 +28,7 @@ router.get("/admin/kiosks", adminAuthMiddleware, insights.getAdminKiosks);
 router.post("/admin/kiosks/:kioskId/restart", adminAuthMiddleware, kioskCommands.postAdminKioskRestart);
 router.post("/admin/kiosks/:kioskId/refill-paper", adminAuthMiddleware, kioskCommands.postAdminRefillPaper);
 router.get("/admin/incidents", adminAuthMiddleware, insights.getAdminIncidents);
+router.get("/admin/finance-sheet", financeOrAdminAuthMiddleware, insights.getAdminFinanceSheetData);
 router.post("/admin/refund", adminAuthMiddleware, admin.postAdminRefund);
 router.get("/admin/refund-requests", adminAuthMiddleware, admin.getAdminRefundRequests);
 

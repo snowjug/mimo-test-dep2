@@ -5,6 +5,7 @@
   "GET /",
   "GET /admin/analytics",
   "GET /admin/coupons",
+  "GET /admin/finance-sheet",
   "GET /admin/hardware",
   "GET /admin/incidents",
   "GET /admin/jobs",
