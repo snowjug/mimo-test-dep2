@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import api from "../api";
 
 interface Ad {
@@ -28,21 +29,88 @@ function wrap(n: number, len: number) {
   return ((n % len) + len) % len;
 }
 
+function normalizeUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function AdSlide({ ad }: { ad: Ad }) {
+  const hasImage = Boolean(ad.imageUrl);
+  const hasCaption = Boolean(ad.caption);
+
+  return hasImage && !hasCaption ? (
+    // CASE 1: Banner mode (image only, no caption)
+    <div className="p-2 sm:p-2.5">
+      <div className="w-full overflow-hidden rounded-[14px] bg-ink-4/5 flex items-center justify-center">
+        <img
+          src={ad.imageUrl!}
+          alt="Announcement banner"
+          loading="lazy"
+          decoding="async"
+          className="w-full max-h-56 sm:max-h-64 object-cover rounded-[14px]"
+          draggable={false}
+        />
+      </div>
+    </div>
+  ) : (
+    // CASE 2: Card mode (image + caption, or caption only)
+    <div className="flex items-center gap-3.5 sm:gap-4 p-3 sm:p-3.5">
+      {hasImage && (
+        <div className="shrink-0 overflow-hidden rounded-[12px] bg-ink-4/10 w-24 sm:w-28 h-32 sm:h-36 flex items-center justify-center" aria-hidden="true">
+          <img
+            src={ad.imageUrl!}
+            alt=""
+            width={112}
+            height={144}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
+        </div>
+      )}
+      {hasCaption && (
+        <div className="flex min-w-0 flex-1 flex-col py-1">
+          <p className="text-[16px] sm:text-[17px] font-semibold leading-snug tracking-tight text-ink line-clamp-4">
+            {ad.caption}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * AdBanner — dynamic, admin-managed replacement for the hardcoded HackathonBanner.
  *
  * - Renders nothing (no layout shift) when there are no active ads.
- * - Auto-slides every 3 s when there are multiple ads.
- * - Supports touch/mouse swipe to navigate.
- * - Opens the ad link in a new tab when tapped (if a link is configured).
+ * - A real sliding-track carousel: all ads sit side by side and the track animates horizontally to
+ *   the active one (not an abrupt content swap), auto-advancing every 3 s.
+ * - The user can control the movement three ways: dragging/swiping the track directly (live-follows
+ *   the finger/pointer, not just a swipe gesture detected after the fact), tapping the prev/next
+ *   arrows, or tapping a dot to jump straight to that slide. Any manual move resets the 3 s auto-timer
+ *   so it doesn't fight the user's own input.
+ * - Height animates smoothly between slides of different sizes (banner vs. card mode).
+ * - Opens the ad link in a new tab when tapped (if a link is configured) -- suppressed after an actual
+ *   drag so a swipe never accidentally triggers the link.
  */
 export function AdBanner() {
   const ads = useAds();
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Touch/mouse swipe state
+  const trackRef = useRef<HTMLDivElement>(null);
+  const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [trackHeight, setTrackHeight] = useState<number | undefined>(undefined);
+
+  // Drag state: dragOffset follows the pointer live (px) while dragging, reset to 0 once released.
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const dragStartX = useRef<number | null>(null);
+  const didDragRef = useRef(false);
 
   const clearTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -64,135 +132,143 @@ export function AdBanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ads?.length]);
 
+  // Keep the container's height in sync with whichever slide is active, animated via CSS so switching
+  // between a tall banner-mode ad and a shorter card-mode one doesn't jump instantly.
+  useLayoutEffect(() => {
+    const el = slideRefs.current[index];
+    if (!el) return;
+    const update = () => setTrackHeight(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [index, ads?.length]);
+
+  const goTo = (i: number, count: number) => {
+    setIndex(wrap(i, count));
+    startTimer(count);
+  };
+
+  // ── Drag / swipe handlers — the track follows the pointer live, not just a post-hoc gesture check ──
+  const onDragStart = (clientX: number) => {
+    dragStartX.current = clientX;
+    didDragRef.current = false;
+    setIsDragging(true);
+  };
+  const onDragMove = (clientX: number, count: number) => {
+    if (dragStartX.current === null) return;
+    const delta = clientX - dragStartX.current;
+    if (Math.abs(delta) > 4) didDragRef.current = true;
+    // Resist dragging past the ends when there's only one slide (nothing to reveal).
+    setDragOffset(count > 1 ? delta : delta * 0.2);
+  };
+  const onDragEnd = (count: number) => {
+    if (dragStartX.current === null) return;
+    if (Math.abs(dragOffset) > 40) goTo(index + (dragOffset < 0 ? 1 : -1), count);
+    dragStartX.current = null;
+    setDragOffset(0);
+    setIsDragging(false);
+  };
+
   // Nothing to show while loading or when there are no ads
   if (!ads || ads.length === 0) return null;
 
-  const current = ads[wrap(index, ads.length)];
-
-  const goTo = (i: number) => {
-    setIndex(wrap(i, ads.length));
-    startTimer(ads.length);
-  };
-
-  // ── Drag / swipe handlers ──────────────────────────────────────────────────
-  const onDragStart = (clientX: number) => {
-    dragStartX.current = clientX;
-  };
-  const onDragEnd = (clientX: number) => {
-    if (dragStartX.current === null) return;
-    const delta = dragStartX.current - clientX;
-    if (Math.abs(delta) > 40) goTo(index + (delta > 0 ? 1 : -1));
-    dragStartX.current = null;
-  };
-
-function normalizeUrl(url: string | null | undefined): string | undefined {
-  if (!url) return undefined;
-  const trimmed = url.trim();
-  if (!trimmed) return undefined;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  return `https://${trimmed}`;
-}
-
-  const hasImage = Boolean(current.imageUrl);
-  const hasCaption = Boolean(current.caption);
-
-  const AdContent = (
-    <div
-      className="relative overflow-hidden rounded-[20px] bg-surface select-none transition-shadow"
-      /* Touch */
-      onTouchStart={(e) => onDragStart(e.touches[0].clientX)}
-      onTouchEnd={(e) => onDragEnd(e.changedTouches[0].clientX)}
-      /* Mouse */
-      onMouseDown={(e) => onDragStart(e.clientX)}
-      onMouseUp={(e) => onDragEnd(e.clientX)}
-    >
-      {/* CASE 1: Banner mode (image only, no caption) */}
-      {hasImage && !hasCaption ? (
-        <div className="p-2 sm:p-2.5">
-          <div className="w-full overflow-hidden rounded-[14px] bg-ink-4/5 flex items-center justify-center">
-            <img
-              src={current.imageUrl!}
-              alt="Announcement banner"
-              loading="lazy"
-              decoding="async"
-              className="w-full max-h-56 sm:max-h-64 object-cover rounded-[14px]"
-              draggable={false}
-            />
-          </div>
-        </div>
-      ) : (
-        /* CASE 2: Card mode (image + caption, or caption only) */
-        <div className="flex items-center gap-3.5 sm:gap-4 p-3 sm:p-3.5">
-          {hasImage && (
-            <div className="shrink-0 overflow-hidden rounded-[12px] bg-ink-4/10 w-24 sm:w-28 h-32 sm:h-36 flex items-center justify-center" aria-hidden="true">
-              <img
-                src={current.imageUrl!}
-                alt=""
-                width={112}
-                height={144}
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover"
-                draggable={false}
-              />
-            </div>
-          )}
-
-          {hasCaption && (
-            <div className="flex min-w-0 flex-1 flex-col py-1">
-              <p className="text-[16px] sm:text-[17px] font-semibold leading-snug tracking-tight text-ink line-clamp-4">
-                {current.caption}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Dot indicators (only when >1 ad) */}
-      {ads.length > 1 && (
-        <div
-          className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface/85 backdrop-blur-md shadow-xs border border-ink-4/10"
-          role="tablist"
-          aria-label="Advertisement slides"
-        >
-          {ads.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              role="tab"
-              aria-selected={i === index}
-              aria-label={`Slide ${i + 1}`}
-              onClick={(e) => { e.stopPropagation(); goTo(i); }}
-              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                i === index ? "w-4 bg-brand" : "w-1.5 bg-ink-4 opacity-40"
-              }`}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  const cleanLink = normalizeUrl(current.link);
+  const trackPercentOffset = -index * 100;
+  const dragPercent = trackRef.current?.clientWidth ? (dragOffset / trackRef.current.clientWidth) * 100 : 0;
 
   return (
     <section aria-label="Advertisement" className="mt-8">
       <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-3">Announcements</h2>
 
-      {/* Wrap in <a> only if a link is present */}
-      {cleanLink ? (
-        <a
-          href={cleanLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block transition-transform active:scale-[0.99]"
-          aria-label={current.caption ?? "View announcement"}
+      <div
+        className="relative overflow-hidden rounded-[20px] bg-surface select-none"
+        style={{ height: trackHeight, transition: isDragging ? undefined : "height 300ms ease" }}
+      >
+        <div
+          ref={trackRef}
+          className="flex"
+          style={{
+            transform: `translateX(calc(${trackPercentOffset}% + ${dragPercent}%))`,
+            transition: isDragging ? "none" : "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+          onTouchStart={(e) => onDragStart(e.touches[0].clientX)}
+          onTouchMove={(e) => onDragMove(e.touches[0].clientX, ads.length)}
+          onTouchEnd={() => onDragEnd(ads.length)}
+          onMouseDown={(e) => onDragStart(e.clientX)}
+          onMouseMove={(e) => { if (dragStartX.current !== null) onDragMove(e.clientX, ads.length); }}
+          onMouseUp={() => onDragEnd(ads.length)}
+          onMouseLeave={() => { if (dragStartX.current !== null) onDragEnd(ads.length); }}
         >
-          {AdContent}
-        </a>
-      ) : (
-        AdContent
-      )}
+          {ads.map((ad, i) => {
+            const slideLink = normalizeUrl(ad.link);
+            const slide = (
+              <div ref={(el) => { slideRefs.current[i] = el; }} className="w-full shrink-0">
+                <AdSlide ad={ad} />
+              </div>
+            );
+            return (
+              <div key={ad.id} className="w-full shrink-0">
+                {slideLink ? (
+                  <a
+                    href={slideLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={ad.caption ?? "View announcement"}
+                    // A real drag must never also fire the link navigation.
+                    onClick={(e) => { if (didDragRef.current) e.preventDefault(); }}
+                    draggable={false}
+                  >
+                    {slide}
+                  </a>
+                ) : (
+                  slide
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {ads.length > 1 && (
+          <>
+            <button
+              type="button"
+              aria-label="Previous announcement"
+              onClick={(e) => { e.stopPropagation(); goTo(index - 1, ads.length); }}
+              className="press absolute left-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-xs backdrop-blur-md border border-ink-4/10 active:bg-surface"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Next announcement"
+              onClick={(e) => { e.stopPropagation(); goTo(index + 1, ads.length); }}
+              className="press absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-xs backdrop-blur-md border border-ink-4/10 active:bg-surface"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+
+            <div
+              className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface/85 backdrop-blur-md shadow-xs border border-ink-4/10"
+              role="tablist"
+              aria-label="Advertisement slides"
+            >
+              {ads.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === index}
+                  aria-label={`Slide ${i + 1}`}
+                  onClick={(e) => { e.stopPropagation(); goTo(i, ads.length); }}
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                    i === index ? "w-4 bg-brand" : "w-1.5 bg-ink-4 opacity-40"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </section>
   );
 }
