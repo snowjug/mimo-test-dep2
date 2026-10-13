@@ -104,15 +104,10 @@ export const OverviewPage: React.FC = () => {
   const [actionError, setActionError] = useState('');
 
   const cur = analytics.data?.current;
+  // All four numbers come from one source (the analytics `reporting` block), so they agree with the Analytics page.
+  // It is absent only if the dashboard is newer than the deployed API; the tiles then show "—".
+  const rep = analytics.data?.reporting;
   const list = jobs.data?.jobs ?? [];
-  const refundedJobs = list.filter((j) => j.outcome === 'refunded' || j.status === 'refunded');
-  const refundCount = Math.max(cur?.refundCount ?? 0, refundedJobs.length);
-  const refundedAmount = Math.max(
-    cur?.refundedAmount ?? 0,
-    refundedJobs.reduce((s, j) => s + (j.refund?.amount ?? j.cost ?? 0), 0)
-  );
-  const printed = list.filter((j) => j.outcome === 'printed').length;
-  const failed = list.filter((j) => j.outcome === 'failed').length;
 
   return (
     <div className="space-y-5 animate-fadeIn font-sans sm:space-y-6">
@@ -137,10 +132,10 @@ export const OverviewPage: React.FC = () => {
 
       {/* The four numbers that matter, one grouped card */}
       <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] lg:grid-cols-4 [&>*]:border-[var(--border)] [&>*:nth-child(odd)]:border-r [&>*:nth-child(-n+2)]:border-b lg:[&>*]:border-b-0 lg:[&>*]:border-r lg:[&>*:last-child]:border-r-0">
-        <Stat label="Revenue" loading={analytics.loading} value={cur ? inr(cur.revenue) : '—'} sub={refundedAmount > 0 ? `${inr(refundedAmount)} refunded` : 'No refunds'} />
-        <Stat label="Pages printed" loading={analytics.loading} value={cur ? int(cur.pages) : '—'} sub={cur ? `${int(cur.bwPages)} B&W · ${int(cur.colorPages)} colour` : undefined} />
-        <Stat label="Prints" loading={jobs.loading} value={int(list.length)} sub={`${printed} printed · ${failed} failed`} />
-        <Stat label="Refunds" loading={jobs.loading && analytics.loading} value={cur || list.length ? inr(refundedAmount) : '—'} sub={refundCount > 0 ? `${refundCount} refund${refundCount === 1 ? '' : 's'}` : 'No refunds'} tone={refundedAmount > 0 ? 'text-blue-600 dark:text-blue-400' : undefined} />
+        <Stat label="Net revenue" loading={analytics.loading} value={rep ? inr(rep.revenue.net) : '—'} sub={rep ? `${inr(rep.revenue.gross)} gross · ${rep.revenue.refunded > 0 ? `${inr(rep.revenue.refunded)} refunded` : 'no refunds'}` : undefined} />
+        <Stat label="Pages printed" loading={analytics.loading} value={rep ? int(rep.jobs.pages) : '—'} sub={cur ? `${int(cur.bwPages)} B&W · ${int(cur.colorPages)} colour` : undefined} />
+        <Stat label="Prints" loading={analytics.loading} value={rep ? int(rep.jobs.total) : '—'} sub={rep ? `${rep.jobs.successful} printed · ${rep.jobs.failed} failed${rep.jobs.successRate !== null ? ` · ${rep.jobs.successRate}%` : ''}` : undefined} />
+        <Stat label="Issues" loading={analytics.loading} value={rep ? int(rep.issues.total) : '—'} sub={rep ? (rep.issues.total ? `${rep.issues.detected} detected · ${rep.issues.customerReported} reported · ${rep.issues.payment} payment` : 'No issues') : undefined} tone={rep && rep.issues.total > 0 ? 'text-amber-600 dark:text-amber-400' : undefined} />
       </div>
 
       {/* Machines */}

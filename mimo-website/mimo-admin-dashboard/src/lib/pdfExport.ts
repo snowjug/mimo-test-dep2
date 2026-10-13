@@ -38,10 +38,12 @@ export function exportAnalyticsPdf(a: Analytics, rangeDescription: string) {
   y += 5;
 
   const cardWidth = (pageWidth - 28 - 9) / 4;
+  // Same definitions as the Analytics page (reporting block); older API responses fall back to the legacy summary.
+  const rep = a.reporting;
   const cards = [
-    { label: 'TOTAL REVENUE', value: inr(a.current.revenue) },
-    { label: 'PAGES PRINTED', value: `${int(a.current.pages)} pgs` },
-    { label: 'PRINT SUCCESS', value: pct(a.current.successRate) },
+    rep ? { label: 'NET REVENUE', value: inr(rep.revenue.net) } : { label: 'TOTAL REVENUE', value: inr(a.current.revenue) },
+    { label: 'PAGES PRINTED', value: `${int(rep ? rep.jobs.pages : a.current.pages)} pgs` },
+    { label: 'PRINT SUCCESS', value: pct(rep ? rep.jobs.successRate : a.current.successRate) },
     { label: 'AVG ORDER VALUE', value: inr(a.current.avgOrderValue) },
   ];
 

@@ -2,7 +2,9 @@ import api from '../api';
 import { DateRangeValue, toApiRange } from '../lib/dateRange';
 import type {
   Analytics,
+  FinanceSheetResponse,
   IncidentsResponse,
+  IssuesResponse,
   JobsResponse,
   KiosksResponse,
   TransactionsResponse,
@@ -33,4 +35,11 @@ export const insights = {
 
   userGrowthReport: (range: DateRangeValue) =>
     api.get<UserGrowthReport>('/admin/user-growth-report', { params: params(range) }).then((r) => r.data),
+
+  financeSheet: (force = false) =>
+    api.get<FinanceSheetResponse>('/admin/finance-sheet', { params: force ? { force: 'true' } : {} }).then((r) => r.data),
+
+  /** Deduplicated, categorised issue history for the range (plus live alerts in `current`). */
+  issues: (range: DateRangeValue, opts: { category?: string; kioskId?: string; source?: string; limit?: number; current?: 0 | 1 } = {}) =>
+    api.get<IssuesResponse>('/admin/issues', { params: params(range, opts) }).then((r) => r.data),
 };

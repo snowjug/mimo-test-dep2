@@ -54,11 +54,26 @@ export const FinanceSettlementsPage: React.FC<FinanceSettlementsPageProps> = ({ 
 
       {error && <ErrorBanner message={error} />}
 
+      {/* Cashfree Settlement & Reconciliation Status Banner */}
+      <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="font-bold flex items-center gap-1.5 text-amber-800">
+            <Landmark className="w-4 h-4 shrink-0 text-amber-600" />
+            Cashfree Bank Settlements &amp; Reconciliation Status
+          </p>
+          <p className="text-[11px] leading-relaxed text-amber-800/90">
+            <strong>Customer Collections:</strong> Derived from MIMO verified payment gateway transactions (<code className="font-mono text-[10px] bg-amber-100/60 px-1 py-0.5 rounded">payment_transactions</code>).
+            <br />
+            <strong>Cashfree Bank Settlements:</strong> UTR transfers, MDR payment gateway processing fees, and net payouts to MIMO&apos;s bank account are handled externally by Cashfree and are <em>unreconciled in Firestore</em>. See the Cashfree Merchant Dashboard for UTR payout reports.
+          </p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <FinanceMetricCard title="Collected" value={cur ? inr(cur.revenue) : '—'} icon={<IndianRupee className="w-5 h-5" />} loading={loading} change={cur ? `${cur.orders} order${cur.orders === 1 ? '' : 's'}` : undefined} comparisonText="" />
-        <FinanceMetricCard title="Via Payment Gateway" value={inr(gateway)} icon={<Landmark className="w-5 h-5" />} iconBgColor="bg-blue-50" iconColor="text-blue-600" loading={loading} change={cur ? `${cur.paidOrders} paid order${cur.paidOrders === 1 ? '' : 's'}` : undefined} comparisonText="" />
-        <FinanceMetricCard title="Refunded" value={cur ? inr(cur.refundedAmount) : '—'} icon={<RotateCcw className="w-5 h-5" />} iconBgColor="bg-rose-50" iconColor="text-rose-600" loading={loading} change={cur ? `${cur.refundCount} refund${cur.refundCount === 1 ? '' : 's'}` : undefined} comparisonText="" />
-        <FinanceMetricCard title="Net Collected" value={cur ? inr(cur.netRevenue) : '—'} icon={<CheckCircle2 className="w-5 h-5" />} iconBgColor="bg-emerald-50" iconColor="text-emerald-600" loading={loading} />
+        <FinanceMetricCard title="Gross Collections" value={cur ? inr(cur.grossCollections ?? cur.revenue) : '—'} icon={<IndianRupee className="w-5 h-5" />} loading={loading} change={cur ? `${cur.orders} order${cur.orders === 1 ? '' : 's'}` : undefined} comparisonText="" />
+        <FinanceMetricCard title="Completed Refunds" value={cur ? inr(cur.refundedAmount) : '—'} icon={<RotateCcw className="w-5 h-5" />} iconBgColor="bg-rose-50" iconColor="text-rose-600" loading={loading} change={cur ? `${cur.refundCount} refund${cur.refundCount === 1 ? '' : 's'}` : undefined} comparisonText="" />
+        <FinanceMetricCard title="Net Collections" value={cur ? inr(cur.netCollections ?? cur.netRevenue) : '—'} icon={<CheckCircle2 className="w-5 h-5" />} iconBgColor="bg-emerald-50" iconColor="text-emerald-600" loading={loading} />
+        <FinanceMetricCard title="Bank Settlements" value="External / Unreconciled" icon={<Landmark className="w-5 h-5" />} iconBgColor="bg-amber-50" iconColor="text-amber-600" loading={loading} change="Requires Cashfree UTR" comparisonText="" />
       </div>
 
       <FinanceChartCard title="Collections ledger" subtitle={a ? `${a.range.granularity === 'hour' ? 'Hourly' : 'Daily'} · only periods with activity` : undefined}>
@@ -85,13 +100,13 @@ export const FinanceSettlementsPage: React.FC<FinanceSettlementsPageProps> = ({ 
             {rows.length > 0 && cur && (
               <tfoot>
                 <tr className="border-t-2 border-[#E4E7EB] font-black text-slate-900">
-                  <td className="py-3 px-3">Total</td><td className="py-3 px-3">{int(cur.orders)}</td><td className="py-3 px-3 font-mono">{inr(cur.revenue)}</td><td className="py-3 px-3 font-mono text-rose-600">{cur.refundedAmount > 0 ? `-${inr(cur.refundedAmount)}` : '—'}</td><td className="py-3 px-3 font-mono">{inr(cur.netRevenue)}</td>
+                  <td className="py-3 px-3">Total</td><td className="py-3 px-3">{int(cur.orders)}</td><td className="py-3 px-3 font-mono">{inr(cur.grossCollections ?? cur.revenue)}</td><td className="py-3 px-3 font-mono text-rose-600">{cur.refundedAmount > 0 ? `-${inr(cur.refundedAmount)}` : '—'}</td><td className="py-3 px-3 font-mono">{inr(cur.netCollections ?? cur.netRevenue)}</td>
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
-        <p className="mt-4 text-[11px] text-slate-400">Bank settlements/payouts are handled by Cashfree; use the Cashfree dashboard for UTR and payout reports. This ledger reflects MIMO's own order records.</p>
+        <p className="mt-4 text-[11px] text-slate-400">Bank settlements/payouts are handled by Cashfree; use the Cashfree dashboard for UTR and payout reports. This ledger reflects MIMO&apos;s own order records.</p>
       </FinanceChartCard>
     </div>
   );

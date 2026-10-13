@@ -11,6 +11,7 @@
  *  - A refunded order has refundStatus "SUCCESS" (auto refund) or status "REFUNDED" (admin refund).
  *  - print_jobs carry kioskId, status, pageCount, printOptions {copies, colorMode, doubleSided}, createdAt, orderId.
  */
+const { reportingOutcome, summarizeJobOutcomes, buildIssues, countIssues } = require("./issueCategories.service");
 
 // The two production machines. Any other id that reports a heartbeat and looks like a kiosk id is added at runtime.
 const KNOWN_KIOSKS = {
@@ -25,6 +26,8 @@ const DONE_JOB_STATUSES = new Set(["completed", "printed"]);
 const QUEUED_JOB_STATUSES = ["paid", "printing"];
 
 const MAX_DOCS_PER_COLLECTION = 5000;
+// A machine needs this many finished jobs (successful + failed) in the range before it is ranked as problematic.
+const MIN_ATTEMPTS_TO_RANK = 10;
 const MAX_RANGE_DAYS = 400;
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -65,7 +68,8 @@ function parseRange(query = {}, now = Date.now()) {
   if (to - from > MAX_RANGE_DAYS * DAY_MS) throw httpError(400, `Range cannot exceed ${MAX_RANGE_DAYS} days`);
 
   const granularity = to - from <= 2 * DAY_MS ? "hour" : "day";
-  return { from, to, tzOffset, offsetMs, granularity, length: to - from };
+  const dateBasis = query.dateBasis === "payment" ? "payment" : "created";
+  return { from, to, tzOffset, offsetMs, granularity, length: to - from, dateBasis };
 }
 
 function httpError(status, message) {
@@ -102,12 +106,13 @@ const methodLabel = (raw, amount) => {
 };
 
 /** Merges `orders` and `payment_transactions` documents into one record per orderId. */
-function normalizeOrders(orderDocs = [], txnDocs = []) {
+function normalizeOrders(orderDocs = [], txnDocs = [], refundDocs = []) {
   const byId = new Map();
   const absorb = (d, source) => {
     const orderId = d.orderId || d.id;
     if (!orderId) return;
     const status = normStatus(d.refundStatus === "SUCCESS" ? "REFUNDED" : d.status || d.orderStatus || d.transactionStatus?.status);
+    const rawRefundAmount = d.refundAmount !== undefined && d.refundAmount !== null ? round2(num(d.refundAmount)) : null;
     const rec = {
       orderId,
       userId: d.userId || null,
@@ -116,13 +121,15 @@ function normalizeOrders(orderDocs = [], txnDocs = []) {
       method: d.paymentMethod || null,
       createdAtMs: toMillis(d.createdAt),
       paidAtMs: toMillis(d.paymentDetails?.paidAt ?? d.transactionStatus?.completedAt ?? d.paymentTime),
-      refundedAtMs: toMillis(d.refundedAt),
+      refundedAtMs: toMillis(d.refundedAt ?? d.cashfreeRefundResponse?.processed_at ?? d.cashfreeResponse?.processed_at),
+      refundAmount: rawRefundAmount,
       couponCode: d.couponCode || null,
       discountPercentage: num(d.discountPercentage),
       coinsUsed: num(d.coinsUsed),
       refundStatus: d.refundStatus || null,
       gatewayRef: d.cashfreePaymentId || null,
       pages: num(d.totalPages),
+      isPriorPeriodRefund: d.isPriorPeriodRefund === true,
       sources: [source],
     };
     const prev = byId.get(orderId);
@@ -136,12 +143,39 @@ function normalizeOrders(orderDocs = [], txnDocs = []) {
       method: best.method || other.method,
       gatewayRef: best.gatewayRef || other.gatewayRef,
       couponCode: best.couponCode || other.couponCode,
+      paidAtMs: best.paidAtMs || other.paidAtMs,
+      refundedAtMs: best.refundedAtMs || other.refundedAtMs,
+      refundAmount: best.refundAmount !== null && best.refundAmount !== undefined ? best.refundAmount : other.refundAmount,
+      isPriorPeriodRefund: best.isPriorPeriodRefund || other.isPriorPeriodRefund,
       sources: [...prev.sources, source],
     });
   };
   orderDocs.forEach((d) => absorb(d, "orders"));
   txnDocs.forEach((d) => absorb(d, "payment_transactions"));
-  return [...byId.values()].map((o) => ({ ...o, method: methodLabel(o.method, o.amount) }));
+
+  if (Array.isArray(refundDocs)) {
+    for (const r of refundDocs) {
+      if (!r.orderId || r.status === "CASHFREE_FAILED") continue;
+      const existing = byId.get(r.orderId);
+      if (existing) {
+        if (existing.refundAmount === null || existing.refundAmount === undefined) {
+          existing.refundAmount = round2(num(r.refundAmount));
+        }
+        if (!existing.refundedAtMs) {
+          existing.refundedAtMs = toMillis(r.initiatedAt);
+        }
+        if (existing.status !== "REFUNDED") {
+          existing.status = "REFUNDED";
+        }
+      }
+    }
+  }
+
+  return [...byId.values()].map((o) => ({
+    ...o,
+    method: methodLabel(o.method, o.amount),
+    refundAmount: o.status === "REFUNDED" && (o.refundAmount === null || o.refundAmount === undefined) ? o.amount : o.refundAmount,
+  }));
 }
 
 function normalizeJobs(jobDocs = []) {
@@ -174,6 +208,13 @@ function normalizeJobs(jobDocs = []) {
       printerStatus: d.printerStatus || null,
       isPrinted: d.isPrinted === true,
       refundStatus: d.refundStatus || null,
+      // Reporting-only evidence (issueCategories.service.js): never shown as customer data.
+      failedAtMs: toMillis(d.failedAt),
+      printedAtMs: toMillis(d.printedAt),
+      printCode: d.printCode || null,
+      printVerified: d.printVerified === true,
+      sheetsVerified: d.sheetsVerified ?? null,
+      customerIssue: d.customerIssue && typeof d.customerIssue === "object" ? d.customerIssue : null,
     };
   });
 }
@@ -183,20 +224,43 @@ const isFailed = (j) => FAILED_JOB_STATUSES.has(j.status);
 
 // ─────────────────────────────── aggregation ───────────────────────────────
 
-function summarize({ orders, jobs, newUsers = 0 }) {
-  const paid = orders.filter((o) => PAID_STATUSES.has(o.status));
-  const refunded = orders.filter((o) => o.status === "REFUNDED");
+function summarize({ orders, jobs, newUsers = 0, truncated = false, fromMs, toMs }) {
+  const paid = orders.filter((o) => PAID_STATUSES.has(o.status) && !o.isPriorPeriodRefund);
+  const refunded = orders.filter((o) => {
+    const hasRefund = o.status === "REFUNDED" || (o.refundAmount !== null && o.refundAmount !== undefined && o.refundAmount > 0);
+    if (!hasRefund) return false;
+    if (Number.isFinite(fromMs) && Number.isFinite(toMs)) {
+      const refTime = o.refundedAtMs || o.createdAtMs;
+      if (Number.isFinite(refTime)) {
+        return refTime >= fromMs && refTime < toMs;
+      }
+    }
+    return true;
+  });
   const pending = orders.filter((o) => o.status === "INITIATED" || o.status === "PENDING");
   const failedPay = orders.filter((o) => o.status === "FAILED");
   const revenue = round2(paid.reduce((a, o) => a + o.amount, 0));
-  const refundedAmount = round2(refunded.reduce((a, o) => a + o.amount, 0));
+  const refundedAmount = round2(refunded.reduce((a, o) => a + (o.refundAmount !== null && o.refundAmount !== undefined ? o.refundAmount : o.amount), 0));
   const done = jobs.filter(isDone);
   const failed = jobs.filter(isFailed);
   const finished = done.length + failed.length;
+
+  const waJobs = jobs.filter((j) => j.orderId && String(j.orderId).startsWith("WA-"));
+  const waConfirmed = waJobs.filter((j) => isDone(j) && !String(j.orderId).startsWith("WA-FREE-"));
+  const whatsappAudit = {
+    totalJobs: waJobs.length,
+    confirmedJobs: waConfirmed.length,
+    estimatedJobCost: round2(waConfirmed.reduce((a, j) => a + (j.cost || 0), 0)),
+    reconciliationStatus: "unreconciled_gateway_records_missing",
+    note: "WhatsApp orders currently lack payment_transactions and Cashfree gateway reference records in Firestore. Not included in verified gateway collections.",
+  };
+
   return {
     revenue,
+    grossCollections: revenue,
     refundedAmount,
     netRevenue: round2(revenue - refundedAmount),
+    netCollections: round2(revenue - refundedAmount),
     orders: paid.length,
     paidOrders: paid.filter((o) => o.amount > 0).length,
     freeOrders: paid.filter((o) => o.amount === 0).length,
@@ -213,6 +277,8 @@ function summarize({ orders, jobs, newUsers = 0 }) {
     bwPages: done.filter((j) => !j.isColor).reduce((a, j) => a + j.pages, 0),
     successRate: finished ? round2((done.length / finished) * 100) : null,
     newUsers,
+    whatsappAudit,
+    completeness: truncated ? "PARTIAL_RECORDS_TRUNCATED" : "COMPLETE",
   };
 }
 
@@ -224,23 +290,32 @@ function bucketKey(ms, offsetMs, granularity) {
   return granularity === "hour" ? `${day}T${pad(d.getUTCHours())}` : day;
 }
 
-function buildSeries({ orders, jobs }, range) {
+function buildSeries({ orders, jobs }, range, { issues = null } = {}) {
   const step = range.granularity === "hour" ? HOUR_MS : DAY_MS;
   const rows = new Map();
   // Pre-fill every bucket so the chart has no gaps.
   const first = Math.floor((range.from + range.offsetMs) / step) * step - range.offsetMs;
   for (let t = first; t < range.to; t += step) {
-    rows.set(bucketKey(t, range.offsetMs, range.granularity), { key: bucketKey(t, range.offsetMs, range.granularity), start: iso(t), revenue: 0, refunds: 0, orders: 0, jobs: 0, pages: 0, failed: 0 });
+    // successful / reportFailed / issues use the reporting outcome (issueCategories.service.js); `failed` keeps its
+    // original meaning for the finance portal.
+    rows.set(bucketKey(t, range.offsetMs, range.granularity), { key: bucketKey(t, range.offsetMs, range.granularity), start: iso(t), revenue: 0, refunds: 0, orders: 0, jobs: 0, pages: 0, failed: 0, successful: 0, reportFailed: 0, issues: 0 });
   }
   const at = (ms) => rows.get(bucketKey(ms, range.offsetMs, range.granularity));
   for (const o of orders) {
-    const row = Number.isFinite(o.createdAtMs) && at(o.createdAtMs);
-    if (!row) continue;
-    if (PAID_STATUSES.has(o.status)) {
-      row.revenue = round2(row.revenue + o.amount);
-      row.orders += 1;
+    const revTimeMs = range.dateBasis === "payment" ? (o.paidAtMs || o.createdAtMs) : o.createdAtMs;
+    const revRow = Number.isFinite(revTimeMs) && at(revTimeMs);
+    if (revRow && PAID_STATUSES.has(o.status) && !o.isPriorPeriodRefund) {
+      revRow.revenue = round2(revRow.revenue + o.amount);
+      revRow.orders += 1;
     }
-    if (o.status === "REFUNDED") row.refunds = round2(row.refunds + o.amount);
+    if (o.status === "REFUNDED" || (o.refundAmount !== null && o.refundAmount !== undefined && o.refundAmount > 0)) {
+      const refTimeMs = o.refundedAtMs || revTimeMs;
+      const refRow = Number.isFinite(refTimeMs) && at(refTimeMs);
+      if (refRow) {
+        const refAmt = o.refundAmount !== null && o.refundAmount !== undefined ? o.refundAmount : o.amount;
+        refRow.refunds = round2(refRow.refunds + refAmt);
+      }
+    }
   }
   for (const j of jobs) {
     const row = Number.isFinite(j.createdAtMs) && at(j.createdAtMs);
@@ -248,17 +323,43 @@ function buildSeries({ orders, jobs }, range) {
     row.jobs += 1;
     if (isDone(j)) row.pages += j.pages;
     if (isFailed(j)) row.failed += 1;
+    const outcome = reportingOutcome(j);
+    if (outcome === "successful") row.successful += 1;
+    if (outcome === "failed") row.reportFailed += 1;
+  }
+  for (const i of issues || []) {
+    const row = Number.isFinite(i.rangeMs) && at(i.rangeMs);
+    if (row) row.issues += 1;
   }
   return [...rows.values()];
 }
 
-function breakdowns({ orders, jobs }, range) {
+const emptyKioskReporting = () => ({ successful: 0, failed: 0, attempts: 0, failureRate: null, issues: 0, rankable: false });
+
+/**
+ * Per-machine, payment-method, status, mode and hour breakdowns.
+ * `machines` (optional) is the registry map from machineRegistry.service.loadMachinesMap: when given, every
+ * non-DECOMMISSIONED machine gets a row (decommissioned ones only when they have jobs in the range) and rows are
+ * sorted by id. Without it the rows are seeded from KNOWN_KIOSKS exactly as before.
+ * `issues` (optional) are the deduplicated issues of the range, counted per machine.
+ */
+function breakdowns({ orders, jobs }, range, { machines = null, issues = null } = {}) {
   const paid = orders.filter((o) => PAID_STATUSES.has(o.status));
 
   const jobByOrder = new Map(jobs.filter((j) => j.orderId).map((j) => [j.orderId, j]));
-  const kiosks = new Map(Object.entries(KNOWN_KIOSKS).map(([id, k]) => [id, { kioskId: id, ...k, jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0 }]));
+  const seed = machines
+    ? [...machines.entries()].filter(([, m]) => m.status !== "DECOMMISSIONED").map(([id, m]) => [id, {
+      name: m.name || id, type: m.type || "bw", description: m.description || "", shortLabel: m.shortLabel || id.slice(0, 2), lifecycleStatus: m.status || "ACTIVE",
+    }])
+    : Object.entries(KNOWN_KIOSKS);
+  const kiosks = new Map(seed.map(([id, k]) => [id, { kioskId: id, ...k, jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0, reporting: emptyKioskReporting() }]));
   const kioskRow = (id) => {
-    if (!kiosks.has(id)) kiosks.set(id, { kioskId: id, name: id, type: "bw", description: "", jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0 });
+    if (!kiosks.has(id)) {
+      const m = machines && machines.get(id);
+      kiosks.set(id, m
+        ? { kioskId: id, name: m.name || id, type: m.type || "bw", description: m.description || "", shortLabel: m.shortLabel || id.slice(0, 2), lifecycleStatus: m.status || "ACTIVE", jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0, reporting: emptyKioskReporting() }
+        : { kioskId: id, name: id, type: "bw", description: "", jobs: 0, completed: 0, failed: 0, pages: 0, revenue: 0, reporting: emptyKioskReporting() });
+    }
     return kiosks.get(id);
   };
   let unassignedRevenue = 0;
@@ -268,6 +369,18 @@ function breakdowns({ orders, jobs }, range) {
     row.jobs += 1;
     if (isDone(j)) { row.completed += 1; row.pages += j.pages; }
     if (isFailed(j)) row.failed += 1;
+    const outcome = reportingOutcome(j);
+    if (outcome === "successful") row.reporting.successful += 1;
+    if (outcome === "failed") row.reporting.failed += 1;
+  }
+  for (const i of issues || []) {
+    if (i.kioskId) kioskRow(i.kioskId).reporting.issues += 1;
+  }
+  for (const row of kiosks.values()) {
+    const r = row.reporting;
+    r.attempts = r.successful + r.failed;
+    r.failureRate = r.attempts ? round2((r.failed / r.attempts) * 100) : null;
+    r.rankable = r.attempts >= MIN_ATTEMPTS_TO_RANK;
   }
   for (const o of paid) {
     const kid = jobByOrder.get(o.orderId)?.kioskId;
@@ -301,8 +414,17 @@ function breakdowns({ orders, jobs }, range) {
     byHour[new Date(j.createdAtMs + range.offsetMs).getUTCHours()].jobs += 1;
   }
 
+  const byKiosk = [...kiosks.values()];
+  if (machines) byKiosk.sort((a, b) => (a.kioskId < b.kioskId ? -1 : a.kioskId > b.kioskId ? 1 : 0));
+  // Ranked only with enough attempts, so one failed print on a quiet machine can't top the list.
+  const problemMachines = byKiosk
+    .filter((k) => k.reporting.rankable)
+    .sort((a, b) => b.reporting.failureRate - a.reporting.failureRate || b.reporting.failed - a.reporting.failed || b.reporting.attempts - a.reporting.attempts)
+    .map((k) => ({ kioskId: k.kioskId, name: k.name, shortLabel: k.shortLabel || null, attempts: k.reporting.attempts, failed: k.reporting.failed, failureRate: k.reporting.failureRate, issues: k.reporting.issues }));
+
   return {
-    byKiosk: [...kiosks.values()],
+    byKiosk,
+    problemMachines,
     unassignedRevenue,
     byPaymentMethod: [...methods.values()].sort((a, b) => b.amount - a.amount),
     byStatus: [...statuses.entries()].map(([status, count]) => ({ status, count })),
@@ -335,6 +457,48 @@ async function loadWindow(db, Timestamp, fromMs, toMs) {
   };
 }
 
+/**
+ * Refund requests filed inside [fromMs, toMs), read-only, for the Payment issue category. A failure here never
+ * breaks the analytics response: the issues are then flagged partial instead.
+ */
+async function loadRefundRequests(db, Timestamp, fromMs, toMs) {
+  try {
+    const snap = await db.collection("refund_requests")
+      .where("requestedAt", ">=", Timestamp.fromMillis(fromMs))
+      .where("requestedAt", "<", Timestamp.fromMillis(toMs))
+      .limit(MAX_DOCS_PER_COLLECTION + 1)
+      .get();
+    return {
+      requests: snap.docs.slice(0, MAX_DOCS_PER_COLLECTION).map((d) => ({ id: d.id, ...d.data() })),
+      truncated: snap.docs.length > MAX_DOCS_PER_COLLECTION,
+      partial: false,
+    };
+  } catch (err) {
+    console.error("[ANALYTICS] refund-request load failed:", err.message);
+    return { requests: [], truncated: false, partial: true };
+  }
+}
+
+/** Issues of a window: deduplicated (issueCategories.service.js) and limited to those that belong to the range. */
+function issuesInRange({ jobs, refundRequests, machines }, range) {
+  return buildIssues({ jobs, refundRequests, machines: machines || new Map() })
+    .filter((i) => Number.isFinite(i.rangeMs) && i.rangeMs >= range.from && i.rangeMs < range.to);
+}
+
+/**
+ * The admin dashboard's KPIs, all from one consistent definition. Job numbers use the mutually exclusive
+ * reporting outcome; revenue is copied from the trusted summary (orders + payment_transactions + refunds), so the
+ * money figures are identical to `current`. `current` itself is unchanged for the finance portal.
+ */
+function buildReporting({ jobs, summary, issues, issuesPartial = false }) {
+  return {
+    jobs: summarizeJobOutcomes(jobs),
+    revenue: { net: summary.netRevenue, gross: summary.revenue, refunded: summary.refundedAmount, refundCount: summary.refundCount },
+    issues: { ...countIssues(issues), partial: issuesPartial },
+    minAttemptsToRank: MIN_ATTEMPTS_TO_RANK,
+  };
+}
+
 async function countNewUsers(db, Timestamp, fromMs, toMs) {
   try {
     const snap = await db.collection("users")
@@ -348,41 +512,75 @@ async function countNewUsers(db, Timestamp, fromMs, toMs) {
   }
 }
 
-/** Refund documents that are not already reflected on an order (e.g. admin refunds of legacy orders). */
-function refundsAsOrders(refundDocs, knownOrderIds) {
+/** Refund documents that are not already reflected on an order (e.g. admin refunds of prior-period orders). */
+function refundsAsOrders(refundDocs = [], knownOrderIds = new Set()) {
   return refundDocs
     .filter((r) => r.orderId && !knownOrderIds.has(r.orderId) && r.status !== "CASHFREE_FAILED")
-    .map((r) => ({ orderId: r.orderId, userId: r.userId, amount: num(r.refundAmount), status: "REFUNDED", createdAt: r.initiatedAt, refundStatus: "SUCCESS" }));
+    .map((r) => ({
+      orderId: r.orderId,
+      userId: r.userId || null,
+      amount: 0, // Prior period order: gross customer collections in THIS window is 0
+      refundAmount: round2(num(r.refundAmount)),
+      status: "REFUNDED",
+      createdAt: r.initiatedAt,
+      refundedAt: r.initiatedAt,
+      paidAtMs: null,
+      refundedAtMs: toMillis(r.initiatedAt),
+      refundStatus: "SUCCESS",
+      isPriorPeriodRefund: true,
+    }));
 }
 
-/** Full analytics payload for the admin dashboard / finance portal. */
-async function getAnalytics(db, Timestamp, range, { compare = true } = {}) {
-  const window = await loadWindow(db, Timestamp, range.from, range.to);
-  const orders = normalizeOrders(window.orders, window.txns);
+/**
+ * Full analytics payload for the admin dashboard / finance portal.
+ * `machines` (optional): registry map; drives byKiosk instead of KNOWN_KIOSKS when given.
+ */
+async function getAnalytics(db, Timestamp, range, { compare = true, machines = null } = {}) {
+  const [window, refundReqs] = await Promise.all([
+    loadWindow(db, Timestamp, range.from, range.to),
+    loadRefundRequests(db, Timestamp, range.from, range.to),
+  ]);
+  const orders = normalizeOrders(window.orders, window.txns, window.refunds);
   orders.push(...normalizeOrders(refundsAsOrders(window.refunds, new Set(orders.map((o) => o.orderId)))));
   const jobs = normalizeJobs(window.jobs);
   const newUsers = await countNewUsers(db, Timestamp, range.from, range.to);
+  const issues = issuesInRange({ jobs, refundRequests: refundReqs.requests, machines }, range);
 
   let previous = null;
   if (compare) {
     const prevFrom = range.from - range.length;
     const prev = await loadWindow(db, Timestamp, prevFrom, range.from);
-    const prevOrders = normalizeOrders(prev.orders, prev.txns);
+    const prevOrders = normalizeOrders(prev.orders, prev.txns, prev.refunds);
     prevOrders.push(...normalizeOrders(refundsAsOrders(prev.refunds, new Set(prevOrders.map((o) => o.orderId)))));
     previous = {
       from: iso(prevFrom),
       to: iso(range.from),
-      summary: summarize({ orders: prevOrders, jobs: normalizeJobs(prev.jobs), newUsers: await countNewUsers(db, Timestamp, prevFrom, range.from) }),
+      summary: summarize({ orders: prevOrders, jobs: normalizeJobs(prev.jobs), newUsers: await countNewUsers(db, Timestamp, prevFrom, range.from), truncated: prev.truncated, fromMs: prevFrom, toMs: range.from }),
     };
   }
 
+  const current = summarize({ orders, jobs, newUsers, truncated: window.truncated, fromMs: range.from, toMs: range.to });
   return {
-    range: { from: iso(range.from), to: iso(range.to), granularity: range.granularity, tzOffset: range.tzOffset },
-    current: summarize({ orders, jobs, newUsers }),
+    range: { from: iso(range.from), to: iso(range.to), granularity: range.granularity, tzOffset: range.tzOffset, dateBasis: range.dateBasis || "created" },
+    current,
     previous,
-    series: buildSeries({ orders, jobs }, range),
-    ...breakdowns({ orders, jobs }, range),
+    reporting: buildReporting({ jobs, summary: current, issues, issuesPartial: refundReqs.partial || refundReqs.truncated }),
+    series: buildSeries({ orders, jobs }, range, { issues }),
+    ...breakdowns({ orders, jobs }, range, { machines, issues }),
     truncated: window.truncated,
+    metadata: {
+      dateBasis: range.dateBasis || "created",
+      dateBasisNote: "Payment date bucketing applies to records loaded in the active creation window. Firestore queries are bounded by document creation timestamp.",
+      timezone: "Asia/Kolkata",
+      currency: "INR",
+      isTruncated: window.truncated,
+      settlementDataAvailable: false,
+      settlementNote: "Cashfree bank settlements (UTR and gateway fee deductions) are not stored in Firestore. Reconcile with Cashfree Settlement dashboard.",
+      whatsappAudit: {
+        status: "unreconciled_gateway_records_missing",
+        note: "WhatsApp orders currently lack payment_transactions and Cashfree gateway reference records in Firestore."
+      }
+    },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -392,6 +590,7 @@ module.exports = {
   KIOSK_ID_PATTERN,
   QUEUED_JOB_STATUSES,
   MAX_DOCS_PER_COLLECTION,
+  MIN_ATTEMPTS_TO_RANK,
   parseRange,
   httpError,
   toMillis,
@@ -404,7 +603,11 @@ module.exports = {
   buildSeries,
   breakdowns,
   loadWindow,
+  loadRefundRequests,
+  issuesInRange,
+  buildReporting,
   getAnalytics,
   isDone,
   isFailed,
+  refundsAsOrders,
 };

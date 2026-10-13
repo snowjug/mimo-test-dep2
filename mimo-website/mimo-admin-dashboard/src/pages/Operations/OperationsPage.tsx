@@ -21,11 +21,6 @@ const STATUS_FILTERS = [
   { id: 'active', label: 'In progress' },
   { id: 'abandoned', label: 'Left / never claimed' },
 ];
-const MACHINE_FILTERS = [
-  { id: 'ALL', label: 'All machines' },
-  { id: 'CV-001', label: 'M1' },
-  { id: 'SV-002', label: 'M2' },
-];
 
 export const OperationsPage: React.FC = () => {
   const { range, setRange, current, live } = useRange();
@@ -75,6 +70,17 @@ export const OperationsPage: React.FC = () => {
       return [displayName(j), j.userEmail, j.userPhone, j.file, j.orderId].some((v) => v && v.toLowerCase().includes(q));
     });
   }, [jobs, search, statusFilter, machineFilter]);
+
+  // Machine chips come from the jobs themselves (labels from the registry via destinationShortLabel), so a newly
+  // registered machine shows up as soon as it has a print, without a code change.
+  const machineFilters = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const j of jobs) {
+      if (j.destination && j.destination !== 'Unassigned' && !seen.has(j.destination)) seen.set(j.destination, j.destinationShortLabel || j.destination);
+    }
+    if (machineFilter !== 'ALL' && !seen.has(machineFilter)) seen.set(machineFilter, machineFilter);
+    return [{ id: 'ALL', label: 'All machines' }, ...[...seen.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([id, label]) => ({ id, label }))];
+  }, [jobs, machineFilter]);
 
   const stats = useMemo(() => {
     const count = (o: string[]) => jobs.filter((j) => o.includes(j.outcome ?? '')).length;
@@ -140,8 +146,8 @@ export const OperationsPage: React.FC = () => {
               <button key={f.id} type="button" onClick={() => setStatusFilter(f.id)} className={chip(statusFilter === f.id)}>{f.label}</button>
             ))}
             <span className="hidden w-px self-stretch bg-[var(--border)] sm:block" />
-            {MACHINE_FILTERS.map((f) => (
-              <button key={f.id} type="button" onClick={() => setMachineFilter(f.id)} className={chip(machineFilter === f.id)}>{f.label}</button>
+            {machineFilters.map((f) => (
+              <button key={f.id} type="button" title={f.id === 'ALL' ? undefined : f.id} onClick={() => setMachineFilter(f.id)} className={chip(machineFilter === f.id)}>{f.label}</button>
             ))}
           </div>
         </div>

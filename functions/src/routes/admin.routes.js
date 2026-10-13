@@ -1,5 +1,5 @@
 const express = require("express");
-const { adminAuthMiddleware, staffAuthMiddleware } = require("../middleware/auth");
+const { adminAuthMiddleware, staffAuthMiddleware, financeOrAdminAuthMiddleware } = require("../middleware/auth");
 const { db } = require("../config/firebase");
 const { createLimiters } = require("../middleware/rateLimit");
 const admin = require("../controllers/admin.controller");
@@ -36,6 +36,8 @@ router.post("/admin/kiosks/:kioskId/restart", adminAuthMiddleware, kioskCommands
 router.post("/admin/kiosks/:kioskId/refill-paper", adminAuthMiddleware, kioskCommands.postAdminRefillPaper);
 router.post("/admin/kiosks/:kioskId/verify", adminAuthMiddleware, kioskCommands.postAdminKioskVerify);
 router.get("/admin/incidents", adminAuthMiddleware, insights.getAdminIncidents);
+router.get("/admin/finance-sheet", financeOrAdminAuthMiddleware, insights.getAdminFinanceSheetData);
+router.get("/admin/issues", adminAuthMiddleware, insights.getAdminIssues);
 router.post("/admin/refund", adminAuthMiddleware, admin.postAdminRefund);
 router.get("/admin/refund-requests", adminAuthMiddleware, admin.getAdminRefundRequests);
 
