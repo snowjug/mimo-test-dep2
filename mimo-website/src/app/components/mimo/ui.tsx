@@ -44,12 +44,11 @@ export function AppBar({
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 bg-canvas/85 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md",
-        "lg:mx-[calc(50%-50vw)] lg:border-b lg:border-hairline lg:px-6",
+        "sticky top-0 z-30 bg-canvas/90 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md border-b border-hairline/60",
         className,
       )}
     >
-      <div className="grid h-14 grid-cols-[44px_1fr_44px] items-center gap-2 lg:mx-auto lg:max-w-[768px]">
+      <div className="grid h-14 grid-cols-[44px_1fr_44px] items-center gap-2">
         <button
           type="button"
           onClick={handleBack}
@@ -304,10 +303,10 @@ export function TextButton({ className, children, ...props }: React.ComponentPro
 /** Sticky bottom action area that stays inside the phone column. Pair with `ActionBarSpacer`. */
 export function ActionBar({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30">
+    <div className="fixed inset-x-0 bottom-0 z-30 pointer-events-none">
       <div
         className={cn(
-          "mx-auto w-full max-w-[440px] border-t border-hairline bg-canvas/90 px-4 pt-3 backdrop-blur-md pad-safe-bottom lg:max-w-[768px] lg:px-8",
+          "pointer-events-auto mx-auto w-full max-w-[440px] border-t border-hairline bg-canvas/95 px-4 pt-3 backdrop-blur-md pad-safe-bottom shadow-lg",
           className,
         )}
       >

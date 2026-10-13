@@ -274,8 +274,8 @@ export function Payment() {
         {/* Decorative Mascot */}
         <div className="relative size-[76px] sm:size-[84px] shrink-0">
           <img
-            src="/images/mimo-mascot.png"
-            alt="MIMO"
+            src="/images/mimo-mascot.png?v=3"
+            alt="MIMO Mascot"
             className="size-full object-contain drop-shadow-md select-none pointer-events-none"
             draggable={false}
           />
