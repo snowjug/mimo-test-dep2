@@ -21,6 +21,16 @@ export interface Summary {
   /** null when no job has finished in the range (never an invented number) */
   successRate: number | null;
   newUsers: number;
+  grossCollections?: number;
+  netCollections?: number;
+  completeness?: 'COMPLETE' | 'PARTIAL_RECORDS_TRUNCATED' | string;
+  whatsappAudit?: {
+    totalJobs: number;
+    confirmedJobs: number;
+    estimatedJobCost: number;
+    reconciliationStatus: string;
+    note: string;
+  };
 }
 
 export interface SeriesPoint {
@@ -47,7 +57,7 @@ export interface KioskBreakdown {
 }
 
 export interface Analytics {
-  range: { from: string; to: string; granularity: 'hour' | 'day'; tzOffset: number };
+  range: { from: string; to: string; granularity: 'hour' | 'day'; tzOffset: number; dateBasis?: 'created' | 'payment' };
   current: Summary;
   previous: { from: string; to: string; summary: Summary } | null;
   series: SeriesPoint[];
@@ -59,6 +69,18 @@ export interface Analytics {
   byHour: { hour: number; jobs: number }[];
   truncated: boolean;
   updatedAt: string;
+  metadata?: {
+    dateBasis: string;
+    timezone: string;
+    currency: string;
+    isTruncated: boolean;
+    settlementDataAvailable: boolean;
+    settlementNote: string;
+    whatsappAudit: {
+      status: string;
+      note: string;
+    };
+  };
 }
 
 export interface TransactionRow {
@@ -74,6 +96,7 @@ export interface TransactionRow {
   status: 'PAID' | 'REFUNDED' | 'FAILED' | 'PENDING' | 'INITIATED' | string;
   method: string;
   gatewayRef: string | number | null;
+  refundAmount?: number | null;
   kioskId: string | null;
   pages: number;
   createdAt: string | null;
@@ -237,4 +260,107 @@ export interface UserGrowthReport {
   paymentsInRange: number;
   monthlyPayments: { month: string; total: number }[];
   updatedAt: string;
+}
+
+export interface FinanceExpenseItem {
+  id: string;
+  date: string;
+  type: 'expense';
+  category: string;
+  description: string;
+  amount: number;
+  paidBy: string;
+  reference: string;
+  year: number;
+  monthKey: string;
+  monthName: string;
+  status: 'approved' | 'draft';
+  notes?: string;
+}
+
+export interface FinanceJournalItem {
+  id: string;
+  date: string;
+  debitAccount: string | null;
+  debitAmount: number | null;
+  creditAccount: string | null;
+  creditAmount: number | null;
+  narration: string | null;
+}
+
+export interface FinanceFounderPsr {
+  name: string;
+  totalInvestment: number;
+  netInvestment: number;
+  ownershipPct: number;
+  profitSharePct: number;
+}
+
+export interface FinanceRevenueItem {
+  id: string;
+  date: string;
+  type: 'revenue';
+  category: 'revenue';
+  description: string;
+  amount: number;
+  amountSettled: number;
+  serviceCharge: number;
+  serviceTaxGst: number;
+  adjustment: number;
+  reference: string;
+  orderId: string | null;
+  cfOrderId: string | null;
+  rawStatus: string;
+  settlementStatus: string;
+  settlementHealth: string;
+  isSettlementConfirmed?: boolean;
+  isSettlementPending?: boolean;
+  status: 'approved' | 'draft';
+  notes?: string;
+}
+
+export interface FinanceSheetResponse {
+  sheetId?: string;
+  sheetUrl?: string;
+  expenses: {
+    totalExpenses: number | null;
+    totalExpenses2026?: number;
+    totalExpenses2025?: number;
+    count: number;
+    items: FinanceExpenseItem[];
+    monthlyTotals?: Record<string, number>;
+    categoryTotals?: Record<string, number>;
+    isAvailable: boolean;
+  };
+  journal?: {
+    count: number;
+    items: FinanceJournalItem[];
+  };
+  psr?: {
+    founders: FinanceFounderPsr[];
+    totalInvestment: number;
+  };
+  revenue: {
+    totalGrossRevenue: number;
+    totalConfirmedSettled: number;
+    totalPendingSettlement: number;
+    totalSettled: number;
+    totalServiceCharges: number;
+    totalGst: number;
+    totalAdjustments: number;
+    count: number;
+    items: FinanceRevenueItem[];
+    monthlyTotals: Record<string, number>;
+    monthlyConfirmedSettled?: Record<string, number>;
+    monthlyPendingSettlements?: Record<string, number>;
+    isAvailable?: boolean;
+    note?: string;
+  };
+  summary: {
+    netPL: number | null;
+    isPlAvailable: boolean;
+  };
+  cached: boolean;
+  lastSyncedAt: string;
+  syncError?: string | null;
 }

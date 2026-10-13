@@ -2,6 +2,7 @@ import api from '../api';
 import { DateRangeValue, toApiRange } from '../lib/dateRange';
 import type {
   Analytics,
+  FinanceSheetResponse,
   IncidentsResponse,
   JobsResponse,
   KiosksResponse,
@@ -33,4 +34,7 @@ export const insights = {
 
   userGrowthReport: (range: DateRangeValue) =>
     api.get<UserGrowthReport>('/admin/user-growth-report', { params: params(range) }).then((r) => r.data),
+
+  financeSheet: (force = false) =>
+    api.get<FinanceSheetResponse>('/admin/finance-sheet', { params: force ? { force: 'true' } : {} }).then((r) => r.data),
 };
