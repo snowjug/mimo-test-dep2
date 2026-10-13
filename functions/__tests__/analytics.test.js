@@ -123,5 +123,113 @@ describe("getAnalytics (fake Firestore)", () => {
     assert.strictEqual(out.series.length, 24);
     assert.strictEqual(out.byPaymentMethod[0].method, "UPI");
     assert.strictEqual(out.current.newUsers, 2);
+    assert.strictEqual(out.metadata.currency, "INR");
+    assert.strictEqual(out.metadata.timezone, "Asia/Kolkata");
+    assert.strictEqual(out.metadata.settlementDataAvailable, false);
+  });
+});
+
+describe("Remediated Revenue & Refund Math", () => {
+  it("partial refund: only the actual refundAmount is deducted from net collections", () => {
+    const orders = A.normalizeOrders([
+      { orderId: "p1", amount: 100, status: "PAID", refundAmount: 25, refundStatus: "SUCCESS" },
+      { orderId: "p2", amount: 60, status: "PAID" },
+    ]);
+    assert.strictEqual(orders[0].refundAmount, 25);
+    const s = A.summarize({ orders, jobs: [] });
+    assert.strictEqual(s.revenue, 160, "Gross collections is full collected amounts");
+    assert.strictEqual(s.refundedAmount, 25, "Only the ₹25 partial refund is deducted");
+    assert.strictEqual(s.netRevenue, 135, "Net collections is 160 - 25 = 135");
+    assert.strictEqual(s.grossCollections, 160);
+    assert.strictEqual(s.netCollections, 135);
+  });
+
+  it("prior-period refunds do not phantom-inflate current-period gross collections", () => {
+    // Order was paid in prior month; in current month, only the refund document is present
+    const priorRefunds = A.refundsAsOrders([
+      { orderId: "old_order_from_august", userId: "u9", refundAmount: 40, status: "SUCCESS", initiatedAt: new Date("2026-09-26T08:00:00Z") },
+    ], new Set()); // not in knownOrderIds of current month
+
+    assert.strictEqual(priorRefunds[0].amount, 0, "No gross collections in current month for old order");
+    assert.strictEqual(priorRefunds[0].refundAmount, 40);
+    assert.strictEqual(priorRefunds[0].isPriorPeriodRefund, true);
+
+    const currentOrders = A.normalizeOrders([
+      { orderId: "new_order_september", amount: 100, status: "PAID", createdAt: new Date("2026-09-26T09:00:00Z") },
+    ]);
+    currentOrders.push(...priorRefunds);
+
+    const s = A.summarize({ orders: currentOrders, jobs: [] });
+    assert.strictEqual(s.revenue, 100, "Gross revenue strictly reflects current period sales (100, not 140)");
+    assert.strictEqual(s.refundedAmount, 40, "Prior period refund is recognized as outflow");
+    assert.strictEqual(s.netRevenue, 60, "Net cash collections is 100 - 40 = 60");
+    assert.strictEqual(s.orders, 1, "Only 1 paid order in current period");
+  });
+
+  it("deduplicates orders across orders and payment_transactions while merging richer refund info", () => {
+    const orders = A.normalizeOrders(
+      [{ orderId: "same_1", amount: 50, status: "PAID" }],
+      [{ orderId: "same_1", amount: 50, status: "REFUNDED", refundAmount: 15, paymentMethod: "upi", cashfreePaymentId: "cf_99" }],
+      [{ orderId: "same_1", refundAmount: 15, status: "SUCCESS" }]
+    );
+    assert.strictEqual(orders.length, 1, "Deduplicated to single record");
+    assert.strictEqual(orders[0].status, "REFUNDED");
+    assert.strictEqual(orders[0].refundAmount, 15);
+    assert.strictEqual(orders[0].gatewayRef, "cf_99");
+    assert.strictEqual(orders[0].method, "UPI");
+  });
+
+  it("audits WhatsApp orders without fabricating gateway collections", () => {
+    const jobs = A.normalizeJobs([
+      { id: "wj1", orderId: "WA-12345678", status: "completed", totalCost: 28, pageCount: 5 },
+      { id: "wj2", orderId: "WA-FREE-001", status: "completed", totalCost: 0, pageCount: 2 },
+    ]);
+    const s = A.summarize({ orders: [], jobs });
+    assert.strictEqual(s.revenue, 0, "No raw print_job is treated as verified gateway revenue without transaction record");
+    assert.strictEqual(s.whatsappAudit.totalJobs, 2);
+    assert.strictEqual(s.whatsappAudit.confirmedJobs, 1);
+    assert.strictEqual(s.whatsappAudit.estimatedJobCost, 28);
+    assert.strictEqual(s.whatsappAudit.reconciliationStatus, "unreconciled_gateway_records_missing");
+  });
+
+  it("reports data truncation and partial completeness status when document ceiling is reached", () => {
+    const s = A.summarize({ orders: [], jobs: [], truncated: true });
+    assert.strictEqual(s.completeness, "PARTIAL_RECORDS_TRUNCATED");
+  });
+
+  it("supports dateBasis=payment for bucketing based on payment completion rather than creation", () => {
+    const range = A.parseRange({ from: "2026-09-26T00:00:00Z", to: "2026-09-27T00:00:00Z", tzOffset: 0, dateBasis: "payment" });
+    assert.strictEqual(range.dateBasis, "payment");
+    const orders = A.normalizeOrders([
+      {
+        orderId: "o_late_pay",
+        amount: 80,
+        status: "PAID",
+        createdAt: new Date("2026-09-26T01:00:00Z"),
+        paymentDetails: { paidAt: new Date("2026-09-26T05:00:00Z") }
+      }
+    ]);
+    const series = A.buildSeries({ orders, jobs: [] }, range);
+    assert.strictEqual(series.find((p) => p.key === "2026-09-26T01").revenue, 0);
+    assert.strictEqual(series.find((p) => p.key === "2026-09-26T05").revenue, 80);
+  });
+
+  it("retrospective queries: subsequent-period refund does not inflate previous-period refunds in summary when date bounds are provided", () => {
+    const orders = A.normalizeOrders([
+      {
+        orderId: "sep_order",
+        amount: 100,
+        status: "REFUNDED",
+        refundAmount: 100,
+        createdAt: new Date("2026-09-15T10:00:00Z"),
+        refundedAt: new Date("2026-10-05T10:00:00Z"),
+      }
+    ]);
+    const sepFrom = new Date("2026-09-01T00:00:00Z").getTime();
+    const sepTo = new Date("2026-10-01T00:00:00Z").getTime();
+    const s = A.summarize({ orders, jobs: [], fromMs: sepFrom, toMs: sepTo });
+    assert.strictEqual(s.revenue, 100, "September gross revenue remains ₹100");
+    assert.strictEqual(s.refundedAmount, 0, "October refund is not attributed to September summary");
+    assert.strictEqual(s.netRevenue, 100, "September net collections remains ₹100");
   });
 });

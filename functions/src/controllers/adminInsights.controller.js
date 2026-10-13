@@ -122,6 +122,7 @@ const getAdminTransactions = async (req, res) => {
         status: o.status,
         method: o.method,
         gatewayRef: o.gatewayRef,
+        refundAmount: o.refundAmount !== undefined && o.refundAmount !== null ? o.refundAmount : (o.status === "REFUNDED" ? o.amount : null),
         kioskId: job?.kioskId || null,
         pages: job?.pages || o.pages || 0,
         createdAt: A.iso(o.createdAtMs),
@@ -426,6 +427,18 @@ const getAdminIncidents = async (req, res) => {
   }
 };
 
+// ─────────────────────────────── GET /admin/finance-sheet ───────────────────────────────
+const getAdminFinanceSheetData = async (req, res) => {
+  try {
+    const { fetchFinanceSheetData } = require("../services/googleSheets.service");
+    const force = req.query.refresh === "1" || req.query.force === "true";
+    const data = await fetchFinanceSheetData({ force });
+    res.json(data);
+  } catch (err) {
+    fail(res, err, "finance-sheet");
+  }
+};
+
 module.exports = {
   jobTimeline,
   jobOutcome,
@@ -438,4 +451,5 @@ module.exports = {
   getAdminJobs,
   getAdminKiosks,
   getAdminIncidents,
+  getAdminFinanceSheetData,
 };

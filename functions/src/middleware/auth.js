@@ -39,7 +39,25 @@ const adminAuthMiddleware = (req, res, next) => {
   }
 };
 
+// ================= FINANCE / ADMIN MIDDLEWARE =================
+// Allows users with role="finance" or admin privileges (isAdmin: true) to access finance-specific endpoints.
+const financeOrAdminAuthMiddleware = (req, res, next) => {
+  const token = req.header("Authorization");
+  if (!token) return res.status(401).json({ error: "Access Denied" });
+  try {
+    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY);
+    const hasAccess = verified.isAdmin === true || verified.role === "finance" || verified.role === "admin";
+    if (!hasAccess) return res.status(403).json({ error: "Forbidden: Finance or Admin access required" });
+    req.admin = verified;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: "Invalid Token" });
+  }
+};
+
 module.exports = {
   adminAuthMiddleware,
   authMiddleware,
+  financeOrAdminAuthMiddleware,
+  financeAuthMiddleware: financeOrAdminAuthMiddleware,
 };
