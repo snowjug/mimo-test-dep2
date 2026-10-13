@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { MimoCoinsDisplay } from "./mimo-coins-display";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { CircleHelp } from "lucide-react";
+import { CircleHelp, MapPin, Gift } from "lucide-react";
 import { Wordmark } from "./mimo/ui";
 import api from "../api";
 import { useTour } from "../utils/tour-context";
@@ -19,49 +18,6 @@ export function initialsOf(name: string) {
   );
 }
 
-const HOW_IT_WORKS = [
-  { title: "Upload", body: "Add a PDF, Word, PowerPoint, Excel, text file or photo." },
-  { title: "Choose options", body: "Pick the machine, colour, sides, pages and copies." },
-  { title: "Pay", body: "You get a 4-digit print code as soon as payment clears." },
-  { title: "Print at the kiosk", body: "Type the code on the MIMO keypad and collect your pages." },
-];
-
-/** Bottom sheet explaining the four-step flow. */
-export function HelpSheet() {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          aria-label="How MIMO works"
-          className="press flex size-10 items-center justify-center rounded-full text-ink-2 active:bg-surface-2"
-        >
-          <CircleHelp className="size-[22px]" strokeWidth={1.75} />
-        </button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>How MIMO works</DialogTitle>
-          <DialogDescription>Four steps from your phone to paper.</DialogDescription>
-        </DialogHeader>
-        <ol className="mt-1 space-y-4">
-          {HOW_IT_WORKS.map((step, i) => (
-            <li key={step.title} className="flex gap-3.5">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[13px] font-semibold tabular-nums text-brand-text">
-                {i + 1}
-              </span>
-              <div>
-                <p className="text-[16px] font-semibold text-ink">{step.title}</p>
-                <p className="text-[15px] leading-snug text-ink-2">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function ProfileButton({ name }: { name: string }) {
   const navigate = useNavigate();
   return (
@@ -69,14 +25,14 @@ export function ProfileButton({ name }: { name: string }) {
       type="button"
       onClick={() => navigate("/user-profile")}
       aria-label="Your profile"
-      className="press flex size-10 items-center justify-center rounded-full bg-brand text-[14px] font-semibold text-on-brand"
+      className="press flex size-9 items-center justify-center rounded-full bg-brand text-[13px] font-bold text-white shadow-sm"
     >
       {initialsOf(name)}
     </button>
   );
 }
 
-/** Home header: wordmark, help, coins and profile. */
+/** Home header: wordmark, how-to, location, coins and profile. */
 export function MimoHeader() {
   const navigate = useNavigate();
   const { start: startTour } = useTour();
@@ -106,34 +62,40 @@ export function MimoHeader() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 -mx-4 bg-canvas/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:mx-[calc(50%-50vw)] lg:border-b lg:border-hairline lg:px-8">
-      <div className="flex h-14 items-center lg:mx-auto lg:max-w-[768px]">
-        <button type="button" onClick={() => navigate("/upload")} aria-label="MIMO home" className="press -ml-1 shrink-0 px-1 py-2">
-          <Wordmark />
-        </button>
-        {/* flex-1 + justify-center reserves exactly the space left between the wordmark and the icon
-            group for this button, so it's centered within the AVAILABLE middle space rather than the
-            full header width -- avoiding any overlap with either side on narrow viewports. min-w-0 lets
-            the button itself shrink/truncate before it ever pushes into a sibling. */}
-        <div className="flex min-w-0 flex-1 justify-center px-1">
+    <header className="sticky top-0 z-30 -mx-4 bg-canvas/95 px-3 py-2.5 backdrop-blur-md border-b border-hairline/60">
+      <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+        {/* Left: Wordmark & How to print */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button type="button" onClick={() => navigate("/upload")} aria-label="MIMO home" className="press shrink-0">
+            <Wordmark className="text-[22px] sm:text-[24px]" />
+          </button>
+
           <button
             type="button"
-            onClick={() => {
-              // MimoHeader also renders on /print-code; step 1 lives on the upload page, so make sure
-              // we're there before starting, regardless of which page this button was clicked from.
-              navigate("/upload");
-              startTour();
-            }}
+            onClick={() => { navigate("/upload"); startTour(); }}
             aria-label="Show the how-to-print tutorial"
-            className="press flex min-w-0 items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-[13px] font-medium text-ink-2 active:bg-surface-3"
+            className="press flex items-center gap-1 rounded-full bg-blue-50/80 px-2.5 py-1 text-[11px] font-semibold text-brand transition-colors active:bg-blue-100"
           >
-            <CircleHelp className="size-[14px] shrink-0" strokeWidth={2} />
-            <span className="truncate">How to print</span>
+            <CircleHelp className="size-3.5 shrink-0" strokeWidth={2.25} />
+            <span className="whitespace-nowrap">How to print</span>
           </button>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <HelpSheet />
+
+        {/* Right: Location, Coins, Profile */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => navigate("/find-machine")}
+            aria-label="Find a kiosk"
+            className="press flex items-center gap-0.5 rounded-full px-1.5 py-1 text-[11px] sm:text-[12px] font-semibold text-ink hover:bg-surface-2 active:bg-surface-3"
+          >
+            <MapPin className="size-3.5 text-brand" strokeWidth={2.25} />
+            <span className="max-w-[50px] sm:max-w-[65px] truncate">REVA</span>
+            <span className="text-[10px] text-ink-3">▾</span>
+          </button>
+
           <MimoCoinsDisplay />
+
           <ProfileButton name={name} />
         </div>
       </div>

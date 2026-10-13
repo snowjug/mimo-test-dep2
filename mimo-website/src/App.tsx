@@ -57,6 +57,7 @@ export default function App() {
               <Route path="/text-editor" element={<TextEditor />} />
               <Route path="/find-machine" element={<FindMachine />} />
               <Route path="/document-scanner" element={<DocumentScanner />} />
+              <Route path="*" element={<UploadFile />} />
             </Routes>
           </Suspense>
         </div>

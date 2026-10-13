@@ -38,12 +38,12 @@ export function MimoCoinsDisplay() {
   return (
     <button
       type="button"
-      className="press flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-surface-2 pl-2.5 pr-3 text-[14px] font-semibold tabular-nums text-ink active:bg-surface-3"
+      className="press flex items-center gap-1 rounded-full bg-blue-50/80 px-2 py-1 text-[11px] font-bold tabular-nums text-brand transition-colors active:bg-blue-100"
       onClick={(e) => { e.stopPropagation(); navigate("/user-profile?tab=mimo-coins"); }}
       aria-label={`${mimoCoinsBalance} MIMO coins`}
     >
-      <Gift className="size-4 text-brand-text" strokeWidth={2} />
-      {mimoCoinsBalance}
+      <Gift className="size-3.5 text-brand" strokeWidth={2.25} />
+      <span>{mimoCoinsBalance}</span>
     </button>
   );
 }

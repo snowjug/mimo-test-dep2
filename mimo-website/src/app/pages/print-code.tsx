@@ -1,48 +1,32 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check, MessageCircle, ShieldCheck } from "lucide-react";
+import { Copy, Check, MessageCircle, ShieldCheck, Printer, FileText, ChevronRight, Loader2, ArrowRight } from "lucide-react";
 import { MimoHeader } from "../components/mimo-header";
-import { Group, PrimaryButton, Row, SecondaryButton, StatusPill } from "../components/mimo/ui";
+import { AdBanner } from "../components/AdBanner";
 import { toast } from "sonner";
-import { AdSenseBlock } from "../components/AdSenseBlock";
 
 export function PrintCode() {
   const navigate = useNavigate();
   const [printCode, setPrintCode] = useState(() => {
-    // Primary: sessionStorage (set within the same browser tab session)
     let code = sessionStorage.getItem("printCode") || "";
     if (!code) {
-      // Fallback: localStorage — survives Cashfree UPI redirect on mobile.
-      // Only use it if it was stored within the last 30 minutes.
       const ts = parseInt(localStorage.getItem("mimo_printCode_ts") || "0", 10);
       const age = Date.now() - ts;
       if (age < 30 * 60 * 1000) {
         code = localStorage.getItem("mimo_printCode") || "";
         if (code) {
-          // Re-populate sessionStorage so the rest of the page works normally
           sessionStorage.setItem("printCode", code);
           const kioskId = localStorage.getItem("mimo_directKioskId") || "";
           if (kioskId) sessionStorage.setItem("directKioskId", kioskId);
         }
       }
-      // Always clean up localStorage entry regardless — one-time use
       localStorage.removeItem("mimo_printCode");
       localStorage.removeItem("mimo_printCode_ts");
       localStorage.removeItem("mimo_directKioskId");
     }
     return code;
   });
-  const [files, setFiles] = useState<any[]>(() => {
-    const storedFiles = sessionStorage.getItem("printFiles");
-    if (storedFiles && storedFiles !== "undefined") {
-      try {
-        return JSON.parse(storedFiles);
-      } catch (err) {
-        console.error("Failed to parse stored files", err);
-      }
-    }
-    return [];
-  });
+
   const [isProcessing, setIsProcessing] = useState(() => {
     const storedCode = sessionStorage.getItem("printCode");
     return !storedCode;
@@ -52,7 +36,7 @@ export function PrintCode() {
   );
   const [sheetsInfo, setSheetsInfo] = useState<{ completed: number; total: number } | null>(null);
   const [isPrinted, setIsPrinted] = useState(false);
-  const [printProgress, setPrintProgress] = useState(0);
+  const [printProgress, setPrintProgress] = useState(8);
   const [refundRequested, setRefundRequested] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
 
@@ -62,14 +46,10 @@ export function PrintCode() {
       return;
     }
 
-    // Push a state so that we have an extra entry to "pop" when they press back
     window.history.pushState({ isPrintCodePage: true }, "", window.location.href);
 
-    const handlePopState = (e: PopStateEvent) => {
-      // User pressed back button
+    const handlePopState = () => {
       toast.success("Your code has been sent to your mail.");
-      
-      // Clear session storage just like handleDone
       sessionStorage.removeItem("printCode");
       sessionStorage.removeItem("printFiles");
       sessionStorage.removeItem("printOptions");
@@ -78,7 +58,7 @@ export function PrintCode() {
       sessionStorage.removeItem("uploadTotalPages");
       sessionStorage.removeItem("totalPages");
       sessionStorage.removeItem("printStatus");
-      
+
       setTimeout(() => {
         navigate("/upload", { replace: true });
       }, 100);
@@ -98,69 +78,67 @@ export function PrintCode() {
         const apiUrl = "https://api-upqxuj7evq-uc.a.run.app";
         const res = await fetch(`${apiUrl}/kiosk/job-status?printCode=${printCode}`);
         const data = await res.json();
-        
-        if (data.totalSheets !== undefined && data.sheetsCompleted !== undefined) {
-          const total = Number(data.totalSheets);
-          const completed = Number(data.sheetsCompleted);
-          if (total > 0) {
-            setSheetsInfo({ total, completed });
-          }
-        }
 
-        if (data.isPrinted) {
-          setIsPrinted(true);
-        }
+        if (data.status) {
+          const rawStatus = (data.status || "").toLowerCase();
+          const pStatus = (data.printerStatus || "").toLowerCase();
 
-        if (data.status && data.status !== printStatus) {
-          // If the job is in 'paid' state waiting for the user to enter their code at the kiosk,
-          // ignore transient heartbeat/offline warnings so the user can still walk over and print.
-          if (printStatus === "paid" && data.status === "failed") {
-            console.warn("Ignoring transient failure before print has started:", data.printerStatus);
+          if (rawStatus === "failed" || pStatus.includes("error") || pStatus.includes("jam")) {
+            setPrintStatus("failed");
+            sessionStorage.setItem("printStatus", "failed");
             return;
           }
-          setPrintStatus(data.status);
-          sessionStorage.setItem("printStatus", data.status);
-          if (data.status === "completed") {
-            toast.success("Your document has been printed!");
-          } else if (data.status === "failed") {
-            toast.error(data.printerStatus || "Print failed. Please contact support.");
+
+          if (data.isPrinted === true || rawStatus === "printed" || rawStatus === "completed") {
+            setIsPrinted(true);
+            setPrintStatus("completed");
+            setPrintProgress(100);
+            sessionStorage.setItem("printStatus", "completed");
+            return;
+          }
+
+          if (rawStatus === "printing" || pStatus.includes("printing")) {
+            setPrintStatus("printing");
+            sessionStorage.setItem("printStatus", "printing");
+            setIsProcessing(false);
+          } else if (rawStatus === "paid" || rawStatus === "ready") {
+            setPrintStatus("paid");
+            setIsProcessing(false);
+          }
+
+          if (data.sheetsPrinted !== undefined && data.totalPages !== undefined) {
+            setSheetsInfo({ completed: data.sheetsPrinted, total: data.totalPages });
           }
         }
       } catch (err) {
-        console.error("Failed to check status", err);
+        console.error("Telemetry poll failed", err);
       }
     };
 
-    // Run status check immediately on mount to avoid the initial 3-second delay
     checkStatus();
-
     const interval = setInterval(checkStatus, 3000);
     return () => clearInterval(interval);
   }, [printCode, printStatus]);
 
-  // Synchronized progress tracking physical sheet cadence
   useEffect(() => {
-    if (printStatus === "paid" || isProcessing) {
-      setPrintProgress((prev) => Math.max(prev, 8));
-      return;
-    }
     if (printStatus === "completed" || isPrinted) {
       setPrintProgress(100);
       return;
     }
+    if (printStatus === "paid") {
+      setPrintProgress((prev) => Math.max(prev, 8));
+      return;
+    }
     if (printStatus === "failed") {
-      // Freeze wherever we are
       return;
     }
     if (printStatus === "printing") {
       if (sheetsInfo && sheetsInfo.total > 0) {
         const frac = sheetsInfo.completed / sheetsInfo.total;
-        // Strictly capped at 98% while printing; only reaches 100% upon completed status
         const computed = Math.min(98, Math.max(15, Math.round(frac * 100)));
         setPrintProgress((prev) => Math.max(prev, computed));
       } else {
-        // Safe non-completing fallback while awaiting first telemetry event
-        setPrintProgress((prev) => Math.max(prev, 18));
+        setPrintProgress((prev) => Math.max(prev, 25));
       }
     }
   }, [printStatus, isProcessing, sheetsInfo, isPrinted]);
@@ -203,7 +181,6 @@ export function PrintCode() {
   };
 
   const handleDone = () => {
-    // Clear ALL session storage to ensure a completely fresh start for next job
     sessionStorage.removeItem("printCode");
     sessionStorage.removeItem("printFiles");
     sessionStorage.removeItem("printOptions");
@@ -215,132 +192,204 @@ export function PrintCode() {
     navigate("/upload");
   };
 
-  const title = isProcessing
-    ? "Preparing your print"
-    : printStatus === "printing"
-    ? "Printing now"
-    : printStatus === "completed"
-    ? "Printed"
-    : printStatus === "failed"
-    ? "Print failed"
-    : "You're all set";
-
-  const subtitle = isProcessing
-    ? "Securing your documents."
-    : printStatus === "printing"
-    ? sheetsInfo
-      ? `Sheet ${sheetsInfo.completed} of ${sheetsInfo.total}. Stay near the kiosk.`
-      : "Your pages are coming out at the kiosk."
-    : printStatus === "completed"
-    ? "Collect your pages from the tray."
-    : printStatus === "failed"
-    ? "Something went wrong at the kiosk."
-    : "Enter this code on the MIMO keypad.";
-
-  const steps = [
-    { label: "Paid", done: true },
-    { label: "Printing", done: printStatus === "printing" || printStatus === "completed" },
-    { label: "Done", done: printStatus === "completed" },
-  ];
-
-  const barTone =
-    printStatus === "completed" ? "bg-success" : printStatus === "failed" ? "bg-danger" : "bg-brand";
+  const codeDigits = (printCode || "0000").slice(0, 4).padEnd(4, "-").split("");
 
   return (
-    <div className="px-4 pb-[max(24px,env(safe-area-inset-bottom))]">
+    <div className="min-h-[100dvh] bg-canvas px-4 pb-36">
+      {/* ── Standard MIMO Header ── */}
       <MimoHeader />
 
-      <section className="rise-in pt-4 text-center" aria-live="polite">
-        <p className="text-[15px] font-medium text-ink-2">{title}</p>
-        <button
-          type="button"
-          data-tour="print-code-display"
-          onClick={handleCopyCode}
-          aria-label={`Print code ${printCode.split("").join(" ")}. Tap to copy.`}
-          className="press mx-auto mt-3 block rounded-[24px] px-4"
-        >
-          <span className="block text-[76px] font-semibold leading-none tracking-[0.12em] tabular-nums text-ink [padding-left:0.12em]">
-            {printCode}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={handleCopyCode}
-          className="press mx-auto mt-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-2 px-4 text-[14px] font-medium text-ink"
-        >
-          <Copy className="size-4" /> Copy code
-        </button>
-        <p className="mx-auto mt-4 max-w-[30ch] text-[15px] text-ink-2">{subtitle}</p>
+      {/* ── Hero Code Section + Mascot ── */}
+      <div className="rise-in pt-3 pb-6">
+        <div className="relative flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-[14px] font-semibold text-ink-3">You're all set!</p>
+
+            {/* 4 large code digits */}
+            <div className="mt-3 flex items-center gap-2.5">
+              {codeDigits.map((digit, i) => (
+                <div
+                  key={i}
+                  className="flex size-14 sm:size-16 items-center justify-center rounded-[18px] bg-blue-50/80 border border-blue-200/70 shadow-xs"
+                >
+                  <span className="text-[34px] sm:text-[40px] font-extrabold tabular-nums leading-none text-brand">
+                    {digit}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Copy code button */}
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="press inline-flex items-center gap-2 rounded-full bg-brand hover:bg-brand-press px-6 py-2.5 text-[14px] font-bold text-white shadow-sm shadow-brand/20"
+              >
+                <Copy className="size-4" /> Copy code
+              </button>
+            </div>
+            <p className="mt-2 text-[12px] text-ink-3">Enter this code on the MIMO keypad.</p>
+          </div>
+
+          {/* 3D Mascot Illustration */}
+          <div className="flex size-[88px] shrink-0 items-center justify-center rounded-[26px] bg-gradient-to-br from-blue-500/10 via-sky-500/15 to-indigo-500/10 border border-blue-100 shadow-sm ml-2">
+            <span className="text-[44px]" aria-hidden>🤖</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Card 1: Printing your document ── */}
+      <section className="mb-5" aria-label="Printing status">
+        <div className="rounded-[20px] bg-surface p-4 border border-hairline shadow-xs">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-[15px] font-bold text-ink">
+              {printStatus === "completed"
+                ? "Document printed"
+                : printStatus === "failed"
+                ? "Print stopped"
+                : "Printing your document"}
+            </h2>
+            <span className="text-[14px] font-extrabold tabular-nums text-brand">
+              {Math.round(printProgress)}%
+            </span>
+          </div>
+
+          {/* Stepper track */}
+          <div className="relative mb-6 px-4">
+            {/* Background line */}
+            <div className="absolute left-8 right-8 top-1/2 -translate-y-1/2 h-1 bg-surface-2 rounded-full" />
+            {/* Progress line */}
+            <div
+              className="absolute left-8 top-1/2 -translate-y-1/2 h-1 bg-brand rounded-full transition-all duration-500"
+              style={{
+                width: `${Math.min(100, Math.max(0, (printProgress / 100) * 80))}%`,
+              }}
+            />
+
+            <div className="relative flex items-center justify-between">
+              {/* Step 1: Paid */}
+              <div className="flex flex-col items-center">
+                <span className="flex size-9 items-center justify-center rounded-full bg-brand text-white shadow-xs">
+                  <Check className="size-4" strokeWidth={3} />
+                </span>
+                <span className="mt-1.5 text-[12px] font-semibold text-ink">Paid</span>
+              </div>
+
+              {/* Step 2: Printing */}
+              <div className="flex flex-col items-center">
+                <span
+                  className={`flex size-9 items-center justify-center rounded-full transition-colors ${
+                    printStatus === "printing" || printStatus === "completed"
+                      ? "bg-brand text-white shadow-xs"
+                      : "bg-surface-2 text-ink-4 border border-hairline"
+                  }`}
+                >
+                  <Printer className="size-4" />
+                </span>
+                <span className="mt-1.5 text-[12px] font-semibold text-ink-3">Printing</span>
+              </div>
+
+              {/* Step 3: Done */}
+              <div className="flex flex-col items-center">
+                <span
+                  className={`flex size-9 items-center justify-center rounded-full transition-colors ${
+                    printStatus === "completed"
+                      ? "bg-emerald-500 text-white shadow-xs"
+                      : "bg-surface-2 text-ink-4 border border-hairline"
+                  }`}
+                >
+                  <FileText className="size-4" />
+                </span>
+                <span className="mt-1.5 text-[12px] font-semibold text-ink-3">Done</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Refund CTA if failed */}
+          {printStatus === "failed" && (
+            <div className="mt-3 rounded-[14px] bg-rose-50 p-3.5 border border-rose-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[14px] font-bold text-rose-900">Something went wrong at the kiosk</p>
+                  <p className="text-[12px] text-rose-700">Refunds are processed in 24–48 hours.</p>
+                </div>
+                {refundRequested ? (
+                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-semibold text-emerald-800">
+                    Requested
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRequestRefund}
+                    disabled={refundLoading}
+                    className="press rounded-full bg-rose-600 px-3.5 py-1.5 text-[12px] font-bold text-white shadow-xs"
+                  >
+                    {refundLoading ? "Submitting…" : "Request refund"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
-      <Group className="mt-8" bodyClassName="px-4 py-4">
-        <div className="flex items-center justify-between">
-          <span className="text-[15px] font-medium text-ink">
-            {printStatus === "completed" ? "Complete" : printStatus === "failed" ? "Stopped" : printStatus === "printing" ? "Printing" : "Waiting for you at the kiosk"}
-          </span>
-          <span className="text-[15px] font-semibold tabular-nums text-ink-2">{Math.round(printProgress)}%</span>
-        </div>
-        <div
-          className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2"
-          role="progressbar"
-          aria-valuenow={Math.round(printProgress)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Print progress"
-        >
-          <div className={`h-full rounded-full transition-[width] duration-500 ${barTone}`} style={{ width: `${printProgress}%` }} />
-        </div>
-        <ol className="mt-3 grid grid-cols-3 text-[13px]">
-          {steps.map((s, i) => (
-            <li
-              key={s.label}
-              className={`flex items-center gap-1 ${i === 1 ? "justify-center" : i === 2 ? "justify-end" : ""} ${
-                s.done && printStatus !== "failed" ? "text-ink" : "text-ink-3"
-              }`}
-            >
-              {s.done && printStatus !== "failed" && <Check className="size-3.5" strokeWidth={2.5} />}
-              {s.label}
-            </li>
-          ))}
-        </ol>
-      </Group>
+      {/* ── Announcement / Advertisement Banner (ABOVE Privacy) ── */}
+      <section className="mb-5" aria-label="Announcements">
+        <AdBanner />
+      </section>
 
-      {printStatus === "failed" && (
-        <Group className="mt-4" bodyClassName="px-4 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[16px] font-medium text-ink">Get your money back</p>
-              <p className="mt-0.5 text-[13px] text-ink-3">Refunds are processed within 24 to 48 hours.</p>
+      {/* ── Privacy & WhatsApp Support ── */}
+      <section className="mb-6" aria-label="Support and privacy">
+        <div className="overflow-hidden rounded-[20px] bg-surface border border-hairline shadow-xs">
+          {/* Privacy row */}
+          <div className="flex items-center gap-3.5 p-4">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <ShieldCheck className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block text-[14px] font-bold text-ink">Your files stay private</span>
+              <span className="text-[12px] text-ink-3">
+                Deleted right after printing. Unprinted files are removed after 24 hours.
+              </span>
             </div>
-            {refundRequested && <StatusPill tone="success">Requested</StatusPill>}
+            <ChevronRight className="size-4 text-ink-4 shrink-0" />
           </div>
-          {!refundRequested && (
-            <SecondaryButton className="mt-3 text-danger" onClick={handleRequestRefund} loading={refundLoading}>
-              Request refund
-            </SecondaryButton>
-          )}
-        </Group>
-      )}
 
-      <Group className="mt-6">
-        <Row
-          icon={<ShieldCheck className="size-5" strokeWidth={1.75} />}
-          label="Your files stay private"
-          detail="Deleted right after printing. Unprinted files are removed after 24 hours."
-        />
-        <Row
-          icon={<MessageCircle className="size-5" strokeWidth={1.75} />}
-          label="Contact support"
-          detail="Chat with us on WhatsApp"
-          chevron
-          onClick={() => window.open("https://wa.me/919364028349?text=Namastey%20MIMO%20%F0%9F%91%8B%0A%0AI%20need%20some%20assistance%20with%20my%20recent%20print%20order.%20Could%20you%20please%20help%20me%3F", "_blank")}
-        />
-      </Group>
+          {/* Contact support row */}
+          <a
+            href="https://wa.me/919364028349?text=Namastey%20MIMO%20%F0%9F%91%8B%0A%0AI%20need%20some%20assistance%20with%20my%20recent%20print%20order.%20Could%20you%20please%20help%20me%3F"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="press flex items-center gap-3.5 border-t border-hairline p-4 transition-colors active:bg-surface-2"
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-purple-50 text-purple-600">
+              <MessageCircle className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block text-[14px] font-bold text-ink">Contact support</span>
+              <span className="text-[12px] text-ink-3">Chat with us on WhatsApp</span>
+            </div>
+            <ChevronRight className="size-4 text-ink-4 shrink-0" />
+          </a>
+        </div>
+      </section>
 
-      <AdSenseBlock className="min-h-[100px] rounded-[20px] bg-surface p-2" />
-
-      <div className="mt-8">
-        <PrimaryButton onClick={handleDone}>Print something else</PrimaryButton>
+      {/* ── Sticky Bottom Action Bar ── */}
+      <div className="fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+        <div className="mx-auto max-w-[480px]">
+          <button
+            type="button"
+            onClick={handleDone}
+            className="press flex w-full items-center justify-center gap-2 rounded-full bg-brand hover:bg-brand-press py-4 text-[16px] font-bold text-white shadow-lg shadow-brand/20 transition-all"
+          >
+            <Printer className="size-5" />
+            <span>Print something else</span>
+            <span className="flex size-6 items-center justify-center rounded-full bg-white/20 text-white ml-1">
+              <ChevronRight className="size-4" strokeWidth={2.5} />
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );

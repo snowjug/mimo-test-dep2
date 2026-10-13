@@ -12,10 +12,15 @@ import { cn } from "../ui/utils";
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span
-      className={cn("select-none text-[26px] leading-none text-brand dark:text-ink", className)}
+      className={cn("relative select-none text-[26px] leading-none text-brand", className)}
       style={{ fontFamily: "'Lovelo', sans-serif", fontWeight: 900, letterSpacing: "0.02em" }}
     >
       MIMO
+      <span
+        className="absolute -top-1 -right-2 text-yellow-400 text-[10px]"
+        aria-hidden
+        style={{ fontFamily: "sans-serif", fontWeight: 900, letterSpacing: 0, lineHeight: 1 }}
+      >✦</span>
     </span>
   );
 }
