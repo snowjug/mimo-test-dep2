@@ -10,6 +10,7 @@
   "GET /admin/hardware",
   "GET /admin/hr-overview",
   "GET /admin/incidents",
+  "GET /admin/issues",
   "GET /admin/jobs",
   "GET /admin/kiosks",
   "GET /admin/metrics",
