@@ -65,7 +65,8 @@ function parseRange(query = {}, now = Date.now()) {
   if (to - from > MAX_RANGE_DAYS * DAY_MS) throw httpError(400, `Range cannot exceed ${MAX_RANGE_DAYS} days`);
 
   const granularity = to - from <= 2 * DAY_MS ? "hour" : "day";
-  return { from, to, tzOffset, offsetMs, granularity, length: to - from };
+  const dateBasis = query.dateBasis === "payment" ? "payment" : "created";
+  return { from, to, tzOffset, offsetMs, granularity, length: to - from, dateBasis };
 }
 
 function httpError(status, message) {
@@ -102,12 +103,13 @@ const methodLabel = (raw, amount) => {
 };
 
 /** Merges `orders` and `payment_transactions` documents into one record per orderId. */
-function normalizeOrders(orderDocs = [], txnDocs = []) {
+function normalizeOrders(orderDocs = [], txnDocs = [], refundDocs = []) {
   const byId = new Map();
   const absorb = (d, source) => {
     const orderId = d.orderId || d.id;
     if (!orderId) return;
     const status = normStatus(d.refundStatus === "SUCCESS" ? "REFUNDED" : d.status || d.orderStatus || d.transactionStatus?.status);
+    const rawRefundAmount = d.refundAmount !== undefined && d.refundAmount !== null ? round2(num(d.refundAmount)) : null;
     const rec = {
       orderId,
       userId: d.userId || null,
@@ -116,13 +118,15 @@ function normalizeOrders(orderDocs = [], txnDocs = []) {
       method: d.paymentMethod || null,
       createdAtMs: toMillis(d.createdAt),
       paidAtMs: toMillis(d.paymentDetails?.paidAt ?? d.transactionStatus?.completedAt ?? d.paymentTime),
-      refundedAtMs: toMillis(d.refundedAt),
+      refundedAtMs: toMillis(d.refundedAt ?? d.cashfreeRefundResponse?.processed_at ?? d.cashfreeResponse?.processed_at),
+      refundAmount: rawRefundAmount,
       couponCode: d.couponCode || null,
       discountPercentage: num(d.discountPercentage),
       coinsUsed: num(d.coinsUsed),
       refundStatus: d.refundStatus || null,
       gatewayRef: d.cashfreePaymentId || null,
       pages: num(d.totalPages),
+      isPriorPeriodRefund: d.isPriorPeriodRefund === true,
       sources: [source],
     };
     const prev = byId.get(orderId);
@@ -136,12 +140,39 @@ function normalizeOrders(orderDocs = [], txnDocs = []) {
       method: best.method || other.method,
       gatewayRef: best.gatewayRef || other.gatewayRef,
       couponCode: best.couponCode || other.couponCode,
+      paidAtMs: best.paidAtMs || other.paidAtMs,
+      refundedAtMs: best.refundedAtMs || other.refundedAtMs,
+      refundAmount: best.refundAmount !== null && best.refundAmount !== undefined ? best.refundAmount : other.refundAmount,
+      isPriorPeriodRefund: best.isPriorPeriodRefund || other.isPriorPeriodRefund,
       sources: [...prev.sources, source],
     });
   };
   orderDocs.forEach((d) => absorb(d, "orders"));
   txnDocs.forEach((d) => absorb(d, "payment_transactions"));
-  return [...byId.values()].map((o) => ({ ...o, method: methodLabel(o.method, o.amount) }));
+
+  if (Array.isArray(refundDocs)) {
+    for (const r of refundDocs) {
+      if (!r.orderId || r.status === "CASHFREE_FAILED") continue;
+      const existing = byId.get(r.orderId);
+      if (existing) {
+        if (existing.refundAmount === null || existing.refundAmount === undefined) {
+          existing.refundAmount = round2(num(r.refundAmount));
+        }
+        if (!existing.refundedAtMs) {
+          existing.refundedAtMs = toMillis(r.initiatedAt);
+        }
+        if (existing.status !== "REFUNDED") {
+          existing.status = "REFUNDED";
+        }
+      }
+    }
+  }
+
+  return [...byId.values()].map((o) => ({
+    ...o,
+    method: methodLabel(o.method, o.amount),
+    refundAmount: o.status === "REFUNDED" && (o.refundAmount === null || o.refundAmount === undefined) ? o.amount : o.refundAmount,
+  }));
 }
 
 function normalizeJobs(jobDocs = []) {
@@ -183,20 +214,43 @@ const isFailed = (j) => FAILED_JOB_STATUSES.has(j.status);
 
 // ─────────────────────────────── aggregation ───────────────────────────────
 
-function summarize({ orders, jobs, newUsers = 0 }) {
-  const paid = orders.filter((o) => PAID_STATUSES.has(o.status));
-  const refunded = orders.filter((o) => o.status === "REFUNDED");
+function summarize({ orders, jobs, newUsers = 0, truncated = false, fromMs, toMs }) {
+  const paid = orders.filter((o) => PAID_STATUSES.has(o.status) && !o.isPriorPeriodRefund);
+  const refunded = orders.filter((o) => {
+    const hasRefund = o.status === "REFUNDED" || (o.refundAmount !== null && o.refundAmount !== undefined && o.refundAmount > 0);
+    if (!hasRefund) return false;
+    if (Number.isFinite(fromMs) && Number.isFinite(toMs)) {
+      const refTime = o.refundedAtMs || o.createdAtMs;
+      if (Number.isFinite(refTime)) {
+        return refTime >= fromMs && refTime < toMs;
+      }
+    }
+    return true;
+  });
   const pending = orders.filter((o) => o.status === "INITIATED" || o.status === "PENDING");
   const failedPay = orders.filter((o) => o.status === "FAILED");
   const revenue = round2(paid.reduce((a, o) => a + o.amount, 0));
-  const refundedAmount = round2(refunded.reduce((a, o) => a + o.amount, 0));
+  const refundedAmount = round2(refunded.reduce((a, o) => a + (o.refundAmount !== null && o.refundAmount !== undefined ? o.refundAmount : o.amount), 0));
   const done = jobs.filter(isDone);
   const failed = jobs.filter(isFailed);
   const finished = done.length + failed.length;
+
+  const waJobs = jobs.filter((j) => j.orderId && String(j.orderId).startsWith("WA-"));
+  const waConfirmed = waJobs.filter((j) => isDone(j) && !String(j.orderId).startsWith("WA-FREE-"));
+  const whatsappAudit = {
+    totalJobs: waJobs.length,
+    confirmedJobs: waConfirmed.length,
+    estimatedJobCost: round2(waConfirmed.reduce((a, j) => a + (j.cost || 0), 0)),
+    reconciliationStatus: "unreconciled_gateway_records_missing",
+    note: "WhatsApp orders currently lack payment_transactions and Cashfree gateway reference records in Firestore. Not included in verified gateway collections.",
+  };
+
   return {
     revenue,
+    grossCollections: revenue,
     refundedAmount,
     netRevenue: round2(revenue - refundedAmount),
+    netCollections: round2(revenue - refundedAmount),
     orders: paid.length,
     paidOrders: paid.filter((o) => o.amount > 0).length,
     freeOrders: paid.filter((o) => o.amount === 0).length,
@@ -213,6 +267,8 @@ function summarize({ orders, jobs, newUsers = 0 }) {
     bwPages: done.filter((j) => !j.isColor).reduce((a, j) => a + j.pages, 0),
     successRate: finished ? round2((done.length / finished) * 100) : null,
     newUsers,
+    whatsappAudit,
+    completeness: truncated ? "PARTIAL_RECORDS_TRUNCATED" : "COMPLETE",
   };
 }
 
@@ -234,13 +290,20 @@ function buildSeries({ orders, jobs }, range) {
   }
   const at = (ms) => rows.get(bucketKey(ms, range.offsetMs, range.granularity));
   for (const o of orders) {
-    const row = Number.isFinite(o.createdAtMs) && at(o.createdAtMs);
-    if (!row) continue;
-    if (PAID_STATUSES.has(o.status)) {
-      row.revenue = round2(row.revenue + o.amount);
-      row.orders += 1;
+    const revTimeMs = range.dateBasis === "payment" ? (o.paidAtMs || o.createdAtMs) : o.createdAtMs;
+    const revRow = Number.isFinite(revTimeMs) && at(revTimeMs);
+    if (revRow && PAID_STATUSES.has(o.status) && !o.isPriorPeriodRefund) {
+      revRow.revenue = round2(revRow.revenue + o.amount);
+      revRow.orders += 1;
     }
-    if (o.status === "REFUNDED") row.refunds = round2(row.refunds + o.amount);
+    if (o.status === "REFUNDED" || (o.refundAmount !== null && o.refundAmount !== undefined && o.refundAmount > 0)) {
+      const refTimeMs = o.refundedAtMs || revTimeMs;
+      const refRow = Number.isFinite(refTimeMs) && at(refTimeMs);
+      if (refRow) {
+        const refAmt = o.refundAmount !== null && o.refundAmount !== undefined ? o.refundAmount : o.amount;
+        refRow.refunds = round2(refRow.refunds + refAmt);
+      }
+    }
   }
   for (const j of jobs) {
     const row = Number.isFinite(j.createdAtMs) && at(j.createdAtMs);
@@ -348,17 +411,29 @@ async function countNewUsers(db, Timestamp, fromMs, toMs) {
   }
 }
 
-/** Refund documents that are not already reflected on an order (e.g. admin refunds of legacy orders). */
-function refundsAsOrders(refundDocs, knownOrderIds) {
+/** Refund documents that are not already reflected on an order (e.g. admin refunds of prior-period orders). */
+function refundsAsOrders(refundDocs = [], knownOrderIds = new Set()) {
   return refundDocs
     .filter((r) => r.orderId && !knownOrderIds.has(r.orderId) && r.status !== "CASHFREE_FAILED")
-    .map((r) => ({ orderId: r.orderId, userId: r.userId, amount: num(r.refundAmount), status: "REFUNDED", createdAt: r.initiatedAt, refundStatus: "SUCCESS" }));
+    .map((r) => ({
+      orderId: r.orderId,
+      userId: r.userId || null,
+      amount: 0, // Prior period order: gross customer collections in THIS window is 0
+      refundAmount: round2(num(r.refundAmount)),
+      status: "REFUNDED",
+      createdAt: r.initiatedAt,
+      refundedAt: r.initiatedAt,
+      paidAtMs: null,
+      refundedAtMs: toMillis(r.initiatedAt),
+      refundStatus: "SUCCESS",
+      isPriorPeriodRefund: true,
+    }));
 }
 
 /** Full analytics payload for the admin dashboard / finance portal. */
 async function getAnalytics(db, Timestamp, range, { compare = true } = {}) {
   const window = await loadWindow(db, Timestamp, range.from, range.to);
-  const orders = normalizeOrders(window.orders, window.txns);
+  const orders = normalizeOrders(window.orders, window.txns, window.refunds);
   orders.push(...normalizeOrders(refundsAsOrders(window.refunds, new Set(orders.map((o) => o.orderId)))));
   const jobs = normalizeJobs(window.jobs);
   const newUsers = await countNewUsers(db, Timestamp, range.from, range.to);
@@ -367,22 +442,35 @@ async function getAnalytics(db, Timestamp, range, { compare = true } = {}) {
   if (compare) {
     const prevFrom = range.from - range.length;
     const prev = await loadWindow(db, Timestamp, prevFrom, range.from);
-    const prevOrders = normalizeOrders(prev.orders, prev.txns);
+    const prevOrders = normalizeOrders(prev.orders, prev.txns, prev.refunds);
     prevOrders.push(...normalizeOrders(refundsAsOrders(prev.refunds, new Set(prevOrders.map((o) => o.orderId)))));
     previous = {
       from: iso(prevFrom),
       to: iso(range.from),
-      summary: summarize({ orders: prevOrders, jobs: normalizeJobs(prev.jobs), newUsers: await countNewUsers(db, Timestamp, prevFrom, range.from) }),
+      summary: summarize({ orders: prevOrders, jobs: normalizeJobs(prev.jobs), newUsers: await countNewUsers(db, Timestamp, prevFrom, range.from), truncated: prev.truncated, fromMs: prevFrom, toMs: range.from }),
     };
   }
 
   return {
-    range: { from: iso(range.from), to: iso(range.to), granularity: range.granularity, tzOffset: range.tzOffset },
-    current: summarize({ orders, jobs, newUsers }),
+    range: { from: iso(range.from), to: iso(range.to), granularity: range.granularity, tzOffset: range.tzOffset, dateBasis: range.dateBasis || "created" },
+    current: summarize({ orders, jobs, newUsers, truncated: window.truncated, fromMs: range.from, toMs: range.to }),
     previous,
     series: buildSeries({ orders, jobs }, range),
     ...breakdowns({ orders, jobs }, range),
     truncated: window.truncated,
+    metadata: {
+      dateBasis: range.dateBasis || "created",
+      dateBasisNote: "Payment date bucketing applies to records loaded in the active creation window. Firestore queries are bounded by document creation timestamp.",
+      timezone: "Asia/Kolkata",
+      currency: "INR",
+      isTruncated: window.truncated,
+      settlementDataAvailable: false,
+      settlementNote: "Cashfree bank settlements (UTR and gateway fee deductions) are not stored in Firestore. Reconcile with Cashfree Settlement dashboard.",
+      whatsappAudit: {
+        status: "unreconciled_gateway_records_missing",
+        note: "WhatsApp orders currently lack payment_transactions and Cashfree gateway reference records in Firestore."
+      }
+    },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -407,4 +495,5 @@ module.exports = {
   getAnalytics,
   isDone,
   isFailed,
+  refundsAsOrders,
 };

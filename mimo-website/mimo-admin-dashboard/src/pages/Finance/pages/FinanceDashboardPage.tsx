@@ -117,11 +117,12 @@ export const FinanceDashboardPage: React.FC<FinanceDashboardPageProps> = ({ anal
   const cur = a?.current;
 
   const allMonthlyData = useMemo(() => {
-    const livGross  = cur?.revenue          ?? 1409.60;
-    const livRef    = cur?.refundedAmount   ?? 35.00;
-    const livNet    = cur?.netRevenue       ?? Math.max(0, livGross - livRef);
-    const livOrders = cur?.orders           ?? 161;
-    const livPages  = cur?.pages            ?? 418;
+    if (!cur) return HISTORICAL_MONTHS;
+    const livGross  = cur.grossCollections ?? cur.revenue ?? 0;
+    const livRef    = cur.refundedAmount   ?? 0;
+    const livNet    = cur.netCollections   ?? cur.netRevenue ?? Math.max(0, livGross - livRef);
+    const livOrders = cur.orders           ?? 0;
+    const livPages  = cur.pages            ?? 0;
     return [
       ...HISTORICAL_MONTHS,
       {
@@ -199,9 +200,9 @@ export const FinanceDashboardPage: React.FC<FinanceDashboardPageProps> = ({ anal
 
       {/* ── KPI Tiles ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiBadge label="Total Gross Revenue" value={inr(totalGross)} sub={`${int(totalOrders)} orders since Month 1 (${startMonth.month})`} accent="indigo" icon={<IndianRupee className="w-4 h-4" />} />
-        <KpiBadge label="Total Refunds Issued" value={inr(totalRefunds)} sub={`${totalGross > 0 ? ((totalRefunds / totalGross) * 100).toFixed(1) : 0}% of gross billings`} accent="rose" icon={<RotateCcw className="w-4 h-4" />} />
-        <KpiBadge label="Net Settled (In Bank)" value={inr(totalNet)} sub="All-time gross minus refunds" accent="emerald" icon={<Landmark className="w-4 h-4" />} />
+        <KpiBadge label="Total Gross Revenue" value={cur ? inr(totalGross) : '—'} sub={cur ? `${int(totalOrders)} orders since Month 1 (${startMonth.month})` : 'Awaiting sync...'} accent="indigo" icon={<IndianRupee className="w-4 h-4" />} />
+        <KpiBadge label="Total Refunds Issued" value={cur ? inr(totalRefunds) : '—'} sub={cur ? `${totalGross > 0 ? ((totalRefunds / totalGross) * 100).toFixed(1) : 0}% of gross billings` : '—'} accent="rose" icon={<RotateCcw className="w-4 h-4" />} />
+        <KpiBadge label="Net Settled (In Bank)" value={cur ? inr(totalNet) : '—'} sub={cur ? "All-time gross minus refunds" : "—"} accent="emerald" icon={<Landmark className="w-4 h-4" />} />
       </div>
 
       {/* ── Growth from Month 1 Chart ── */}

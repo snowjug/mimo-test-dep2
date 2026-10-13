@@ -9,6 +9,7 @@
   "GET /admin/company-activity",
   "GET /admin/coupons",
   "GET /admin/employees",
+  "GET /admin/finance-sheet",
   "GET /admin/gang/login-streaks",
   "GET /admin/gang/marketing-tasks",
   "GET /admin/gang/technical-tasks",
