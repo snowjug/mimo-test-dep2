@@ -97,26 +97,16 @@ function AdSlide({ ad }: { ad: Ad }) {
  * - Opens the ad link in a new tab when tapped (if a link is configured) -- suppressed after an actual
  *   drag so a swipe never accidentally triggers the link.
  */
-const DEFAULT_CAMPUS_ADS: Ad[] = [
-  {
-    id: "mimo-advertise-banner",
-    imageUrl: "/images/mimo-advertise-banner.png",
-    link: "https://wa.me/919364028349?text=Namastey%20MIMO,%20I%20want%20to%20partner%20with%20MIMO%20at%20my%20campus!",
-    caption: null,
-  },
-  {
-    id: "mimo-campus-banner",
-    imageUrl: "/images/mimo-campus-banner.jpg",
-    link: "https://wa.me/919364028349?text=Namastey%20MIMO,%20I%20want%20to%20partner%20with%20MIMO%20at%20my%20campus!",
-    caption: null,
-  },
-];
-
 export function AdBanner() {
   const ads = useAds();
-  const activeAds = ads && ads.length > 0 
-    ? (ads.some((a) => a.id === "mimo-advertise-banner") ? ads : [...DEFAULT_CAMPUS_ADS, ...ads])
-    : DEFAULT_CAMPUS_ADS;
+
+  // Strictly use only ads managed via the admin dashboard.
+  // Never append or fallback to extra hardcoded banners.
+  if (!ads || ads.length === 0) {
+    return null;
+  }
+
+  const activeAds = ads;
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
