@@ -252,6 +252,10 @@ class ListenerTestCase(unittest.TestCase):
             mock.patch.object(listener, "db", self.db),
             mock.patch.object(listener.subprocess, "run", self.sub),
             mock.patch.object(listener, "report_print_failure", self.report),
+            # Retry delays (download exceptions, and now a validation failure after a nominally-successful
+            # download) use real time.sleep; mocking it keeps tests fast and deterministic, matching the
+            # existing convention in test_download_retry.py.
+            mock.patch.object(listener.time, "sleep"),
         ]
         if self.MOCK_PRINT_FILE:
             patches.append(mock.patch.object(listener, "print_file", self.print_file))
@@ -378,6 +382,44 @@ class ProcessJobInputTests(ListenerTestCase):
         self.assert_failed_once_without_printing()
         self.assertIn("Downloaded file is invalid", self.report.call_args[0][1], "must be stopped at acquisition")
         self.assertFalse(os.path.exists(cache), "the invalid cache must never be used as a fallback")
+        self.assert_no_leftover_files()
+
+    def test_06b_a_truncated_first_download_is_retried_and_the_job_succeeds(self):
+        # Regression test for a real production incident (2026-10-13, jobs L4Hsnj9YR1jsozjhCJuf and
+        # gVmhrD2pjG3WJ85DyfoR): a download that completes with no exception can still be silently
+        # truncated on a flaky connection. Before this fix, a single bad download failed the whole job
+        # outright with no retry, even though download_file's own exception-based retry exists for the
+        # exact same class of problem. Here the download "succeeds" (no exception) but writes a truncated
+        # file on the first attempt, and a valid one on the second -- the job must recover on its own.
+        calls = {"n": 0}
+
+        def flaky_content(filename):
+            calls["n"] += 1
+            with open(filename, "wb") as fh:
+                fh.write(TRUNCATED_PDF if calls["n"] == 1 else VALID_PDF)
+
+        self.bucket.store["uploads/a.pdf"] = flaky_content
+        self.run_job(job("job06b", [entry("uploads/a.pdf")]))
+        self.report.assert_not_called()
+        self.assertEqual(calls["n"], 2, "the download must be retried once after the first validation failure")
+        self.assertEqual(len(self.handed_off_paths()), 1)
+        self.assert_no_leftover_files()
+
+    def test_06c_a_download_that_never_validates_still_fails_after_bounded_retries(self):
+        # The complementary case to 06b: a persistently truncated source must still fail (not retry
+        # forever), and still report the real, specific reason -- not a generic message.
+        calls = {"n": 0}
+
+        def always_truncated(filename):
+            calls["n"] += 1
+            with open(filename, "wb") as fh:
+                fh.write(TRUNCATED_PDF)
+
+        self.bucket.store["uploads/a.pdf"] = always_truncated
+        self.run_job(job("job06c", [entry("uploads/a.pdf")]))
+        self.assert_failed_once_without_printing()
+        self.assertIn("PDF is truncated (no %%EOF marker)", self.report.call_args[0][1])
+        self.assertEqual(calls["n"], listener.VALIDATION_RETRY_ATTEMPTS, "bounded, not unbounded, retries")
         self.assert_no_leftover_files()
 
     def test_07_download_failure_fails_job(self):
@@ -691,7 +733,12 @@ class MergeAndFinalGateTests(ListenerTestCase):
         bad = self.write(os.path.join(self.tmp, "final.pdf"), TRUNCATED_PDF)
         doc_ref = self.db.document("jobG")
         result = listener.print_file([bad], 1, None, listener.BW_PRINTER_NAME, doc_ref=doc_ref)
-        self.assertIs(result, False)
+        # print_file now returns the specific validation reason alongside False (previously a bare False),
+        # so process_job's caller can report that real reason instead of a generic "CUPS error on Pi" --
+        # still `is not None` and `is not True`, so process_job's existing identity checks are unaffected.
+        self.assertIsInstance(result, tuple)
+        self.assertIs(result[0], False)
+        self.assertIn("PDF is truncated (no %%EOF marker): final.pdf", result[1])
         self.assertNotIn("lp", self.sub.tools(), "lp must not execute when the final check fails")
         self.report.assert_not_called()  # print_file does not report; process_job owns reporting
         self.wait_for_cups.assert_not_called()
@@ -708,7 +755,9 @@ class MergeAndFinalGateTests(ListenerTestCase):
         self.assertEqual(self.sub.lp_calls, [])
         self.assertNotIn("lp", self.sub.tools())
         self.assertEqual(self.report.call_count, 1)
-        self.assertEqual(self.report.call_args[0][1], "CUPS error on Pi")
+        # Was the generic "CUPS error on Pi" before this fix -- production incident 2026-10-13 showed
+        # exactly that unhelpful message for a real truncated-PDF failure (job tr5VvvOw5tz88NqCpkxw).
+        self.assertIn("PDF is truncated (no %%EOF marker): sliced_corrupt.pdf", self.report.call_args[0][1])
 
     def test_G3_final_gate_accepts_valid_single_file(self):
         good = self.write(os.path.join(self.tmp, "ok.pdf"), make_pdf(2))
