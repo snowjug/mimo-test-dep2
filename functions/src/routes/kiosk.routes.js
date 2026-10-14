@@ -314,14 +314,30 @@ function createKioskRouter(dependencies) {
             throw new Error("TX_ABORT");
           }
 
-          // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
+          // Sort in memory, most recent first (used below for the "already redeemed" fallback path).
           const sortedDocs = querySnap.docs.sort((a, b) => {
             const timeA = a.data().createdAt?.toDate ? a.data().createdAt.toDate().getTime() : 0;
             const timeB = b.data().createdAt?.toDate ? b.data().createdAt.toDate().getTime() : 0;
             return timeB - timeA;
           });
 
-          const jobDoc = sortedDocs[0];
+          // Print-code allocation is now atomic (printCode.service.js) and this should never find more than
+          // one "paid" (freshly redeemable) job for the same code -- but this used to silently pick
+          // "most recent overall" regardless of status, which is exactly backwards: a genuine collision
+          // between an OLD code's stale job (completed/failed/refunded) and a NEW customer's "paid" job
+          // would hand the NEW customer's documents to whoever redeems the OLD code's number, and vice
+          // versa. A real production incident served one customer's own, correctly-paid code with a
+          // DIFFERENT customer's print job this way. If this still ever finds >1 "paid" match (e.g. from
+          // data predating the atomic-allocation fix), fail loudly instead of guessing -- handing over the
+          // wrong customer's private documents is never an acceptable "best effort".
+          const paidDocs = sortedDocs.filter((d) => d.data().status === "paid");
+          if (paidDocs.length > 1) {
+            console.error(`[PRINT-CODE COLLISION] code ${printCode} matches ${paidDocs.length} paid jobs: ${paidDocs.map((d) => d.id).join(", ")}`);
+            transactionFailedError = { status: 409, message: "This code matched more than one order. Please contact support — do not retry." };
+            throw new Error("TX_ABORT");
+          }
+
+          const jobDoc = paidDocs[0] || sortedDocs[0];
           const jobData = jobDoc.data();
 
           // Capability-based routing validation, driven by the machine registry (looked up above, outside
