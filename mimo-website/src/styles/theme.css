@@ -267,80 +267,40 @@
 .kiosk-rise { animation: kiosk-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both; }
 .sheet-rise { animation: sheet-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-/* Liquid stream flowing around button perimeter (No rotation, true perimeter flow) */
-@keyframes liquid-stream-flow {
+/* Clean wave animation around scan button (No glowing, big & long wave ripples) */
+@keyframes scan-button-wave {
   0% {
-    stroke-dashoffset: 0;
-  }
-  100% {
-    stroke-dashoffset: -100;
-  }
-}
-
-@keyframes liquid-glow-pulse {
-  0%, 100% {
-    box-shadow: 0 0 8px 1px rgba(56, 189, 248, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 16px 3px rgba(56, 189, 248, 0.7), 0 0 24px 6px rgba(103, 232, 249, 0.4);
-  }
-}
-
-@keyframes liquid-water-ripple {
-  0% {
-    transform: scale(0.96);
-    opacity: 0.8;
+    transform: scale(1);
+    opacity: 0.65;
+    border-color: rgba(255, 255, 255, 0.5);
   }
   60% {
-    transform: scale(1.15, 1.25);
     opacity: 0.25;
+    border-color: rgba(255, 255, 255, 0.3);
   }
   100% {
-    transform: scale(1.24, 1.38);
+    transform: scale(1.85, 2.4);
     opacity: 0;
+    border-color: rgba(255, 255, 255, 0);
   }
 }
 
-.liquid-pulse-aura {
+.scan-wave {
   position: absolute;
-  inset: -1.5px;
+  inset: 0;
   border-radius: 9999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
   pointer-events: none;
-  animation: liquid-glow-pulse 2.2s ease-in-out infinite;
+  animation: scan-button-wave 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
-.liquid-ripple {
-  position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  border: 1.5px solid rgba(103, 232, 249, 0.55);
-  animation: liquid-water-ripple 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-  pointer-events: none;
+.scan-wave-delay-1 {
+  animation-delay: 1.2s;
 }
 
-.liquid-stream-glow {
-  stroke-dasharray: 28 72;
-  stroke-dashoffset: 0;
-  animation: liquid-stream-flow 2.2s linear infinite;
-  filter: blur(2.5px);
+.scan-wave-delay-2 {
+  animation-delay: 2.4s;
 }
 
-.liquid-stream-main {
-  stroke-dasharray: 22 78;
-  stroke-dashoffset: 0;
-  animation: liquid-stream-flow 2.2s linear infinite;
-}
-
-.liquid-stream-core {
-  stroke-dasharray: 10 90;
-  stroke-dashoffset: -4;
-  animation: liquid-stream-flow 2.2s linear infinite;
-}
-
-.liquid-stream-drop {
-  stroke-dasharray: 4 96;
-  stroke-dashoffset: 8;
-  animation: liquid-stream-flow 2.2s linear infinite;
-}
 
 
