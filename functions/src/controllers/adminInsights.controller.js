@@ -440,15 +440,66 @@ const getAdminIncidents = async (req, res) => {
       }
     }
     let failedShown = 0;
+    const failedDocs = [];
     failedSnap.forEach((d) => {
       const j = d.data();
       if (!["failed", "refunded"].includes(String(j.status || "").toLowerCase()) || failedShown >= 200) return;
       failedShown += 1;
-      incidents.push({ id: `job-${d.id}`, type: "print_failed", severity: "high", kioskId: j.kioskId || j.printDestination || null, title: `Print failed${j.kioskId ? ` on ${j.kioskId}` : ""}`, detail: j.printerStatus || j.error || j.fileName || "Job failed", at: A.iso(A.toMillis(j.createdAt)), jobId: d.id, orderId: j.orderId || null, refundStatus: j.refundStatus || null, tab: "operations" });
+      failedDocs.push({ id: d.id, ...j });
     });
+
+    const userMap = await lookupUsers(failedDocs.map((d) => d.userId));
+
+    for (const j of failedDocs) {
+      const u = userMap.get(j.userId);
+      const kid = j.kioskId || j.printDestination || j.printOptions?.directKioskId || null;
+      const userEmail = j.userEmail || u?.email || (j.source === "whatsapp" ? j.userId : null) || (j.userId ? "Registered User" : null);
+      const userName = j.userName || j.name || u?.name || (j.source === "whatsapp" ? "WhatsApp Customer" : null);
+      const userPhone = j.userPhone || j.phoneNumber || u?.phone || (j.source === "whatsapp" ? j.userId : null);
+      const failureReason = j.printerStatus || j.error || "Job failed";
+
+      incidents.push({
+        id: `job-${j.id}`,
+        type: "print_failed",
+        severity: "high",
+        kioskId: kid,
+        title: `Print failed${kid ? ` on ${kid}` : ""}`,
+        detail: j.printerStatus || j.error || j.fileName || "Job failed",
+        at: A.iso(A.toMillis(j.createdAt)),
+        jobId: j.id,
+        orderId: j.orderId || null,
+        userId: j.userId || null,
+        userName,
+        userEmail,
+        userPhone,
+        fileName: j.fileName || null,
+        failureReason,
+        status: j.status || "failed",
+        refundStatus: j.refundStatus || null,
+        refundAmount: j.refundAmount || null,
+        amount: j.totalCost || j.amount || null,
+        pageCount: j.pageCount || null,
+        copies: j.copies || 1,
+        colorMode: j.colorMode || null,
+        tab: "operations",
+      });
+    }
+
     refundSnap.forEach((d) => {
       const r = d.data();
-      incidents.push({ id: `refund-${d.id}`, type: "refund_request", severity: "medium", kioskId: null, title: "Refund request awaiting review", detail: `Order ${r.orderId} · ₹${A.num(r.amount)}${r.reason ? ` · ${r.reason}` : ""}`, at: A.iso(A.toMillis(r.requestedAt)), orderId: r.orderId, tab: "incidents" });
+      incidents.push({
+        id: `refund-${d.id}`,
+        type: "refund_request",
+        severity: "medium",
+        kioskId: r.kioskId || null,
+        title: "Refund request awaiting review",
+        detail: `Order ${r.orderId} · ₹${A.num(r.amount)}${r.reason ? ` · ${r.reason}` : ""}`,
+        at: A.iso(A.toMillis(r.requestedAt)),
+        orderId: r.orderId,
+        failureReason: r.reason || "Customer requested refund",
+        amount: r.amount || null,
+        tab: "incidents",
+      });
     });
 
     incidents.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || (A.toMillis(b.at) || 0) - (A.toMillis(a.at) || 0));

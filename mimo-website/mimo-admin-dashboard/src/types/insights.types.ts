@@ -305,7 +305,19 @@ export interface Incident {
   tab: string;
   jobId?: string;
   orderId?: string | null;
+  userId?: string | null;
+  userName?: string | null;
+  userEmail?: string | null;
+  userPhone?: string | null;
+  fileName?: string | null;
+  failureReason?: string | null;
+  status?: string | null;
+  amount?: number | null;
   refundStatus?: string | null;
+  refundAmount?: number | null;
+  pageCount?: number | null;
+  copies?: number | null;
+  colorMode?: string | null;
 }
 
 export interface IncidentsResponse {
