@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check, MessageCircle, ShieldCheck } from "lucide-react";
+import { Copy, Check, MessageCircle, ShieldCheck, Printer } from "lucide-react";
 import { MimoHeader } from "../components/mimo-header";
 import { Group, PrimaryButton, Row, SecondaryButton, StatusPill } from "../components/mimo/ui";
 import { toast } from "sonner";
@@ -23,6 +23,10 @@ export function PrintCode() {
           sessionStorage.setItem("printCode", code);
           const kioskId = localStorage.getItem("mimo_directKioskId") || "";
           if (kioskId) sessionStorage.setItem("directKioskId", kioskId);
+          const localOpts = localStorage.getItem("mimo_printOptions");
+          if (localOpts && !sessionStorage.getItem("printOptions")) {
+            sessionStorage.setItem("printOptions", localOpts);
+          }
         }
       }
       // Always clean up localStorage entry regardless — one-time use
@@ -31,6 +35,25 @@ export function PrintCode() {
       localStorage.removeItem("mimo_directKioskId");
     }
     return code;
+  });
+  const [colorMode] = useState<string>(() => {
+    try {
+      const stored = sessionStorage.getItem("printOptions");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.colorMode) return parsed.colorMode;
+      }
+    } catch {}
+    const localColor = localStorage.getItem("mimo_colorMode");
+    if (localColor) return localColor;
+    try {
+      const storedLocal = localStorage.getItem("mimo_printOptions");
+      if (storedLocal) {
+        const parsedLocal = JSON.parse(storedLocal);
+        if (parsedLocal.colorMode) return parsedLocal.colorMode;
+      }
+    } catch {}
+    return "bw";
   });
   const [files, setFiles] = useState<any[]>(() => {
     const storedFiles = sessionStorage.getItem("printFiles");
@@ -78,6 +101,8 @@ export function PrintCode() {
       sessionStorage.removeItem("uploadTotalPages");
       sessionStorage.removeItem("totalPages");
       sessionStorage.removeItem("printStatus");
+      localStorage.removeItem("mimo_colorMode");
+      localStorage.removeItem("mimo_printOptions");
       
       setTimeout(() => {
         navigate("/upload", { replace: true });
@@ -202,6 +227,9 @@ export function PrintCode() {
     toast.success("Code copied to clipboard!");
   };
 
+  const isColor = colorMode === "color";
+  const isBlackAndWhite = !isColor;
+
   const handleDone = () => {
     // Clear ALL session storage to ensure a completely fresh start for next job
     sessionStorage.removeItem("printCode");
@@ -212,6 +240,8 @@ export function PrintCode() {
     sessionStorage.removeItem("uploadTotalPages");
     sessionStorage.removeItem("totalPages");
     sessionStorage.removeItem("printStatus");
+    localStorage.removeItem("mimo_colorMode");
+    localStorage.removeItem("mimo_printOptions");
     navigate("/upload");
   };
 
@@ -271,6 +301,50 @@ export function PrintCode() {
           <Copy className="size-4" /> Copy code
         </button>
         <p className="mx-auto mt-4 max-w-[30ch] text-[15px] text-ink-2">{subtitle}</p>
+
+        {isBlackAndWhite ? (
+          <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-brand/15 bg-brand-soft/70 p-4 text-left shadow-sm">
+            <div className="flex items-start gap-3.5">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+                <Printer className="size-5" strokeWidth={2} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-[14px] font-semibold text-ink">
+                    Valid on MIMO 1.0 & MIMO 2.0
+                  </p>
+                  <span className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand-text">
+                    B&W
+                  </span>
+                </div>
+                <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                  This code is valid for both machines. You can enter it on either <strong>MIMO 1.0</strong> or <strong>MIMO 2.0</strong> to get your printout.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : isColor ? (
+          <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-hairline bg-surface p-4 text-left shadow-sm">
+            <div className="flex items-start gap-3.5">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink">
+                <Printer className="size-5" strokeWidth={2} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-[14px] font-semibold text-ink">
+                    Collect at MIMO 2.0
+                  </p>
+                  <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
+                    Colour
+                  </span>
+                </div>
+                <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                  Colour printing is available only on <strong>MIMO 2.0</strong>. Please enter your code at the MIMO 2.0 kiosk.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <Group className="mt-8" bodyClassName="px-4 py-4">

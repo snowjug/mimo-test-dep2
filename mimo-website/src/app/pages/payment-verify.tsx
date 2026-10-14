@@ -39,6 +39,10 @@ export function PaymentVerify() {
               sessionStorage.setItem("directKioskId", directKioskId);
               localStorage.setItem("mimo_directKioskId", directKioskId);
             }
+            const storedLocalOptions = localStorage.getItem("mimo_printOptions");
+            if (storedLocalOptions && !sessionStorage.getItem("printOptions")) {
+              sessionStorage.setItem("printOptions", storedLocalOptions);
+            }
             toast.success("Payment confirmed!");
             setTimeout(() => {
               navigate("/print-code");

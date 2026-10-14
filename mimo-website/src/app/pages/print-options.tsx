@@ -395,8 +395,7 @@ export function PrintOptions() {
     // Clean the Kiosk ID for the backend (SV-002-COLOR -> SV-002)
     const cleanKioskId = directKioskId?.startsWith("SV-002") ? "SV-002" : directKioskId;
 
-    // Store print options for payment page
-    sessionStorage.setItem("printOptions", JSON.stringify({
+    const optionsPayload = {
       copies: Number(copies) || 1,
       colorMode,
       doubleSided,
@@ -410,7 +409,12 @@ export function PrintOptions() {
       totalCost,
       totalPages: actualPages, // Store actual printable pages per set
       directKioskId: cleanKioskId
-    }));
+    };
+
+    // Store print options for payment page and fallback for redirects
+    sessionStorage.setItem("printOptions", JSON.stringify(optionsPayload));
+    localStorage.setItem("mimo_colorMode", colorMode);
+    localStorage.setItem("mimo_printOptions", JSON.stringify(optionsPayload));
 
     navigate("/payment");
   };
