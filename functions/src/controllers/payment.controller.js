@@ -790,9 +790,11 @@ const postPaymentSuccess = async (req, res) => {
         }
       }
 
-      // All reads are done. generateUniquePrintCode only performs reads (no writes), so calling it here is still
-      // safe with respect to Firestore's "all reads before any writes" transaction rule.
-      const printCode = await generateUniquePrintCode(db);
+      // generateUniquePrintCode now also WRITES a claim doc (see printCode.service.js) -- passing this
+      // transaction so that write joins it instead of opening a second, illegally-nested transaction. The
+      // claim's own read (of print_code_claims/{code}) still happens before this transaction's other writes,
+      // so Firestore's "all reads before any writes" rule is still satisfied.
+      const printCode = await generateUniquePrintCode(db, tx);
       let directKioskId = null;
 
       let coinsToCharge = 0;
