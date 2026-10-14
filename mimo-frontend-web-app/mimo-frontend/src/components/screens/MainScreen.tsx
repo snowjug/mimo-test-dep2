@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { CV001BellsDecor } from './CV001BellsDecor';
+import { motion } from 'motion/react';
+import { ArrowRight, Check, CaretRight } from '@phosphor-icons/react';
+import { DiyaRow, FestiveBackdrop, Kalash, Lotus, OrnamentDivider, ZariBorder } from '../festive/NavaratriDecor';
 import { isFestivalActive } from '../../config/festivalConfig';
 
 interface MainScreenProps {
@@ -8,10 +10,8 @@ interface MainScreenProps {
     kioskId?: string | null;
 }
 
-
-
 export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskId }) => {
-    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+    const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
     const isSV002 = kioskId === 'SV-002';
     const [isDragging, setIsDragging] = useState(false);
     const [dragX, setDragX] = useState(0);
@@ -106,201 +106,339 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
         };
     }, [isDragging, isUnlocked, onNext]);
 
+    const thumbWidth = thumbRef.current?.offsetWidth || 240;
+    const fillWidth = dragX + thumbWidth / 2 + TRACK_PADDING;
+
+    const swipeTrack = (
+        <div className="relative z-10 flex w-full justify-center px-6">
+            <div
+                ref={trackRef}
+                className={`relative h-[88px] w-full max-w-[620px] overflow-hidden rounded-full border transition-colors duration-300 ${
+                    isFestiveMode
+                        ? `border-gold-600/50 ${isUnlocked ? 'bg-success-500/10' : 'bg-white/75'} shadow-[inset_0_0_0_4px_rgba(251,246,236,0.95),inset_0_0_0_5px_rgba(201,151,62,0.35),0_14px_34px_rgba(122,18,48,0.12)]`
+                        : `border-gold-600/35 ${isUnlocked ? 'bg-success-500/10 border-success-500/40' : 'bg-white/80'} shadow-[inset_0_2px_4px_rgba(0,0,0,0.03),0_10px_30px_rgba(200,134,10,0.10)] backdrop-blur-md`
+                }`}
+                style={{ padding: TRACK_PADDING }}
+            >
+                {/* Progress fill trailing the thumb */}
+                <div
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{
+                        width: `${fillWidth}px`,
+                        background: isUnlocked
+                            ? 'linear-gradient(90deg, var(--color-success-600), var(--color-success-500))'
+                            : isFestiveMode
+                            ? 'linear-gradient(90deg, var(--color-mahogany-700), var(--color-gold-500))'
+                            : 'linear-gradient(90deg, #F0C878, #D9A544, #B8862F)',
+                        transition: isDragging ? 'none' : 'width 0.5s var(--ease-kiosk)',
+                        opacity: dragX > 0 || isUnlocked ? 1 : 0,
+                    }}
+                />
+
+                {/* Chevron affordance, fades out as the thumb travels */}
+                <div
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center gap-1"
+                    style={{ opacity: Math.max(0, 1 - dragX / 140) }}
+                >
+                    {[0, 1, 2, 3].map((i) => (
+                        <CaretRight
+                            key={i}
+                            size={22}
+                            weight="bold"
+                            className={isFestiveMode ? 'text-mahogany-600/35' : 'text-gold-600/30'}
+                        />
+                    ))}
+                </div>
+
+                {/* Draggable thumb */}
+                <div
+                    ref={thumbRef}
+                    onMouseDown={handleDragStart}
+                    onTouchStart={handleDragStart}
+                    className={`relative flex h-[72px] cursor-grab select-none items-center gap-3.5 rounded-full px-2.5 pr-7 shadow-lg active:cursor-grabbing ${
+                        isUnlocked
+                            ? 'bg-success-600 text-white ring-1 ring-success-400'
+                            : isFestiveMode
+                            ? 'bg-gradient-to-br from-mahogany-600 to-mahogany-800 ring-1 ring-gold-400/70 shadow-[0_10px_24px_rgba(122,18,48,0.35)]'
+                            : 'bg-gradient-to-r from-gold-500 via-gold-500 to-gold-600 ring-1 ring-gold-300/80 shadow-[0_6px_20px_rgba(200,134,10,0.35)]'
+                    }`}
+                    style={{
+                        transform: `translateX(${dragX}px)`,
+                        transition: isDragging ? 'none' : 'transform 0.5s var(--ease-kiosk)',
+                        width: 'fit-content',
+                    }}
+                >
+                    <span
+                        className={`flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full shadow-sm ${
+                            isUnlocked
+                                ? 'bg-white text-success-600'
+                                : isFestiveMode
+                                ? 'bg-gradient-to-br from-gold-200 to-gold-500 text-mahogany-800'
+                                : 'bg-white text-gold-700'
+                        }`}
+                    >
+                        {isUnlocked ? <Check size={26} weight="bold" /> : <ArrowRight size={24} weight="bold" />}
+                    </span>
+                    <span
+                        className={`whitespace-nowrap text-[18px] font-extrabold uppercase tracking-[0.14em] ${
+                            isUnlocked ? 'text-white' : isFestiveMode ? 'text-parchment-50' : 'text-white'
+                        }`}
+                    >
+                        {isUnlocked ? 'Unlocked' : 'Swipe to start'}
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+
+    const copyright = (
+        <footer
+            className={`relative z-10 text-center text-[13px] font-medium ${
+                isFestiveMode ? 'pb-7 text-mahogany-800/45' : 'pb-6 text-[#7C7267]'
+            }`}
+        >
+            &copy; 2026 <strong className="font-semibold text-[#5C544B]">VisionPrintt</strong>. All rights reserved.
+        </footer>
+    );
+
+    const isCV001 = kioskId === 'CV-001' || (!isSV002 && kioskId !== 'SV-002');
+
+    if (isSV002) {
+        return (
+            <div
+                className={`screen ${isActive ? 'visible' : ''} sv002-welcome-screen relative flex h-full w-full select-none overflow-hidden`}
+                style={{
+                    display: isActive ? 'flex' : 'none',
+                    backgroundColor: '#1A0A01',
+                    backgroundImage: 'url(/navratri-welcome-bg.png)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center right',
+                    backgroundRepeat: 'no-repeat',
+                }}
+            >
+                {/* Subtle cinematic amber illumination for atmosphere */}
+                <div 
+                    className="pointer-events-none absolute inset-0 z-0"
+                    style={{
+                        background: 'radial-gradient(circle 700px at 28% 45%, rgba(120, 50, 10, 0.28) 0%, transparent 70%)'
+                    }}
+                />
+
+                <main className="relative z-10 flex h-full w-full max-w-[700px] flex-col justify-between pl-16 pr-6 pt-16 pb-10">
+                    <motion.section
+                        initial={isActive ? { opacity: 0, y: 18 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex flex-col items-start text-left"
+                    >
+                        <p className="font-sans text-[15px] font-bold uppercase tracking-[0.55em] text-[#DFCBB5]">
+                            Welcome to
+                        </p>
+
+                        <div className="relative mt-2 flex items-baseline leading-none">
+                            <h1 className="font-sans text-[118px] font-black tracking-[-0.03em] text-[#EFE2CF] drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
+                                MIMO
+                            </h1>
+                            <span className="ml-3 font-sans text-[44px] font-extrabold text-[#E5B878] drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                                2.0
+                            </span>
+                        </div>
+
+                        <h2 className="mt-2 font-sans text-[32px] font-semibold text-white tracking-tight">
+                            Self-Service Printing Kiosk
+                        </h2>
+
+                        <div className="my-7 h-[1.5px] w-[140px] bg-gradient-to-r from-[#D4A559] via-[#A8793B] to-transparent" />
+
+                        <p className="font-serif text-[23px] font-medium italic leading-[1.4] text-[#E6C59E] max-w-[500px]">
+                            Happy Navaratri &mdash; may the divine bring joy, prosperity and good health.
+                        </p>
+                    </motion.section>
+
+                    <div className="flex flex-col items-start gap-5">
+                        <div className="w-full max-w-[460px]">
+                            {swipeTrack}
+                        </div>
+                        <footer className="text-[12px] font-medium text-[#A68868]/60">
+                            &copy; 2026 <strong className="font-semibold text-[#C4A480]/80">VisionPrintt</strong>. All rights reserved.
+                        </footer>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
+    if (isFestiveMode && isCV001) {
+        return (
+            <div
+                className={`screen ${isActive ? 'visible' : ''} cv001-welcome-screen relative flex h-full w-full select-none overflow-hidden`}
+                style={{
+                    display: isActive ? 'flex' : 'none',
+                    backgroundColor: '#1A0A01',
+                    backgroundImage: 'url(/navratri-welcome-bg.png)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center right',
+                    backgroundRepeat: 'no-repeat',
+                }}
+            >
+                {/* Subtle cinematic amber illumination for atmosphere */}
+                <div 
+                    className="pointer-events-none absolute inset-0 z-0"
+                    style={{
+                        background: 'radial-gradient(circle 700px at 28% 45%, rgba(120, 50, 10, 0.28) 0%, transparent 70%)'
+                    }}
+                />
+
+                <main className="relative z-10 flex h-full w-full max-w-[700px] flex-col justify-between pl-16 pr-6 pt-16 pb-10">
+                    <motion.section
+                        initial={isActive ? { opacity: 0, y: 18 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex flex-col items-start text-left"
+                    >
+                        <p className="font-sans text-[15px] font-bold uppercase tracking-[0.55em] text-[#DFCBB5]">
+                            Welcome to
+                        </p>
+
+                        <div className="relative mt-2 flex items-baseline leading-none">
+                            <h1 className="font-sans text-[118px] font-black tracking-[-0.03em] text-[#EFE2CF] drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
+                                MIMO
+                            </h1>
+                            <span className="ml-3 font-sans text-[44px] font-extrabold text-[#E5B878] drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                                1.0
+                            </span>
+                        </div>
+
+                        <h2 className="mt-2 font-sans text-[32px] font-semibold text-white tracking-tight">
+                            Self-Service Printing Kiosk
+                        </h2>
+
+                        <div className="my-7 h-[1.5px] w-[140px] bg-gradient-to-r from-[#D4A559] via-[#A8793B] to-transparent" />
+
+                        <p className="font-serif text-[23px] font-medium italic leading-[1.4] text-[#E6C59E] max-w-[500px]">
+                            Happy Navaratri &mdash; may the divine bring joy, prosperity and good health.
+                        </p>
+                    </motion.section>
+
+                    <div className="flex flex-col items-start gap-5">
+                        <div className="w-full max-w-[460px]">
+                            {swipeTrack}
+                        </div>
+                        <footer className="text-[12px] font-medium text-[#A68868]/60">
+                            &copy; 2026 <strong className="font-semibold text-[#C4A480]/80">VisionPrintt</strong>. All rights reserved.
+                        </footer>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
+    if (isFestiveMode) {
+        return (
+            <div
+                className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col overflow-hidden bg-[#FFF8EC]`}
+                style={{ display: isActive ? 'flex' : 'none' }}
+            >
+                <FestiveBackdrop />
+
+                <Kalash className="absolute left-[86px] top-[296px] z-[1]" />
+                <Kalash className="absolute right-[86px] top-[296px] z-[1]" style={{ transform: 'scaleX(-1)' }} />
+
+                <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pt-0">
+                    <motion.section
+                        initial={isActive ? { opacity: 0, y: 22 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex flex-col items-center text-center"
+                    >
+                        <div className="flex items-center gap-4">
+                            <Lotus size={26} />
+                            <p lang="hi" className="font-deva text-[36px] leading-[1.2] text-mahogany-600">
+                                शुभ नवरात्रि
+                            </p>
+                            <Lotus size={26} />
+                        </div>
+
+                        <p className="mt-2 text-[13px] font-bold uppercase tracking-[0.55em] text-mahogany-700/60">
+                            Welcome to
+                        </p>
+
+                        <div className="relative mt-1 flex items-baseline justify-center leading-none [filter:drop-shadow(0_3px_0_rgba(122,18,48,0.18))]">
+                            <h1 className="bg-gradient-to-b from-gold-300 via-gold-500 to-gold-700 bg-clip-text font-sans text-[128px] font-black tracking-tight text-transparent">
+                                MIMO
+                            </h1>
+                            <span className="bg-gradient-to-b from-gold-300 via-gold-500 to-gold-700 bg-clip-text pb-5 pl-2 font-sans text-[46px] font-extrabold text-transparent">
+                                {isSV002 ? '2.0' : '1.0'}
+                            </span>
+                        </div>
+
+                        <h2 className="mt-1 text-[34px] font-semibold text-mahogany-800">
+                            Self-Service <span className="text-gold-600">Printing Kiosk</span>
+                        </h2>
+
+                        <div className="mb-3 mt-4">
+                            <OrnamentDivider width={110} />
+                        </div>
+
+                        <p className="font-serif text-[27px] font-medium italic text-mahogany-700">
+                            Happy Navaratri &mdash; nine nights of devotion, dance &amp; light
+                        </p>
+                    </motion.section>
+                </main>
+
+                <div className="relative z-10 pb-5">
+                    <DiyaRow count={9} size={38} gap={46} />
+                </div>
+
+                <div className="relative z-10 pb-4">
+                    {swipeTrack}
+                </div>
+                {copyright}
+                <ZariBorder />
+            </div>
+        );
+    }
+
     return (
         <div
-            className={`screen main-interface-wrap ${isActive ? 'visible' : ''} ${isFestiveMode ? 'cv001-main' : ''}`}
+            className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col overflow-hidden bg-[#FAFAF8]`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
-            {/* Botanical background */}
-            <div className="kiosk-bg" />
+            <div
+                className="pointer-events-none absolute left-1/2 top-[32%] h-[600px] w-[960px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[140px]"
+                style={{ background: 'radial-gradient(closest-side, rgba(217,165,68,0.14), transparent)' }}
+            />
 
-            {/* Symmetrical Golden Brass Bells for Festive Mode */}
-            {isFestiveMode && <CV001BellsDecor />}
+            <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pb-6">
+                <motion.section
+                    initial={isActive ? { opacity: 0, y: 22 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex flex-col items-center text-center"
+                >
+                    <p className="mb-2 text-[15px] font-bold uppercase tracking-[0.55em] text-gold-700/80">Welcome to</p>
 
-            {/* Ambient warm glows */}
-            <div className="ambient-glow glow-1" />
-            <div className="ambient-glow glow-2" />
-            <div className="ambient-glow glow-3" />
-
-            {/* Oversized watermark */}
-            <div className="watermark-mimo">MIMO</div>
-
-            <main className="immersive-container" style={{ padding: isFestiveMode ? '35px 40px 50px' : '0 40px 200px', top: isFestiveMode ? '40px' : '20px' }}>
-                <section className="brand-panel" style={{ marginBottom: isFestiveMode ? '20px' : '50px' }}>
-
-                    <div style={{ opacity: 0.88, transform: 'translateY(2px)' }}>
-                        <p className="tag-line" style={{ color: isFestiveMode ? '#7C5A34' : 'rgba(255, 255, 255, 0.85)' }}>
-                            — WELCOME TO —
-                        </p>
+                    <div className="relative flex items-baseline justify-center leading-none [filter:drop-shadow(0_4px_18px_rgba(200,134,10,0.20))]">
+                        <h1 className="bg-gradient-to-b from-gold-400 via-gold-500 to-gold-700 bg-clip-text font-sans text-[136px] font-black tracking-tight text-transparent">
+                            MIMO
+                        </h1>
+                        <span className="bg-gradient-to-b from-gold-400 via-gold-500 to-gold-700 bg-clip-text pb-6 pl-2.5 font-sans text-[50px] font-extrabold text-transparent">
+                            {isSV002 ? '2.0' : '1.0'}
+                        </span>
                     </div>
 
-                    <div className="main-heading">
-                        <svg width="820" height="180" viewBox="0 0 820 180" style={{ overflow: 'visible', filter: isFestiveMode ? 'drop-shadow(0 16px 28px rgba(74, 45, 20, 0.35))' : 'drop-shadow(0 10px 22px rgba(80,40,0,0.38))' }}>
-                            <defs>
-                                <linearGradient id="mimoBotanicalGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%"   stopColor="#ffd97d" />
-                                    <stop offset="100%" stopColor="#b78c43" />
-                                </linearGradient>
-                                <linearGradient id="mimoCyberGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%"   stopColor="#ffffff" />
-                                    <stop offset="100%" stopColor="#e3f2ff" />
-                                </linearGradient>
-                                <linearGradient id="mimoCv001Grad" x1="0" y1="0" x2="1" y2="1">
-                                    <stop offset="0%" stopColor="#3c2113" />
-                                    <stop offset="48%" stopColor="#a86f2b" />
-                                    <stop offset="100%" stopColor="#e7bd68" />
-                                </linearGradient>
-                            </defs>
+                    <h2 className="mt-2 text-[40px] font-bold text-[#1A1714]">
+                        Self-Service <span className="text-gold-600">Printing Kiosk</span>
+                    </h2>
 
-                            {/* 3D shadow layer */}
-                            <text
-                                x="50%" y="52%"
-                                dominantBaseline="middle"
-                                textAnchor="middle"
-                                fill={isFestiveMode ? 'rgba(67, 38, 18, 0.28)' : 'rgba(80,40,0,0.45)'}
-                                transform="translate(5, 18)"
-                                style={{
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                    fontSize: '155px',
-                                    fontWeight: 900,
-                                    letterSpacing: '4px'
-                                }}
-                            >
-                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">{isSV002 ? '2.0' : '1.0'}</tspan>
-                            </text>
-
-                            {/* Main text */}
-                            <text
-                                x="50%" y="52%"
-                                dominantBaseline="middle"
-                                textAnchor="middle"
-                                fill={isFestiveMode ? 'url(#mimoCv001Grad)' : 'url(#mimoBotanicalGrad)'}
-                                stroke={isFestiveMode ? 'none' : 'rgba(255,255,255,0.35)'}
-                                strokeWidth={isFestiveMode ? '0' : '1.5'}
-                                paintOrder="stroke fill"
-                                transform="translate(0, 12)"
-                                style={{
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                    fontSize: '155px',
-                                    fontWeight: 900,
-                                    letterSpacing: '4px'
-                                }}
-                            >
-                                MIMO<tspan dx="15" dy="-60" fontSize="60px" fontWeight="800">{isSV002 ? '2.0' : '1.0'}</tspan>
-                            </text>
-                        </svg>
-                    </div>
-
-                    <div className="sub-heading-wrap">
-                        <h2 className="sub-heading" style={{ color: isFestiveMode ? '#2C3E50' : 'rgba(255, 255, 255, 0.92)' }}>
-                            Self-Service <span className={isFestiveMode ? "cv001-gold-text" : "cyan-text"}>Printing Kiosk</span>
-                        </h2>
-                    </div>
-
-                    {isFestiveMode ? (
-                        <div className="cv001-festive-message" style={{ marginTop: '12px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '17px', fontWeight: 600, color: '#8B5E0A', letterSpacing: '0.28em', textTransform: 'uppercase' }}>
-                                — Happy —
-                            </div>
-                            <h1
-                                style={{
-                                    fontFamily: "'Playfair Display', 'Cormorant Garamond', Georgia, serif",
-                                    fontStyle: 'italic',
-                                    fontSize: '48px',
-                                    fontWeight: 700,
-                                    color: '#7B241C',
-                                    margin: '2px 0 4px',
-                                    textShadow: '0 2px 8px rgba(123, 36, 28, 0.12)',
-                                    letterSpacing: '0.5px'
-                                }}
-                            >
-                                Ganesh Chaturthi
-                            </h1>
-                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', margin: '2px 0 6px' }}>
-                                <div style={{ width: '28px', height: '1px', background: 'linear-gradient(to right, transparent, #C8860A)' }} />
-                                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#C8860A' }}>spa</span>
-                                <div style={{ width: '28px', height: '1px', background: 'linear-gradient(to left, transparent, #C8860A)' }} />
-                            </div>
-                            <p style={{ fontSize: '15px', fontWeight: 500, color: '#6A5644', letterSpacing: '0.2px' }}>
-                                May Lord Ganesha bring happiness, prosperity and success to all.
-                            </p>
-                        </div>
-                    ) : (
-                        <p className="brand-desc">Fast, secure document printing via Mimo code.</p>
-                    )}
-                </section>
-
-                <section className="action-panel">
-                    <div
-                        className={`swipe-track-glass ${isUnlocked ? 'unlocked' : ''} ${isFestiveMode ? 'cv001-track' : ''}`}
-                        ref={trackRef}
-                    >
-                        <div className="glass-reflection" />
-
-                        {/* Progress fill */}
-                        <div
-                            className={`swipe-fill ${isFestiveMode ? 'cv001-swipe-fill' : ''}`}
-                            style={{
-                                width: dragX + (thumbRef.current?.offsetWidth || 360) / 2 + TRACK_PADDING + 'px',
-                                transition: isDragging ? 'none' : 'width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                                opacity: dragX > 0 ? 1 : 0
-                            }}
-                        />
-
-                        {/* Shimmer chevrons */}
-                        <div
-                            className="swipe-right-text"
-                            style={{
-                                opacity: Math.max(0, 1 - (dragX / 150)),
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center'
-                            }}
-                        >
-                            <div className={`shimmer-chevrons-container ${isFestiveMode ? 'cv001-chevrons' : ''}`}>
-                                {[0, 1, 2, 3, 4].map((i) => (
-                                    <span
-                                        key={i}
-                                        className="material-symbols-outlined"
-                                        style={{ margin: '0 -22px', fontVariationSettings: '"wght" 300' }}
-                                    >
-                                        chevron_right
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Draggable thumb */}
-                        <div
-                            className={`swipe-pill-thumb ${isDragging ? 'dragging' : ''} ${isFestiveMode ? 'cv001-thumb' : ''}`}
-                            ref={thumbRef}
-                            style={{
-                                transform: `translateX(${dragX}px)`,
-                                transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)'
-                            }}
-                            onMouseDown={handleDragStart}
-                            onTouchStart={handleDragStart}
-                        >
-                            <span className="thumb-text">
-                                {isUnlocked ? 'UNLOCKED' : 'SWIPE TO START'}
-                            </span>
-                            <div className="arrow-circle">
-                                <span
-                                    className="material-symbols-outlined"
-                                    style={{ color: isUnlocked ? '#4CAF50' : (isFestiveMode ? '#a66d2b' : '') }}
-                                >
-                                    {isUnlocked ? 'check' : 'arrow_forward'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                    <p className="mt-3 text-[19px] font-medium text-[#5C544B]">Fast, secure document printing via Mimo code.</p>
+                </motion.section>
             </main>
 
-            <footer className="kiosk-footer" style={{ position: 'relative', zIndex: 10, color: isFestiveMode ? '#7C6756' : 'rgba(255,255,255,0.7)' }}>
-                Crafted with innovation by <strong>Md Huzaif, Rathin &amp; Atharv.</strong><br />
-                &copy; 2026 <strong>VisionPrintt</strong>. All rights reserved.
-            </footer>
+            <div className="relative z-10 pb-8">
+                {swipeTrack}
+            </div>
+            {copyright}
         </div>
     );
 };
