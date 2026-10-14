@@ -64,6 +64,27 @@ PRINTER_USB_IDS = {
 # backlog document on every Firestore listener (re)connect.
 _prefetch_pool = ThreadPoolExecutor(max_workers=PREFETCH_MAX_CONCURRENT, thread_name_prefix="prefetch")
 
+# Exactly one process_job() in flight at a time per kiosk. on_snapshot() and the watchdog's stuck-job
+# fallback each used to fire a bare threading.Thread(...).start() per matching job, with no serialization --
+# if an earlier job was still mid-flight (slow download, CUPS submission, etc.) when a second, unrelated
+# job came in, both ran concurrently and could physically print out of order: a customer who thought their
+# print "didn't work" and walked away could have their job land on the tray during the NEXT customer's
+# redemption instead. Routing every submission through this single-worker pool forces strict, submission-
+# ordered one-job-at-a-time processing, matching the physical reality of one printer.
+_print_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="printjob")
+
+def _run_process_job(doc):
+    """process_job() catches its own exceptions internally, but the handful of lines before its own
+    try block (doc parsing, stamp_job) do not -- with a raw threading.Thread those still surfaced via
+    Python's default thread-exception hook (printed to stderr). A Future from pool.submit() silently
+    swallows an exception unless something calls .result(), so this wrapper re-prints it to keep that
+    same visibility instead of letting a failure vanish unlogged."""
+    try:
+        process_job(doc)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+
 def ensure_work_dirs():
     os.makedirs(TEMP_DIR, exist_ok=True)
     os.makedirs(PRE_FETCH_DIR, exist_ok=True)
@@ -2056,7 +2077,7 @@ def on_snapshot(col_snapshot, changes, read_time):
                     print(f"\n🔔 New {data.get('colorMode', 'monochrome')} job detected: {doc.id}")
 
                 active_jobs.add(doc.id)
-                threading.Thread(target=process_job, args=(doc,), daemon=True).start()
+                _print_pool.submit(_run_process_job, doc)
 
 PRINTER_HEALTH_INTERVAL_SEC = 600
 
@@ -2352,7 +2373,7 @@ def watchdog_loop():
                     continue
                 active_jobs.add(doc.id)
                 auto_resumed_this_pass += 1
-                threading.Thread(target=process_job, args=(doc,), daemon=True).start()
+                _print_pool.submit(_run_process_job, doc)
                     
         except Exception as e:
             print(f"⚠️ Watchdog failed: {e}")

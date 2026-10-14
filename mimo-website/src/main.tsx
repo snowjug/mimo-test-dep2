@@ -12,8 +12,8 @@ const GOOGLE_CLIENT_ID = "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.goo
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      {/* Follows the phone's light/dark setting. The old key never applied a class, so a new key starts everyone on "system". */}
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange storageKey="mimo-theme">
+      {/* Always use the bright/light theme as the default, dark theme removed */}
+      <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light" enableSystem={false} disableTransitionOnChange storageKey="mimo-theme">
         <App />
       </ThemeProvider>
     </GoogleOAuthProvider>

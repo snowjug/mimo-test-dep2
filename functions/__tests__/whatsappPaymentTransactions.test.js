@@ -34,6 +34,10 @@ const db = {
     // generateUniquePrintCode checks for a collision via .where("printCode", "==", code).get(); always empty here.
     where: () => ({ get: async () => ({ empty: true, docs: [], forEach: () => {} }) }),
   }),
+  // generateUniquePrintCode now claims a code via a real transaction (see printCode.service.js) -- this call
+  // site (whatsapp.service.js) isn't inside an existing transaction, so it opens its own. docRefs/queries above
+  // already expose the same .get()/.set() shape a real transaction would use, so this just forwards to them.
+  runTransaction: async (updateFn) => updateFn({ get: (ref) => ref.get(), set: (ref, data) => ref.set(data) }),
 };
 const admin = { firestore: { FieldValue: { serverTimestamp: () => "TS" } } };
 const firebasePath = require.resolve("../src/config/firebase");

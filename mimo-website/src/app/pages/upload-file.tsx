@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MimoHeader } from "../components/mimo-header";
 import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
-import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, MapPin, Camera, Loader2 } from "lucide-react";
+import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { AdBanner } from "../components/AdBanner";
@@ -906,7 +906,7 @@ export function UploadFile() {
   }
 
   return (
-    <div className="px-4 pb-10">
+    <div className="px-4 pb-2 sm:pb-3">
       <MimoHeader />
       <input
         ref={fileInputRef}
@@ -917,84 +917,139 @@ export function UploadFile() {
         onChange={(e) => handleFileSelect(e.target.files)}
       />
 
-      <div className="rise-in pt-3 pb-6">
-        <h1 className="text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] text-ink">
+      <div className="rise-in pt-0.5 pb-1">
+        <h1 className="text-[22px] sm:text-[24px] font-semibold leading-tight tracking-[-0.02em] text-ink">
           {firstName ? `Hi, ${firstName}` : "Hi there"}
         </h1>
-        <p className="mt-1.5 text-[16px] text-ink-2">What are we printing today?</p>
+        <p className="mt-0.5 text-[13px] text-ink-2">What are we printing today?</p>
       </div>
 
-      {/* Active print codes */}
+      {/* Active print codes (Horizontal scroll like announcements) */}
       {activePrintCodes.length > 0 && (
-        <Group title="Ready to print" footer="Tap a code to copy it. Codes stay valid for 24 hours." className="mb-6">
-          {activePrintCodes.map((job: any) => {
-            const isColor = job.colorMode === "color" || (job.details && job.details.toLowerCase().includes("color"));
-            const pageText = job.pageCount
-              ? `${job.pageCount} ${job.pageCount === 1 ? "page" : "pages"}`
-              : job.details
-              ? job.details.split("•")[0].trim()
-              : "1 page";
-            const copies = job.copies || 1;
+        <section className="mb-2.5" aria-label="Ready to print">
+          <div className="flex items-center justify-between mb-1.5 px-1">
+            <h2 className="text-[11.5px] font-semibold uppercase tracking-wider text-ink-3">
+              Ready to print {activePrintCodes.length > 1 && `(${activePrintCodes.length})`}
+            </h2>
+            <span className="text-[11px] text-ink-3">Tap code to copy</span>
+          </div>
 
-            // Calculate Valid till: creation timestamp + 24 hours
-            const jobTimestamp = typeof job.createdAtTime === "number" && job.createdAtTime > 0
-              ? job.createdAtTime
-              : job.date
-              ? new Date(job.date).getTime()
-              : 0;
+          <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
+            {activePrintCodes.map((job: any) => {
+              const isColor = job.colorMode === "color" || (job.details && job.details.toLowerCase().includes("color"));
+              const pageText = job.pageCount
+                ? `${job.pageCount} ${job.pageCount === 1 ? "page" : "pages"}`
+                : job.details
+                ? job.details.split("•")[0].trim()
+                : "1 page";
+              const copies = job.copies || 1;
 
-            let validTillText = "";
-            if (jobTimestamp && !isNaN(jobTimestamp)) {
-              const expiryDate = new Date(jobTimestamp + 24 * 60 * 60 * 1000);
-              const day = expiryDate.getDate();
-              const month = expiryDate.toLocaleString("en-US", { month: "short" });
-              const time = expiryDate.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-              validTillText = `${day} ${month}, ${time}`;
-            }
+              const jobTimestamp = typeof job.createdAtTime === "number" && job.createdAtTime > 0
+                ? job.createdAtTime
+                : job.date
+                ? new Date(job.date).getTime()
+                : 0;
 
-            return (
-              <button
-                key={job.id || job.printCode}
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(job.printCode);
-                  toast.success(`Print code ${job.printCode} copied!`);
-                }}
-                aria-label={`Copy print code ${job.printCode}`}
-                className="flex w-full items-center gap-4 border-t border-hairline px-4 py-3 text-left transition-colors first:border-t-0 active:bg-surface-2"
-              >
-                <span className="text-[28px] font-semibold leading-none tracking-[0.08em] tabular-nums text-ink">{job.printCode}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] text-ink">{job.file || "Document"}</span>
-                  <span className="mt-0.5 block text-[13px] text-ink-3">
-                    {pageText}, {isColor ? "colour" : "B&W"}{copies > 1 ? `, ${copies} copies` : ""}
-                    {validTillText && <span className="block">Valid till {validTillText}</span>}
-                  </span>
-                </span>
-                <Copy className="size-4 shrink-0 text-ink-3" />
-              </button>
-            );
-          })}
-        </Group>
+              let validTillText = "";
+              if (jobTimestamp && !isNaN(jobTimestamp)) {
+                const expiryDate = new Date(jobTimestamp + 24 * 60 * 60 * 1000);
+                const day = expiryDate.getDate();
+                const month = expiryDate.toLocaleString("en-US", { month: "short" });
+                const time = expiryDate.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+                validTillText = `${day} ${month}, ${time}`;
+              }
+
+              return (
+                <div
+                  key={job.id || job.printCode}
+                  onClick={() => {
+                    navigator.clipboard.writeText(job.printCode);
+                    toast.success(`Print code ${job.printCode} copied!`);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      navigator.clipboard.writeText(job.printCode);
+                      toast.success(`Print code ${job.printCode} copied!`);
+                    }
+                  }}
+                  className={`press ${activePrintCodes.length > 1 ? "w-[75%] max-w-[270px]" : "w-full"} shrink-0 snap-start rounded-[16px] bg-surface p-2.5 sm:p-3 border border-hairline shadow-xs cursor-pointer active:bg-surface-2 transition-all flex flex-col justify-between`}
+                >
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="min-w-0">
+                      <span className="text-[20px] sm:text-[22px] font-bold leading-none tracking-[0.05em] tabular-nums text-brand">
+                        {job.printCode}
+                      </span>
+                      <p className="mt-0.5 font-medium text-[12.5px] text-ink line-clamp-1">
+                        {job.file || "Document"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand-text">
+                        {isColor ? "Colour" : "B&W"}
+                      </span>
+                      <span className="flex size-7 items-center justify-center rounded-full bg-surface-2 text-ink-3">
+                        <Copy className="size-3.5" />
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 pt-1.5 border-t border-hairline flex items-center justify-between text-[11px] text-ink-3">
+                    <span>{pageText}{copies > 1 ? ` • ${copies} copies` : ""}</span>
+                    {validTillText && <span>Valid till {validTillText}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
-      {/* Upload */}
+      {/* Upload with Scan button integrated into right corner */}
       {files.length === 0 ? (
-        <button
-          type="button"
+        <div
           data-tour="upload-dropzone"
           onClick={() => fileInputRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
-          className={`press flex w-full flex-col items-start rounded-[24px] bg-brand p-5 text-left text-on-brand ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+          className={`press relative flex w-full flex-col justify-between rounded-[18px] bg-brand p-3 sm:p-3.5 text-left text-on-brand cursor-pointer overflow-hidden shadow-sm ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
         >
-          <span className="flex size-11 items-center justify-center rounded-full bg-white/15">
-            <Plus className="size-6" strokeWidth={2} />
-          </span>
-          <span className="mt-8 text-[22px] font-semibold leading-tight tracking-tight">Choose files to print</span>
-          <span className="mt-1 text-[15px] text-white/75">PDF, Word, PowerPoint, Excel, text or photos</span>
-        </button>
+          {/* Top row: Plus on left, Scan Document button on right corner with fluid animation */}
+          <div className="flex w-full items-start justify-between">
+            <span className="flex size-9 sm:size-10 items-center justify-center rounded-full bg-white/15">
+              <Plus className="size-5" strokeWidth={2} />
+            </span>
+            {/* Scan button with clean expanding wave animation (No glowing, big & long waves) */}
+            <div className="relative group flex items-center justify-center">
+              <span className="scan-wave" aria-hidden="true" />
+              <span className="scan-wave scan-wave-delay-1" aria-hidden="true" />
+              <span className="scan-wave scan-wave-delay-2" aria-hidden="true" />
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate("/document-scanner");
+                }}
+                aria-label="Scan document"
+                className="press relative z-10 flex items-center gap-1.5 rounded-full bg-white/20 hover:bg-white/25 active:bg-white/30 backdrop-blur-md px-3.5 py-1.5 text-white border border-white/25 shadow-sm"
+              >
+                <Camera className="size-4 shrink-0" strokeWidth={2} />
+                <span className="text-[13px] font-semibold tracking-wide">Scan</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-2.5 sm:mt-3">
+            <span className="block text-[17px] sm:text-[18px] font-semibold leading-tight tracking-tight">Choose files to print</span>
+            <span className="mt-0.5 block text-[12.5px] text-white/75">PDF, Word, PowerPoint, Excel, text or photos</span>
+          </div>
+        </div>
       ) : (
         <Group
           title="Files"
@@ -1054,72 +1109,116 @@ export function UploadFile() {
         </Group>
       )}
 
-      {/* Quick print */}
+      {/* 3 Horizontal Compartments (Compact, subtext removed) */}
       {files.length === 0 && (
-        <Group title="Quick print" className="mt-8">
-          <Row
-            icon={<FileIcon className="size-5" strokeWidth={1.75} />}
-            label="Blank A4 sheet"
-            detail="Plain paper, no upload needed"
-            chevron
+        <div className="mt-2.5 grid grid-cols-3 gap-2">
+          {/* Compartment 1: Blank A4 sheet */}
+          <div
             onClick={() => navigate("/blank-pages?type=a4")}
-          />
-          <Row
-            icon={<Grid3X3 className="size-5" strokeWidth={1.75} />}
-            label="MIMO graph paper"
-            detail="Squared sheets for maths and drawings"
-            chevron
-            onClick={() => navigate("/blank-pages?type=graph")}
-          />
-          <Row
-            icon={<PenLine className="size-5" strokeWidth={1.75} />}
-            label="Type a document"
-            detail="Write or paste text, then print it"
-            chevron
-            onClick={() => navigate("/text-editor")}
-          />
-          <Row
-            icon={<Camera className="size-5" strokeWidth={1.75} />}
-            label="Scan a document"
-            detail="Capture with your camera, crop and print"
-            chevron
-            onClick={() => navigate("/document-scanner")}
-          />
-        </Group>
-      )}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=a4");
+            }}
+            className="press flex flex-col items-center justify-between p-2 rounded-[14px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+          >
+            <span className="flex size-7 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1 group-hover:scale-105 transition-transform">
+              <FileIcon className="size-3.5" strokeWidth={1.75} />
+            </span>
+            <p className="text-[11.5px] font-semibold text-ink leading-tight line-clamp-1">
+              Blank A4 sheet
+            </p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate("/blank-pages?type=a4");
+              }}
+              className="mt-1.5 w-full py-0.5 text-[10.5px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+            >
+              Print
+            </button>
+          </div>
 
-      {files.length === 0 && (
-        <Group className="mt-4">
-          <Row
-            icon={<MapPin className="size-5" strokeWidth={1.75} />}
-            label="Find a kiosk"
-            detail="Locations and which one prints colour"
-            chevron
-            onClick={() => navigate("/find-machine")}
-          />
-        </Group>
+          {/* Compartment 2: MIMO graph paper */}
+          <div
+            onClick={() => navigate("/blank-pages?type=graph")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=graph");
+            }}
+            className="press flex flex-col items-center justify-between p-2 rounded-[14px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+          >
+            <span className="flex size-7 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1 group-hover:scale-105 transition-transform">
+              <Grid3X3 className="size-3.5" strokeWidth={1.75} />
+            </span>
+            <p className="text-[11.5px] font-semibold text-ink leading-tight line-clamp-1">
+              MIMO graph paper
+            </p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate("/blank-pages?type=graph");
+              }}
+              className="mt-1.5 w-full py-0.5 text-[10.5px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+            >
+              Print
+            </button>
+          </div>
+
+          {/* Compartment 3: Type a document */}
+          <div
+            onClick={() => navigate("/text-editor")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") navigate("/text-editor");
+            }}
+            className="press flex flex-col items-center justify-between p-2 rounded-[14px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+          >
+            <span className="flex size-7 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1 group-hover:scale-105 transition-transform">
+              <PenLine className="size-3.5" strokeWidth={1.75} />
+            </span>
+            <p className="text-[11.5px] font-semibold text-ink leading-tight line-clamp-1">
+              Type a document
+            </p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate("/text-editor");
+              }}
+              className="mt-1.5 w-full py-0.5 text-[10.5px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+            >
+              Write
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Activity */}
       {files.length === 0 && (
-        <section className="mt-8" aria-label="Your activity">
-          <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-3">Your activity</h2>
-          <dl className="grid grid-cols-3 divide-x divide-hairline rounded-[20px] bg-surface py-4">
+        <section className="mt-2 sm:mt-2.5" aria-label="Your activity">
+          <h2 className="mb-0.5 px-1 text-[11px] font-medium text-ink-3">Your activity</h2>
+          <dl className="grid grid-cols-3 divide-x divide-hairline rounded-[16px] bg-surface py-1.5">
             {[
               { label: "Prints", value: userStats.totalDocs },
               { label: "Pages", value: userStats.totalPages },
               { label: "Spent", value: `₹${Number(userStats.totalSpent).toFixed(0)}` },
             ].map((s) => (
               <div key={s.label} className="flex flex-col-reverse px-3 text-center">
-                <dt className="mt-0.5 text-[13px] text-ink-3">{s.label}</dt>
-                <dd className="text-[22px] font-semibold tabular-nums tracking-tight text-ink">{s.value}</dd>
+                <dt className="text-[11px] text-ink-3">{s.label}</dt>
+                <dd className="text-[18px] font-semibold tabular-nums tracking-tight text-ink">{s.value}</dd>
               </div>
             ))}
           </dl>
         </section>
       )}
 
-      {files.length === 0 && <AdBanner />}
+      {/* Announcements / Advertisements (Shown in all states, hides cleanly with 0 skeleton if empty) */}
+      <AdBanner />
 
       {files.length > 0 && (
         <>
