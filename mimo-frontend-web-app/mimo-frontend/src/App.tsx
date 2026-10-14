@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { WarningCircle, Info, X } from '@phosphor-icons/react';
 import { MainScreen } from './components/screens/MainScreen';
 import { CodeEntryScreen } from './components/screens/CodeEntryScreen';
 import { PrintingScreen } from './components/screens/PrintingScreen';
@@ -8,6 +9,7 @@ import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
 import { CV001Background } from './components/screens/CV001Background';
 import { Adds } from './components/screens/adds/Adds';
 import { isFestivalActive } from './config/festivalConfig';
+import { useAutoUpdate } from './hooks/useAutoUpdate';
 
 
 export type ScreenState =
@@ -21,9 +23,11 @@ export type ScreenState =
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const currentKioskId = urlParams.get("kioskId");
-  const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID;
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const defaultKioskFromHost = host.includes('mimo-2-0') || host.includes('mimo-kiosk-app') ? 'SV-002' : undefined;
+  const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID || defaultKioskFromHost;
   const isFestive = isFestivalActive();
-  const isFestiveForKiosk = dynamicKioskId === 'CV-001' || (dynamicKioskId === 'SV-002' && isFestive);
+  const isFestiveForKiosk = dynamicKioskId === 'CV-001' || dynamicKioskId === 'SV-002' || isFestive;
 
   useEffect(() => {
     const rootEl = document.getElementById('root');
@@ -31,12 +35,12 @@ function App() {
     document.body.classList.remove('theme-cv001', 'theme-sv002');
     rootEl?.classList.remove('theme-cv001', 'theme-sv002');
 
-    if (isFestiveForKiosk) {
-      document.body.classList.add('theme-cv001');
-      rootEl?.classList.add('theme-cv001');
-    } else if (dynamicKioskId === 'SV-002') {
+    if (dynamicKioskId === 'SV-002') {
       document.body.classList.add('theme-sv002');
       rootEl?.classList.add('theme-sv002');
+    } else if (dynamicKioskId === 'CV-001' || isFestiveForKiosk) {
+      document.body.classList.add('theme-cv001');
+      rootEl?.classList.add('theme-cv001');
     }
   }, [dynamicKioskId, isFestiveForKiosk]);
 
@@ -49,6 +53,10 @@ function App() {
   const [showRefundBanner, setShowRefundBanner] = useState(false);
   const [showScreensaver, setShowScreensaver] = useState(false);
   const [idleTimeout, setIdleTimeout] = useState(60);
+  // True while a submitted code is being verified/triggered on the backend. The idle timer must not
+  // reset to the home screen mid-request — that races the network round trip and silently discards
+  // an in-flight print, showing the customer nothing but a jump back to home.
+  const [isSubmittingCode, setIsSubmittingCode] = useState(false);
 
   const [jobData, setJobData] = useState<{
     userName: string;
@@ -60,6 +68,25 @@ function App() {
 
   const toastTimerRef = useRef<number | null>(null);
   const validationTimerRef = useRef<number | null>(null);
+
+  // Strictly verified idle state: Kiosk is on main-interface, no entered code,
+  // no loaded job data, no in-flight network validation, no printing in progress,
+  // no active error/refund screens, no pending validation timers, and no active toast notifications.
+  const isKioskIdle =
+    currentScreen === 'main-interface' &&
+    code === '' &&
+    jobData === null &&
+    !isSubmittingCode &&
+    printStatus === 'idle' &&
+    printError === undefined &&
+    !showRefundBanner &&
+    validationTimerRef.current === null &&
+    toastMsg === '';
+
+  useAutoUpdate({
+    isIdle: isKioskIdle,
+    checkIntervalMs: 60000,
+  });
 
   // ================= TOAST =================
   const showToast = useCallback((msg: string, isError: boolean = false) => {
@@ -81,7 +108,9 @@ function App() {
     const resetIdleTimer = () => {
       clearTimeout(idleTimer);
       setShowScreensaver(false);
-      if (currentScreen === 'code-entry-screen') {
+      // A submitted code is being verified/triggered on the backend — that round trip can take
+      // longer than 20s (cold start, slow network), and this timer must not fire mid-request.
+      if (currentScreen === 'code-entry-screen' && !isSubmittingCode) {
         idleTimer = window.setTimeout(() => {
           setCurrentScreen('main-interface');
         }, 20000); // 20 seconds of idle time -> reset to main interface
@@ -107,7 +136,7 @@ function App() {
       window.removeEventListener('click', resetIdleTimer);
       window.removeEventListener('keypress', resetIdleTimer);
     };
-  }, [currentScreen, idleTimeout]);
+  }, [currentScreen, idleTimeout, isSubmittingCode]);
 
   // ================= VALIDATION + DOWNLOAD =================
   const handleValidationSuccess = useCallback(async () => {
@@ -115,6 +144,7 @@ function App() {
 
     return new Promise<void>((resolve, reject) => {
       validationTimerRef.current = window.setTimeout(async () => {
+        setIsSubmittingCode(true);
         try {
           if (!dynamicKioskId && code !== "0000" && code !== "9999") {
             throw new Error("Kiosk ID not configured on this device (?kioskId= missing)");
@@ -221,10 +251,11 @@ function App() {
           reject(err);
         } finally {
           validationTimerRef.current = null;
+          setIsSubmittingCode(false);
         }
       }, 300);
     });
-  }, [code, showToast, currentKioskId]);
+  }, [code, showToast, dynamicKioskId]);
 
   // ================= RESET =================
   const handleReset = useCallback(() => {
@@ -253,14 +284,25 @@ function App() {
     <>
       {/* ================= TOAST ================= */}
       {toastMsg && (
-        <div className={`toast-container visible ${toastError ? 'error' : ''}`}>
-          <span className="material-symbols-outlined icon-main">
-            {toastError ? 'error' : 'info'}
-          </span>
-          <span>{toastMsg}</span>
-          <div className="toast-close" onClick={() => setToastMsg('')}>
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
-          </div>
+        <div
+          className={`fixed left-1/2 top-9 z-[1000] flex -translate-x-1/2 items-center gap-4 rounded-2xl border px-7 py-4 shadow-2xl backdrop-blur-xl ${
+            toastError
+              ? 'border-danger-500/30 bg-danger-600/95 text-white'
+              : 'border-gold-500/30 bg-white/95 text-[#1A1714]'
+          }`}
+        >
+          {toastError ? <WarningCircle size={22} weight="fill" /> : <Info size={22} weight="fill" className="text-gold-600" />}
+          <span className="text-[17px] font-semibold">{toastMsg}</span>
+          <button
+            onClick={() => setToastMsg('')}
+            className={`ml-1 flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+              toastError
+                ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                : 'text-[#8C8072] hover:bg-black/5 hover:text-[#1A1714]'
+            }`}
+          >
+            <X size={16} weight="bold" />
+          </button>
         </div>
       )}
 
@@ -334,6 +376,7 @@ function App() {
         onReset={handleReset}
         jobData={jobData}
         kioskId={dynamicKioskId}
+        printCode={code}
       />
 
       <SystemErrorScreen
