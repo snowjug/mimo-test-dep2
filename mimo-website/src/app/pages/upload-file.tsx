@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { MimoHeader } from "../components/mimo-header";
 import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
 import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { toast } from "sonner";
 import api from "../api";
 import { AdBanner } from "../components/AdBanner";
@@ -927,15 +926,15 @@ export function UploadFile() {
 
       {/* Active print codes (Horizontal scroll like announcements) */}
       {activePrintCodes.length > 0 && (
-        <section className="mb-6" aria-label="Ready to print">
+        <section className="mb-4" aria-label="Ready to print">
           <div className="flex items-center justify-between mb-2 px-1">
-            <h2 className="text-[13px] font-semibold uppercase tracking-wider text-ink-3">
+            <h2 className="text-[12px] font-semibold uppercase tracking-wider text-ink-3">
               Ready to print {activePrintCodes.length > 1 && `(${activePrintCodes.length})`}
             </h2>
-            <span className="text-[12px] text-ink-3">Tap code to copy</span>
+            <span className="text-[11px] text-ink-3">Tap code to copy</span>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
             {activePrintCodes.map((job: any) => {
               const isColor = job.colorMode === "color" || (job.details && job.details.toLowerCase().includes("color"));
               const pageText = job.pageCount
@@ -975,28 +974,28 @@ export function UploadFile() {
                       toast.success(`Print code ${job.printCode} copied!`);
                     }
                   }}
-                  className={`press ${activePrintCodes.length > 1 ? "w-[85%] sm:w-[320px]" : "w-full"} shrink-0 snap-start rounded-[20px] bg-surface p-4 border border-hairline shadow-xs cursor-pointer active:bg-surface-2 transition-all flex flex-col justify-between`}
+                  className={`press ${activePrintCodes.length > 1 ? "w-[75%] max-w-[270px]" : "w-full"} shrink-0 snap-start rounded-[16px] bg-surface p-3 sm:p-3.5 border border-hairline shadow-xs cursor-pointer active:bg-surface-2 transition-all flex flex-col justify-between`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="text-[30px] font-bold leading-none tracking-[0.06em] tabular-nums text-brand">
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="min-w-0">
+                      <span className="text-[22px] sm:text-[24px] font-bold leading-none tracking-[0.05em] tabular-nums text-brand">
                         {job.printCode}
                       </span>
-                      <p className="mt-2 font-medium text-[14px] text-ink line-clamp-1">
+                      <p className="mt-1 font-medium text-[13px] text-ink line-clamp-1">
                         {job.file || "Document"}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand-text">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand-text">
                         {isColor ? "Colour" : "B&W"}
                       </span>
-                      <span className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-ink-3">
-                        <Copy className="size-4" />
+                      <span className="flex size-7 items-center justify-center rounded-full bg-surface-2 text-ink-3">
+                        <Copy className="size-3.5" />
                       </span>
                     </div>
                   </div>
 
-                  <div className="mt-3 pt-2.5 border-t border-hairline flex items-center justify-between text-[12px] text-ink-3">
+                  <div className="mt-2.5 pt-2 border-t border-hairline flex items-center justify-between text-[11px] text-ink-3">
                     <span>{pageText}{copies > 1 ? ` • ${copies} copies` : ""}</span>
                     {validTillText && <span>Valid till {validTillText}</span>}
                   </div>
@@ -1020,23 +1019,92 @@ export function UploadFile() {
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
           className={`press relative flex w-full flex-col justify-between rounded-[24px] bg-brand p-5 text-left text-on-brand cursor-pointer overflow-hidden shadow-sm ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
         >
-          {/* Top row: Plus on left, Scan Document button on right corner */}
+          {/* Top row: Plus on left, Scan Document button on right corner with fluid animation */}
           <div className="flex w-full items-start justify-between">
             <span className="flex size-11 items-center justify-center rounded-full bg-white/15">
               <Plus className="size-6" strokeWidth={2} />
             </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/document-scanner");
-              }}
-              aria-label="Scan document"
-              className="press flex items-center gap-2 rounded-full bg-white/20 hover:bg-white/25 active:bg-white/30 backdrop-blur-md px-3.5 py-2 text-white border border-white/20 shadow-sm"
-            >
-              <Camera className="size-4 shrink-0" strokeWidth={2} />
-              <span className="text-[13px] font-semibold">Scan</span>
-            </button>
+            {/* Scan button with liquid stream flowing along its perimeter */}
+            <div className="relative group flex items-center justify-center">
+              <span className="liquid-ripple" aria-hidden="true" />
+              <span className="liquid-pulse-aura" aria-hidden="true" />
+
+              <svg
+                className="absolute inset-0 size-full pointer-events-none overflow-visible"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+              >
+                <rect
+                  x="0"
+                  y="0"
+                  width="100%"
+                  height="100%"
+                  rx="9999"
+                  ry="9999"
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  pathLength="100"
+                  className="liquid-stream-glow"
+                />
+                <rect
+                  x="0"
+                  y="0"
+                  width="100%"
+                  height="100%"
+                  rx="9999"
+                  ry="9999"
+                  fill="none"
+                  stroke="#67e8f9"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  pathLength="100"
+                  className="liquid-stream-main"
+                />
+                <rect
+                  x="0"
+                  y="0"
+                  width="100%"
+                  height="100%"
+                  rx="9999"
+                  ry="9999"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  pathLength="100"
+                  className="liquid-stream-core"
+                />
+                <rect
+                  x="0"
+                  y="0"
+                  width="100%"
+                  height="100%"
+                  rx="9999"
+                  ry="9999"
+                  fill="none"
+                  stroke="#bae6fd"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  pathLength="100"
+                  className="liquid-stream-drop"
+                />
+              </svg>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate("/document-scanner");
+                }}
+                aria-label="Scan document"
+                className="press relative z-10 flex items-center gap-1.5 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/35 backdrop-blur-md px-3.5 py-1.5 text-white border border-white/25 shadow-sm"
+              >
+                <Camera className="size-4 shrink-0" strokeWidth={2} />
+                <span className="text-[13px] font-semibold tracking-wide">Scan</span>
+              </button>
+            </div>
           </div>
 
           <div className="mt-8">
@@ -1103,87 +1171,107 @@ export function UploadFile() {
         </Group>
       )}
 
-      {/* Blank templates & document typing — kept inside ONE button */}
+      {/* 3 Horizontal Compartments (Static, not scrollable) */}
       {files.length === 0 && (
-        <div className="mt-4">
-          <Dialog>
-            <DialogTrigger asChild>
-              <button
-                type="button"
-                className="press flex w-full items-center justify-between rounded-[20px] bg-surface p-4 border border-hairline shadow-xs text-left active:bg-surface-2 transition-all"
-              >
-                <div className="flex items-center gap-3.5">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-surface-2 text-brand">
-                    <FileIcon className="size-5" strokeWidth={1.75} />
-                  </span>
-                  <div>
-                    <span className="block text-[15px] font-semibold text-ink">
-                      Blank sheets & text editor
-                    </span>
-                    <span className="mt-0.5 block text-[13px] text-ink-3">
-                      Blank A4, MIMO graph paper, or write text
-                    </span>
-                  </div>
-                </div>
-                <ChevronRight className="size-5 text-ink-3 shrink-0" />
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[440px]">
-              <DialogHeader>
-                <DialogTitle className="text-[18px] font-bold text-ink">Print templates & documents</DialogTitle>
-                <DialogDescription className="text-[14px] text-ink-3">
-                  Choose a template or write your text directly
-                </DialogDescription>
-              </DialogHeader>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {/* Compartment 1: Blank A4 sheet */}
+          <div
+            onClick={() => navigate("/blank-pages?type=a4")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=a4");
+            }}
+            className="press flex flex-col items-center justify-between p-2.5 rounded-[16px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+          >
+            <div className="flex flex-col items-center w-full">
+              <span className="flex size-7.5 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
+                <FileIcon className="size-4" strokeWidth={1.75} />
+              </span>
+              <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
+                Blank A4 sheet
+              </p>
+              <p className="text-[10px] text-ink-3 leading-snug mt-1 line-clamp-2 h-[26px] flex items-center justify-center">
+                Plain paper, no upload needed
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate("/blank-pages?type=a4");
+              }}
+              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+            >
+              Print
+            </button>
+          </div>
 
-              <div className="mt-2 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => navigate("/blank-pages?type=a4")}
-                  className="press flex w-full items-center gap-3.5 rounded-[16px] bg-surface-2 p-3.5 text-left active:bg-surface-3 transition-colors"
-                >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface text-ink">
-                    <FileIcon className="size-5" strokeWidth={1.75} />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[15px] font-semibold text-ink">Blank A4 sheet</p>
-                    <p className="text-[13px] text-ink-3">Plain paper, no upload needed</p>
-                  </div>
-                  <ChevronRight className="size-4 text-ink-3 shrink-0" />
-                </button>
+          {/* Compartment 2: MIMO graph paper */}
+          <div
+            onClick={() => navigate("/blank-pages?type=graph")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=graph");
+            }}
+            className="press flex flex-col items-center justify-between p-2.5 rounded-[16px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+          >
+            <div className="flex flex-col items-center w-full">
+              <span className="flex size-7.5 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
+                <Grid3X3 className="size-4" strokeWidth={1.75} />
+              </span>
+              <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
+                MIMO graph paper
+              </p>
+              <p className="text-[10px] text-ink-3 leading-snug mt-1 line-clamp-2 h-[26px] flex items-center justify-center">
+                Squared sheets for maths and drawings
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate("/blank-pages?type=graph");
+              }}
+              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+            >
+              Print
+            </button>
+          </div>
 
-                <button
-                  type="button"
-                  onClick={() => navigate("/blank-pages?type=graph")}
-                  className="press flex w-full items-center gap-3.5 rounded-[16px] bg-surface-2 p-3.5 text-left active:bg-surface-3 transition-colors"
-                >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface text-ink">
-                    <Grid3X3 className="size-5" strokeWidth={1.75} />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[15px] font-semibold text-ink">MIMO graph paper</p>
-                    <p className="text-[13px] text-ink-3">Squared sheets for maths and drawings</p>
-                  </div>
-                  <ChevronRight className="size-4 text-ink-3 shrink-0" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate("/text-editor")}
-                  className="press flex w-full items-center gap-3.5 rounded-[16px] bg-surface-2 p-3.5 text-left active:bg-surface-3 transition-colors"
-                >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface text-ink">
-                    <PenLine className="size-5" strokeWidth={1.75} />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[15px] font-semibold text-ink">Type a document</p>
-                    <p className="text-[13px] text-ink-3">Write or paste text, then print it</p>
-                  </div>
-                  <ChevronRight className="size-4 text-ink-3 shrink-0" />
-                </button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          {/* Compartment 3: Type a document */}
+          <div
+            onClick={() => navigate("/text-editor")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") navigate("/text-editor");
+            }}
+            className="press flex flex-col items-center justify-between p-2.5 rounded-[16px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+          >
+            <div className="flex flex-col items-center w-full">
+              <span className="flex size-7.5 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
+                <PenLine className="size-4" strokeWidth={1.75} />
+              </span>
+              <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
+                Type a document
+              </p>
+              <p className="text-[10px] text-ink-3 leading-snug mt-1 line-clamp-2 h-[26px] flex items-center justify-center">
+                Write or paste text, then print it
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate("/text-editor");
+              }}
+              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+            >
+              Write
+            </button>
+          </div>
         </div>
       )}
 
