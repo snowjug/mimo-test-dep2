@@ -184,6 +184,10 @@ export function Payment() {
     try {
       const storedOptions = sessionStorage.getItem("printOptions");
       const printOptions = storedOptions ? JSON.parse(storedOptions) : {};
+      if (printOptions.colorMode) {
+        localStorage.setItem("mimo_colorMode", printOptions.colorMode);
+        localStorage.setItem("mimo_printOptions", JSON.stringify(printOptions));
+      }
       
       const storedFiles = sessionStorage.getItem("printFiles");
       const parsedFiles = storedFiles ? JSON.parse(storedFiles) : [];
@@ -212,6 +216,7 @@ export function Payment() {
       // 2. If backend determines it's totally free, skip Cashfree
       if (free && printCode) {
         sessionStorage.setItem("printCode", printCode);
+        localStorage.setItem("mimo_colorMode", printOptions.colorMode || "bw");
         toast.success("Free Order Confirmed!");
         navigate("/print-code");
         return;
