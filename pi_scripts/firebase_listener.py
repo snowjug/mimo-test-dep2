@@ -2633,10 +2633,49 @@ def finish_restart_after_boot(ref=None):
         print(f"⚠️ [RESTART] Could not close the restart command: {e}")
 
 
+def handle_clean_head_command(cmd, ref=None, clock=time):
+    """Run an admin / remote colour printhead cleaning request."""
+    if not cmd or cmd.get("status") != "pending" or cmd.get("action") != "clean_color_head":
+        return "ignored"
+    ref = ref or _command_ref()
+    command_id = cmd.get("commandId") or "clean"
+    print(f"🧹 [CLEAN] Remote request to clean colour ink head on {KIOSK_ID} (command {command_id}).")
+    safe_update(ref, {"status": "cleaning", "message": "Checking printer idle state and running head clean...",
+                      "updatedAt": firestore.SERVER_TIMESTAMP})
+    try:
+        from clean_epson import run_cleaning_job
+        ok, detail = run_cleaning_job(printer_name=COLOR_PRINTER_NAME, kiosk_id=KIOSK_ID, clock=clock)
+        status_str = "done" if ok else "failed"
+        safe_update(ref, {"status": status_str, "message": detail, "updatedAt": firestore.SERVER_TIMESTAMP,
+                          "completedAt": firestore.SERVER_TIMESTAMP})
+        return status_str
+    except Exception as e:
+        print(f"❌ [CLEAN] Cleaning command failed: {e}")
+        safe_update(ref, {"status": "failed", "message": str(e), "updatedAt": firestore.SERVER_TIMESTAMP})
+        return "failed"
+
+
 def on_command_snapshot(doc_snapshots, changes, read_time):
     for snap in doc_snapshots:
         if snap.exists:
-            threading.Thread(target=handle_restart_command, args=(snap.to_dict(),), daemon=True).start()
+            cmd = snap.to_dict() or {}
+            action = cmd.get("action")
+            if action == "clean_color_head":
+                threading.Thread(target=handle_clean_head_command, args=(cmd,), daemon=True).start()
+            else:
+                threading.Thread(target=handle_restart_command, args=(cmd,), daemon=True).start()
+
+
+def color_cleaning_scheduler_loop():
+    """Background loop that schedules and executes colour ink cleaning daily at 6:00 AM IST."""
+    if KIOSK_ID != "SV-002" and not is_color_queue(COLOR_PRINTER_NAME):
+        return
+    try:
+        print("⏰ [CLEAN] Starting 6:00 AM daily colour ink cleaning scheduler...")
+        from clean_epson import run_daily_scheduler
+        run_daily_scheduler(printer_name=COLOR_PRINTER_NAME, kiosk_id=KIOSK_ID, target_hour=6, target_minute=0)
+    except Exception as e:
+        print(f"⚠️ [CLEAN] Could not start colour cleaning scheduler: {e}")
 
 
 def startup_purge_cups():
@@ -2659,6 +2698,7 @@ if __name__ == "__main__":
     threading.Thread(target=watchdog_loop, daemon=True).start()
     threading.Thread(target=keep_warm_loop, daemon=True).start()
     threading.Thread(target=prefetch_cache_cleanup_loop, daemon=True).start()
+    threading.Thread(target=color_cleaning_scheduler_loop, daemon=True).start()
 
     print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
     print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")

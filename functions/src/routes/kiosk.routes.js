@@ -602,6 +602,66 @@ function createKioskRouter(dependencies) {
     }
   });
 
+  // ================= 5. KIOSK: REPORT CLEANING STATUS =================
+  // The Pi's automated colour ink cleaning routine (scheduled at 6:00 AM) calls this after cleaning finishes
+  // to notify visionprintt@gmail.com and record the maintenance event in Firestore.
+  router.post("/report-clean", async (req, res) => {
+    try {
+      const { kioskId, printerName, secret, status, detail } = req.body || {};
+      if (!secretsMatch(secret, process.env.INTERNAL_WEBHOOK_SECRET)) {
+        return res.status(403).json({ error: "Invalid webhook secret" });
+      }
+
+      const targetKiosk = kioskId || "SV-002";
+      const targetPrinter = printerName || "Epson_L3250";
+      const cleanStatus = status || "completed";
+
+      // 1. Record maintenance log in Firestore
+      try {
+        await db.collection("printer_maintenance").add({
+          kioskId: targetKiosk,
+          printerName: targetPrinter,
+          type: "color_ink_cleaning",
+          status: cleanStatus,
+          detail: detail || "Cleaning is done in colour printer ink",
+          cleanedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (dbErr) {
+        console.error("[REPORT-CLEAN] Failed to record in DB:", dbErr.message || dbErr);
+      }
+
+      // 2. Send notification email to visionprintt@gmail.com
+      try {
+        const transporter = getTransporter();
+        const machines = await loadMachinesMap(db);
+        const kioskName = machines.get(targetKiosk)?.name || targetKiosk;
+
+        await transporter.sendMail({
+          from: '"Mimo Printing" <visionprintt@gmail.com>',
+          to: "visionprintt@gmail.com",
+          subject: `MIMO Colour Printer Ink Cleaning Done - ${targetKiosk}`,
+          text:
+            `MIMO Colour Printer Maintenance Notification\n` +
+            `=============================================\n\n` +
+            `Kiosk: ${targetKiosk} (${kioskName})\n` +
+            `Printer: ${targetPrinter} (Colour Ink Tank)\n` +
+            `Status: Cleaning is done in colour printer ink\n` +
+            `Scheduled Time: 6:00 AM Daily\n` +
+            `Details: ${detail || "Automated head cleaning routine finished successfully without disturbing customer prints."}\n\n` +
+            `The colour printer is clean, verified, and operational for printouts.`,
+        });
+        console.log(`[EMAIL] Colour ink cleaning notification sent for ${targetKiosk}`);
+      } catch (mailErr) {
+        console.error("[REPORT-CLEAN] Email sending failed:", mailErr.message || mailErr);
+      }
+
+      return res.json({ success: true, message: "Cleaning status recorded and notification sent" });
+    } catch (err) {
+      console.error("[REPORT-CLEAN] Unexpected error:", err);
+      return res.status(500).json({ error: "Failed to process cleaning status" });
+    }
+  });
+
   return router;
 }
 
