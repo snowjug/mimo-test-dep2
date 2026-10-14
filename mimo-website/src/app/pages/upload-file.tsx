@@ -906,7 +906,7 @@ export function UploadFile() {
   }
 
   return (
-    <div className="px-4 pb-10">
+    <div className="px-4 pb-2 sm:pb-3">
       <MimoHeader />
       <input
         ref={fileInputRef}
@@ -917,18 +917,18 @@ export function UploadFile() {
         onChange={(e) => handleFileSelect(e.target.files)}
       />
 
-      <div className="rise-in pt-3 pb-6">
-        <h1 className="text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] text-ink">
+      <div className="rise-in pt-0.5 pb-1">
+        <h1 className="text-[22px] sm:text-[24px] font-semibold leading-tight tracking-[-0.02em] text-ink">
           {firstName ? `Hi, ${firstName}` : "Hi there"}
         </h1>
-        <p className="mt-1.5 text-[16px] text-ink-2">What are we printing today?</p>
+        <p className="mt-0.5 text-[13px] text-ink-2">What are we printing today?</p>
       </div>
 
       {/* Active print codes (Horizontal scroll like announcements) */}
       {activePrintCodes.length > 0 && (
-        <section className="mb-4" aria-label="Ready to print">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <h2 className="text-[12px] font-semibold uppercase tracking-wider text-ink-3">
+        <section className="mb-2.5" aria-label="Ready to print">
+          <div className="flex items-center justify-between mb-1.5 px-1">
+            <h2 className="text-[11.5px] font-semibold uppercase tracking-wider text-ink-3">
               Ready to print {activePrintCodes.length > 1 && `(${activePrintCodes.length})`}
             </h2>
             <span className="text-[11px] text-ink-3">Tap code to copy</span>
@@ -974,14 +974,14 @@ export function UploadFile() {
                       toast.success(`Print code ${job.printCode} copied!`);
                     }
                   }}
-                  className={`press ${activePrintCodes.length > 1 ? "w-[75%] max-w-[270px]" : "w-full"} shrink-0 snap-start rounded-[16px] bg-surface p-3 sm:p-3.5 border border-hairline shadow-xs cursor-pointer active:bg-surface-2 transition-all flex flex-col justify-between`}
+                  className={`press ${activePrintCodes.length > 1 ? "w-[75%] max-w-[270px]" : "w-full"} shrink-0 snap-start rounded-[16px] bg-surface p-2.5 sm:p-3 border border-hairline shadow-xs cursor-pointer active:bg-surface-2 transition-all flex flex-col justify-between`}
                 >
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="min-w-0">
-                      <span className="text-[22px] sm:text-[24px] font-bold leading-none tracking-[0.05em] tabular-nums text-brand">
+                      <span className="text-[20px] sm:text-[22px] font-bold leading-none tracking-[0.05em] tabular-nums text-brand">
                         {job.printCode}
                       </span>
-                      <p className="mt-1 font-medium text-[13px] text-ink line-clamp-1">
+                      <p className="mt-0.5 font-medium text-[12.5px] text-ink line-clamp-1">
                         {job.file || "Document"}
                       </p>
                     </div>
@@ -995,7 +995,7 @@ export function UploadFile() {
                     </div>
                   </div>
 
-                  <div className="mt-2.5 pt-2 border-t border-hairline flex items-center justify-between text-[11px] text-ink-3">
+                  <div className="mt-2 pt-1.5 border-t border-hairline flex items-center justify-between text-[11px] text-ink-3">
                     <span>{pageText}{copies > 1 ? ` • ${copies} copies` : ""}</span>
                     {validTillText && <span>Valid till {validTillText}</span>}
                   </div>
@@ -1017,12 +1017,12 @@ export function UploadFile() {
           role="button"
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
-          className={`press relative flex w-full flex-col justify-between rounded-[24px] bg-brand p-5 text-left text-on-brand cursor-pointer overflow-hidden shadow-sm ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
+          className={`press relative flex w-full flex-col justify-between rounded-[18px] bg-brand p-3 sm:p-3.5 text-left text-on-brand cursor-pointer overflow-hidden shadow-sm ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
         >
           {/* Top row: Plus on left, Scan Document button on right corner with fluid animation */}
           <div className="flex w-full items-start justify-between">
-            <span className="flex size-11 items-center justify-center rounded-full bg-white/15">
-              <Plus className="size-6" strokeWidth={2} />
+            <span className="flex size-9 sm:size-10 items-center justify-center rounded-full bg-white/15">
+              <Plus className="size-5" strokeWidth={2} />
             </span>
             {/* Scan button with clean expanding wave animation (No glowing, big & long waves) */}
             <div className="relative group flex items-center justify-center">
@@ -1045,9 +1045,9 @@ export function UploadFile() {
             </div>
           </div>
 
-          <div className="mt-8">
-            <span className="block text-[22px] font-semibold leading-tight tracking-tight">Choose files to print</span>
-            <span className="mt-1 block text-[15px] text-white/75">PDF, Word, PowerPoint, Excel, text or photos</span>
+          <div className="mt-2.5 sm:mt-3">
+            <span className="block text-[17px] sm:text-[18px] font-semibold leading-tight tracking-tight">Choose files to print</span>
+            <span className="mt-0.5 block text-[12.5px] text-white/75">PDF, Word, PowerPoint, Excel, text or photos</span>
           </div>
         </div>
       ) : (
@@ -1111,7 +1111,7 @@ export function UploadFile() {
 
       {/* 3 Horizontal Compartments (Compact, subtext removed) */}
       {files.length === 0 && (
-        <div className="mt-3.5 grid grid-cols-3 gap-2">
+        <div className="mt-2.5 grid grid-cols-3 gap-2">
           {/* Compartment 1: Blank A4 sheet */}
           <div
             onClick={() => navigate("/blank-pages?type=a4")}
@@ -1200,17 +1200,17 @@ export function UploadFile() {
 
       {/* Activity */}
       {files.length === 0 && (
-        <section className="mt-8" aria-label="Your activity">
-          <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-3">Your activity</h2>
-          <dl className="grid grid-cols-3 divide-x divide-hairline rounded-[20px] bg-surface py-4">
+        <section className="mt-2 sm:mt-2.5" aria-label="Your activity">
+          <h2 className="mb-0.5 px-1 text-[11px] font-medium text-ink-3">Your activity</h2>
+          <dl className="grid grid-cols-3 divide-x divide-hairline rounded-[16px] bg-surface py-1.5">
             {[
               { label: "Prints", value: userStats.totalDocs },
               { label: "Pages", value: userStats.totalPages },
               { label: "Spent", value: `₹${Number(userStats.totalSpent).toFixed(0)}` },
             ].map((s) => (
               <div key={s.label} className="flex flex-col-reverse px-3 text-center">
-                <dt className="mt-0.5 text-[13px] text-ink-3">{s.label}</dt>
-                <dd className="text-[22px] font-semibold tabular-nums tracking-tight text-ink">{s.value}</dd>
+                <dt className="text-[11px] text-ink-3">{s.label}</dt>
+                <dd className="text-[18px] font-semibold tabular-nums tracking-tight text-ink">{s.value}</dd>
               </div>
             ))}
           </dl>
