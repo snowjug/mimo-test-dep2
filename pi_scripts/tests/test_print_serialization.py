@@ -43,7 +43,7 @@ class PrintJobDispatchGoesThroughSingleWorkerPoolTests(unittest.TestCase):
     def test_watchdog_stuck_job_fallback_also_uses_the_print_pool(self):
         # The watchdog's own stuck-job fallback (separate from on_snapshot) used to spawn its own raw
         # thread too -- same bug, same fix, same pool.
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firebase_listener.py")) as fh:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firebase_listener.py"), encoding="utf-8") as fh:
             src = fh.read()
         self.assertNotIn("threading.Thread(target=process_job", src, "a raw thread spawn for process_job survived the fix")
         self.assertEqual(src.count("_print_pool.submit(_run_process_job, doc)"), 2, "expected both call sites (on_snapshot and the watchdog fallback) to use the pool")

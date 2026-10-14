@@ -118,6 +118,7 @@
   "POST /hr/login",
   "POST /hr/profile/document/:docType",
   "POST /kiosk/print",
+  "POST /kiosk/report-clean",
   "POST /kiosk/report-failure",
   "POST /kiosk/report-problem",
   "POST /login",

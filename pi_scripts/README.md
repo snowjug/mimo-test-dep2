@@ -8,7 +8,7 @@ There are **two listener variants** in this repository — this one and [`pi-lis
 |---|---|
 | `firebase_listener.py` (≈1 650 lines) | The listener: `on_snapshot` on `print_jobs` (status `printing` for `KIOSK_ID`), `process_job`, `print_file` (CUPS options: colour/B&W, duplex, copies, N-up, page ranges), image handling (Pillow, optional HEIC), a prefetch watcher, `heartbeat_loop` → `system_status/<KIOSK_ID>`, and a call to `POST /kiosk/report-failure` when a print fails |
 | `check_jobs.py` | Small Firestore job inspection helper (expects `serviceAccountKey.json` at a fixed Pi path) |
-| `clean_epson.py` | Epson auto-clean routine for the Pi (logs to `/home/pi/mimo/clean_epson.log`) |
+| `clean_epson.py` | Epson automated colour ink cleaning routine scheduled at **6:00 AM daily**; verifies printer queue is idle before running so active customer prints are never disturbed; sends confirmation notification to `visionprintt@gmail.com` via backend API (`POST /kiosk/report-clean`) and records maintenance logs in Firestore (logs to `/home/pi/mimo/clean_epson.log`) |
 | `inject_live_job.py` | Writes a test print job (sample images fetched from a raw GitHub URL of another repository) into Firestore for a kiosk given on the command line — **touches whatever database its key points at**; use only with a test kiosk |
 
 ## How it talks to other modules
