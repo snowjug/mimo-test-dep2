@@ -13,6 +13,7 @@ import {
   FileText,
   Search,
   ArrowUpRight,
+  ArrowDownRight,
   TrendingUp,
   AlertCircle,
   RotateCcw,
@@ -51,8 +52,15 @@ import { useRange } from '../../context/RangeContext';
 import { insights } from '../../services/insights.service';
 import { DateRangePicker } from '../../components/ui/DateRangePicker';
 import { ErrorBanner } from '../../components/insights/InsightBits';
-import { bucketLabel, describeRange } from '../../lib/dateRange';
+import { bucketLabel, describeRange, presetRange, toDateKey } from '../../lib/dateRange';
 import { errorMessage } from '../../hooks/useLiveQuery';
+
+const fmtDateShort = (key?: string) => {
+  if (!key) return '';
+  const parts = key.split('-').map(Number);
+  if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return key;
+  return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+};
 import { exportFinancePdf } from '../../lib/pdfExport';
 import { inr, int } from '../../lib/format';
 import type { Analytics } from '../../types/insights.types';
@@ -94,12 +102,24 @@ export const FinancePage: React.FC = () => {
   const [activeSegment, setActiveSegment] = useState<'overview' | 'transactions' | 'refunds' | 'pricing'>('overview');
   const [activeChartTab, setActiveChartTab] = useState<'waterfall' | 'monthly' | 'hourly'>('waterfall');
 
-  // Launch Month (May 2026) Baseline
-  const [launchMonthData, setLaunchMonthData] = useState<{
-    revenue: number;
-    pages: number;
-    orders: number;
-    refunds: number;
+  // Weekly Comparison Benchmark State (Last Week vs This Week)
+  const [weeklyBenchmarkData, setWeeklyBenchmarkData] = useState<{
+    thisWeek: {
+      revenue: number;
+      pages: number;
+      orders: number;
+      refunds: number;
+      from: string;
+      to: string;
+    };
+    lastWeek: {
+      revenue: number;
+      pages: number;
+      orders: number;
+      refunds: number;
+      from: string;
+      to: string;
+    };
   } | null>(null);
 
   // Pricing State
@@ -184,20 +204,40 @@ export const FinancePage: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    insights.analytics({ preset: 'custom', from: '2026-05-01', to: '2026-05-31' }, false)
+    const r7d = presetRange('7d');
+    insights.analytics(r7d, true)
       .then((res) => {
         if (isMounted && res?.current) {
-          setLaunchMonthData({
-            revenue: res.current.grossCollections ?? res.current.revenue ?? 0,
-            pages: res.current.pages || 0,
-            orders: res.current.orders || 0,
-            refunds: res.current.refundedAmount || 0,
+          const curSum = res.current;
+          const prevSum = res.previous?.summary;
+          const [fy, fm, fd] = r7d.from.split('-').map(Number);
+          const fromDate = new Date(fy, fm - 1, fd);
+          const lastWeekFrom = toDateKey(new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate() - 7));
+          const lastWeekTo = toDateKey(new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate() - 1));
+
+          setWeeklyBenchmarkData({
+            thisWeek: {
+              revenue: curSum.grossCollections ?? curSum.revenue ?? 0,
+              pages: curSum.pages || 0,
+              orders: curSum.orders || 0,
+              refunds: curSum.refundedAmount || 0,
+              from: r7d.from,
+              to: r7d.to,
+            },
+            lastWeek: {
+              revenue: prevSum?.grossCollections ?? prevSum?.revenue ?? 0,
+              pages: prevSum?.pages || 0,
+              orders: prevSum?.orders || 0,
+              refunds: prevSum?.refundedAmount || 0,
+              from: lastWeekFrom,
+              to: lastWeekTo,
+            },
           });
         }
       })
       .catch(() => {
         if (isMounted) {
-          setLaunchMonthData(null);
+          setWeeklyBenchmarkData(null);
         }
       });
     return () => { isMounted = false; };
@@ -296,39 +336,56 @@ export const FinancePage: React.FC = () => {
     });
   }, [analytics]);
 
-  // Verified Monthly Progression (Only verified baseline and active range, without fake numbers)
+  // Verified Progression (Week-over-Week)
   const monthlyProgression = useMemo(() => {
     const list: Array<{ month: string; Revenue: number; NetRevenue: number; Pages: number }> = [];
-    if (launchMonthData && launchMonthData.revenue > 0) {
+    if (weeklyBenchmarkData) {
       list.push({
-        month: 'May 2026 (Launch)',
-        Revenue: launchMonthData.revenue,
-        NetRevenue: Math.max(0, launchMonthData.revenue - (launchMonthData.refunds || 0)),
-        Pages: launchMonthData.pages,
+        month: 'Last Week',
+        Revenue: weeklyBenchmarkData.lastWeek.revenue,
+        NetRevenue: Math.max(0, weeklyBenchmarkData.lastWeek.revenue - (weeklyBenchmarkData.lastWeek.refunds || 0)),
+        Pages: weeklyBenchmarkData.lastWeek.pages,
       });
-    }
-    if (analytics?.current && totalGross > 0) {
       list.push({
-        month: 'Current Range',
-        Revenue: totalGross,
-        NetRevenue: netRevenue,
-        Pages: analytics.current.pages || 0,
+        month: 'This Week',
+        Revenue: weeklyBenchmarkData.thisWeek.revenue,
+        NetRevenue: Math.max(0, weeklyBenchmarkData.thisWeek.revenue - (weeklyBenchmarkData.thisWeek.refunds || 0)),
+        Pages: weeklyBenchmarkData.thisWeek.pages,
       });
     }
     return list;
-  }, [launchMonthData, totalGross, netRevenue, analytics]);
+  }, [weeklyBenchmarkData]);
 
-  // Launch Month Benchmark Metrics
-  const launchBenchmark = useMemo(() => {
-    const lRev = launchMonthData?.revenue || 0;
-    const lPages = launchMonthData?.pages || 0;
-    const lOrders = launchMonthData?.orders || 0;
+  // Weekly Benchmark Metrics
+  const weeklyBenchmark = useMemo(() => {
+    const thisRev = weeklyBenchmarkData?.thisWeek.revenue ?? 0;
+    const thisPages = weeklyBenchmarkData?.thisWeek.pages ?? 0;
+    const thisOrders = weeklyBenchmarkData?.thisWeek.orders ?? 0;
 
-    const hasBaseline = lRev > 0;
-    const revMultiplier = hasBaseline ? (totalGross / lRev).toFixed(1) : '—';
-    const revGrowthPct = hasBaseline ? Math.round(((totalGross - lRev) / lRev) * 100) : 0;
-    return { hasBaseline, revMultiplier, revGrowthPct, lRev, lPages, lOrders };
-  }, [launchMonthData, totalGross]);
+    const lastRev = weeklyBenchmarkData?.lastWeek.revenue ?? 0;
+    const lastPages = weeklyBenchmarkData?.lastWeek.pages ?? 0;
+    const lastOrders = weeklyBenchmarkData?.lastWeek.orders ?? 0;
+
+    const hasBaseline = weeklyBenchmarkData !== null;
+    const revMultiplier = lastRev > 0 ? (thisRev / lastRev).toFixed(1) : (thisRev > 0 ? '—' : '1.0');
+    const revGrowthPct = lastRev > 0 ? Math.round(((thisRev - lastRev) / lastRev) * 100) : (thisRev > 0 ? 100 : 0);
+    const pageGrowthPct = lastPages > 0 ? Math.round(((thisPages - lastPages) / lastPages) * 100) : (thisPages > 0 ? 100 : 0);
+    const orderGrowthPct = lastOrders > 0 ? Math.round(((thisOrders - lastOrders) / lastOrders) * 100) : (thisOrders > 0 ? 100 : 0);
+    return {
+      hasBaseline,
+      thisRev,
+      thisPages,
+      thisOrders,
+      lastRev,
+      lastPages,
+      lastOrders,
+      revMultiplier,
+      revGrowthPct,
+      pageGrowthPct,
+      orderGrowthPct,
+      isRevUp: revGrowthPct >= 0,
+    };
+  }, [weeklyBenchmarkData]);
 
   // Hourly Peak Chart
   const hourlyRevenueData = useMemo(() => {
@@ -537,7 +594,7 @@ export const FinancePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Launch Month vs Current Benchmark Banner */}
+          {/* Last Week vs This Week Benchmark Banner */}
           <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10">
@@ -549,26 +606,30 @@ export const FinancePage: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-extrabold text-base sm:text-lg text-white">
-                        Launch Month (May 2026) vs Today Benchmark
+                        Last Week vs This Week Comparison
                       </h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">
-                        {launchBenchmark.hasBaseline ? `${launchBenchmark.revMultiplier}x Multiplier` : '—'}
+                        {weeklyBenchmark.hasBaseline ? `${weeklyBenchmark.revMultiplier}x Multiplier` : '—'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-300">
-                      {launchBenchmark.hasBaseline ? 'Comparing company financial performance against Day 1 launch baseline.' : 'Historical May 2026 baseline data not available.'}
+                      {weeklyBenchmark.hasBaseline
+                        ? 'Comparing current 7-day performance against previous 7-day baseline.'
+                        : 'Weekly comparative benchmark loading...'}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Revenue Expansion
+                    Week-over-Week Revenue
                   </span>
-                  <span className="text-xl font-black text-emerald-400 flex items-center justify-end gap-1">
-                    {launchBenchmark.hasBaseline ? (
+                  <span className={`text-xl font-black flex items-center justify-end gap-1 ${
+                    weeklyBenchmark.hasBaseline && !weeklyBenchmark.isRevUp ? 'text-rose-400' : 'text-emerald-400'
+                  }`}>
+                    {weeklyBenchmark.hasBaseline ? (
                       <>
-                        <ArrowUpRight size={18} />
-                        +{launchBenchmark.revGrowthPct}%
+                        {weeklyBenchmark.isRevUp ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
+                        {weeklyBenchmark.revGrowthPct >= 0 ? `+${weeklyBenchmark.revGrowthPct}%` : `${weeklyBenchmark.revGrowthPct}%`}
                       </>
                     ) : (
                       '—'
@@ -579,27 +640,47 @@ export const FinancePage: React.FC = () => {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
                 <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Month 1 Revenue</span>
-                  <p className="text-xl font-black text-white mt-1">{launchBenchmark.hasBaseline ? inr(launchBenchmark.lRev) : '—'}</p>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">{launchBenchmark.hasBaseline ? 'Baseline May 2026' : 'Unreconciled'}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Last Week Revenue</span>
+                  <p className="text-xl font-black text-white mt-1">
+                    {weeklyBenchmark.hasBaseline ? inr(weeklyBenchmark.lastRev) : '—'}
+                  </p>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    {weeklyBenchmark.hasBaseline && weeklyBenchmarkData?.lastWeek.from
+                      ? `${fmtDateShort(weeklyBenchmarkData.lastWeek.from)} – ${fmtDateShort(weeklyBenchmarkData.lastWeek.to)}`
+                      : 'Prior 7 days'}
+                  </span>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Period Revenue</span>
-                  <p className="text-xl font-black text-emerald-400 mt-1">{inr(totalGross)}</p>
-                  <span className="text-[10px] text-emerald-300/80 font-bold mt-0.5 block">{launchBenchmark.hasBaseline ? `+${launchBenchmark.revGrowthPct}% Growth` : 'Active window'}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">This Week Revenue</span>
+                  <p className="text-xl font-black text-emerald-400 mt-1">
+                    {weeklyBenchmark.hasBaseline ? inr(weeklyBenchmark.thisRev) : '—'}
+                  </p>
+                  <span className="text-[10px] text-emerald-300/80 font-bold mt-0.5 block">
+                    {weeklyBenchmark.hasBaseline
+                      ? `${weeklyBenchmark.revGrowthPct >= 0 ? '+' : ''}${weeklyBenchmark.revGrowthPct}% vs last week`
+                      : 'Active 7 days'}
+                  </span>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Print Volume Scaled</span>
-                  <p className="text-xl font-black text-white mt-1">{int(analytics?.current.pages || 0)} pgs</p>
-                  <span className="text-[10px] text-indigo-300 font-bold mt-0.5 block">{launchBenchmark.hasBaseline ? `vs ${launchBenchmark.lPages} in M1` : 'Active window'}</span>
+                  <p className="text-xl font-black text-white mt-1">
+                    {weeklyBenchmark.hasBaseline ? `${int(weeklyBenchmark.thisPages)} pgs` : '—'}
+                  </p>
+                  <span className="text-[10px] text-indigo-300 font-bold mt-0.5 block">
+                    {weeklyBenchmark.hasBaseline ? `vs ${int(weeklyBenchmark.lastPages)} last week` : 'Active 7 days'}
+                  </span>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Orders Handled</span>
-                  <p className="text-xl font-black text-white mt-1">{analytics?.current.orders || 0} orders</p>
-                  <span className="text-[10px] text-amber-300 font-bold mt-0.5 block">{launchBenchmark.hasBaseline ? `vs ${launchBenchmark.lOrders} in M1` : 'Active window'}</span>
+                  <p className="text-xl font-black text-white mt-1">
+                    {weeklyBenchmark.hasBaseline ? `${weeklyBenchmark.thisOrders} orders` : '—'}
+                  </p>
+                  <span className="text-[10px] text-amber-300 font-bold mt-0.5 block">
+                    {weeklyBenchmark.hasBaseline ? `vs ${weeklyBenchmark.lastOrders} last week` : 'Active 7 days'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -614,14 +695,14 @@ export const FinancePage: React.FC = () => {
                     {activeChartTab === 'waterfall'
                       ? 'Revenue & Refund Trajectory'
                       : activeChartTab === 'monthly'
-                      ? 'Month-by-Month Company Growth'
+                      ? 'Week-over-Week Company Growth'
                       : 'Hourly Financial Intensity'}
                   </h3>
                   <p className="text-xs text-[var(--text-3)]">
                     {activeChartTab === 'waterfall'
                       ? 'Gross collections vs refunds deducted vs net realized revenue'
                       : activeChartTab === 'monthly'
-                      ? 'Revenue scaling from Day 1 inception to current date'
+                      ? 'Comparative revenue scaling between Last Week and This Week'
                       : 'Peak transaction volume across campus hours'}
                   </p>
                 </div>
@@ -647,7 +728,7 @@ export const FinancePage: React.FC = () => {
                         : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
                     }`}
                   >
-                    MoM Growth
+                    WoW Growth
                   </button>
                   <button
                     type="button"
