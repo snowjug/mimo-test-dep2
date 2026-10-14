@@ -11,6 +11,7 @@ import { ConfirmDialog, EmptyState } from '../../components/ui/shared';
 import { describeRange } from '../../lib/dateRange';
 import { dateTime, inr, timeAgo, tsToIso } from '../../lib/format';
 import type { Incident, IssueBasis, IssueRow, IssueSource } from '../../types/insights.types';
+import { IncidentDetailsModal } from './IncidentDetailsModal';
 
 interface RefundRequest {
   id: string;
@@ -40,6 +41,7 @@ export const IncidentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = (
   const inc = useLiveQuery(() => insights.incidents(current()), [range], { live: true, intervalMs: 20000 });
   const refunds = useLiveQuery(() => api.get<{ requests: RefundRequest[] }>('/admin/refund-requests').then((r) => r.data.requests), [], { live: true, intervalMs: 30000 });
   const [confirm, setConfirm] = useState<RefundRequest | null>(null);
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -95,28 +97,37 @@ export const IncidentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = (
         ) : (
           <ul className="p-3 sm:p-5 space-y-2.5">
             {inc.data?.incidents.map((i) => (
-              <li key={i.id} className="flex items-start gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/40">
+              <li
+                key={i.id}
+                onClick={() => setSelectedIncident(i)}
+                className="flex items-start gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/40 hover:bg-[var(--surface-2)]/80 hover:border-indigo-500/30 transition-all cursor-pointer group"
+              >
                 <span className={`mt-0.5 w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0 ${SEV[i.severity]}`}>{ICONS[i.type]}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-bold text-[var(--text-1)]">{i.title}</p>
+                    <p className="text-sm font-bold text-[var(--text-1)] group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{i.title}</p>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase border ${SEV[i.severity]}`}>{i.severity}</span>
                   </div>
                   <p className="text-xs text-[var(--text-2)] mt-0.5 break-words">{i.detail}</p>
                   {i.at && <p className="text-[11px] text-[var(--text-3)] mt-1">{dateTime(i.at)} · {timeAgo(i.at)}</p>}
                 </div>
-                {onNavigate && i.type !== 'refund_request' && (
-                  <button type="button" onClick={() => onNavigate(i.tab)} className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1 flex-shrink-0">
-                    <Cpu size={12} /> Open
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedIncident(i);
+                  }}
+                  className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 cursor-pointer flex items-center gap-1.5 flex-shrink-0 px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition-all"
+                >
+                  <Cpu size={12} /> Open
+                </button>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <IssueHistory />
+      <IssueHistory onSelectIncident={setSelectedIncident} />
 
       <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs p-5">
         <h2 className="text-sm font-bold text-[var(--text-1)]">Refund requests</h2>
@@ -151,6 +162,12 @@ export const IncidentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = (
 
       <ConfirmDialog open={!!confirm} title="Approve this refund?" description={confirm ? `${inr(confirm.amount)} will be refunded to the customer through Cashfree for order ${confirm.orderId}. This cannot be undone.` : ''}
         confirmLabel="Refund now" loading={busy} onConfirm={approve} onCancel={() => setConfirm(null)} />
+
+      <IncidentDetailsModal
+        incident={selectedIncident}
+        onClose={() => setSelectedIncident(null)}
+        onNavigate={onNavigate}
+      />
     </div>
   );
 };
@@ -173,7 +190,7 @@ const HISTORY_PAGE = 25;
  * Dated, deduplicated issue history for the selected range (GET /admin/issues). Read-only: actions on refunds stay
  * in the Refund requests section. Live alerts are already listed under Open incidents, so they are not fetched here.
  */
-const IssueHistory: React.FC = () => {
+const IssueHistory: React.FC<{ onSelectIncident?: (incident: Incident) => void }> = ({ onSelectIncident }) => {
   const { range, current, live } = useRange();
   const q = useLiveQuery(() => insights.issues(current(), { limit: HISTORY_LIMIT, current: 0 }), [range], { live, intervalMs: 60000 });
   const [category, setCategory] = useState<string>('ALL');
@@ -217,7 +234,29 @@ const IssueHistory: React.FC = () => {
           {rows.slice(0, shown).map((i) => {
             const evidence = i.evidence.printerStatus || i.evidence.note || i.evidence.reason || null;
             return (
-              <li key={i.id} className="p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/40">
+              <li
+                key={i.id}
+                onClick={() => {
+                  if (onSelectIncident) {
+                    onSelectIncident({
+                      id: i.id,
+                      type: i.source === 'refund_request' ? 'refund_request' : 'print_failed',
+                      severity: i.severity,
+                      kioskId: i.kioskId,
+                      title: i.title,
+                      detail: evidence || i.title,
+                      at: i.at,
+                      tab: 'operations',
+                      jobId: i.jobId || (i.jobIds.length > 0 ? i.jobIds[0] : undefined),
+                      orderId: i.orderId,
+                      failureReason: evidence || 'Issue logged in history',
+                    });
+                  }
+                }}
+                className={`p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/40 ${
+                  onSelectIncident ? 'hover:bg-[var(--surface-2)]/80 hover:border-indigo-500/30 transition-all cursor-pointer' : ''
+                }`}
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase border ${SEV[i.severity]}`}>{i.severity}</span>
                   <p className="text-sm font-bold text-[var(--text-1)] min-w-0 break-words">{i.title}</p>
