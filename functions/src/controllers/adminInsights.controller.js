@@ -458,6 +458,11 @@ const getAdminIncidents = async (req, res) => {
       const userPhone = j.userPhone || j.phoneNumber || u?.phone || (j.source === "whatsapp" ? j.userId : null);
       const failureReason = j.printerStatus || j.error || "Job failed";
 
+      const rawColor = String(j.colorMode || j.printOptions?.colorMode || j.settings?.colorMode || (j.isColor ? "color" : "") || "").toLowerCase();
+      const isColor = rawColor === "color" || rawColor === "colour";
+      const colorMode = isColor ? "color" : "bw";
+      const pageCount = Number(j.pageCount || j.pages || j.printOptions?.pageCount || 1);
+
       incidents.push({
         id: `job-${j.id}`,
         type: "print_failed",
@@ -478,9 +483,9 @@ const getAdminIncidents = async (req, res) => {
         refundStatus: j.refundStatus || null,
         refundAmount: j.refundAmount || null,
         amount: j.totalCost || j.amount || null,
-        pageCount: j.pageCount || null,
-        copies: j.copies || 1,
-        colorMode: j.colorMode || null,
+        pageCount,
+        copies: j.copies || j.printOptions?.copies || 1,
+        colorMode,
         tab: "operations",
       });
     }
