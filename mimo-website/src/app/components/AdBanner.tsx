@@ -43,14 +43,14 @@ function AdSlide({ ad, onImageLoad }: { ad: Ad; onImageLoad?: () => void }) {
 
   return hasImage && !hasCaption ? (
     // CASE 1: Banner mode (image only, no caption) - full image shown cleanly without any cropping
-    <div className="p-1 sm:p-1.5">
-      <div className="w-full overflow-hidden rounded-[12px] bg-ink-4/5 flex items-center justify-center">
+    <div className="p-2 sm:p-2.5">
+      <div className="w-full overflow-hidden rounded-[14px] bg-surface flex items-center justify-center">
         <img
           src={ad.imageUrl!}
           alt="Announcement banner"
           loading="eager"
           decoding="async"
-          className="w-full h-auto max-h-[160px] sm:max-h-[180px] object-contain rounded-[12px] block"
+          className="w-full h-auto max-h-[220px] sm:max-h-[240px] object-contain rounded-[14px] block"
           draggable={false}
           onLoad={onImageLoad}
         />
@@ -58,14 +58,14 @@ function AdSlide({ ad, onImageLoad }: { ad: Ad; onImageLoad?: () => void }) {
     </div>
   ) : (
     // CASE 2: Card mode (image + caption, or caption only)
-    <div className="flex items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3">
+    <div className="flex items-center gap-4 p-3.5 sm:p-4">
       {hasImage && (
-        <div className="shrink-0 overflow-hidden rounded-[12px] bg-ink-4/10 w-20 sm:w-24 h-24 sm:h-28 flex items-center justify-center" aria-hidden="true">
+        <div className="shrink-0 overflow-hidden rounded-[14px] bg-surface-2 w-24 sm:w-28 h-28 sm:h-32 flex items-center justify-center" aria-hidden="true">
           <img
             src={ad.imageUrl!}
             alt=""
-            width={96}
-            height={112}
+            width={112}
+            height={128}
             loading="eager"
             decoding="async"
             className="h-full w-full object-contain"
@@ -75,8 +75,8 @@ function AdSlide({ ad, onImageLoad }: { ad: Ad; onImageLoad?: () => void }) {
         </div>
       )}
       {hasCaption && (
-        <div className="flex min-w-0 flex-1 flex-col py-0.5">
-          <p className="text-[14px] sm:text-[15px] font-semibold leading-snug tracking-tight text-ink line-clamp-3">
+        <div className="flex min-w-0 flex-1 flex-col py-1">
+          <p className="text-[15px] sm:text-[16px] font-semibold leading-snug tracking-tight text-ink line-clamp-3">
             {ad.caption}
           </p>
         </div>
@@ -184,11 +184,11 @@ export function AdBanner() {
   };
 
   return (
-    <section aria-label="Advertisement" className="mt-2 sm:mt-2.5">
-      <h2 className="mb-0.5 px-1 text-[11px] font-medium text-ink-3">Announcements</h2>
+    <section aria-label="Advertisement" className="mt-5 sm:mt-6">
+      <h2 className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-wider text-ink-3">Announcements</h2>
 
       <div
-        className="relative overflow-hidden rounded-[16px] bg-surface select-none"
+        className="relative overflow-hidden rounded-[20px] bg-surface select-none border border-hairline/60 shadow-xs"
         style={{ height: trackHeight, transition: isDragging ? undefined : "height 300ms ease" }}
       >
         <div
