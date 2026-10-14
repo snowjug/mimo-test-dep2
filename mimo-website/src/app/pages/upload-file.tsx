@@ -906,7 +906,7 @@ export function UploadFile() {
   }
 
   return (
-    <div className="px-4 pb-2 sm:pb-3">
+    <div className="px-4 pb-8 max-w-lg mx-auto">
       <MimoHeader />
       <input
         ref={fileInputRef}
@@ -917,11 +917,11 @@ export function UploadFile() {
         onChange={(e) => handleFileSelect(e.target.files)}
       />
 
-      <div className="rise-in pt-0.5 pb-1">
-        <h1 className="text-[22px] sm:text-[24px] font-semibold leading-tight tracking-[-0.02em] text-ink">
+      <div className="rise-in pt-2 pb-4">
+        <h1 className="text-[26px] sm:text-[28px] font-bold leading-tight tracking-[-0.03em] text-ink">
           {firstName ? `Hi, ${firstName}` : "Hi there"}
         </h1>
-        <p className="mt-0.5 text-[13px] text-ink-2">What are we printing today?</p>
+        <p className="mt-1 text-[14.5px] text-ink-2">What are we printing today?</p>
       </div>
 
       {/* Active print codes (Horizontal scroll like announcements) */}
@@ -1017,12 +1017,12 @@ export function UploadFile() {
           role="button"
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
-          className={`press relative flex w-full flex-col justify-between rounded-[18px] bg-brand p-3 sm:p-3.5 text-left text-on-brand cursor-pointer overflow-hidden shadow-sm ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
+          className={`press relative flex w-full flex-col justify-between rounded-[22px] bg-brand p-4 sm:p-5 text-left text-on-brand cursor-pointer overflow-hidden shadow-sm transition-all ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
         >
           {/* Top row: Plus on left, Scan Document button on right corner with fluid animation */}
           <div className="flex w-full items-start justify-between">
-            <span className="flex size-9 sm:size-10 items-center justify-center rounded-full bg-white/15">
-              <Plus className="size-5" strokeWidth={2} />
+            <span className="flex size-10 sm:size-11 items-center justify-center rounded-full bg-white/15 backdrop-blur-xs">
+              <Plus className="size-5 sm:size-6 text-white" strokeWidth={2.2} />
             </span>
             {/* Scan button with clean expanding wave animation (No glowing, big & long waves) */}
             <div className="relative group flex items-center justify-center">
@@ -1037,17 +1037,17 @@ export function UploadFile() {
                   navigate("/document-scanner");
                 }}
                 aria-label="Scan document"
-                className="press relative z-10 flex items-center gap-1.5 rounded-full bg-white/20 hover:bg-white/25 active:bg-white/30 backdrop-blur-md px-3.5 py-1.5 text-white border border-white/25 shadow-sm"
+                className="press relative z-10 flex items-center gap-1.5 rounded-full bg-white/20 hover:bg-white/25 active:bg-white/30 backdrop-blur-md px-4 py-2 text-white border border-white/25 shadow-sm"
               >
                 <Camera className="size-4 shrink-0" strokeWidth={2} />
-                <span className="text-[13px] font-semibold tracking-wide">Scan</span>
+                <span className="text-[13.5px] font-semibold tracking-wide">Scan</span>
               </button>
             </div>
           </div>
 
-          <div className="mt-2.5 sm:mt-3">
-            <span className="block text-[17px] sm:text-[18px] font-semibold leading-tight tracking-tight">Choose files to print</span>
-            <span className="mt-0.5 block text-[12.5px] text-white/75">PDF, Word, PowerPoint, Excel, text or photos</span>
+          <div className="mt-5 sm:mt-6">
+            <span className="block text-[19px] sm:text-[21px] font-bold leading-tight tracking-tight">Choose files to print</span>
+            <span className="mt-1 block text-[13.5px] text-white/80">PDF, Word, PowerPoint, Excel, text or photos</span>
           </div>
         </div>
       ) : (
@@ -1109,9 +1109,9 @@ export function UploadFile() {
         </Group>
       )}
 
-      {/* 3 Horizontal Compartments (Compact, subtext removed) */}
+      {/* 3 Horizontal Compartments (Clean, static, professional) */}
       {files.length === 0 && (
-        <div className="mt-2.5 grid grid-cols-3 gap-2">
+        <div className="mt-3.5 sm:mt-4 grid grid-cols-3 gap-2.5">
           {/* Compartment 1: Blank A4 sheet */}
           <div
             onClick={() => navigate("/blank-pages?type=a4")}
@@ -1120,12 +1120,12 @@ export function UploadFile() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=a4");
             }}
-            className="press flex flex-col items-center justify-between p-2 rounded-[14px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+            className="press flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-[16px] bg-surface border border-hairline/60 shadow-xs text-center cursor-pointer active:bg-surface-2 hover:border-brand/30 transition-all group"
           >
-            <span className="flex size-7 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1 group-hover:scale-105 transition-transform">
-              <FileIcon className="size-3.5" strokeWidth={1.75} />
+            <span className="flex size-8 items-center justify-center rounded-[10px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
+              <FileIcon className="size-4" strokeWidth={1.75} />
             </span>
-            <p className="text-[11.5px] font-semibold text-ink leading-tight line-clamp-1">
+            <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
               Blank A4 sheet
             </p>
             <button
@@ -1134,7 +1134,7 @@ export function UploadFile() {
                 e.stopPropagation();
                 navigate("/blank-pages?type=a4");
               }}
-              className="mt-1.5 w-full py-0.5 text-[10.5px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
             >
               Print
             </button>
@@ -1148,12 +1148,12 @@ export function UploadFile() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=graph");
             }}
-            className="press flex flex-col items-center justify-between p-2 rounded-[14px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+            className="press flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-[16px] bg-surface border border-hairline/60 shadow-xs text-center cursor-pointer active:bg-surface-2 hover:border-brand/30 transition-all group"
           >
-            <span className="flex size-7 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1 group-hover:scale-105 transition-transform">
-              <Grid3X3 className="size-3.5" strokeWidth={1.75} />
+            <span className="flex size-8 items-center justify-center rounded-[10px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
+              <Grid3X3 className="size-4" strokeWidth={1.75} />
             </span>
-            <p className="text-[11.5px] font-semibold text-ink leading-tight line-clamp-1">
+            <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
               MIMO graph paper
             </p>
             <button
@@ -1162,7 +1162,7 @@ export function UploadFile() {
                 e.stopPropagation();
                 navigate("/blank-pages?type=graph");
               }}
-              className="mt-1.5 w-full py-0.5 text-[10.5px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
             >
               Print
             </button>
@@ -1176,12 +1176,12 @@ export function UploadFile() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") navigate("/text-editor");
             }}
-            className="press flex flex-col items-center justify-between p-2 rounded-[14px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+            className="press flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-[16px] bg-surface border border-hairline/60 shadow-xs text-center cursor-pointer active:bg-surface-2 hover:border-brand/30 transition-all group"
           >
-            <span className="flex size-7 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1 group-hover:scale-105 transition-transform">
-              <PenLine className="size-3.5" strokeWidth={1.75} />
+            <span className="flex size-8 items-center justify-center rounded-[10px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
+              <PenLine className="size-4" strokeWidth={1.75} />
             </span>
-            <p className="text-[11.5px] font-semibold text-ink leading-tight line-clamp-1">
+            <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
               Type a document
             </p>
             <button
@@ -1190,7 +1190,7 @@ export function UploadFile() {
                 e.stopPropagation();
                 navigate("/text-editor");
               }}
-              className="mt-1.5 w-full py-0.5 text-[10.5px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
             >
               Write
             </button>
@@ -1200,17 +1200,17 @@ export function UploadFile() {
 
       {/* Activity */}
       {files.length === 0 && (
-        <section className="mt-2 sm:mt-2.5" aria-label="Your activity">
-          <h2 className="mb-0.5 px-1 text-[11px] font-medium text-ink-3">Your activity</h2>
-          <dl className="grid grid-cols-3 divide-x divide-hairline rounded-[16px] bg-surface py-1.5">
+        <section className="mt-5 sm:mt-6" aria-label="Your activity">
+          <h2 className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-wider text-ink-3">Your activity</h2>
+          <dl className="grid grid-cols-3 divide-x divide-hairline rounded-[20px] bg-surface py-3 border border-hairline/60 shadow-xs">
             {[
               { label: "Prints", value: userStats.totalDocs },
               { label: "Pages", value: userStats.totalPages },
               { label: "Spent", value: `₹${Number(userStats.totalSpent).toFixed(0)}` },
             ].map((s) => (
               <div key={s.label} className="flex flex-col-reverse px-3 text-center">
-                <dt className="text-[11px] text-ink-3">{s.label}</dt>
-                <dd className="text-[18px] font-semibold tabular-nums tracking-tight text-ink">{s.value}</dd>
+                <dt className="text-[11.5px] font-medium text-ink-3 mt-0.5">{s.label}</dt>
+                <dd className="text-[20px] sm:text-[22px] font-bold tabular-nums tracking-tight text-ink">{s.value}</dd>
               </div>
             ))}
           </dl>
