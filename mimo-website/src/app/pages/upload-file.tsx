@@ -1024,73 +1024,11 @@ export function UploadFile() {
             <span className="flex size-11 items-center justify-center rounded-full bg-white/15">
               <Plus className="size-6" strokeWidth={2} />
             </span>
-            {/* Scan button with liquid stream flowing along its perimeter */}
+            {/* Scan button with clean expanding wave animation (No glowing, big & long waves) */}
             <div className="relative group flex items-center justify-center">
-              <span className="liquid-ripple" aria-hidden="true" />
-              <span className="liquid-pulse-aura" aria-hidden="true" />
-
-              <svg
-                className="absolute inset-0 size-full pointer-events-none overflow-visible"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                <rect
-                  x="0"
-                  y="0"
-                  width="100%"
-                  height="100%"
-                  rx="9999"
-                  ry="9999"
-                  fill="none"
-                  stroke="#38bdf8"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  pathLength="100"
-                  className="liquid-stream-glow"
-                />
-                <rect
-                  x="0"
-                  y="0"
-                  width="100%"
-                  height="100%"
-                  rx="9999"
-                  ry="9999"
-                  fill="none"
-                  stroke="#67e8f9"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  pathLength="100"
-                  className="liquid-stream-main"
-                />
-                <rect
-                  x="0"
-                  y="0"
-                  width="100%"
-                  height="100%"
-                  rx="9999"
-                  ry="9999"
-                  fill="none"
-                  stroke="#ffffff"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  pathLength="100"
-                  className="liquid-stream-core"
-                />
-                <rect
-                  x="0"
-                  y="0"
-                  width="100%"
-                  height="100%"
-                  rx="9999"
-                  ry="9999"
-                  fill="none"
-                  stroke="#bae6fd"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  pathLength="100"
-                  className="liquid-stream-drop"
-                />
-              </svg>
+              <span className="scan-wave" aria-hidden="true" />
+              <span className="scan-wave scan-wave-delay-1" aria-hidden="true" />
+              <span className="scan-wave scan-wave-delay-2" aria-hidden="true" />
 
               <button
                 type="button"
@@ -1099,7 +1037,7 @@ export function UploadFile() {
                   navigate("/document-scanner");
                 }}
                 aria-label="Scan document"
-                className="press relative z-10 flex items-center gap-1.5 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/35 backdrop-blur-md px-3.5 py-1.5 text-white border border-white/25 shadow-sm"
+                className="press relative z-10 flex items-center gap-1.5 rounded-full bg-white/20 hover:bg-white/25 active:bg-white/30 backdrop-blur-md px-3.5 py-1.5 text-white border border-white/25 shadow-sm"
               >
                 <Camera className="size-4 shrink-0" strokeWidth={2} />
                 <span className="text-[13px] font-semibold tracking-wide">Scan</span>
@@ -1171,9 +1109,9 @@ export function UploadFile() {
         </Group>
       )}
 
-      {/* 3 Horizontal Compartments (Static, not scrollable) */}
+      {/* 3 Horizontal Compartments (Compact, subtext removed) */}
       {files.length === 0 && (
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="mt-3.5 grid grid-cols-3 gap-2">
           {/* Compartment 1: Blank A4 sheet */}
           <div
             onClick={() => navigate("/blank-pages?type=a4")}
@@ -1182,26 +1120,21 @@ export function UploadFile() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=a4");
             }}
-            className="press flex flex-col items-center justify-between p-2.5 rounded-[16px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+            className="press flex flex-col items-center justify-between p-2 rounded-[14px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
           >
-            <div className="flex flex-col items-center w-full">
-              <span className="flex size-7.5 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
-                <FileIcon className="size-4" strokeWidth={1.75} />
-              </span>
-              <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
-                Blank A4 sheet
-              </p>
-              <p className="text-[10px] text-ink-3 leading-snug mt-1 line-clamp-2 h-[26px] flex items-center justify-center">
-                Plain paper, no upload needed
-              </p>
-            </div>
+            <span className="flex size-7 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1 group-hover:scale-105 transition-transform">
+              <FileIcon className="size-3.5" strokeWidth={1.75} />
+            </span>
+            <p className="text-[11.5px] font-semibold text-ink leading-tight line-clamp-1">
+              Blank A4 sheet
+            </p>
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 navigate("/blank-pages?type=a4");
               }}
-              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+              className="mt-1.5 w-full py-0.5 text-[10.5px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
             >
               Print
             </button>
@@ -1215,26 +1148,21 @@ export function UploadFile() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=graph");
             }}
-            className="press flex flex-col items-center justify-between p-2.5 rounded-[16px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+            className="press flex flex-col items-center justify-between p-2 rounded-[14px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
           >
-            <div className="flex flex-col items-center w-full">
-              <span className="flex size-7.5 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
-                <Grid3X3 className="size-4" strokeWidth={1.75} />
-              </span>
-              <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
-                MIMO graph paper
-              </p>
-              <p className="text-[10px] text-ink-3 leading-snug mt-1 line-clamp-2 h-[26px] flex items-center justify-center">
-                Squared sheets for maths and drawings
-              </p>
-            </div>
+            <span className="flex size-7 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1 group-hover:scale-105 transition-transform">
+              <Grid3X3 className="size-3.5" strokeWidth={1.75} />
+            </span>
+            <p className="text-[11.5px] font-semibold text-ink leading-tight line-clamp-1">
+              MIMO graph paper
+            </p>
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 navigate("/blank-pages?type=graph");
               }}
-              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+              className="mt-1.5 w-full py-0.5 text-[10.5px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
             >
               Print
             </button>
@@ -1248,26 +1176,21 @@ export function UploadFile() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") navigate("/text-editor");
             }}
-            className="press flex flex-col items-center justify-between p-2.5 rounded-[16px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
+            className="press flex flex-col items-center justify-between p-2 rounded-[14px] bg-surface border border-hairline shadow-xs text-center cursor-pointer active:bg-surface-2 transition-all group"
           >
-            <div className="flex flex-col items-center w-full">
-              <span className="flex size-7.5 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
-                <PenLine className="size-4" strokeWidth={1.75} />
-              </span>
-              <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
-                Type a document
-              </p>
-              <p className="text-[10px] text-ink-3 leading-snug mt-1 line-clamp-2 h-[26px] flex items-center justify-center">
-                Write or paste text, then print it
-              </p>
-            </div>
+            <span className="flex size-7 items-center justify-center rounded-[8px] bg-surface-2 text-ink mb-1 group-hover:scale-105 transition-transform">
+              <PenLine className="size-3.5" strokeWidth={1.75} />
+            </span>
+            <p className="text-[11.5px] font-semibold text-ink leading-tight line-clamp-1">
+              Type a document
+            </p>
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 navigate("/text-editor");
               }}
-              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
+              className="mt-1.5 w-full py-0.5 text-[10.5px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
             >
               Write
             </button>
