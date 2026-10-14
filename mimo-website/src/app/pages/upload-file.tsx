@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MimoHeader } from "../components/mimo-header";
 import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
-import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, MapPin, Camera, Loader2 } from "lucide-react";
+import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { toast } from "sonner";
 import api from "../api";
 import { AdBanner } from "../components/AdBanner";
@@ -924,77 +925,125 @@ export function UploadFile() {
         <p className="mt-1.5 text-[16px] text-ink-2">What are we printing today?</p>
       </div>
 
-      {/* Active print codes */}
+      {/* Active print codes (Horizontal scroll like announcements) */}
       {activePrintCodes.length > 0 && (
-        <Group title="Ready to print" footer="Tap a code to copy it. Codes stay valid for 24 hours." className="mb-6">
-          {activePrintCodes.map((job: any) => {
-            const isColor = job.colorMode === "color" || (job.details && job.details.toLowerCase().includes("color"));
-            const pageText = job.pageCount
-              ? `${job.pageCount} ${job.pageCount === 1 ? "page" : "pages"}`
-              : job.details
-              ? job.details.split("•")[0].trim()
-              : "1 page";
-            const copies = job.copies || 1;
+        <section className="mb-6" aria-label="Ready to print">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <h2 className="text-[13px] font-semibold uppercase tracking-wider text-ink-3">
+              Ready to print {activePrintCodes.length > 1 && `(${activePrintCodes.length})`}
+            </h2>
+            <span className="text-[12px] text-ink-3">Tap code to copy</span>
+          </div>
 
-            // Calculate Valid till: creation timestamp + 24 hours
-            const jobTimestamp = typeof job.createdAtTime === "number" && job.createdAtTime > 0
-              ? job.createdAtTime
-              : job.date
-              ? new Date(job.date).getTime()
-              : 0;
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
+            {activePrintCodes.map((job: any) => {
+              const isColor = job.colorMode === "color" || (job.details && job.details.toLowerCase().includes("color"));
+              const pageText = job.pageCount
+                ? `${job.pageCount} ${job.pageCount === 1 ? "page" : "pages"}`
+                : job.details
+                ? job.details.split("•")[0].trim()
+                : "1 page";
+              const copies = job.copies || 1;
 
-            let validTillText = "";
-            if (jobTimestamp && !isNaN(jobTimestamp)) {
-              const expiryDate = new Date(jobTimestamp + 24 * 60 * 60 * 1000);
-              const day = expiryDate.getDate();
-              const month = expiryDate.toLocaleString("en-US", { month: "short" });
-              const time = expiryDate.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-              validTillText = `${day} ${month}, ${time}`;
-            }
+              const jobTimestamp = typeof job.createdAtTime === "number" && job.createdAtTime > 0
+                ? job.createdAtTime
+                : job.date
+                ? new Date(job.date).getTime()
+                : 0;
 
-            return (
-              <button
-                key={job.id || job.printCode}
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(job.printCode);
-                  toast.success(`Print code ${job.printCode} copied!`);
-                }}
-                aria-label={`Copy print code ${job.printCode}`}
-                className="flex w-full items-center gap-4 border-t border-hairline px-4 py-3 text-left transition-colors first:border-t-0 active:bg-surface-2"
-              >
-                <span className="text-[28px] font-semibold leading-none tracking-[0.08em] tabular-nums text-ink">{job.printCode}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] text-ink">{job.file || "Document"}</span>
-                  <span className="mt-0.5 block text-[13px] text-ink-3">
-                    {pageText}, {isColor ? "colour" : "B&W"}{copies > 1 ? `, ${copies} copies` : ""}
-                    {validTillText && <span className="block">Valid till {validTillText}</span>}
-                  </span>
-                </span>
-                <Copy className="size-4 shrink-0 text-ink-3" />
-              </button>
-            );
-          })}
-        </Group>
+              let validTillText = "";
+              if (jobTimestamp && !isNaN(jobTimestamp)) {
+                const expiryDate = new Date(jobTimestamp + 24 * 60 * 60 * 1000);
+                const day = expiryDate.getDate();
+                const month = expiryDate.toLocaleString("en-US", { month: "short" });
+                const time = expiryDate.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+                validTillText = `${day} ${month}, ${time}`;
+              }
+
+              return (
+                <div
+                  key={job.id || job.printCode}
+                  onClick={() => {
+                    navigator.clipboard.writeText(job.printCode);
+                    toast.success(`Print code ${job.printCode} copied!`);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      navigator.clipboard.writeText(job.printCode);
+                      toast.success(`Print code ${job.printCode} copied!`);
+                    }
+                  }}
+                  className={`press ${activePrintCodes.length > 1 ? "w-[85%] sm:w-[320px]" : "w-full"} shrink-0 snap-start rounded-[20px] bg-surface p-4 border border-hairline shadow-xs cursor-pointer active:bg-surface-2 transition-all flex flex-col justify-between`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="text-[30px] font-bold leading-none tracking-[0.06em] tabular-nums text-brand">
+                        {job.printCode}
+                      </span>
+                      <p className="mt-2 font-medium text-[14px] text-ink line-clamp-1">
+                        {job.file || "Document"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand-text">
+                        {isColor ? "Colour" : "B&W"}
+                      </span>
+                      <span className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-ink-3">
+                        <Copy className="size-4" />
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-hairline flex items-center justify-between text-[12px] text-ink-3">
+                    <span>{pageText}{copies > 1 ? ` • ${copies} copies` : ""}</span>
+                    {validTillText && <span>Valid till {validTillText}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
-      {/* Upload */}
+      {/* Upload with Scan button integrated into right corner */}
       {files.length === 0 ? (
-        <button
-          type="button"
+        <div
           data-tour="upload-dropzone"
           onClick={() => fileInputRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
-          className={`press flex w-full flex-col items-start rounded-[24px] bg-brand p-5 text-left text-on-brand ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+          className={`press relative flex w-full flex-col justify-between rounded-[24px] bg-brand p-5 text-left text-on-brand cursor-pointer overflow-hidden shadow-sm ${isDragging ? "ring-4 ring-brand-soft" : ""}`}
         >
-          <span className="flex size-11 items-center justify-center rounded-full bg-white/15">
-            <Plus className="size-6" strokeWidth={2} />
-          </span>
-          <span className="mt-8 text-[22px] font-semibold leading-tight tracking-tight">Choose files to print</span>
-          <span className="mt-1 text-[15px] text-white/75">PDF, Word, PowerPoint, Excel, text or photos</span>
-        </button>
+          {/* Top row: Plus on left, Scan Document button on right corner */}
+          <div className="flex w-full items-start justify-between">
+            <span className="flex size-11 items-center justify-center rounded-full bg-white/15">
+              <Plus className="size-6" strokeWidth={2} />
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate("/document-scanner");
+              }}
+              aria-label="Scan document"
+              className="press flex items-center gap-2 rounded-full bg-white/20 hover:bg-white/25 active:bg-white/30 backdrop-blur-md px-3.5 py-2 text-white border border-white/20 shadow-sm"
+            >
+              <Camera className="size-4 shrink-0" strokeWidth={2} />
+              <span className="text-[13px] font-semibold">Scan</span>
+            </button>
+          </div>
+
+          <div className="mt-8">
+            <span className="block text-[22px] font-semibold leading-tight tracking-tight">Choose files to print</span>
+            <span className="mt-1 block text-[15px] text-white/75">PDF, Word, PowerPoint, Excel, text or photos</span>
+          </div>
+        </div>
       ) : (
         <Group
           title="Files"
@@ -1054,50 +1103,88 @@ export function UploadFile() {
         </Group>
       )}
 
-      {/* Quick print */}
+      {/* Blank templates & document typing — kept inside ONE button */}
       {files.length === 0 && (
-        <Group title="Quick print" className="mt-8">
-          <Row
-            icon={<FileIcon className="size-5" strokeWidth={1.75} />}
-            label="Blank A4 sheet"
-            detail="Plain paper, no upload needed"
-            chevron
-            onClick={() => navigate("/blank-pages?type=a4")}
-          />
-          <Row
-            icon={<Grid3X3 className="size-5" strokeWidth={1.75} />}
-            label="MIMO graph paper"
-            detail="Squared sheets for maths and drawings"
-            chevron
-            onClick={() => navigate("/blank-pages?type=graph")}
-          />
-          <Row
-            icon={<PenLine className="size-5" strokeWidth={1.75} />}
-            label="Type a document"
-            detail="Write or paste text, then print it"
-            chevron
-            onClick={() => navigate("/text-editor")}
-          />
-          <Row
-            icon={<Camera className="size-5" strokeWidth={1.75} />}
-            label="Scan a document"
-            detail="Capture with your camera, crop and print"
-            chevron
-            onClick={() => navigate("/document-scanner")}
-          />
-        </Group>
-      )}
+        <div className="mt-4">
+          <Dialog>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="press flex w-full items-center justify-between rounded-[20px] bg-surface p-4 border border-hairline shadow-xs text-left active:bg-surface-2 transition-all"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-surface-2 text-brand">
+                    <FileIcon className="size-5" strokeWidth={1.75} />
+                  </span>
+                  <div>
+                    <span className="block text-[15px] font-semibold text-ink">
+                      Blank sheets & text editor
+                    </span>
+                    <span className="mt-0.5 block text-[13px] text-ink-3">
+                      Blank A4, MIMO graph paper, or write text
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="size-5 text-ink-3 shrink-0" />
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[440px]">
+              <DialogHeader>
+                <DialogTitle className="text-[18px] font-bold text-ink">Print templates & documents</DialogTitle>
+                <DialogDescription className="text-[14px] text-ink-3">
+                  Choose a template or write your text directly
+                </DialogDescription>
+              </DialogHeader>
 
-      {files.length === 0 && (
-        <Group className="mt-4">
-          <Row
-            icon={<MapPin className="size-5" strokeWidth={1.75} />}
-            label="Find a kiosk"
-            detail="Locations and which one prints colour"
-            chevron
-            onClick={() => navigate("/find-machine")}
-          />
-        </Group>
+              <div className="mt-2 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/blank-pages?type=a4")}
+                  className="press flex w-full items-center gap-3.5 rounded-[16px] bg-surface-2 p-3.5 text-left active:bg-surface-3 transition-colors"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface text-ink">
+                    <FileIcon className="size-5" strokeWidth={1.75} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-semibold text-ink">Blank A4 sheet</p>
+                    <p className="text-[13px] text-ink-3">Plain paper, no upload needed</p>
+                  </div>
+                  <ChevronRight className="size-4 text-ink-3 shrink-0" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/blank-pages?type=graph")}
+                  className="press flex w-full items-center gap-3.5 rounded-[16px] bg-surface-2 p-3.5 text-left active:bg-surface-3 transition-colors"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface text-ink">
+                    <Grid3X3 className="size-5" strokeWidth={1.75} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-semibold text-ink">MIMO graph paper</p>
+                    <p className="text-[13px] text-ink-3">Squared sheets for maths and drawings</p>
+                  </div>
+                  <ChevronRight className="size-4 text-ink-3 shrink-0" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/text-editor")}
+                  className="press flex w-full items-center gap-3.5 rounded-[16px] bg-surface-2 p-3.5 text-left active:bg-surface-3 transition-colors"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface text-ink">
+                    <PenLine className="size-5" strokeWidth={1.75} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-semibold text-ink">Type a document</p>
+                    <p className="text-[13px] text-ink-3">Write or paste text, then print it</p>
+                  </div>
+                  <ChevronRight className="size-4 text-ink-3 shrink-0" />
+                </button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       )}
 
       {/* Activity */}
@@ -1119,7 +1206,8 @@ export function UploadFile() {
         </section>
       )}
 
-      {files.length === 0 && <AdBanner />}
+      {/* Announcements / Advertisements (Shown in all states, hides cleanly with 0 skeleton if empty) */}
+      <AdBanner />
 
       {files.length > 0 && (
         <>
