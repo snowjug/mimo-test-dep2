@@ -2,12 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MimoHeader } from "../components/mimo-header";
 import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
-import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight } from "lucide-react";
+import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight, Clock } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { AdBanner } from "../components/AdBanner";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase";
+import { getTimeLeft, isCodeActive } from "../utils/print-code-expiry";
 
 interface UploadedFile {
   clientUploadId?: string;
@@ -25,9 +26,13 @@ interface ActivePrintCodeJob {
   status: string;
   printerStatus?: string;
   fileName?: string;
+  file?: string;
+  createdAtTime?: number;
+  createdAt?: any;
   totalPages?: number;
   totalPagesToPrint?: number;
   copiesRequested?: number;
+  copies?: number;
   colorMode?: string;
   pageCount?: number;
   details?: string;
@@ -360,35 +365,14 @@ export function UploadFile() {
   }, []);
 
   const [activePrintCodes, setActivePrintCodes] = useState<ActivePrintCodeJob[]>([]);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   const fetchActiveCodes = async () => {
     try {
       const historyRes = await api.get("/print-history");
       if (Array.isArray(historyRes.data)) {
         const now = Date.now();
-        const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-
-        const unused = historyRes.data.filter((job: any) => {
-          if (job.status !== "paid" || !job.printCode || job.printCode === "-" || job.isPrinted === true) {
-            return false;
-          }
-
-          // Calculate creation timestamp in ms from createdAtTime or ISO date string
-          const jobTimestamp = typeof job.createdAtTime === "number" && job.createdAtTime > 0
-            ? job.createdAtTime
-            : job.date
-            ? new Date(job.date).getTime()
-            : 0;
-
-          if (!jobTimestamp || isNaN(jobTimestamp)) {
-            return false;
-          }
-
-          // Retain for a maximum of 24 hours from creation
-          const ageMs = now - jobTimestamp;
-          return ageMs >= 0 && ageMs <= TWENTY_FOUR_HOURS_MS;
-        });
-
+        const unused = historyRes.data.filter((job: any) => isCodeActive(job, now));
         setActivePrintCodes(unused);
       }
     } catch (err) {
@@ -417,6 +401,17 @@ export function UploadFile() {
     const intervalId = setInterval(() => {
       fetchActiveCodes();
     }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [activePrintCodes.length]);
+
+  // Live countdown clock tick every second while active unused codes exist
+  useEffect(() => {
+    if (activePrintCodes.length === 0) return;
+
+    const intervalId = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
 
     return () => clearInterval(intervalId);
   }, [activePrintCodes.length]);
@@ -944,20 +939,7 @@ export function UploadFile() {
                 : "1 page";
               const copies = job.copies || 1;
 
-              const jobTimestamp = typeof job.createdAtTime === "number" && job.createdAtTime > 0
-                ? job.createdAtTime
-                : job.date
-                ? new Date(job.date).getTime()
-                : 0;
-
-              let validTillText = "";
-              if (jobTimestamp && !isNaN(jobTimestamp)) {
-                const expiryDate = new Date(jobTimestamp + 24 * 60 * 60 * 1000);
-                const day = expiryDate.getDate();
-                const month = expiryDate.toLocaleString("en-US", { month: "short" });
-                const time = expiryDate.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-                validTillText = `${day} ${month}, ${time}`;
-              }
+              const timeLeft = getTimeLeft(job, currentTime);
 
               return (
                 <div
@@ -997,7 +979,26 @@ export function UploadFile() {
 
                   <div className="mt-2 pt-1.5 border-t border-hairline flex items-center justify-between text-[11px] text-ink-3">
                     <span>{pageText}{copies > 1 ? ` • ${copies} copies` : ""}</span>
-                    {validTillText && <span>Valid till {validTillText}</span>}
+                    <span
+                      className={`inline-flex items-center gap-1 font-medium tabular-nums transition-colors ${
+                        timeLeft.isExpired
+                          ? "text-rose-600 dark:text-rose-400 font-semibold"
+                          : timeLeft.urgency === "critical"
+                          ? "text-amber-600 dark:text-amber-400 font-semibold"
+                          : timeLeft.urgency === "warning"
+                          ? "text-amber-600/90 dark:text-amber-400/90"
+                          : "text-ink-2"
+                      }`}
+                      title={timeLeft.validTillText ? `Valid till ${timeLeft.validTillText}` : undefined}
+                      aria-label={timeLeft.validTillText ? `${timeLeft.text}, valid till ${timeLeft.validTillText}` : timeLeft.text}
+                    >
+                      <Clock
+                        className={`size-3 shrink-0 ${
+                          timeLeft.urgency === "critical" ? "animate-pulse text-amber-500" : "text-ink-3"
+                        }`}
+                      />
+                      <span>{timeLeft.text}</span>
+                    </span>
                   </div>
                 </div>
               );
