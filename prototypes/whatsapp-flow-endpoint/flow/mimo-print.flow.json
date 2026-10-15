@@ -1,0 +1,217 @@
+{
+  "version": "6.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "UPLOAD": ["CONFIGURE"],
+    "CONFIGURE": ["PROCESSING", "UPLOAD"],
+    "PROCESSING": ["PROCESSING", "REVIEW", "UPLOAD"],
+    "REVIEW": ["SUCCESS"],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "UPLOAD",
+      "title": "MIMO print (internal test)",
+      "data": {
+        "error_message": { "type": "string", "__example__": "" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "upload_form",
+            "children": [
+              { "type": "TextBody", "text": "Internal test workflow. Choose up to 10 files: PDF, JPG or PNG, 10 MB each. Word, PowerPoint and Excel files are not supported yet." },
+              { "type": "TextCaption", "text": "Choosing a file does not mean it is valid. Your files are downloaded and checked in a later step." },
+              {
+                "type": "DocumentPicker",
+                "name": "documents",
+                "label": "Documents",
+                "description": "PDF, JPG or PNG",
+                "min-uploaded-documents": 1,
+                "max-uploaded-documents": 10,
+                "max-file-size-kb": 10240,
+                "allowed-mime-types": ["application/pdf", "image/jpeg", "image/png"],
+                "enabled": true
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": { "type": "screen", "name": "CONFIGURE" },
+                  "payload": { "documents": "${form.documents}" }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "CONFIGURE",
+      "title": "Print options",
+      "data": {
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "media_id": { "type": "string" },
+              "file_name": { "type": "string" },
+              "mime_type": { "type": "string" },
+              "cdn_url": { "type": "string" },
+              "encryption_metadata": {
+                "type": "object",
+                "properties": {
+                  "encrypted_hash": { "type": "string" },
+                  "iv": { "type": "string" },
+                  "encryption_key": { "type": "string" },
+                  "hmac_key": { "type": "string" },
+                  "plaintext_hash": { "type": "string" }
+                }
+              }
+            }
+          },
+          "__example__": []
+        },
+        "error_message": { "type": "string", "__example__": "" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "options_form",
+            "children": [
+              {
+                "type": "RadioButtonsGroup",
+                "name": "color",
+                "label": "Print type",
+                "required": true,
+                "init-value": "bw",
+                "data-source": [
+                  { "id": "bw", "title": "Black & White" },
+                  { "id": "color", "title": "Color" }
+                ]
+              },
+              {
+                "type": "If",
+                "condition": "${form.color} == 'color'",
+                "then": [
+                  { "type": "TextBody", "text": "🎨 Color printing is available only at MIMO 2.0. Your job will be routed automatically to MIMO 2.0." }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "copies",
+                "label": "Copies",
+                "required": true,
+                "init-value": "1",
+                "data-source": [
+                  { "id": "1", "title": "1" },
+                  { "id": "2", "title": "2" },
+                  { "id": "3", "title": "3" },
+                  { "id": "4", "title": "4" },
+                  { "id": "5", "title": "5" },
+                  { "id": "6", "title": "6" },
+                  { "id": "7", "title": "7" },
+                  { "id": "8", "title": "8" },
+                  { "id": "9", "title": "9" },
+                  { "id": "10", "title": "10" }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Check my files",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "documents": "${data.documents}",
+                    "color": "${form.color}",
+                    "copies": "${form.copies}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PROCESSING",
+      "title": "Checking files",
+      "data": {
+        "status_text": { "type": "string", "__example__": "Checking 1 file(s)." }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Checking your files" },
+          { "type": "TextBody", "text": "${data.status_text}" },
+          { "type": "TextCaption", "text": "This screen does not refresh by itself. Tap the button to ask for the latest status." },
+          {
+            "type": "Footer",
+            "label": "Check status",
+            "on-click-action": { "name": "data_exchange", "payload": { "requested": "status" } }
+          }
+        ]
+      }
+    },
+    {
+      "id": "REVIEW",
+      "title": "Review (test)",
+      "data": {
+        "files_summary": { "type": "string", "__example__": "• sample.pdf - 3 page(s)" },
+        "total_pages_text": { "type": "string", "__example__": "Total pages: 3" },
+        "settings_text": { "type": "string", "__example__": "B&W, 1 copy" },
+        "rates_text": { "type": "string", "__example__": "Configured rate: Rs 2.8 per page (B&W)" },
+        "pricing_text": { "type": "string", "__example__": "Order total is not calculated in this test workflow." },
+        "show_color_notice": { "type": "boolean", "__example__": false },
+        "color_notice": { "type": "string", "__example__": "" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Review your test job" },
+          { "type": "TextBody", "text": "${data.files_summary}" },
+          { "type": "TextBody", "text": "${data.total_pages_text}" },
+          { "type": "TextBody", "text": "${data.settings_text}" },
+          {
+            "type": "If",
+            "condition": "${data.show_color_notice} == true",
+            "then": [{ "type": "TextBody", "text": "${data.color_notice}" }]
+          },
+          { "type": "TextBody", "text": "${data.rates_text}" },
+          { "type": "TextCaption", "text": "${data.pricing_text}" },
+          { "type": "TextCaption", "text": "Internal test: no payment is taken and nothing is printed." },
+          {
+            "type": "Footer",
+            "label": "Finish test run",
+            "on-click-action": { "name": "data_exchange", "payload": { "requested": "finish" } }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Test complete",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Internal test finished" },
+          { "type": "TextBody", "text": "This was a simulated workflow. No order was created, no payment was collected and nothing was sent to a printer." },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": { "name": "complete", "payload": {} }
+          }
+        ]
+      }
+    }
+  ]
+}
