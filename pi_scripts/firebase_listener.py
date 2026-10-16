@@ -5,6 +5,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 import time
 import subprocess
 import os
+import shutil
 import tempfile
 import zipfile
 import urllib.parse
@@ -131,6 +132,9 @@ OFFICE_EXTENSIONS = (".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".txt", 
 ZIP_OFFICE_EXTENSIONS = (".docx", ".pptx", ".xlsx", ".odt", ".ods", ".odp")
 OLE_OFFICE_EXTENSIONS = (".doc", ".ppt", ".xls")
 OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+JPEG_MAGIC = b"\xff\xd8\xff"
+ZIP_MAGIC = b"PK\x03\x04"  # OOXML (.docx/.pptx/.xlsx) and other zip-based office formats
 MIN_PDF_BYTES = 100
 PDF_EOF_SCAN_BYTES = 2048
 PDFINFO_TIMEOUT_SEC = 20
@@ -142,6 +146,32 @@ PDF_DAMAGE_MARKERS = (
     "pdf file is damaged",
     "try to reconstruct",
 )
+
+def sniff_kind(path):
+    """Read the first bytes of a downloaded file and return "image" | "zip_office" | "ole_office" | None.
+
+    None means inconclusive (a real PDF, plain text, or an empty/missing file) -- callers fall back to their
+    existing extension-based handling in that case, unchanged.
+
+    WhatsApp/mobile uploads often arrive with mimetype "application/octet-stream" and no file extension
+    (confirmed root cause of "PDF is truncated (no %%EOF marker)" failures on SV-002, 2026-10-16: the
+    downloaded file was a genuine PNG, not a PDF at all -- validate_input_file's extension-based dispatch
+    defaulted it to validate_pdf_strict, which correctly found no PDF structure and misreported it as
+    truncated). Checking the actual content lets a mislabeled file still be routed correctly.
+    """
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(8)
+    except OSError:
+        return None
+    if head.startswith(PNG_MAGIC) or head.startswith(JPEG_MAGIC):
+        return "image"
+    if head.startswith(ZIP_MAGIC):
+        return "zip_office"
+    if head.startswith(OLE_MAGIC):
+        return "ole_office"
+    return None
+
 
 def validate_pdf_strict(path):
     """Strictly validate a PDF. Returns (ok, page_count, reason); page_count is None when not ok.
@@ -194,6 +224,12 @@ def validate_input_file(path):
     PDFs (and files without a known image/Office extension, which are treated as PDFs) use validate_pdf_strict.
     Images must be readable by Pillow. Office files must be complete archives/documents; their converted PDF is
     validated again after conversion.
+
+    The file's actual content (via sniff_kind) is checked before its extension/mimetype: an upload with a
+    generic or missing extension (e.g. WhatsApp's "application/octet-stream" with no filename extension) must
+    still be validated as what it actually is, not defaulted to a PDF it never was. sniff_kind returning None
+    (inconclusive -- a real PDF, plain text, or an unrecognised binary) falls through to the extension-based
+    checks below, unchanged.
     """
     try:
         if not path or not os.path.isfile(path):
@@ -201,17 +237,18 @@ def validate_input_file(path):
         size = os.path.getsize(path)
         if size == 0:
             return False, f"file is empty: {os.path.basename(path)}"
+        kind = sniff_kind(path)
         ext = os.path.splitext(path)[1].lower()
-        if ext in IMAGE_EXTENSIONS:
+        if kind == "image" or ext in IMAGE_EXTENSIONS:
             from PIL import Image
             with Image.open(path) as img:
                 img.verify()
             return True, "ok"
-        if ext in ZIP_OFFICE_EXTENSIONS:
+        if kind == "zip_office" or ext in ZIP_OFFICE_EXTENSIONS:
             if not zipfile.is_zipfile(path):
                 return False, f"Office file is incomplete or corrupt: {os.path.basename(path)}"
             return True, "ok"
-        if ext in OLE_OFFICE_EXTENSIONS:
+        if kind == "ole_office" or ext in OLE_OFFICE_EXTENSIONS:
             with open(path, "rb") as fh:
                 if fh.read(8) != OLE_MAGIC:
                     return False, f"Office file is incomplete or corrupt: {os.path.basename(path)}"
@@ -1735,9 +1772,35 @@ def process_job(doc_snapshot):
         # Any conversion failure fails the job: an unconverted raw input is never passed on.
         any_file_sliced = False
         for f_entry, l_path in download_results:
-            f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             entry_name = f_entry.get("name", "document")
+
+            # Content-based detection overrides a missing/generic extension (e.g. a WhatsApp upload stored
+            # as "application/octet-stream" with no filename extension) so a mislabeled image/office file
+            # is still routed to the correct conversion branch below instead of falling through to PDF
+            # handling. Images don't need a real file rename (Pillow reads by content, not extension) --
+            # only office files do, since LibreOffice picks its import filter partly from the extension on
+            # disk; make a same-directory copy with a representative extension for those (the exact
+            # docx/pptx/xlsx subtype doesn't matter -- LibreOffice's own content autodetection resolves it).
+            # The original downloaded/cached file is left untouched either way, so prefetch_cache_path()'s
+            # naming (computed independently by prefetch_job and process_job) never desyncs.
+            kind = sniff_kind(l_path)
+            if kind == "image" and ext not in IMAGE_EXTENSIONS:
+                ext = ".jpg"
+            elif kind == "zip_office" and ext not in OFFICE_EXTENSIONS:
+                office_copy = l_path + ".docx"
+                shutil.copyfile(l_path, office_copy)
+                artifact_paths.append(office_copy)
+                l_path = office_copy
+                ext = ".docx"
+            elif kind == "ole_office" and ext not in OFFICE_EXTENSIONS:
+                office_copy = l_path + ".doc"
+                shutil.copyfile(l_path, office_copy)
+                artifact_paths.append(office_copy)
+                l_path = office_copy
+                ext = ".doc"
+
+            f_final = l_path
 
             if ext in IMAGE_EXTENSIONS:
                 if image_scaling == "fill":

@@ -91,6 +91,24 @@ TRUNCATED_PDF = VALID_PDF[: len(VALID_PDF) // 2]            # starts with %PDF, 
 HEADER_ONLY_PDF = b"%PDF-1.4\n" + b"x" * 200 + b"\n%%EOF\n"  # starts with %PDF, ends with %%EOF, no structure
 
 
+def _make_png_bytes():
+    """A real, tiny, Pillow-verifiable PNG -- for magic-byte sniffing tests, independent of file extension."""
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (2, 2), color=(255, 0, 0)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _make_zip_bytes():
+    """A real, minimal zip archive (same magic bytes as a .docx/.pptx/.xlsx) -- for magic-byte sniffing tests."""
+    import io
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("[Content_Types].xml", "<Types/>")
+    return buf.getvalue()
+
+
 def fake_pdfinfo_result(path):
     """Imitates poppler's pdfinfo on the fixtures above."""
     with open(path, "rb") as fh:
@@ -346,6 +364,38 @@ class StrictValidatorTests(ListenerTestCase):
         self.assertFalse(listener.validate_pdf_strict(os.path.join(self.tmp, "nope.pdf"))[0])
         tiny = self.write(os.path.join(self.tmp, "tiny.pdf"), b"%PDF-1.4\n%%EOF\n")
         self.assertFalse(listener.validate_pdf_strict(tiny)[0])
+
+    # ── magic-byte sniffing: a WhatsApp/mobile upload with mimetype "application/octet-stream" and no
+    # filename extension must be validated as what it actually is, not defaulted to a PDF it never was
+    # (confirmed production incident, 2026-10-16: a genuine PNG on SV-002 was rejected as "PDF is
+    # truncated (no %%EOF marker)" because it had no extension to route it to the image branch).
+    def test_03f_sniff_kind_detects_real_magic_bytes(self):
+        png_bytes = _make_png_bytes()
+        docx_bytes = _make_zip_bytes()
+        self.assertEqual(listener.sniff_kind(self.write(os.path.join(self.tmp, "no_ext_image"), png_bytes)), "image")
+        self.assertEqual(listener.sniff_kind(self.write(os.path.join(self.tmp, "no_ext_office"), docx_bytes)), "zip_office")
+        self.assertEqual(listener.sniff_kind(self.write(os.path.join(self.tmp, "no_ext_ole"), listener.OLE_MAGIC + b"\x00" * 8)), "ole_office")
+        self.assertIsNone(listener.sniff_kind(self.write(os.path.join(self.tmp, "no_ext_pdf"), VALID_PDF)), "a real PDF is inconclusive -- falls back to extension-based handling")
+        self.assertIsNone(listener.sniff_kind(os.path.join(self.tmp, "missing")), "a missing file must not raise")
+
+    def test_03g_extensionless_png_with_no_extension_validates_as_image(self):
+        path = self.write(os.path.join(self.tmp, "Document_from_Meghana"), _make_png_bytes())
+        ok, reason = listener.validate_input_file(path)
+        self.assertTrue(ok, reason)
+
+    def test_03h_extensionless_docx_with_no_extension_validates_as_office(self):
+        path = self.write(os.path.join(self.tmp, "Document_from_Utkarsh_Viji"), _make_zip_bytes())
+        ok, reason = listener.validate_input_file(path)
+        self.assertTrue(ok, reason)
+
+    def test_03i_a_genuinely_truncated_real_pdf_is_still_rejected(self):
+        # Content-based sniffing must not weaken the existing safety net: a real PDF that was actually
+        # cut off mid-download (sniff_kind returns None for it, same as any other real PDF) still has to
+        # fail the %%EOF check -- that is correct behaviour for a genuinely incomplete download, not a bug.
+        path = self.write(os.path.join(self.tmp, "Document_from_Someone.pdf"), TRUNCATED_PDF)
+        ok, reason = listener.validate_input_file(path)
+        self.assertFalse(ok)
+        self.assertIn("truncated", reason)
 
 
 # ── 4-9, 12: process_job acquisition / processing / hand-off ───────────────────────────────────────────────────
