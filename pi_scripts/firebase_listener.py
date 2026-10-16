@@ -25,12 +25,22 @@ except ImportError:
 active_jobs = set()
 
 # ================= CONFIGURATION =================
-BW_PRINTER_NAME = os.environ.get("BW_PRINTER_NAME", "Brother_HL_L2440DW_series")
-COLOR_PRINTER_NAME = os.environ.get("COLOR_PRINTER_NAME", "Epson_L3250")
-
 # Kiosk Routing Identity (Fail-closed if missing or invalid)
 VALID_KIOSK_IDS = {"CV-001", "SV-002"}
 KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
+
+DEFAULT_BW_PRINTERS = {
+    "CV-001": "Brother_HL_L5210DN_series",
+    "SV-002": "Brother_HL_L2440DW_series",
+}
+DEFAULT_COLOR_PRINTERS = {
+    "CV-001": None,
+    "SV-002": "Epson_L3250",
+}
+CROSS_KIOSK_INCOMPATIBLE = {
+    "CV-001": {"Brother_HL_L2440DW_series", "Epson_L3250", "L3250-Series"},
+    "SV-002": {"Brother_HL_L5210DN_series", "Brother_HL_L5210DN_series_USB", "Brother_IPP"},
+}
 
 
 def validate_kiosk_identity(kiosk_id):
@@ -43,11 +53,65 @@ def validate_kiosk_identity(kiosk_id):
     return kiosk_id
 
 
+def resolve_printer_queues(kiosk_id, env_bw=None, env_color=None, is_mono_only=False):
+    """
+    Selects printer queues based on kiosk ID with fail-safe validation.
+    CV-001 defaults to Brother_HL_L5210DN_series.
+    SV-002 defaults to Brother_HL_L2440DW_series and Epson_L3250.
+    Fails clearly if KIOSK_ID or expected queue configuration is missing or invalid.
+    Preserves legitimate service configuration overrides.
+    """
+    validate_kiosk_identity(kiosk_id)
+
+    # 1. Resolve B&W queue
+    bw = env_bw if (env_bw and env_bw.strip()) else DEFAULT_BW_PRINTERS.get(kiosk_id)
+    if not bw:
+        raise ValueError(f"FATAL: Missing B&W printer queue configuration for kiosk '{kiosk_id}'. Refusing to start.")
+
+    incompatible = CROSS_KIOSK_INCOMPATIBLE.get(kiosk_id, set())
+    if bw in incompatible:
+        raise ValueError(
+            f"FATAL: Misconfigured B&W printer '{bw}' for kiosk '{kiosk_id}'. "
+            f"This queue belongs to another kiosk. Refusing to start."
+        )
+
+    # 2. Resolve Color queue
+    color = env_color if (env_color and env_color.strip()) else DEFAULT_COLOR_PRINTERS.get(kiosk_id)
+    if kiosk_id == "CV-001":
+        if color in incompatible:
+            raise ValueError(
+                f"FATAL: Misconfigured Color printer '{color}' for kiosk '{kiosk_id}'. Refusing to start."
+            )
+        if not color or is_mono_only:
+            color = bw
+    elif kiosk_id == "SV-002":
+        if not color:
+            raise ValueError("FATAL: Missing Color printer queue configuration for SV-002 (expected Epson_L3250). Refusing to start.")
+        if color in incompatible:
+            raise ValueError(
+                f"FATAL: Misconfigured Color printer '{color}' for kiosk '{kiosk_id}'. Refusing to start."
+            )
+
+    return bw, color
+
+
+# Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
+IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
+
+# Initial module-level printer names
+_raw_bw = os.environ.get("BW_PRINTER_NAME")
+_raw_color = os.environ.get("COLOR_PRINTER_NAME")
+if KIOSK_ID in VALID_KIOSK_IDS:
+    BW_PRINTER_NAME, COLOR_PRINTER_NAME = resolve_printer_queues(
+        KIOSK_ID, env_bw=_raw_bw, env_color=_raw_color, is_mono_only=IS_MONOCHROME_ONLY
+    )
+else:
+    BW_PRINTER_NAME = _raw_bw or "Brother_HL_L2440DW_series"
+    COLOR_PRINTER_NAME = _raw_color or "Epson_L3250"
+
 # Storage locations: default to disk-backed /var/tmp to prevent tmpfs RAM exhaustion on 1GB Pis
 TEMP_DIR = os.environ.get("TEMP_DIR", "/var/tmp/mimo_prints")
 PRE_FETCH_DIR = os.environ.get("PRE_FETCH_DIR", "/var/tmp/mimo_pre_fetch")
-# Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
-IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
 
 
 def safe_sudo_run(cmd, timeout=10):
@@ -875,8 +939,8 @@ def is_printer_online(printer_name):
         if "disabled" in p_out or "stopped" in p_out or "not accepting" in p_out:
             print(f"⚠️ Printer {printer_name} is OFFLINE/DISABLED in CUPS. Attempting automatic queue healing...")
             try:
-                subprocess.run(["sudo", "-S", "cupsenable", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
-                subprocess.run(["sudo", "-S", "cupsaccept", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
+                safe_sudo_run(["/usr/sbin/cupsenable", printer_name], timeout=5)
+                safe_sudo_run(["/usr/sbin/cupsaccept", printer_name], timeout=5)
                 subprocess.run(["cupsenable", printer_name], capture_output=True, timeout=5)
                 subprocess.run(["cupsaccept", printer_name], capture_output=True, timeout=5)
                 time.sleep(1)
@@ -1128,8 +1192,8 @@ def auto_heal_cups_queue(printer_name=BW_PRINTER_NAME, job_id=None):
             subprocess.run(["cancel", job_id], capture_output=True, timeout=5)
         # Re-enable and accept jobs on the CUPS queue in case an error paused it
         try:
-            subprocess.run(["sudo", "-S", "cupsenable", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
-            subprocess.run(["sudo", "-S", "cupsaccept", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
+            safe_sudo_run(["/usr/sbin/cupsenable", printer_name], timeout=5)
+            safe_sudo_run(["/usr/sbin/cupsaccept", printer_name], timeout=5)
             subprocess.run(["cupsenable", printer_name], capture_output=True, timeout=5)
             subprocess.run(["cupsaccept", printer_name], capture_output=True, timeout=5)
         except Exception as perm_err:
@@ -1193,11 +1257,14 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                     if job_ok:
                         try:
                             job_num = job_id.split("-")[-1]
-                            # Use -F (fixed string) to match exact literal [Job N] without regex bracket interpretation
-                            err_log_check = subprocess.run(
-                                ["sudo", "grep", "-a", "-F", f"[Job {job_num}]", "/var/log/cups/error_log"],
-                                capture_output=True, text=True, timeout=5
-                            ).stdout
+                            # Try direct read first (if in lp group or error_log readable); fallback to safe_sudo_run
+                            err_log_check = ""
+                            try:
+                                with open("/var/log/cups/error_log", "r", errors="replace") as f:
+                                    err_log_check = "".join(line for line in f if f"[Job {job_num}]" in line)
+                            except (PermissionError, FileNotFoundError):
+                                res = safe_sudo_run(["/usr/bin/grep", "-a", "-F", f"[Job {job_num}]", "/var/log/cups/error_log"], timeout=5)
+                                err_log_check = res.stdout if res.returncode == 0 else ""
                             # Check specifically for driver filter crashes only (SetupJobAttrib = escpr crash, signal 13 = SIGPIPE crash)
                             # Note: "exited with no errors" is SUCCESS — do NOT flag it
                             if "SetupJobAttrib" in err_log_check or ("signal 13" in err_log_check and "no errors" not in err_log_check):
@@ -2791,6 +2858,9 @@ def startup_reconcile_cups():
 # Startup runs only when executed as a script (systemd: python firebase_listener.py), never on import.
 if __name__ == "__main__":
     validate_kiosk_identity(KIOSK_ID)
+    BW_PRINTER_NAME, COLOR_PRINTER_NAME = resolve_printer_queues(
+        KIOSK_ID, env_bw=os.environ.get("BW_PRINTER_NAME"), env_color=os.environ.get("COLOR_PRINTER_NAME"), is_mono_only=IS_MONOCHROME_ONLY
+    )
     ensure_work_dirs()
     init_firebase()
 

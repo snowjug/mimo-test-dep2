@@ -91,5 +91,66 @@ class Gate2SafeSudoTests(unittest.TestCase):
             self.assertEqual(mock_cancel_stale.call_count, 2)
 
 
+class PrinterQueueFailSafeTests(unittest.TestCase):
+    def test_cv001_defaults_to_brother_5210dn(self):
+        bw, color = L.resolve_printer_queues("CV-001")
+        self.assertEqual(bw, "Brother_HL_L5210DN_series")
+        # CV-001 is monochrome; color defaults to same queue
+        self.assertEqual(color, "Brother_HL_L5210DN_series")
+
+    def test_sv002_defaults_to_2440dw_and_epson_3250(self):
+        bw, color = L.resolve_printer_queues("SV-002")
+        self.assertEqual(bw, "Brother_HL_L2440DW_series")
+        self.assertEqual(color, "Epson_L3250")
+
+    def test_cv001_rejects_sv002_queues(self):
+        with self.assertRaises(ValueError) as ctx:
+            L.resolve_printer_queues("CV-001", env_bw="Brother_HL_L2440DW_series")
+        self.assertIn("Misconfigured B&W printer", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx2:
+            L.resolve_printer_queues("CV-001", env_color="Epson_L3250")
+        self.assertIn("Misconfigured Color printer", str(ctx2.exception))
+
+    def test_sv002_rejects_cv001_queues(self):
+        with self.assertRaises(ValueError) as ctx:
+            L.resolve_printer_queues("SV-002", env_bw="Brother_HL_L5210DN_series")
+        self.assertIn("Misconfigured B&W printer", str(ctx.exception))
+
+    def test_preserves_legitimate_service_overrides(self):
+        # CV-001 legitimate override
+        bw, color = L.resolve_printer_queues("CV-001", env_bw="Brother_IPP")
+        self.assertEqual(bw, "Brother_IPP")
+        self.assertEqual(color, "Brother_IPP")
+
+        # SV-002 legitimate override
+        bw, color = L.resolve_printer_queues("SV-002", env_bw="Brother_Custom_Queue", env_color="Epson_L3250")
+        self.assertEqual(bw, "Brother_Custom_Queue")
+        self.assertEqual(color, "Epson_L3250")
+
+    def test_unconfigured_kiosk_fails_closed(self):
+        for bad in ("KIOSK_1", "", None, "UNKNOWN"):
+            with self.assertRaises(ValueError):
+                L.resolve_printer_queues(bad)
+
+
+class SudoersSecurityTests(unittest.TestCase):
+    def test_no_hardcoded_plain_passwords_in_listener_source(self):
+        with open(L.LISTENER_PATH if hasattr(L, "LISTENER_PATH") else os.path.join(os.path.dirname(__file__), "..", "firebase_listener.py"), "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertNotIn('input="printpi\\n"', content)
+        self.assertNotIn("input='printpi\\n'", content)
+
+    @mock.patch.object(L, "safe_sudo_run")
+    @mock.patch("subprocess.run")
+    def test_auto_heal_calls_safe_sudo(self, mock_run, mock_safe_sudo):
+        mock_safe_sudo.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+        L.auto_heal_cups_queue("Brother_HL_L5210DN_series")
+        called_cmds = [call[0][0] for call in mock_safe_sudo.call_args_list]
+        self.assertIn(["/usr/sbin/cupsenable", "Brother_HL_L5210DN_series"], called_cmds)
+        self.assertIn(["/usr/sbin/cupsaccept", "Brother_HL_L5210DN_series"], called_cmds)
+
+
 if __name__ == "__main__":
     unittest.main()
