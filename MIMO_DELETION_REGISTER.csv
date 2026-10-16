@@ -1,0 +1,109 @@
+ID,File/Folder,Type,Evidence of Non-Use,Possible Hidden Dependencies,Classification,Confidence,Required Verification,Estimated Savings
+DEL-001,mimo-website/build_output.txt,File,UTF-16LE build log artifact from a past local Windows build. Never imported or referenced.,None. Completely dead output file.,Category A,CONFIRMED,None. Can be removed immediately.,12 KB
+DEL-002,mimo-website/supabase.ts,File,Abandoned client setup for Supabase. 0 imports across the entire repository.,None. MIMO exclusively uses Firebase / Cloud Firestore.,Category A,CONFIRMED,Verify zero grep matches across repo.,1 KB
+DEL-003,mimo-website/src/app/pages/supabase.ts,File,Exact duplicate of mimo-website/supabase.ts. 0 imports across entire repository.,None.,Category A,CONFIRMED,Verify zero grep matches across repo.,1 KB
+DEL-004,mimo-website/IMG_3641.JPG.jpeg,File,SHA256 checksum is bit-for-bit identical to mimo-website/public/dashboard-bg-2.jpeg. Loose file in root.,None. Root image not served by public folder.,Category A,CONFIRMED,Verify hash matches public/dashboard-bg-2.jpeg.,161 KB
+DEL-005,mimo-website/WhatsApp Image 2026-06-11 at 4.18.59 PM.jpeg,File,SHA256 checksum is bit-for-bit identical to mimo-website/public/dashboard-bg.jpeg. Loose file in root.,None. Root image not served by public folder.,Category A,CONFIRMED,Verify hash matches public/dashboard-bg.jpeg.,62 KB
+DEL-006,mimo-website/A4 Sheet.pdf,File,SHA256 checksum is bit-for-bit identical to backend/downloaded_Vtr8NbTjHTwAdHVVufDf.pdf. Loose file in root. Live PDF is in public/blank_a4.pdf.,None. Root PDF is never referenced.,Category A,CONFIRMED,Confirm /blank-pages route downloads /blank_a4.pdf from public.,9 KB
+DEL-007,mimo-website/MIMO Graph.pdf,File,Loose duplicate PDF in website root. Production app serves /mimo_graph.pdf from public/.,None.,Category A,CONFIRMED,Confirm /blank-pages route downloads /mimo_graph.pdf from public.,1.1 MB
+DEL-008,functions/firestore-debug.log,File,Temporary debug log from local Firebase emulator execution.,None.,Category A,CONFIRMED,None. Local runtime log.,4 KB
+DEL-009,mimo-frontend-web-app/mimo-frontend/src/components/screens/OldPrintingScreen.tsx.backup,File,Obsolete backup file left in kiosk frontend tree.,None. Backup file with .backup suffix not imported.,Category A,CONFIRMED,Verify no imports of OldPrintingScreen.,32 KB
+DEL-010,backend/api/mimo.db,File,18.8 MB SQLite database file checked into git. MIMO uses Firestore for all persistence.,None. server.js uses Firestore; SQLite file is an obsolete relic.,Category A,CONFIRMED,Check server.js for any sqlite3 connections (none exist).,18.8 MB
+DEL-011,backend/api/test_download.pdf,File,1.25 MB test PDF artifact checked into git.,None. Ad-hoc test fixture.,Category A,CONFIRMED,Verify zero imports.,1.25 MB
+DEL-012,backend/api/kiosk2_logs.txt,File,133 KB plaintext log file from historical kiosk debugging.,None.,Category A,CONFIRMED,None.,133 KB
+DEL-013,backend/api/journal_logs.txt,File,0-byte empty file checked into git.,None.,Category A,CONFIRMED,None.,0 KB
+DEL-014,backend/api/GEMINI.md,File,0-byte empty file checked into git.,None.,Category A,CONFIRMED,None.,0 KB
+DEL-015,backend/dummy.pdf,File,Empty or stub test PDF in backend root.,None.,Category A,CONFIRMED,Verify test scripts.,1 KB
+DEL-016,backend/dummy.png,File,Stub test image in backend root.,None.,Category A,CONFIRMED,Verify test scripts.,1 KB
+DEL-017,backend/smoke1.pdf,File,324-byte test PDF generated during smoke testing.,None.,Category A,CONFIRMED,Verify smoke tests use scripts/testing/fixtures/.,1 KB
+DEL-018,backend/smoke2.pdf,File,324-byte test PDF generated during smoke testing.,None.,Category A,CONFIRMED,Verify smoke tests.,1 KB
+DEL-019,backend/imposed_blue.pdf,File,137 KB imposed test output PDF left in backend root.,None.,Category A,CONFIRMED,None.,137 KB
+DEL-020,backend/test_blue.pdf,File,35 KB test PDF left in backend root.,None.,Category A,CONFIRMED,None.,35 KB
+DEL-021,backend/my_extracted_image.png,File,169-byte test extraction artifact in backend root.,None.,Category A,CONFIRMED,None.,1 KB
+DEL-022,backend/downloaded_Vtr8NbTjHTwAdHVVufDf.pdf,File,9 KB downloaded job artifact left in backend root.,None.,Category A,CONFIRMED,None.,9 KB
+DEL-023,backend/firebase.json,File,Exact duplicate of firebase/firebase.json. Root and functions use canonical firebase/.,None. Firebase CLI uses root firebase.json.,Category A,CONFIRMED,Verify diff with firebase/firebase.json.,1 KB
+DEL-024,backend/firestore.indexes.json,File,Duplicate of firebase/firestore.indexes.json.,None.,Category A,CONFIRMED,Verify diff with firebase/firestore.indexes.json.,1 KB
+DEL-025,backend/firestore.rules,File,Duplicate of firebase/firestore.rules.,None.,Category A,CONFIRMED,Verify diff with firebase/firestore.rules.,1 KB
+DEL-026,mimo-website/public/lovelo_black-webfont.ttf,File,Exact byte-for-byte duplicate of mimo-website/public/fonts/lovelo_black-webfont.ttf in same public folder.,CSS imports fonts from fonts/ subfolder.,Category A,HIGH CONFIDENCE,Verify index.css @font-face points to fonts/lovelo_black-webfont.ttf.,30 KB
+DEL-027,mimo-website/public/lovelo_black-webfont.woff,File,Exact byte-for-byte duplicate of mimo-website/public/fonts/lovelo_black-webfont.woff in same public folder.,CSS imports fonts from fonts/ subfolder.,Category A,HIGH CONFIDENCE,Verify index.css @font-face points to fonts/lovelo_black-webfont.woff.,12 KB
+DEL-028,mimo-website/public/lovelo_black-webfont.woff2,File,Exact byte-for-byte duplicate of mimo-website/public/fonts/lovelo_black-webfont.woff2 in same public folder.,CSS imports fonts from fonts/ subfolder.,Category A,HIGH CONFIDENCE,Verify index.css @font-face points to fonts/lovelo_black-webfont.woff2.,9 KB
+DEL-029,mimo-website/public/scrollcraft,Directory,scrollcraft.js and scrollcraft.css have 0 references across all HTML/JSX/TSX files in repository.,None. Abandoned parallax library.,Category A,HIGH CONFIDENCE,Verify zero grep references in mimo-website.,78 KB
+DEL-030,company-website,Directory,45 files totaling 6.9 MB. Stale marketing site where 44 files are identical copies of mimo-website/public/. Production serves printmimo.tech from mimo-website/public/.,DNS or secondary Vercel project could point to company-website.,Category B,HIGH CONFIDENCE,Verify Vercel / domain DNS does not link to company-website folder.,6.9 MB
+DEL-031,brag-output,Directory,8 files totaling 9.6 MB (includes 2.5 MB brag.mp4 and composition/). 0 references in codebase. Untracked in git (in .gitignore).,Marketing team social media files.,Category B,HIGH CONFIDENCE,Verify owner has backed up video/social assets before local cleanup.,9.6 MB
+DEL-032,mimo-website/src/app/pages/mimo-admin-dashboard/index.tsx,File,1082 lines (61.6 KB) single-file prototype of admin dashboard. Production uses mimo-admin-dashboard/ package via Vercel rewrites.,App.tsx has lazy fallback import for local dev /admin and /finance routes.,Category B,HIGH CONFIDENCE,Update App.tsx to redirect to /admin/ (served by built dashboard) or point to subproject in dev.,61.6 KB
+DEL-033,mimo-website/src/app/components/ui/accordion.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-034,mimo-website/src/app/components/ui/alert-dialog.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,4 KB
+DEL-035,mimo-website/src/app/components/ui/alert.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-036,mimo-website/src/app/components/ui/aspect-ratio.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,1 KB
+DEL-037,mimo-website/src/app/components/ui/avatar.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,1 KB
+DEL-038,mimo-website/src/app/components/ui/badge.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-039,mimo-website/src/app/components/ui/breadcrumb.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-040,mimo-website/src/app/components/ui/calendar.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,3 KB
+DEL-041,mimo-website/src/app/components/ui/card.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-042,mimo-website/src/app/components/ui/carousel.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,6 KB
+DEL-043,mimo-website/src/app/components/ui/chart.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,10 KB
+DEL-044,mimo-website/src/app/components/ui/checkbox.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,1 KB
+DEL-045,mimo-website/src/app/components/ui/collapsible.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,1 KB
+DEL-046,mimo-website/src/app/components/ui/command.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,5 KB
+DEL-047,mimo-website/src/app/components/ui/context-menu.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,8 KB
+DEL-048,mimo-website/src/app/components/ui/drawer.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,4 KB
+DEL-049,mimo-website/src/app/components/ui/form.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,4 KB
+DEL-050,mimo-website/src/app/components/ui/hover-card.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-051,mimo-website/src/app/components/ui/input-otp.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-052,mimo-website/src/app/components/ui/menubar.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,8 KB
+DEL-053,mimo-website/src/app/components/ui/navigation-menu.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,7 KB
+DEL-054,mimo-website/src/app/components/ui/pagination.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,3 KB
+DEL-055,mimo-website/src/app/components/ui/popover.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-056,mimo-website/src/app/components/ui/progress.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,1 KB
+DEL-057,mimo-website/src/app/components/ui/radio-group.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,1 KB
+DEL-058,mimo-website/src/app/components/ui/resizable.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-059,mimo-website/src/app/components/ui/scroll-area.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-060,mimo-website/src/app/components/ui/select.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,6 KB
+DEL-061,mimo-website/src/app/components/ui/sidebar.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,22 KB
+DEL-062,mimo-website/src/app/components/ui/slider.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-063,mimo-website/src/app/components/ui/table.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-064,mimo-website/src/app/components/ui/tabs.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-065,mimo-website/src/app/components/ui/textarea.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,1 KB
+DEL-066,mimo-website/src/app/components/ui/theme-toggle.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,1 KB
+DEL-067,mimo-website/src/app/components/ui/toggle-group.tsx,File,Unreferenced shadcn UI component. 0 imports across codebase.,None.,Category B,HIGH CONFIDENCE,Verify static import scan.,2 KB
+DEL-068,mimo-website/src/app/components/ui/button.tsx,File,Only referenced by unused UI components (alert-dialog, calendar, carousel, pagination, sidebar, theme-toggle). App pages use custom styled buttons.,None.,Category B,HIGH CONFIDENCE,Can be deleted once unreferenced UI components are removed.,2 KB
+DEL-069,mimo-website/src/app/components/ui/dialog.tsx,File,Only referenced by command.tsx (which is unused).,None.,Category B,HIGH CONFIDENCE,Delete alongside command.tsx.,4 KB
+DEL-070,mimo-website/src/app/components/ui/dropdown-menu.tsx,File,Only referenced by theme-toggle.tsx (which is unused).,None.,Category B,HIGH CONFIDENCE,Delete alongside theme-toggle.tsx.,8 KB
+DEL-071,mimo-website/src/app/components/ui/input.tsx,File,Only referenced by sidebar.tsx (which is unused).,None.,Category B,HIGH CONFIDENCE,Delete alongside sidebar.tsx.,1 KB
+DEL-072,mimo-website/src/app/components/ui/label.tsx,File,Only referenced by form.tsx (which is unused).,None.,Category B,HIGH CONFIDENCE,Delete alongside form.tsx.,1 KB
+DEL-073,mimo-website/src/app/components/ui/separator.tsx,File,Only referenced by sidebar.tsx (which is unused).,None.,Category B,HIGH CONFIDENCE,Delete alongside sidebar.tsx.,1 KB
+DEL-074,mimo-website/src/app/components/ui/sheet.tsx,File,Only referenced by sidebar.tsx (which is unused).,None.,Category B,HIGH CONFIDENCE,Delete alongside sidebar.tsx.,4 KB
+DEL-075,mimo-website/src/app/components/ui/skeleton.tsx,File,Only referenced by sidebar.tsx (which is unused). App uses ScreenSkeleton in components/mimo/screen-skeleton.tsx.,None.,Category B,HIGH CONFIDENCE,Delete alongside sidebar.tsx.,1 KB
+DEL-076,mimo-website/src/app/components/ui/toggle.tsx,File,Only referenced by toggle-group.tsx (which is unused).,None.,Category B,HIGH CONFIDENCE,Delete alongside toggle-group.tsx.,2 KB
+DEL-077,mimo-website/src/app/components/ui/tooltip.tsx,File,Only referenced by sidebar.tsx (which is unused).,None.,Category B,HIGH CONFIDENCE,Delete alongside sidebar.tsx.,2 KB
+DEL-078,mimo-website/src/app/components/ui/use-mobile.ts,File,Only referenced by sidebar.tsx (which is unused).,None.,Category B,HIGH CONFIDENCE,Delete alongside sidebar.tsx.,1 KB
+DEL-079,backend/,Directory,125 files totaling 327 MB on disk. Legacy Express backend replaced by functions/. No client in repository calls it.,Live deployments exist on Northflank (mimo-backend) and Vercel (mimo-kiosk-backend).,Category C,CONFIRMED,Follow 4-step procedure in docs/deployment/LEGACY_BACKEND_REMOVAL.md (pause Northflank + Vercel first).,327 MB
+DEL-080,.github/workflows/backend-image.yml,File,Builds and pushes Docker image for legacy backend to ghcr.io on push.,Required by Northflank if Northflank pulls this image.,Category C,CONFIRMED,Delete alongside backend/ after Step 2 of retirement plan.,1 KB
+DEL-081,pi-listener/,Directory,6 files totaling 228 KB. Alternate/smaller listener variant (1140 lines vs 2720 lines in pi_scripts).,Uncertain if any physical machine was provisioned with this variant during SV-002 testing.,Category C,LIKELY,Inspect running process on physical Pis (ps aux | grep listener) before removing.,228 KB
+DEL-082,backend/check_epson_options.py,File,Duplicate of scripts/pi-ops/check_epson_options.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/ with credentials parameterized.,4 KB
+DEL-083,backend/check_epson_state.py,File,Duplicate of scripts/pi-ops/check_epson_state.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-084,backend/check_pi.py,File,Duplicate of scripts/pi-ops/check_pi.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-085,backend/check_printpi_jobs.py,File,Duplicate of scripts/pi-ops/check_printpi_jobs.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-086,backend/check_usb_processes.py,File,Duplicate of scripts/pi-ops/check_usb_processes.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-087,backend/configure_pi_usb_brother.py,File,Duplicate of scripts/pi-ops/configure_pi_usb_brother.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-088,backend/deploy_all_fixes.py,File,Duplicate of scripts/pi-ops/deploy_all_fixes.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-089,backend/deploy_both.py,File,Duplicate of scripts/pi-ops/deploy_both.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-090,backend/deploy_pi.py,File,Duplicate of scripts/pi-ops/deploy_pi.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-091,backend/diagnose_sv002.py,File,Duplicate of scripts/pi-ops/diagnose_sv002.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-092,backend/ssh_run.py,File,Duplicate of scripts/pi-ops/ssh_run.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-093,backend/test_epson_print.py,File,Duplicate of scripts/pi-ops/test_epson_print.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-094,backend/test_print_options.py,File,Duplicate of scripts/pi-ops/test_print_options.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-095,backend/update_printpi_service.py,File,Duplicate of scripts/pi-ops/update_printpi_service.py.,Contains hardcoded credentials.,Category C,CONFIRMED,Migrated to scripts/pi-ops/.,4 KB
+DEL-096,functions/src/,Directory,The canonical active Cloud Functions backend (routes, controllers, triggers, services).,Production API.,Category D,CONFIRMED,Must be preserved.,1.2 MB
+DEL-097,converter/,Directory,Active private Cloud Run Office-to-PDF conversion microservice.,Called by functions converter.service.js.,Category D,CONFIRMED,Must be preserved.,86 MB
+DEL-098,mimo-website/src/app/pages/upload-file.tsx,File,Active user upload and printing entrypoint.,Primary web app page.,Category D,CONFIRMED,Must be preserved.,50 KB
+DEL-099,mimo-website/mimo-admin-dashboard/,Directory,Active production Admin & Finance dashboard application.,Built into dist/admin during website build.,Category D,CONFIRMED,Must be preserved.,1.2 MB
+DEL-100,mimo-frontend-web-app/mimo-frontend/,Directory,Active touchscreen kiosk user interface deployed to mimo-kiosk-app.vercel.app.,Loaded by Android tablets on physical kiosks.,Category D,CONFIRMED,Must be preserved.,315 MB
+DEL-101,LENOVO TABLET APP/,Directory,Android Kotlin project that locks Lenovo tablets into kiosk mode.,Needed to build and provision physical kiosk tablets.,Category D,CONFIRMED,Must be preserved.,332 KB
+DEL-102,pi_scripts/firebase_listener.py,File,Active canonical Raspberry Pi print listener (2720 lines).,Runs on physical kiosks CV-001 and SV-002; watches Firestore and triggers CUPS printing.,Category D,CONFIRMED,Must be preserved.,135 KB
+DEL-103,pi_scripts/clean_epson.py,File,Automated 6:00 AM colour ink cleaning maintenance script.,Runs on physical kiosks.,Category D,CONFIRMED,Must be preserved.,12 KB
+DEL-104,scripts/pi-ops/,Directory,Parameterized operational scripts for managing kiosks.,Tested in CI.,Category D,CONFIRMED,Must be preserved.,1 MB
+DEL-105,mimo-website/public/vendor/opencv/opencv-4.9.0.js,File,9.8 MB OpenCV WebAssembly/JS engine. Loaded dynamically by scanner-cv-engine.ts for perspective correction.,Dynamically injected script tag during document scan.,Category D,CONFIRMED,Do not delete despite lack of ES module import.,9.8 MB
+DEL-106,mimo-frontend-web-app/mimo-frontend/public/models/MIMO_FINAL.glb,File,1.1 MB 3D GLB model of MIMO character rendered by model-viewer on kiosk screen.,Loaded dynamically by MimoCharacter3D.tsx.,Category D,CONFIRMED,Do not delete.,1.1 MB
+DEL-107,serviceAccountKey.json,File,Root service account key (untracked). Used by local admin scripts and emulator.,Production credentials holder.,Category E,CONFIRMED,Check which physical Pi holds key f159c3b8 before rotation.,4 KB
+DEL-108,PI3_SETUP_YOUR_STEPS.md,File,Untracked working notes for Pi 3 setup.,User working file.,Category E,CONFIRMED,Must be preserved per instruction.,4 KB
