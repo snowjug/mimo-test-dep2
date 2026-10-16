@@ -62,7 +62,7 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
 
   // Navigation & Screen State
   const [currentScreen, setCurrentScreen] = useState<Mimo3ScreenState>('main-interface');
-  const [showScreensaver, setShowScreensaver] = useState(false);
+  const [showScreensaver, setShowScreensaver] = useState(true);
   const [code, setCode] = useState('');
   const [jobData, setJobData] = useState<JobData | null>(null);
   const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>('idle');
@@ -123,9 +123,8 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
   useEffect(() => {
     let idleTimer: number;
 
-    const resetIdleTimer = () => {
+    const onUserActivity = () => {
       clearTimeout(idleTimer);
-      setShowScreensaver(false);
 
       if (currentScreen === 'code-entry-screen' && !isSubmittingRef.current) {
         // Return to main screen after 20s of inactivity on keypad
@@ -133,7 +132,7 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
           setCurrentScreen('main-interface');
           setCode('');
         }, 20000);
-      } else if (currentScreen === 'main-interface') {
+      } else if (currentScreen === 'main-interface' && !showScreensaver) {
         // Activate screensaver after 60s of inactivity on home screen
         idleTimer = window.setTimeout(() => {
           setShowScreensaver(true);
@@ -141,21 +140,21 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
       }
     };
 
-    window.addEventListener('mousemove', resetIdleTimer);
-    window.addEventListener('touchstart', resetIdleTimer);
-    window.addEventListener('click', resetIdleTimer);
-    window.addEventListener('keydown', resetIdleTimer);
+    window.addEventListener('mousemove', onUserActivity);
+    window.addEventListener('touchstart', onUserActivity);
+    window.addEventListener('click', onUserActivity);
+    window.addEventListener('keydown', onUserActivity);
 
-    resetIdleTimer();
+    onUserActivity();
 
     return () => {
       clearTimeout(idleTimer);
-      window.removeEventListener('mousemove', resetIdleTimer);
-      window.removeEventListener('touchstart', resetIdleTimer);
-      window.removeEventListener('click', resetIdleTimer);
-      window.removeEventListener('keydown', resetIdleTimer);
+      window.removeEventListener('mousemove', onUserActivity);
+      window.removeEventListener('touchstart', onUserActivity);
+      window.removeEventListener('click', onUserActivity);
+      window.removeEventListener('keydown', onUserActivity);
     };
-  }, [currentScreen, idleTimeoutSec]);
+  }, [currentScreen, showScreensaver, idleTimeoutSec]);
 
   // Global Physical Keyboard Support (for debugging & accessibility)
   useEffect(() => {
@@ -352,6 +351,11 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
         }}
         kioskId={activeKioskId}
         onOmTap={handleOmTap}
+        onOpenScreensaver={() => {
+          playTactileClick();
+          setShowScreensaver(true);
+        }}
+        isOnline={isOnline}
       />
 
       {/* ================= STEP 3: CODE ENTRY SCREEN ================= */}
