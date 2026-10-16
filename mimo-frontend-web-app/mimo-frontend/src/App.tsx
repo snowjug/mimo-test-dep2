@@ -11,6 +11,9 @@ import { Adds } from './components/screens/adds/Adds';
 import { isFestivalActive } from './config/festivalConfig';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 
+// MIMO 3.0 Dedicated Hindu Devotional Appliance Suite (Completely isolated for SV-003 / /mimo3)
+import { Mimo3KioskPage } from './components/mimo3/Mimo3KioskPage';
+
 
 export type ScreenState =
   | 'main-interface'
@@ -24,25 +27,41 @@ function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const currentKioskId = urlParams.get("kioskId");
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
   const defaultKioskFromHost = host.includes('mimo-2-0') || host.includes('mimo-kiosk-app') ? 'SV-002' : undefined;
-  const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID || defaultKioskFromHost;
+  const dynamicKioskId =
+    currentKioskId ||
+    (pathname.startsWith('/mimo3') ? 'SV-003' : undefined) ||
+    import.meta.env.VITE_KIOSK_ID ||
+    defaultKioskFromHost;
+  
+  // MIMO 3.0 is strictly isolated to SV-003 / MIMO-3 / /mimo3. MIMO 1.0 (CV-001) & MIMO 2.0 (SV-002) are 100% untouched.
+  const isMimo3 = dynamicKioskId === 'SV-003' || dynamicKioskId === 'MIMO-3';
   const isFestive = isFestivalActive();
-  const isFestiveForKiosk = dynamicKioskId === 'CV-001' || (dynamicKioskId === 'SV-002' && isFestive);
+  const isFestiveForKiosk = !isMimo3 && (dynamicKioskId === 'CV-001' || (dynamicKioskId === 'SV-002' && isFestive));
 
   useEffect(() => {
     const rootEl = document.getElementById('root');
     // Clear themes first
-    document.body.classList.remove('theme-cv001', 'theme-sv002');
-    rootEl?.classList.remove('theme-cv001', 'theme-sv002');
+    document.body.classList.remove('theme-cv001', 'theme-sv002', 'theme-mimo3');
+    rootEl?.classList.remove('theme-cv001', 'theme-sv002', 'theme-mimo3');
 
-    if (isFestiveForKiosk) {
+    if (isMimo3) {
+      document.body.classList.add('theme-mimo3');
+      rootEl?.classList.add('theme-mimo3');
+    } else if (isFestiveForKiosk) {
       document.body.classList.add('theme-cv001');
       rootEl?.classList.add('theme-cv001');
     } else if (dynamicKioskId === 'SV-002') {
       document.body.classList.add('theme-sv002');
       rootEl?.classList.add('theme-sv002');
     }
-  }, [dynamicKioskId, isFestiveForKiosk]);
+  }, [dynamicKioskId, isFestiveForKiosk, isMimo3]);
+
+  // MIMO 3.0: Return dedicated, self-contained, complete appliance page
+  if (isMimo3) {
+    return <Mimo3KioskPage kioskId={dynamicKioskId} />;
+  }
 
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('main-interface');
   const [code, setCode] = useState('');
@@ -87,6 +106,12 @@ function App() {
     isIdle: isKioskIdle,
     checkIntervalMs: 60000,
   });
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      (window as any).__TRIGGER_SCREENSAVER = () => setShowScreensaver(true);
+    }
+  }, []);
 
   // ================= TOAST =================
   const showToast = useCallback((msg: string, isError: boolean = false) => {
