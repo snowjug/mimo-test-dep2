@@ -33,8 +33,10 @@ class ConfigError(RuntimeError):
     """A required environment variable is missing."""
 
 
-def load_env_file(path=ENV_FILE):
+def load_env_file(path=None):
     """Read KEY=VALUE lines from the git-ignored pi-hosts.env without overriding real environment variables."""
+    if path is None:
+        path = ENV_FILE
     if not Path(path).exists():
         return
     for line in Path(path).read_text(encoding="utf-8").splitlines():

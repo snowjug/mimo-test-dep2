@@ -69,6 +69,24 @@ class ExpandTests(unittest.TestCase):
                 pi.expand("@SUDO@ id", "CV-001")
             self.assertIn("PI_CV001_PASSWORD", str(ctx.exception))
 
+    def test_sudo_prefers_sudo_password_over_login_password(self):
+        with clean_env(PI_CV001_SUDO_PASSWORD="custom_sudo_pw"), mock.patch.object(pi, "ENV_FILE", HERE / "missing.env"):
+            out = pi.expand("@SUDO@ whoami", "CV-001")
+            self.assertEqual(out, "echo custom_sudo_pw | sudo -S whoami")
+
+    def test_load_env_file_honors_dynamically_patched_env_file(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+            tf.write("PI_CV001_PASSWORD=from_temp_file\n")
+            tf.flush()
+            temp_path = Path(tf.name)
+        try:
+            with clean_env(), mock.patch.object(pi, "ENV_FILE", temp_path):
+                os.environ.pop("PI_CV001_PASSWORD", None)
+                self.assertEqual(pi.setting("CV-001", "PASSWORD"), "from_temp_file")
+        finally:
+            temp_path.unlink(missing_ok=True)
+
     def test_unknown_kiosk_rejected(self):
         with self.assertRaises(pi.ConfigError):
             pi.normalize("XX-999")
