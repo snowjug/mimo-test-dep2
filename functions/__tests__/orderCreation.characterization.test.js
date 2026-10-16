@@ -60,7 +60,7 @@ test.describe("what a successful paid checkout does", () => {
     assert.strictEqual(job.status, "pending");
     assert.strictEqual(job.orderId, res.body.orderId);
     assert.strictEqual(job.userId, "u1");
-    assert.strictEqual(job.kioskId, "CV-001", "default kiosk when none is chosen");
+    assert.strictEqual(job.kioskId, null, "unassigned kiosk when none is chosen");
     assert.strictEqual(job.files.length, 1);
     assert.strictEqual(job.files[0].pageCount, 5);
     assert.strictEqual(job.color, false);

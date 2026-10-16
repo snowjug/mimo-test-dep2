@@ -264,7 +264,7 @@ const postCreateOrder = async (req, res) => {
       duplex: printOptions?.doubleSided === "double",
       finalCost: jobCost,
       totalCost: jobCost,
-      kioskId: printOptions?.directKioskId || "CV-001",
+      kioskId: printOptions?.directKioskId || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       retentionStartAt: earliestRetentionStartAt || admin.firestore.FieldValue.serverTimestamp()
@@ -800,10 +800,10 @@ const postPaymentSuccess = async (req, res) => {
       let coinsToCharge = 0;
       jobsToUpdate.forEach((doc) => {
         const data = doc.data();
-        const jobKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || data.kioskId;
-        const targetKiosk = jobKioskId || "CV-001";
-        if (jobKioskId) {
-          directKioskId = jobKioskId;
+        const explicitKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || null;
+        const targetKiosk = explicitKioskId || null;
+        if (explicitKioskId) {
+          directKioskId = explicitKioskId;
         }
         const jobUpdate = {
           status: "paid",

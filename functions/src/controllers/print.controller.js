@@ -54,6 +54,21 @@ const postGetDocumentsByCode = async (req, res) => {
       });
     }
 
+    const isExplicitlyRestricted = Boolean(
+      firstJob.strictKiosk === true ||
+      firstJob.directKioskRestriction === true ||
+      firstJob.printOptions?.strictKiosk === true ||
+      firstJob.printOptions?.directKioskRestriction === true
+    );
+    const restrictedKiosk = isExplicitlyRestricted
+      ? (firstJob.printOptions?.directKioskId || firstJob.directKioskId || firstJob.kioskId)
+      : null;
+    if (restrictedKiosk && restrictedKiosk !== kioskId) {
+      return res.status(403).json({
+        error: `This print job is restricted to machine ${restrictedKiosk}.`
+      });
+    }
+
     const unprintable = unprintableFilesForKiosk(snapshot.docs.map((doc) => doc.data()), kioskId);
     if (unprintable.length) {
       return res.status(400).json({ error: unprintableFilesMessage(unprintable) });

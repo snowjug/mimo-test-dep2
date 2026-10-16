@@ -1,0 +1,23 @@
+[Unit]
+Description=Mimo Cage Wayland Kiosk Display (SV-002)
+After=systemd-user-sessions.service network.target
+Conflicts=lightdm.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+PAMName=login
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="WLR_LIBINPUT_NO_DEVICES=0"
+Environment="XDG_SESSION_TYPE=wayland"
+TTYPath=/dev/tty7
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+ExecStart=/usr/bin/cage -s -- /home/pi/mimo/mimo-kiosk-launcher.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target
