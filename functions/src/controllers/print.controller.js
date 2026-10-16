@@ -16,9 +16,16 @@ const postGetDocumentsByCode = async (req, res) => {
 
     if (snapshot.empty) {
       // Secondary check: was this code already used (completed / refunded / printing)?
+      // Bounded to the last 24h -- matches the window printCode.service.js's CODE_VALIDITY_MS already
+      // documents codes as valid for. Without this bound, a code recycled from a job months old (now
+      // free to reissue) permanently shadows any brand-new job that is handed the same code, incorrectly
+      // telling the customer their code was "already used" (confirmed production incident, 2026-10-16:
+      // printCode 9670 collided with a September job and blocked a same-day paid job from printing).
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const usedSnap = await db.collection("print_jobs")
         .where("printCode", "==", printCode)
         .where("status", "in", ["completed", "printing", "refunded", "printed", "expired"])
+        .where("createdAt", ">=", dayAgo)
         .limit(1)
         .get();
       if (!usedSnap.empty) {

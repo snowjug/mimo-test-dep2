@@ -117,6 +117,17 @@
     background: var(--color-parchment-100);
   }
 
+  #root.theme-mimo3 {
+    background: #F8FAFC;
+    color: #0F172A;
+  }
+
+  body.theme-mimo3,
+  html.kiosk-full-bleed body.theme-mimo3 {
+    background: #F8FAFC;
+    color: #0F172A;
+  }
+
   @media (max-width: 1000px) {
     #root {
       width: var(--kiosk-width, 1440px);
@@ -197,6 +208,13 @@
   @keyframes navaratri-caret {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.15; }
+  }
+
+  @keyframes devotionalFlame {
+    0%, 100% { transform: scale(1, 1) rotate(0deg); opacity: 1; }
+    25% { transform: scale(0.92, 1.08) rotate(-2.5deg); opacity: 0.94; }
+    50% { transform: scale(1.06, 0.94) rotate(2deg); opacity: 1; }
+    75% { transform: scale(0.96, 1.04) rotate(-1.5deg); opacity: 0.96; }
   }
 
   @media (prefers-reduced-motion: reduce) {

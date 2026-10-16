@@ -5,13 +5,15 @@ import App from './App.tsx'
 
 const kioskIdParam = new URLSearchParams(window.location.search).get('kioskId');
 const host = window.location.hostname;
+const pathname = window.location.pathname;
 const kioskId =
   kioskIdParam ||
+  (pathname.startsWith('/mimo3') ? 'SV-003' : undefined) ||
   import.meta.env.VITE_KIOSK_ID ||
   (host.includes('mimo-2-0') || host.includes('mimo-kiosk-app') ? 'SV-002' : undefined);
 
-// Both SV-002 and CV-001 screens widen the canvas to fill the viewport instead of letterboxing.
-const isFullBleed = kioskId === 'SV-002' || kioskId === 'CV-001';
+// SV-002, CV-001, and SV-003 screens widen the canvas to fill the viewport instead of letterboxing.
+const isFullBleed = kioskId === 'SV-002' || kioskId === 'CV-001' || kioskId === 'SV-003';
 if (isFullBleed) document.documentElement.classList.add('kiosk-full-bleed');
 
 const updateScale = () => {
