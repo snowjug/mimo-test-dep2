@@ -360,6 +360,23 @@ function createKioskRouter(dependencies) {
             throw new Error("TX_ABORT");
           }
 
+          const isExplicitlyRestricted = Boolean(
+            jobData.strictKiosk === true ||
+            jobData.directKioskRestriction === true ||
+            jobData.printOptions?.strictKiosk === true ||
+            jobData.printOptions?.directKioskRestriction === true
+          );
+          const restrictedKiosk = isExplicitlyRestricted
+            ? (jobData.printOptions?.directKioskId || jobData.directKioskId || jobData.kioskId)
+            : null;
+          if (restrictedKiosk && restrictedKiosk !== kioskId) {
+            transactionFailedError = {
+              status: 403,
+              message: `This print job is restricted to machine ${restrictedKiosk}.`
+            };
+            throw new Error("TX_ABORT");
+          }
+
           const unprintable = unprintableFilesForKiosk([jobData], kioskId);
           if (unprintable.length) {
             transactionFailedError = { status: 400, message: unprintableFilesMessage(unprintable) };

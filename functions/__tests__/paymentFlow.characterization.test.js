@@ -121,7 +121,7 @@ test.describe("POST /payment-success (assigns the 4-digit print code)", () => {
     for (const id of ["j1", "j2"]) {
       assert.strictEqual(jobs[id].status, "paid");
       assert.strictEqual(jobs[id].printCode, res.body.printCode);
-      assert.strictEqual(jobs[id].kioskId, "CV-001", "no kiosk chosen -> defaults to CV-001");
+      assert.strictEqual(jobs[id].kioskId, null, "no kiosk chosen -> kioskId is null until redeemed at kiosk");
       assert.strictEqual(jobs[id].isPrinted, false);
     }
   });

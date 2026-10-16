@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import requests
+import shlex
 
 try:
     from pillow_heif import register_heif_opener
@@ -26,12 +27,40 @@ active_jobs = set()
 # ================= CONFIGURATION =================
 BW_PRINTER_NAME = os.environ.get("BW_PRINTER_NAME", "Brother_HL_L2440DW_series")
 COLOR_PRINTER_NAME = os.environ.get("COLOR_PRINTER_NAME", "Epson_L3250")
-# Kiosk Routing Identity
+
+# Kiosk Routing Identity (Fail-closed if missing or invalid)
+VALID_KIOSK_IDS = {"CV-001", "SV-002"}
 KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
-TEMP_DIR = "/tmp/mimo_prints"
-PRE_FETCH_DIR = "/tmp/mimo_pre_fetch"
+
+
+def validate_kiosk_identity(kiosk_id):
+    """Enforces explicit, valid kiosk identity. Fails closed if missing or unknown."""
+    if not kiosk_id or kiosk_id == "KIOSK_1" or kiosk_id not in VALID_KIOSK_IDS:
+        raise ValueError(
+            f"FATAL: KIOSK_ID '{kiosk_id}' is invalid or unconfigured. "
+            f"Must be explicitly set to one of {sorted(VALID_KIOSK_IDS)}. Refusing to start."
+        )
+    return kiosk_id
+
+
+# Storage locations: default to disk-backed /var/tmp to prevent tmpfs RAM exhaustion on 1GB Pis
+TEMP_DIR = os.environ.get("TEMP_DIR", "/var/tmp/mimo_prints")
+PRE_FETCH_DIR = os.environ.get("PRE_FETCH_DIR", "/var/tmp/mimo_pre_fetch")
 # Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
 IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
+
+
+def safe_sudo_run(cmd, timeout=10):
+    """Executes a command via sudo without hardcoded credentials, utilizing sudoers NOPASSWD."""
+    if os.geteuid() == 0:
+        cmd_list = cmd if isinstance(cmd, list) else shlex.split(cmd)
+        return subprocess.run(cmd_list, capture_output=True, text=True, timeout=timeout)
+    cmd_list = ["sudo", "-n"] + (cmd if isinstance(cmd, list) else shlex.split(cmd))
+    try:
+        return subprocess.run(cmd_list, capture_output=True, text=True, timeout=timeout)
+    except Exception as e:
+        print(f"⚠️ safe_sudo_run error for {cmd}: {e}")
+        return subprocess.CompletedProcess(args=cmd_list, returncode=1, stdout="", stderr=str(e))
 
 # ── Prefetch tuning (bounded pool + cache eviction) ──
 # Caps simultaneous prefetch downloads so a Firestore reconnect backlog can't spawn
@@ -87,8 +116,12 @@ def _run_process_job(doc):
         traceback.print_exc()
 
 def ensure_work_dirs():
-    os.makedirs(TEMP_DIR, exist_ok=True)
-    os.makedirs(PRE_FETCH_DIR, exist_ok=True)
+    for d in (TEMP_DIR, PRE_FETCH_DIR):
+        os.makedirs(d, exist_ok=True)
+        try:
+            os.chmod(d, 0o775)
+        except Exception:
+            pass
 
 # ── Ghostscript compression presets ──
 # /ebook  → downsample images to 150 DPI; great for B&W laser (small spool, fast USB transfer)
@@ -2242,11 +2275,14 @@ def reset_printer_usb(printer_name):
 
     if usb_id:
         print(f"🔌 Waking up printer {printer_name} via hardware USB reset ({usb_id})...")
-        # Run usbreset with piped password
-        res = subprocess.run(f"echo 'printpi' | sudo -S usbreset {usb_id}", shell=True, capture_output=True, text=True)
+        # Run usbreset without hardcoded password
+        res = safe_sudo_run(["usbreset", usb_id])
         print(f"USB reset output: {res.stdout.strip()} | Error: {res.stderr.strip()}")
-        # Restart CUPS to immediately re-claim USB interface and prevent usbfs detach hangs
-        subprocess.run(f"echo 'printpi' | sudo -S systemctl restart cups", shell=True, capture_output=True)
+        # Restart CUPS only if no active jobs are currently printing
+        if not active_jobs:
+            safe_sudo_run(["systemctl", "restart", "cups"])
+        else:
+            print("⚠️ CUPS restart skipped during USB reset because jobs are currently in flight.")
         return True
     else:
         print(f"⚠️ No USB ID found for printer {printer_name}")
@@ -2376,7 +2412,7 @@ def watchdog_loop():
                     status_out = status_res.stdout.lower()
                     if "disabled" in status_out:
                         print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
-                        subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                        safe_sudo_run(["/usr/sbin/cupsenable", printer])
                         # Cancel stale spool entries for jobs already failed/refunded in Firestore
                         # before resuming to prevent ghost prints when printer comes back online
                         cancel_stale_cups_jobs_for_printer(printer)
@@ -2401,11 +2437,11 @@ def watchdog_loop():
                                 # Ensure ipp-usb is stopped and disabled so direct USB works
                                 if "Brother" in printer:
                                     print("Ensuring ipp-usb is stopped...")
-                                    subprocess.run(f"echo 'printpi' | sudo -S systemctl stop ipp-usb", shell=True, capture_output=True)
-                                    subprocess.run(f"echo 'printpi' | sudo -S systemctl disable ipp-usb", shell=True, capture_output=True)
+                                    safe_sudo_run(["systemctl", "stop", "ipp-usb"])
+                                    safe_sudo_run(["systemctl", "disable", "ipp-usb"])
                                 
                                 # Re-enable CUPS queue
-                                subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                                safe_sudo_run(["/usr/sbin/cupsenable", printer])
                                 # Cancel stale spool entries for jobs already failed/refunded in Firestore
                                 cancel_stale_cups_jobs_for_printer(printer)
                                 stuck_cycles[printer] = 0
@@ -2741,20 +2777,24 @@ def color_cleaning_scheduler_loop():
         print(f"⚠️ [CLEAN] Could not start colour cleaning scheduler: {e}")
 
 
-def startup_purge_cups():
-    """Cancel all stale queued CUPS jobs on listener startup to prevent ghost prints when paper is refilled."""
+def startup_reconcile_cups():
+    """On startup, reconcile CUPS queues against Firestore instead of blindly destroying all queued jobs.
+    Active jobs whose Firestore status is still 'printing' are preserved; only jobs that have already
+    failed, refunded, completed, or are unrecorded in Firestore are safely cancelled."""
     try:
-        print("🧹 [STARTUP] Clearing stale CUPS queues to prevent ghost prints...")
-        subprocess.run(["cancel", "-a", "-x"], capture_output=True, timeout=5)
+        print("🔍 [STARTUP] Reconciling CUPS queue with Firestore job status...")
+        for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
+            cancel_stale_cups_jobs_for_printer(printer)
     except Exception as e:
-        print(f"⚠️ [STARTUP] Failed to purge stale CUPS queues: {e}")
+        print(f"⚠️ [STARTUP] Failed to reconcile CUPS queues on startup: {e}")
 
 # Startup runs only when executed as a script (systemd: python firebase_listener.py), never on import.
 if __name__ == "__main__":
+    validate_kiosk_identity(KIOSK_ID)
     ensure_work_dirs()
     init_firebase()
 
-    startup_purge_cups()
+    startup_reconcile_cups()
 
     # Start background threads
     threading.Thread(target=heartbeat_loop, daemon=True).start()

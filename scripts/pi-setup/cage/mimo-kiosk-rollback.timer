@@ -1,0 +1,9 @@
+[Unit]
+Description=Mimo Kiosk Migration Rollback Watchdog Timer (180s)
+
+[Timer]
+OnActiveSec=180
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
