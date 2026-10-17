@@ -12,11 +12,14 @@
 // A claim auto-expires after CODE_VALIDITY_MS (matching the 24h window print codes are already documented to
 // stay valid for elsewhere in the app -- see upload-file.tsx's "Codes stay valid for 24 hours"), so no caller
 // needs to explicitly release a code when its job finishes; a stale claim just becomes reclaimable on its own.
+const crypto = require("crypto");
+
 const ACTIVE_STATUSES = new Set(["paid", "printing"]);
 const MAX_ATTEMPTS = 25;
 const CODE_VALIDITY_MS = 24 * 60 * 60 * 1000;
 
-const randomCode = () => Math.floor(1000 + Math.random() * 9000).toString();
+// crypto.randomInt's upper bound is exclusive, so (1000, 10000) is the 1000-9999 inclusive range.
+const randomCode = () => crypto.randomInt(1000, 10000).toString();
 
 /** Runs the check-and-claim against whatever transaction-like object is given (a real transaction, or the
  * per-attempt one generateUniquePrintCode opens itself) -- reads and the claim write all join the SAME

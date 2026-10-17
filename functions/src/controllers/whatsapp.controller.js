@@ -82,9 +82,6 @@ const getWaPaySuccess = async (req, res) => {
       // Payment just completed, trigger fulfillment
       const cfStatus = await axios.get(`${CASHFREE_BASE_URL}/links/${orderId}`, { headers: cashfreeHeaders });
       if (cfStatus.data.link_status === "PAID") {
-        printCode = await generateUniquePrintCode(db);
-        const now = admin.firestore.FieldValue.serverTimestamp();
-
         // Resolve Cashfree's own order_id for this payment. Refunds (autoRefundJob, /kiosk/report-failure)
         // call POST /orders/{order_id}/refunds -- but our `orderId` here is the Payment Link's link_id, and
         // Cashfree assigns a SEPARATE, auto-generated order_id to the actual order created when the customer
@@ -99,19 +96,40 @@ const getWaPaySuccess = async (req, res) => {
           console.error("[WA-PAY-SUCCESS] Failed to resolve Cashfree order_id for refund eligibility:", resolveErr.response?.data || resolveErr.message);
         }
 
-        const batch = db.batch();
-        waJobs.forEach(d => batch.update(d.ref, {
-          status: "paid",
-          printCode,
-          codeCreatedAt: now,
-          paymentTime: now,
-          retentionStartAt: now,
-          ...(cfOrderId ? { cfOrderId } : {})
-        }));
-        await batch.commit();
+        // The existing-code check above and the generate+write below are now one atomic transaction, keyed
+        // by orderId -- mirrors payment.controller.js's postPaymentSuccess. Without this, two near-simultaneous
+        // calls for the same order (plausible via Cashfree's own redirect plus a user's manual page refresh)
+        // could both observe "no code yet" above, both generate a valid code, and race on the final write --
+        // last write wins, silently wasting the first-generated code (left claimed for 24h) and potentially
+        // having already sent that stale first code to the customer over WhatsApp before the overwrite.
+        const now = admin.firestore.FieldValue.serverTimestamp();
+        const outcome = await db.runTransaction(async (tx) => {
+          const freshJobs = await tx.get(db.collection("print_jobs").where("orderId", "==", orderId));
+          let existingCode = null;
+          freshJobs.forEach(d => { if (d.data().printCode) existingCode = d.data().printCode; });
+          if (existingCode) {
+            // Another concurrent call already won the race and wrote a code -- use it, don't generate a second.
+            return { printCode: existingCode, alreadyIssued: true };
+          }
+
+          // generateUniquePrintCode WRITES a claim doc (see printCode.service.js) -- passing this transaction
+          // so that write joins it instead of opening a second, illegally-nested transaction.
+          const code = await generateUniquePrintCode(db, tx);
+          freshJobs.forEach(d => tx.update(d.ref, {
+            status: "paid",
+            printCode: code,
+            codeCreatedAt: now,
+            paymentTime: now,
+            retentionStartAt: now,
+            ...(cfOrderId ? { cfOrderId } : {})
+          }));
+          return { printCode: code, alreadyIssued: false };
+        });
+        printCode = outcome.printCode;
 
         // Mark the payment_transactions record PAID and store the resolved order id refund calls need --
-        // without this, refund logic has no way to learn the real Cashfree order_id later.
+        // without this, refund logic has no way to learn the real Cashfree order_id later. Idempotent
+        // (plain .update()), so running it again if this handler is called twice for the same order is safe.
         const txSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).limit(1).get();
         if (!txSnap.empty) {
           await txSnap.docs[0].ref.update({
@@ -121,23 +139,26 @@ const getWaPaySuccess = async (req, res) => {
           });
         }
 
-        // Notify on WhatsApp with native order card
-        const waSession = await db.collection("whatsapp_sessions").where("jobId", "==", waJobs.docs[0]?.id).get();
-        if (!waSession.empty) {
-          const phone = waSession.docs[0].id;
-          const jobData = waJobs.docs[0].data();
-          const botPhoneNumberId = jobData.botPhoneNumberId || process.env.WA_PHONE_NUMBER_ID || "943206795552432";
-          await waContext.run({ phoneNumberId: botPhoneNumberId }, async () => {
-            await sendWhatsAppOrderCard(phone, {
-              orderId,
-              fileName: jobData.fileName || "Document",
-              colorMode: jobData.colorMode || "bw",
-              copies: jobData.copies || 1,
-              totalAmount: jobData.totalCost || 0,
-              status: "paid",
-              printCode
+        // Notify on WhatsApp with native order card -- only for the call that actually issued the code, so a
+        // concurrent duplicate call (which observed alreadyIssued above) doesn't send a second notification.
+        if (!outcome.alreadyIssued) {
+          const waSession = await db.collection("whatsapp_sessions").where("jobId", "==", waJobs.docs[0]?.id).get();
+          if (!waSession.empty) {
+            const phone = waSession.docs[0].id;
+            const jobData = waJobs.docs[0].data();
+            const botPhoneNumberId = jobData.botPhoneNumberId || process.env.WA_PHONE_NUMBER_ID || "943206795552432";
+            await waContext.run({ phoneNumberId: botPhoneNumberId }, async () => {
+              await sendWhatsAppOrderCard(phone, {
+                orderId,
+                fileName: jobData.fileName || "Document",
+                colorMode: jobData.colorMode || "bw",
+                copies: jobData.copies || 1,
+                totalAmount: jobData.totalCost || 0,
+                status: "paid",
+                printCode
+              });
             });
-          });
+          }
         }
       }
     }

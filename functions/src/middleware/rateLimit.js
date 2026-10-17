@@ -83,6 +83,56 @@ function createFailureLimiter(db, { scope, limits, failureStatuses = [404, 409],
   };
 }
 
+/**
+ * Like createFailureLimiter, but counts every request regardless of outcome. For endpoints where the
+ * cost/DoS risk is in call VOLUME itself (external API calls: Cloud Run conversion, Cashfree order
+ * creation) rather than just failed/guessed attempts -- a successful request is just as costly as a
+ * failed one here. Same Firestore-backed per-IP state, same fail-open-on-outage behavior as above.
+ */
+function createRequestLimiter(db, { scope, limits, now = Date.now, random = Math.random }) {
+  const longestWindow = Math.max(...limits.map((l) => l.windowMs));
+
+  return async function requestLimiter(req, res, next) {
+    const ref = db.collection(COLLECTION).doc(`${scope}_${hashIp(req.ip)}`);
+    try {
+      let blockedRetry = 0;
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const data = snap.exists ? snap.data() : {};
+        const t = now();
+        const retry = retryAfterSeconds(data, limits, t);
+        if (retry > 0) {
+          blockedRetry = retry;
+          return;
+        }
+        const w = limits.map((limit, i) => {
+          const cur = data.w && data.w[i];
+          return cur && t < cur.start + limit.windowMs ? { start: cur.start, count: cur.count + 1 } : { start: t, count: 1 };
+        });
+        tx.set(ref, { scope, w, updatedAt: t, expireAt: new Date(t + longestWindow) });
+      });
+      if (blockedRetry > 0) {
+        res.set("Retry-After", String(blockedRetry));
+        return res.status(429).json({ error: "Too many requests. Please wait a moment and try again." });
+      }
+    } catch (err) {
+      console.error("[RATE-LIMIT] check failed, allowing request:", err.message);
+      return next();
+    }
+    if (random() < CLEANUP_PROBABILITY) {
+      db.collection(COLLECTION).where("expireAt", "<", new Date(now())).limit(CLEANUP_BATCH).get()
+        .then((stale) => {
+          if (stale.empty) return;
+          const batch = db.batch();
+          stale.forEach((doc) => batch.delete(doc.ref));
+          return batch.commit();
+        })
+        .catch((err) => console.error("[RATE-LIMIT] cleanup failed:", err.message));
+    }
+    next();
+  };
+}
+
 // One shared budget for the two endpoints that accept a print code, and a looser one for status polling.
 // loginLimiter uses the same budget as codeGuessLimiter (credential guessing is brute-forceable the same
 // way a 4-digit code is) and counts both "wrong credentials" (400/401) responses used by the login/register
@@ -102,7 +152,21 @@ function createLimiters(db) {
       limits: [{ windowMs: 60 * 1000, max: 5 }, { windowMs: 60 * 60 * 1000, max: 20 }],
       failureStatuses: [400, 401],
     }),
+    // /kiosk/report-failure triggers a real refund and is gated only by a shared secret (no per-user
+    // credential): throttle wrong-secret/unknown-job attempts the same way code-guessing is throttled.
+    reportFailureLimiter: createFailureLimiter(db, {
+      scope: "report-failure",
+      limits: [{ windowMs: 60 * 1000, max: 10 }, { windowMs: 60 * 60 * 1000, max: 50 }],
+      failureStatuses: [403, 404],
+    }),
+    // Guards authenticated write/cost-bearing endpoints (uploads, orders, refunds) that have no
+    // failure-based signal to key off -- a legitimate-looking flood of successful calls is still a
+    // real cost/DoS risk against the Office converter and Cashfree order-creation APIs.
+    writeActionLimiter: createRequestLimiter(db, {
+      scope: "write",
+      limits: [{ windowMs: 60 * 1000, max: 20 }, { windowMs: 60 * 60 * 1000, max: 100 }],
+    }),
   };
 }
 
-module.exports = { createFailureLimiter, createLimiters, retryAfterSeconds };
+module.exports = { createFailureLimiter, createRequestLimiter, createLimiters, retryAfterSeconds };

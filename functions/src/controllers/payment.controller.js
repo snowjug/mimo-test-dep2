@@ -35,9 +35,9 @@ const postCreateOrder = async (req, res) => {
       return res.status(400).json({ error: "Explicit non-empty jobIds array is required for checkout." });
     }
 
-    // Retrieve and strictly validate every requested job document from Firestore
+    // Validate the jobId list shape first (no Firestore access needed for this part).
     const seenJobIds = new Set();
-    const targetJobs = [];
+    const jobRefs = [];
     for (const rawJobId of jobIds) {
       if (typeof rawJobId !== "string" || !rawJobId.trim()) {
         return res.status(400).json({ error: "Invalid jobId format in checkout selection." });
@@ -47,22 +47,42 @@ const postCreateOrder = async (req, res) => {
         return res.status(400).json({ error: `Duplicate jobId detected in checkout request: ${jobId}` });
       }
       seenJobIds.add(jobId);
+      jobRefs.push(db.collection("print_jobs").doc(jobId));
+    }
 
-      const doc = await db.collection("print_jobs").doc(jobId).get();
-      if (!doc.exists) {
-        return res.status(400).json({ error: `Print job not found: ${jobId}` });
+    // Plain (non-transactional) read for early validation and pricing computation. This can race with a
+    // concurrent checkout for the same jobs -- that's fine, because the actual claim decision is made again,
+    // atomically and with a fresh read, inside the transaction immediately before the final write below. No
+    // write happens here, which matters: if the Cashfree call later fails, nothing was ever written and the
+    // customer's pending jobs are completely untouched and immediately retryable (no claim to clean up).
+    let targetJobs; // array of { ref, data }
+    try {
+      targetJobs = await Promise.all(jobRefs.map(async (ref) => {
+        const jobId = ref.id;
+        const doc = await ref.get();
+        if (!doc.exists) {
+          throw Object.assign(new Error(`Print job not found: ${jobId}`), { httpStatus: 400 });
+        }
+        const data = doc.data();
+        if (data.userId !== userId) {
+          throw Object.assign(new Error(`Unauthorized access to print job: ${jobId}`), { httpStatus: 403 });
+        }
+        if (data.status !== "pending") {
+          throw Object.assign(
+            new Error(`Print job ${jobId} is not in pending status (current status: ${data.status}).`),
+            { httpStatus: 400 }
+          );
+        }
+        if (data.removedByUser === true || data.fileDeleted === true) {
+          throw Object.assign(new Error(`Print job ${jobId} has been removed or deleted.`), { httpStatus: 400 });
+        }
+        return { ref: doc.ref, data };
+      }));
+    } catch (claimErr) {
+      if (claimErr && claimErr.httpStatus) {
+        return res.status(claimErr.httpStatus).json({ error: claimErr.message });
       }
-      const data = doc.data();
-      if (data.userId !== userId) {
-        return res.status(403).json({ error: `Unauthorized access to print job: ${jobId}` });
-      }
-      if (data.status !== "pending") {
-        return res.status(400).json({ error: `Print job ${jobId} is not in pending status (current status: ${data.status}).` });
-      }
-      if (data.removedByUser === true || data.fileDeleted === true) {
-        return res.status(400).json({ error: `Print job ${jobId} has been removed or deleted.` });
-      }
-      targetJobs.push(doc);
+      throw claimErr;
     }
 
     let discountPercentage = 0;
@@ -97,16 +117,12 @@ const postCreateOrder = async (req, res) => {
       return res.status(400).json({ error: `copies must be a whole number between 1 and ${MAX_COPIES}.` });
     }
 
-    const batchUpdate = db.batch();
-
     // Group all validated pending jobs into a single unified job for the printer
     const mergedFiles = [];
     let totalRawPages = 0;
     let earliestRetentionStartAt = null;
 
-    targetJobs.forEach((doc) => {
-      const data = doc.data();
-
+    targetJobs.forEach(({ ref, data }) => {
       // Preserve earliest retentionStartAt across predecessor jobs
       const jobRetention = data.retentionStartAt || data.uploadedAt || data.createdAt;
       if (jobRetention) {
@@ -217,8 +233,6 @@ const postCreateOrder = async (req, res) => {
         });
       }
 
-      // Delete the individual pending jobs so we can replace them with the merged group
-      batchUpdate.delete(doc.ref);
     });
 
     // Handle N-up photo layouts on the grouped total
@@ -241,9 +255,10 @@ const postCreateOrder = async (req, res) => {
     const jobCost = actualPages * copies * pricePerPage;
     totalAmount += jobCost;
 
-    // Create the unified merged job
+    // Create the unified merged job (data only -- written transactionally below, after a fresh
+    // re-verification that every source job is still exactly as validated above).
     const newJobRef = db.collection("print_jobs").doc();
-    batchUpdate.set(newJobRef, {
+    const newJobData = {
       userId,
       fileName: mergedFiles.length > 1 ? `Multiple Files (${mergedFiles.length})` : mergedFiles[0].name,
       fileUrl: mergedFiles[0].url, // legacy support for older apps
@@ -268,7 +283,7 @@ const postCreateOrder = async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       retentionStartAt: earliestRetentionStartAt || admin.firestore.FieldValue.serverTimestamp()
-    });
+    };
 
     // Coins: never more than the customer owns (minus coins reserved by their other unpaid orders), and they can
     // cover at most half of the price (1 coin = ₹0.50), the same rule the customer site applies.
@@ -276,7 +291,7 @@ const postCreateOrder = async (req, res) => {
     if (coinsRequested > 0) {
       const userSnap = await db.collection("users").doc(userId).get();
       const balance = Number(userSnap.exists ? userSnap.data().mimo_coins?.balance : 0) || 0;
-      const checkedOutIds = new Set(targetJobs.map((d) => d.id));
+      const checkedOutIds = new Set(targetJobs.map((j) => j.ref.id));
       const otherPending = await db.collection("print_jobs").where("userId", "==", userId).where("status", "==", "pending").get();
       let reserved = 0;
       otherPending.forEach((d) => { if (!checkedOutIds.has(d.id)) reserved += Number(d.data().coinsToDeduct) || 0; });
@@ -342,7 +357,35 @@ const postCreateOrder = async (req, res) => {
       );
     }
 
-    await batchUpdate.commit();
+    // Atomic, race-safe commit: re-read every source job fresh, right here, immediately before writing.
+    // This is the one point that actually needs to be race-proof -- if a concurrent checkout for the same
+    // jobIds (double-click, client retry) already consumed them between the plain read above and this
+    // transaction, that fresh re-read sees it and this attempt is rejected with 409 instead of silently
+    // creating a second merged job for the same files. Nothing is written before this point, so a Cashfree
+    // failure (which returns before reaching here) leaves the customer's pending jobs completely untouched.
+    try {
+      await db.runTransaction(async (tx) => {
+        const freshDocs = await Promise.all(targetJobs.map(({ ref }) => tx.get(ref)));
+        freshDocs.forEach((doc, i) => {
+          const jobId = targetJobs[i].ref.id;
+          if (!doc.exists || doc.data().status !== "pending" || doc.data().userId !== userId) {
+            throw Object.assign(
+              new Error(`Print job ${jobId} is no longer available for checkout (already claimed by another checkout).`),
+              { httpStatus: 409 }
+            );
+          }
+        });
+        targetJobs.forEach(({ ref }) => tx.delete(ref));
+        tx.set(newJobRef, newJobData);
+      });
+    } catch (commitErr) {
+      if (commitErr && commitErr.httpStatus) {
+        // Note: if this was a paid order, the Cashfree order above was already created and is now unused --
+        // not rolled back, same as the pre-existing "failure after the gateway call" characteristic.
+        return res.status(commitErr.httpStatus).json({ error: commitErr.message });
+      }
+      throw commitErr;
+    }
 
     // ─── FREE ORDER BYPASS ──────────────────────────────────────────────────────
     if (isFreeOrder) {
@@ -386,7 +429,7 @@ const postCreateOrder = async (req, res) => {
           }
         }
 
-        console.log(`[EMAIL-DEBUG] Preparing to send FREE OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
+        console.log(`[EMAIL-DEBUG] Preparing to send FREE OTP. Has Email: ${!!userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
 
         if (userEmail && process.env.GMAIL_APP_PASSWORD) {
           const mailOptions = {
@@ -502,7 +545,7 @@ const getVerifyPayment = async (req, res) => {
         const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
         const internalRes = await axios.post(
           `http://localhost:${process.env.PORT || 8080}/payment-success`,
-          { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
+          { orderId },
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
         printCode = internalRes.data.printCode;
@@ -623,7 +666,7 @@ const postCashfreeWebhook = async (req, res) => {
           const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
           await axios.post(
             `http://localhost:${process.env.PORT || 8080}/payment-success`,
-            { internalSecret: process.env.INTERNAL_WEBHOOK_SECRET, orderId },
+            { orderId },
             { headers: { Authorization: `Bearer ${dummyToken}` } }
           );
         } catch (internalErr) {
@@ -730,8 +773,30 @@ const postCashfreeWebhook = async (req, res) => {
       }
       console.log(`[WEBHOOK] Refund status ${status} recorded for order ${orderId}`);
       res.status(200).send("Refund webhook processed");
+    } else if (event.type === "PAYMENT_FAILED_WEBHOOK" || event.type === "PAYMENT_USER_DROPPED_WEBHOOK") {
+      // Previously a no-op: the job just stayed "pending" forever, relying solely on the unrelated 24h
+      // storage-age sweep to eventually notice. Flipping it to "abandoned" now makes the failure visible
+      // and cleanable immediately, same status/fields upload.controller.js already uses for abandoned jobs.
+      const orderId = event.data?.order?.order_id;
+      if (!orderId) {
+        console.log(`[WEBHOOK] ${event.type} with no order_id, acknowledged`);
+        return res.status(200).send("Webhook ignored");
+      }
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      const jobs = await db.collection("print_jobs").where("orderId", "==", orderId).get();
+      const jobsBatch = db.batch();
+      let abandonedCount = 0;
+      jobs.forEach((doc) => {
+        if (doc.data().status === "pending") {
+          jobsBatch.update(doc.ref, { status: "abandoned", abandonedAt: now, updatedAt: now, abandonReason: event.type });
+          abandonedCount += 1;
+        }
+      });
+      if (abandonedCount > 0) await jobsBatch.commit();
+      console.log(`[WEBHOOK] ${event.type} for order ${orderId}: ${abandonedCount} job(s) marked abandoned`);
+      res.status(200).send("Webhook processed");
     } else {
-      // Acknowledge other events (e.g. USER_DROPPED, PAYMENT_FAILED, etc.)
+      // Acknowledge other events
       console.log(`[WEBHOOK] event ${event.type || "unknown"} acknowledged, no action`);
       res.status(200).send("Webhook ignored");
     }
@@ -795,6 +860,11 @@ const postCheckStatus = async (req, res) => {
 };
 
 // ================= PAYMENT SUCCESS (Generates Print Code) =================
+// This route is reachable by any authenticated user, not just the two internal callers above (getVerifyPayment
+// and the webhook handler) -- it used to accept a req.body.internalSecret that neither caller's request was ever
+// actually checked against (dead code; removed). That's fine: the real protection against an attacker calling
+// this directly for someone else's order is the per-job orders/payment_transactions status==="PAID" check inside
+// the transaction below, which reads real payment state server-side and is independent of anything the caller sends.
 const postPaymentSuccess = async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
@@ -919,7 +989,7 @@ const postPaymentSuccess = async (req, res) => {
         }
       }
 
-      console.log(`[EMAIL-DEBUG] Preparing to send OTP to: ${userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
+      console.log(`[EMAIL-DEBUG] Preparing to send OTP. Has Email: ${!!userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
 
       if (userEmail && process.env.GMAIL_APP_PASSWORD) {
         const mailOptions = {

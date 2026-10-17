@@ -11,6 +11,14 @@ const {
 // Smallest size a real uploaded document can have. Anything smaller with an unrecognised type is not a document.
 const MIN_REAL_FILE_BYTES = 256;
 
+// Largest size accepted for an unrecognised (not PDF/Office/Image) file type. The PDF and Office branches above
+// are already implicitly bounded by pdf-lib/the converter service actually being able to process the file; the
+// catch-all branch has no equivalent check, so without this an arbitrarily large file could be billed as a
+// single page. No business-set ceiling exists yet for this specific branch (document-scanner's own 10MB cap,
+// MAX_PAGE_BYTES in scanner.controller.js, is for single scanned image pages, not general documents) — 50MB is
+// a conservative ceiling for a print document pending an explicit product decision.
+const MAX_UNRECOGNISED_FILE_BYTES = 50 * 1024 * 1024;
+
 // Uploads are cleaned up 24 h after they were written (see docs/deployment/STORAGE_CLEANUP.md). A cart item can outlive its file
 // (open tab, stale session), so refuse to create a payable job for an object that is already gone. Only a definite "does not
 // exist" answer blocks the request; any other storage problem leaves the existing behaviour untouched.
@@ -142,7 +150,7 @@ const postFinalizeUpload = async (req, res) => {
           printableMimetype = "application/pdf";
           convertedStoragePath = conv.storagePath;
           if (convertedStoragePath) generatedPaths.push(convertedStoragePath);
-          console.log(`[FINALIZE-UPLOAD] Office conversion succeeded for '${f.name}': ${resolvedPageCount} pages, printable PDF: ${printableFileUrl}`);
+          console.log(`[FINALIZE-UPLOAD] Office conversion succeeded for '${f.name}': ${resolvedPageCount} pages`);
         } catch (convErr) {
           console.error(`[FINALIZE-UPLOAD ERROR] Conversion failed for '${f.name}':`, convErr.message);
           // CRITICAL: Fail fast. Do NOT create a payable job with unverified pageCount!
@@ -158,6 +166,14 @@ const postFinalizeUpload = async (req, res) => {
         if (Number.isFinite(reportedSize) && reportedSize < MIN_REAL_FILE_BYTES) {
           return failEarly(400, {
             error: `"${f.name}" doesn't look like a real document. If you shared a link, download the actual file first and upload that.`,
+          });
+        }
+        // Unlike the PDF/Office branches, nothing here reads the file to verify its real size against the
+        // client-declared one, so this is a trust-the-client ceiling, not a verified one — same trust level
+        // this branch already has for file type. It still closes the "unlimited size, billed as 1 page" gap.
+        if (Number.isFinite(reportedSize) && reportedSize > MAX_UNRECOGNISED_FILE_BYTES) {
+          return failEarly(400, {
+            error: `"${f.name}" is too large (${Math.round(reportedSize / (1024 * 1024))}MB). Unrecognised file types are limited to ${MAX_UNRECOGNISED_FILE_BYTES / (1024 * 1024)}MB.`,
           });
         }
         // Unsupported/unrecognised format: there is no server-side way to read a real page count out of

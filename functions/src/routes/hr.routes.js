@@ -1,11 +1,14 @@
 const express = require("express");
 const { hrAuthMiddleware } = require("../middleware/auth");
+const { db } = require("../config/firebase");
+const { createLimiters } = require("../middleware/rateLimit");
 const hr = require("../controllers/hr.controller");
 
 const router = express.Router();
+const { loginLimiter } = createLimiters(db);
 
 // Public
-router.post("/hr/login", hr.postHrLogin);
+router.post("/hr/login", loginLimiter, hr.postHrLogin);
 
 // Authenticated HR
 router.get("/hr/me", hrAuthMiddleware, hr.getHrMe);

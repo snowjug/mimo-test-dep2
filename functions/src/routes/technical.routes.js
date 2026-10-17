@@ -1,11 +1,14 @@
 const express = require("express");
 const { technicalAuthMiddleware, technicalLeadOnly } = require("../middleware/auth");
+const { db } = require("../config/firebase");
+const { createLimiters } = require("../middleware/rateLimit");
 const technical = require("../controllers/technical.controller");
 
 const router = express.Router();
+const { loginLimiter } = createLimiters(db);
 
 // Public
-router.post("/technical/login", technical.postTechnicalLogin);
+router.post("/technical/login", loginLimiter, technical.postTechnicalLogin);
 
 // Authenticated technical-team member
 router.get("/technical/me", technicalAuthMiddleware, technical.getTechnicalMe);

@@ -3,6 +3,7 @@
 // orders with its OWN code. KNOWN RISK / KNOWN DEFECT tests pass today and must be flipped on purpose when fixed.
 const test = require("node:test");
 const assert = require("node:assert");
+const crypto = require("node:crypto");
 const jwt = require("jsonwebtoken");
 const { fake, http, mailbox, seed, pendingJob, response, controller } = require("./helpers/orderHarness");
 const publicController = require("../src/controllers/public.controller");
@@ -160,28 +161,28 @@ test.describe("GET /verify-payment twice (duplicate verification)", () => {
   });
 
   test("print codes are drawn from 1000-9999", async () => {
-    const original = Math.random;
+    const original = crypto.randomInt;
     try {
-      for (const [r, expected] of [[0, "1000"], [0.9999999, "9999"]]) {
-        Math.random = () => r;
+      for (const [code, expected] of [[1000, "1000"], [9999, "9999"]]) {
+        crypto.randomInt = () => code;
         seed({ jobs: { j1: pendingJob({ orderId: "order_1" }) }, extra: { orders: { o1: { orderId: "order_1", userId: "u1", amount: 5, status: "INITIATED" } } } });
         wire();
         assert.strictEqual((await verify()).body.printCode, expected);
       }
-    } finally { Math.random = original; }
+    } finally { crypto.randomInt = original; }
   });
 
   const paidOrders = { orders: { o1: { orderId: "order_1", userId: "u1", amount: 5, status: "PAID" }, o2: { orderId: "order_2", userId: "u2", amount: 5, status: "PAID" } } };
-  const withRandoms = async (values, fn) => {
-    const original = Math.random;
+  const withRandoms = async (codes, fn) => {
+    const original = crypto.randomInt;
     let i = 0;
-    Math.random = () => values[Math.min(i++, values.length - 1)];
-    try { return await fn(); } finally { Math.random = original; }
+    crypto.randomInt = () => codes[Math.min(i++, codes.length - 1)];
+    try { return await fn(); } finally { crypto.randomInt = original; }
   };
 
   test("two customers never share an active print code: a colliding draw is discarded and redrawn", async () => {
     seed({ jobs: { a: pendingJob({ userId: "u1", orderId: "order_1" }), b: pendingJob({ userId: "u2", orderId: "order_2" }) }, extra: paidOrders });
-    const [r1, r2] = await withRandoms([0.42, 0.42, 0.9], async () => {
+    const [r1, r2] = await withRandoms([4780, 4780, 9100], async () => {
       const a = response(), b = response();
       await controller.postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, a);
       await controller.postPaymentSuccess({ user: { userId: "u2" }, body: { orderId: "order_2" } }, b);
@@ -195,13 +196,13 @@ test.describe("GET /verify-payment twice (duplicate verification)", () => {
 
   test("a code held only by FINISHED jobs (completed, failed, refunded) may be reused", async () => {
     seed({ jobs: { old: pendingJob({ userId: "u9", status: "completed", printCode: "4780" }), old2: pendingJob({ userId: "u9", status: "refunded", printCode: "4780" }), a: pendingJob({ userId: "u1", orderId: "order_1" }) }, extra: paidOrders });
-    const res = await withRandoms([0.42], async () => { const a = response(); await controller.postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, a); return a; });
+    const res = await withRandoms([4780], async () => { const a = response(); await controller.postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, a); return a; });
     assert.strictEqual(res.body.printCode, "4780");
   });
 
   test("printing jobs also hold their code", async () => {
     seed({ jobs: { busy: pendingJob({ userId: "u9", status: "printing", printCode: "4780" }), a: pendingJob({ userId: "u1", orderId: "order_1" }) }, extra: paidOrders });
-    const res = await withRandoms([0.42, 0.9], async () => { const a = response(); await controller.postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, a); return a; });
+    const res = await withRandoms([4780, 9100], async () => { const a = response(); await controller.postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, a); return a; });
     assert.strictEqual(res.body.printCode, "9100");
   });
 
@@ -209,7 +210,7 @@ test.describe("GET /verify-payment twice (duplicate verification)", () => {
     seed({ jobs: { busy: pendingJob({ userId: "u9", status: "paid", printCode: "4780" }), a: pendingJob({ userId: "u1", orderId: "order_1" }) }, extra: paidOrders });
     const original = console.error; console.error = () => {};
     let res;
-    try { res = await withRandoms([0.42], async () => { const a = response(); await controller.postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, a); return a; }); }
+    try { res = await withRandoms([4780], async () => { const a = response(); await controller.postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, a); return a; }); }
     finally { console.error = original; }
     assert.ok(res.code >= 500 || res.body.error, "an error is returned");
     assert.strictEqual(fake.data("print_jobs").a.status, "pending");
@@ -414,9 +415,9 @@ test.describe("WhatsApp orders (whatsapp.service _askForCoupon / _finalizePaymen
   test("a free WhatsApp order also gets a code that no active job holds", async () => {
     const { ref, session: s } = setup();
     fake.reset({ ...fake_state(), print_jobs: { wj1: pendingJob(), other: pendingJob({ userId: "u9", status: "paid", printCode: "4780" }) }, coupons: { ALL: { isActive: true, discountPercentage: 100 } } });
-    const original = Math.random; let i = 0; const draws = [0.42, 0.9];
-    Math.random = () => draws[Math.min(i++, draws.length - 1)];
-    try { await whatsapp._finalizePayment("919876543210", { ...s, rawTotal: 28 }, ref, "ALL"); } finally { Math.random = original; }
+    const original = crypto.randomInt; let i = 0; const draws = [4780, 9100];
+    crypto.randomInt = () => draws[Math.min(i++, draws.length - 1)];
+    try { await whatsapp._finalizePayment("919876543210", { ...s, rawTotal: 28 }, ref, "ALL"); } finally { crypto.randomInt = original; }
     assert.strictEqual(fake.data("print_jobs").wj1.printCode, "9100");
   });
 
@@ -470,9 +471,9 @@ test.describe("GET /wa-pay-success/:orderId", () => {
   test("the code avoids codes held by active jobs", async () => {
     seed({ jobs: { wj1: waJob(), other: waJob({ userId: "u9", orderId: "WA-OTHER", status: "paid", printCode: "4780" }) }, extra: { whatsapp_sessions: { "919876543210": { jobId: "wj1" } } } });
     linkStatus("PAID");
-    const original = Math.random; let i = 0; const draws = [0.42, 0.9];
-    Math.random = () => draws[Math.min(i++, draws.length - 1)];
-    try { await page(); } finally { Math.random = original; }
+    const original = crypto.randomInt; let i = 0; const draws = [4780, 9100];
+    crypto.randomInt = () => draws[Math.min(i++, draws.length - 1)];
+    try { await page(); } finally { crypto.randomInt = original; }
     assert.strictEqual(fake.data("print_jobs").wj1.printCode, "9100");
   });
 });

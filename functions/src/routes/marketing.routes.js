@@ -1,11 +1,14 @@
 const express = require("express");
 const { marketingAuthMiddleware } = require("../middleware/auth");
+const { db } = require("../config/firebase");
+const { createLimiters } = require("../middleware/rateLimit");
 const marketing = require("../controllers/marketing.controller");
 
 const router = express.Router();
+const { loginLimiter } = createLimiters(db);
 
 // Public
-router.post("/marketing/login", marketing.postMarketingLogin);
+router.post("/marketing/login", loginLimiter, marketing.postMarketingLogin);
 
 // Authenticated
 router.get("/marketing/me", marketingAuthMiddleware, marketing.getMarketingMe);
