@@ -1,29 +1,31 @@
 import paramiko
+import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 
 sys.stdout.reconfigure(encoding='utf-8')
 
 def update_service():
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = new_client()
     try:
-        client.connect('100.70.107.44', username='printpi', password='printpi', timeout=15)
+        connect(client, "CV-001", timeout=15)
         print("Connected to printpi!")
         
         # 1. Update the service file to use Brother_HL_L5210DN_series instead of Brother_HL_L5210DN_series_USB
         print("Updating mimo-listener.service on printpi...")
-        cmd = "echo 'printpi' | sudo -S sed -i 's/Brother_HL_L5210DN_series_USB/Brother_HL_L5210DN_series/g' /etc/systemd/system/mimo-listener.service"
+        cmd = "@SUDO@ sed -i 's/Brother_HL_L5210DN_series_USB/Brother_HL_L5210DN_series/g' /etc/systemd/system/mimo-listener.service"
         stdin, stdout, stderr = client.exec_command(cmd)
         stdout.read()
         
         # 2. systemctl daemon-reload
         print("Running systemctl daemon-reload...")
-        stdin, stdout, stderr = client.exec_command("echo 'printpi' | sudo -S systemctl daemon-reload")
+        stdin, stdout, stderr = client.exec_command("@SUDO@ systemctl daemon-reload")
         stdout.read()
         
         # 3. systemctl restart mimo-listener
         print("Restarting mimo-listener service...")
-        stdin, stdout, stderr = client.exec_command("echo 'printpi' | sudo -S systemctl restart mimo-listener")
+        stdin, stdout, stderr = client.exec_command("@SUDO@ systemctl restart mimo-listener")
         stdout.read()
         
         # 4. Check service status

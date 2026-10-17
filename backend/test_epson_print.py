@@ -1,18 +1,20 @@
 import paramiko
+import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 
 sys.stdout.reconfigure(encoding='utf-8')
 
 def test_epson():
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = new_client()
     try:
-        client.connect('100.107.95.16', username='pi', password='printpi', timeout=15)
+        connect(client, "SV-002", timeout=15)
         print("Connected to pi@pi!")
         
         # 1. Reset Epson USB port first to clear any stuck states
         print("Resetting Epson USB port...")
-        client.exec_command("echo 'printpi' | sudo -S usbreset 04b8:118a")
+        client.exec_command("@SUDO@ usbreset 04b8:118a")
         import time
         time.sleep(3)
         

@@ -1,40 +1,42 @@
 import paramiko
+import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 
 sys.stdout.reconfigure(encoding='utf-8')
 
 def configure_brother():
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = new_client()
     try:
-        client.connect('100.107.95.16', username='pi', password='printpi', timeout=15)
+        connect(client, "SV-002", timeout=15)
         print("Connected to pi@pi!")
         
         # 1. Stop and disable ipp-usb
         print("Stopping and disabling ipp-usb...")
-        stdin, stdout, stderr = client.exec_command("echo 'printpi' | sudo -S systemctl stop ipp-usb")
+        stdin, stdout, stderr = client.exec_command("@SUDO@ systemctl stop ipp-usb")
         stdout.read()
-        stdin, stdout, stderr = client.exec_command("echo 'printpi' | sudo -S systemctl disable ipp-usb")
+        stdin, stdout, stderr = client.exec_command("@SUDO@ systemctl disable ipp-usb")
         stdout.read()
         
         # 2. Re-create the queue Brother_HL_L2440DW_series as a native USB queue using brlaser driver
         print("Re-creating Brother_HL_L2440DW_series print queue...")
         # Delete old queue first
-        stdin, stdout, stderr = client.exec_command("echo 'printpi' | sudo -S lpadmin -x Brother_HL_L2440DW_series")
+        stdin, stdout, stderr = client.exec_command("@SUDO@ lpadmin -x Brother_HL_L2440DW_series")
         stdout.read()
         
         # Create new queue
         uri = "usb://Brother/HL-L2440DW?serial=E82911A6N205524"
         ppd = "drv:///brlaser.drv/brl2400d.ppd"
-        cmd = f"echo 'printpi' | sudo -S lpadmin -p Brother_HL_L2440DW_series -v '{uri}' -m '{ppd}' -E"
+        cmd = f"@SUDO@ lpadmin -p Brother_HL_L2440DW_series -v '{uri}' -m '{ppd}' -E"
         stdin, stdout, stderr = client.exec_command(cmd)
         print("lpadmin Output:", stdout.read().decode('utf-8', errors='replace').strip())
         print("lpadmin Error:", stderr.read().decode('utf-8', errors='replace').strip())
         
         # 3. Enable the printer
         print("Enabling printer...")
-        client.exec_command("echo 'printpi' | sudo -S cupsenable Brother_HL_L2440DW_series")
-        client.exec_command("echo 'printpi' | sudo -S cupsaccept Brother_HL_L2440DW_series")
+        client.exec_command("@SUDO@ cupsenable Brother_HL_L2440DW_series")
+        client.exec_command("@SUDO@ cupsaccept Brother_HL_L2440DW_series")
         
         # 4. Check printer status
         print("\n--- lpstat -p Brother_HL_L2440DW_series -l ---")

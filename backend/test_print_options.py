@@ -1,14 +1,15 @@
 import paramiko
-import sys
 import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 
 sys.stdout.reconfigure(encoding='utf-8')
 
 def test_print():
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = new_client()
     try:
-        client.connect('100.70.107.44', username='printpi', password='printpi', timeout=15)
+        connect(client, "CV-001", timeout=15)
         print("Connected to printpi!")
         
         # Upload test.pdf to Pi

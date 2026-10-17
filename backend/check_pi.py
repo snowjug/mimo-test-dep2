@@ -1,10 +1,13 @@
 import paramiko
+import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 import time
 
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh = new_client()
 try:
-    ssh.connect('100.108.118.38', username='printpi', password='printpi', timeout=10)
+    connect(ssh, "CV-001", timeout=10)
     print("Connected to printpi")
     
     # Check if PyPDF2 is installed

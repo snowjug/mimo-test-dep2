@@ -1,11 +1,13 @@
 import paramiko
+import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-client = paramiko.SSHClient()
-client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect('100.107.95.16', username='pi', password='printpi', timeout=20)
+client = new_client()
+connect(client, "SV-002", timeout=20)
 
 print("=== CHECK SYSTEM DATE & JOURNAL LOGS FOR 4804 & 5521 ===")
 stdin, stdout, stderr = client.exec_command('date; journalctl -u mimo-listener --grep "4804|5521|1243|awdOU9Q|Y0yb9Y|MpSMsmol" -n 50 --no-pager')
