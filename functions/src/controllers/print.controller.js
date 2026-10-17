@@ -38,6 +38,16 @@ const postGetDocumentsByCode = async (req, res) => {
       return res.status(404).json({ error: "Invalid or expired print code" });
     }
 
+    // Print-code allocation is atomic (printCode.service.js) and this should never find more than one
+    // "paid" job for the same code -- but if it ever does (e.g. data predating the atomic-allocation fix,
+    // or the same class of collision fixed in kiosk.routes.js's /print handler after a real production
+    // incident), fail loudly instead of guessing: silently picking docs[0] could expose one customer's
+    // document metadata (filename, page count) in a response meant for a different customer.
+    if (snapshot.size > 1) {
+      console.error(`[PRINT-CODE COLLISION] code ${printCode} matches ${snapshot.size} paid jobs: ${snapshot.docs.map((d) => d.id).join(", ")}`);
+      return res.status(409).json({ error: "This code matched more than one order. Please contact support — do not retry." });
+    }
+
     // Capability-based routing validation, driven by the machine registry: a machine must be a known, ACTIVE
     // destination, and a colour job must land on a machine whose template/override actually supports colour.
     const firstJob = snapshot.docs[0].data();

@@ -19,7 +19,8 @@ const { autoRefundJob } = require("../src/triggers/printJob.triggers");
 const { postAdminRefund } = require("../src/controllers/admin.controller");
 
 const router = createKioskRouter({ db: fake.db, admin: fake.admin, isColorJob, CASHFREE_BASE_URL, cashfreeHeaders, axios: http });
-const reportFailure = router.stack.find((l) => l.route && l.route.path === "/report-failure" && l.route.methods.post).route.stack[0].handle;
+const failureLayer = router.stack.find((l) => l.route && l.route.path === "/report-failure" && l.route.methods.post).route.stack;
+const reportFailure = failureLayer[failureLayer.length - 1].handle; // skip the rate limiter
 
 const REFUND_URL = /\/orders\/([^/]+)\/refunds$/;
 const refundCalls = () => http.calls.filter((c) => c.method === "post" && REFUND_URL.test(c.url));

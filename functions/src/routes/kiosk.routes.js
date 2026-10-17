@@ -111,7 +111,7 @@ function createKioskRouter(dependencies) {
   } = dependencies;
 
   const router = express.Router();
-  const { codeGuessLimiter, statusLimiter } = createLimiters(db);
+  const { codeGuessLimiter, statusLimiter, reportFailureLimiter } = createLimiters(db);
 
   // ================= 1. KIOSK: POLL JOB STATUS =================
   router.get("/job-status", statusLimiter, async (req, res) => {
@@ -427,7 +427,7 @@ function createKioskRouter(dependencies) {
   });
 
   // ================= 3. KIOSK: REPORT FAILURE & AUTO-REFUND =================
-  router.post("/report-failure", async (req, res) => {
+  router.post("/report-failure", reportFailureLimiter, async (req, res) => {
     try {
       const { jobId, reason, secret } = req.body;
       if (!process.env.INTERNAL_WEBHOOK_SECRET || !secretsMatch(secret, process.env.INTERNAL_WEBHOOK_SECRET)) {
@@ -625,7 +625,7 @@ function createKioskRouter(dependencies) {
   router.post("/report-clean", async (req, res) => {
     try {
       const { kioskId, printerName, secret, status, detail } = req.body || {};
-      if (!secretsMatch(secret, process.env.INTERNAL_WEBHOOK_SECRET)) {
+      if (!process.env.INTERNAL_WEBHOOK_SECRET || !secretsMatch(secret, process.env.INTERNAL_WEBHOOK_SECRET)) {
         return res.status(403).json({ error: "Invalid webhook secret" });
       }
 

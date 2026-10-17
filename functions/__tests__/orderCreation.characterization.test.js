@@ -3,6 +3,7 @@
 // they pass today and must be flipped ON PURPOSE when the behaviour is fixed (see docs/contributing.md).
 const test = require("node:test");
 const assert = require("node:assert");
+const crypto = require("node:crypto");
 const { fake, http, mailbox, markPaid, seed, checkout, cashfreeCalls, pendingJob, mergedJobs, response, controller } = require("./helpers/orderHarness");
 
 test.describe("validation of the checkout request", () => {
@@ -366,26 +367,26 @@ test.describe("abuse and edge cases", () => {
   });
 
   test("print codes of free orders are unique among active jobs too", async () => {
-    const original = Math.random;
-    let i = 0; const draws = [0.42, 0.9];
+    const original = crypto.randomInt;
+    let i = 0; const draws = [4780, 9100];
     try {
       seed({ jobs: { j1: pendingJob(), other: pendingJob({ userId: "u9", status: "paid", printCode: "4780" }) }, coupons: { ALL: { isActive: true, discountPercentage: 100 } } });
-      Math.random = () => draws[Math.min(i++, draws.length - 1)];
+      crypto.randomInt = () => draws[Math.min(i++, draws.length - 1)];
       const res = await checkout({ couponCode: "ALL" });
       assert.strictEqual(res.body.printCode, "9100", "4780 belongs to an active job, so it was redrawn");
-    } finally { Math.random = original; }
+    } finally { crypto.randomInt = original; }
   });
 
   test("print-code generation: the free path draws from 1000-9999", async () => {
-    const original = Math.random;
+    const original = crypto.randomInt;
     try {
-      for (const [r, expected] of [[0, "1000"], [0.5, "5500"], [0.9999999, "9999"]]) {
-        Math.random = () => r;
+      for (const [code, expected] of [[1000, "1000"], [5500, "5500"], [9999, "9999"]]) {
+        crypto.randomInt = () => code;
         seed({ coupons: { ALL: { isActive: true, discountPercentage: 100 } } });
         const res = await checkout({ couponCode: "ALL" });
         assert.strictEqual(res.body.printCode, expected);
       }
-    } finally { Math.random = original; }
+    } finally { crypto.randomInt = original; }
   });
 });
 void response; void controller; void mergedJobs;

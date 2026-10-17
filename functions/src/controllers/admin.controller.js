@@ -54,7 +54,9 @@ const postAdminLogin = (req, res) => {
     return res.json({ token, role: "finance", message: "Finance Login Successful" });
   }
 
-  console.log(`[AUTH FAILED] Attempted: '${reqIdentifier}' / '${reqPassword}' against Admin: '${envAdminEmail}' / Finance: '${envFinanceEmail}'`);
+  // Never log the submitted password (or the real admin/finance email identifiers) -- a mistyped
+  // password here would otherwise leak a near-real or real credential into Cloud Logging.
+  console.log(`[AUTH FAILED] Login attempt for identifier length=${reqIdentifier.length}`);
   return res.status(401).json({ error: "Invalid credentials" });
 };
 
