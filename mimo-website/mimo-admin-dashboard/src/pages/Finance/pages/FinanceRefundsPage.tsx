@@ -11,6 +11,9 @@ import {
   AlertTriangle,
   Loader2,
   Check,
+  CheckSquare,
+  Square,
+  ShieldAlert,
 } from 'lucide-react';
 import api from '../../../api';
 import { useRange } from '../../../context/RangeContext';
@@ -45,6 +48,11 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Bulk Approval State
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [showBulkConfirmModal, setShowBulkConfirmModal] = useState(false);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
   // Compute metrics from real refund requests data
   const totalRequests = refundRequests.length;
   const pendingRequests = refundRequests.filter((r) => r.status === 'pending' || r.status === 'PENDING').length;
@@ -67,6 +75,30 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
 
     return matchSearch && matchStatus;
   });
+
+  const pendingFiltered = filteredRequests.filter((r) => (r.status === 'pending' || r.status === 'PENDING') && r.orderId);
+
+  const handleToggleSelect = (orderId: string) => {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const handleToggleSelectAllPending = () => {
+    if (selectedOrderIds.size === pendingFiltered.length && pendingFiltered.length > 0) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(pendingFiltered.map((r) => r.orderId)));
+    }
+  };
+
+  const selectedTotalAmount = Array.from(selectedOrderIds).reduce((acc, orderId) => {
+    const item = refundRequests.find((r) => r.orderId === orderId);
+    return acc + (Number(item?.refundAmount || item?.amount || 0));
+  }, 0);
 
   const handleOpenProcessModal = (req: any) => {
     setRefundToProcess(req);
@@ -99,6 +131,31 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
     }
   };
 
+  const handleExecuteBulkRefund = async () => {
+    if (selectedOrderIds.size === 0) return;
+    setIsBulkProcessing(true);
+    setActionError(null);
+    setActionSuccess(null);
+
+    try {
+      const orderIds = Array.from(selectedOrderIds);
+      const res = await api.post('/admin/refund/bulk', {
+        orderIds,
+        note: `Bulk approved by Finance Team (${orderIds.length} orders)`,
+      });
+
+      const { successfulCount, failedCount } = res.data;
+      setActionSuccess(`Bulk refund completed: ${successfulCount} approved successfully, ${failedCount} failed.`);
+      setShowBulkConfirmModal(false);
+      setSelectedOrderIds(new Set());
+      onRefresh();
+    } catch (err: any) {
+      setActionError(err.response?.data?.error || err.message || 'Bulk refund operation failed.');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -111,11 +168,12 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
           className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 rounded-xl transition-all flex items-center gap-2 cursor-pointer self-start"
         >
           <RotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          Refresh Requests
         </button>
       </div>
 
       {error && <ErrorBanner message={error} onRetry={onRefresh} />}
+
       {/* ── TOP METRICS ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <FinanceMetricCard
@@ -172,15 +230,50 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
 
       {/* ── FEEDBACK BANNERS ───────────────────────────────────────────────────── */}
       {actionSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-          <Check className="w-4 h-4 text-emerald-600" />
+        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           {actionSuccess}
         </div>
       )}
       {actionError && (
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-rose-600" />
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs font-semibold flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
           {actionError}
+        </div>
+      )}
+
+      {/* ── BULK ACTION BAR (VISIBLE WHEN SELECTED) ─────────────────────────────── */}
+      {selectedOrderIds.size > 0 && (
+        <div className="p-4 rounded-2xl bg-[#093765] dark:bg-indigo-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <span className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center font-mono font-bold text-sm">
+              {selectedOrderIds.size}
+            </span>
+            <div>
+              <p className="font-bold text-xs">
+                {selectedOrderIds.size} Refund Request{selectedOrderIds.size > 1 ? 's' : ''} Selected
+              </p>
+              <p className="text-[11px] text-white/70">
+                Total sum to refund: <strong className="text-white font-mono">₹{selectedTotalAmount.toFixed(2)}</strong>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedOrderIds(new Set())}
+              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-all cursor-pointer"
+            >
+              Clear Selection
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBulkConfirmModal(true)}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all cursor-pointer shadow-md"
+            >
+              Approve All {selectedOrderIds.size} Requests
+            </button>
+          </div>
         </div>
       )}
 
@@ -228,6 +321,20 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-[#F3F4F6] dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-400 font-semibold text-[10px]">
+                <th className="py-3 px-3 w-10 text-center">
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAllPending}
+                    title="Select all pending"
+                    className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                  >
+                    {pendingFiltered.length > 0 && selectedOrderIds.size === pendingFiltered.length ? (
+                      <CheckSquare className="w-4 h-4 text-[#093765] dark:text-indigo-400" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
+                </th>
                 <th className="py-3 px-4">Request ID</th>
                 <th className="py-3 px-4">Order ID</th>
                 <th className="py-3 px-4">Customer</th>
@@ -241,15 +348,33 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     No refund requests found in the dispute queue.
                   </td>
                 </tr>
               ) : (
                 filteredRequests.map((req, idx) => {
                   const isPending = req.status === 'pending' || req.status === 'PENDING';
+                  const isSelected = req.orderId && selectedOrderIds.has(req.orderId);
                   return (
-                    <tr key={req.id || idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr
+                      key={req.id || idx}
+                      className={`hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors ${
+                        isSelected ? 'bg-indigo-50/40 dark:bg-indigo-950/20' : ''
+                      }`}
+                    >
+                      <td className="py-3.5 px-3 text-center">
+                        {isPending && req.orderId ? (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelect(req.orderId)}
+                            className="rounded border-slate-300 text-[#093765] focus:ring-[#093765] cursor-pointer"
+                          />
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-700">—</span>
+                        )}
+                      </td>
                       <td className="py-3.5 px-4 font-mono font-bold text-[#093765] dark:text-indigo-400">
                         {req.id ? (req.id.startsWith('REF-') ? req.id : `REF-${String(req.id).slice(-4).toUpperCase()}`) : `REF-${idx + 1}`}
                       </td>
@@ -299,7 +424,7 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
         </div>
       </div>
 
-      {/* ── EXECUTE REFUND MODAL ───────────────────────────────────────────────── */}
+      {/* ── EXECUTE SINGLE REFUND MODAL ────────────────────────────────────────── */}
       <ConfirmationDialog
         isOpen={Boolean(refundToProcess)}
         title="Approve Cashfree Refund"
@@ -321,7 +446,7 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
               step="0.01"
               value={customRefundAmount}
               onChange={(e) => setCustomRefundAmount(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold font-mono focus:outline-none focus:border-[#093765]"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm font-bold font-mono focus:outline-none focus:border-[#093765]"
             />
           </div>
           <div>
@@ -332,9 +457,29 @@ export const FinanceRefundsPage: React.FC<FinanceRefundsPageProps> = ({
               type="text"
               value={refundNote}
               onChange={(e) => setRefundNote(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#093765]"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs focus:outline-none focus:border-[#093765]"
             />
           </div>
+        </div>
+      </ConfirmationDialog>
+
+      {/* ── BULK APPROVAL CONFIRMATION MODAL ────────────────────────────────────── */}
+      <ConfirmationDialog
+        isOpen={showBulkConfirmModal}
+        title={`Approve ${selectedOrderIds.size} Bulk Refunds`}
+        description={`You are executing bulk approval for ${selectedOrderIds.size} customer orders with total value ₹${selectedTotalAmount.toFixed(2)}. Each request will be processed with individual claim locks and verified via Cashfree.`}
+        confirmLabel={`Authorize Bulk Refunds (₹${selectedTotalAmount.toFixed(2)})`}
+        cancelLabel="Cancel"
+        isDestructive={false}
+        isLoading={isBulkProcessing}
+        onConfirm={handleExecuteBulkRefund}
+        onCancel={() => setShowBulkConfirmModal(false)}
+      >
+        <div className="mt-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
+          <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+          <span>
+            <strong>Maker-Checker Policy:</strong> This action will be immutably recorded in the Financial Audit Log with your operator credentials.
+          </span>
         </div>
       </ConfirmationDialog>
 

@@ -158,4 +158,24 @@ export const technical = {
   dailyReports: (memberId?: string) => api.get<{ reports: DailyReport[] }>('/technical/daily-reports', { params: memberId ? { memberId } : {} }).then((r) => r.data.reports),
   submitDailyReport: (body: { summary: string; blockers?: string; tomorrowPlan?: string; completedTaskIds?: string[] }) =>
     api.post('/technical/daily-reports', body).then((r) => r.data),
+
+  // 11 Technical Task Modules
+  failureAnalytics: (days = 30) => api.get<any>('/technical/analytics/failures', { params: { days } }).then((r) => r.data),
+  customerUsageAnalytics: () => api.get<any>('/technical/analytics/customer-usage').then((r) => r.data),
+  maintenanceTickets: () => api.get<{ tickets: any[]; summary: any }>('/technical/maintenance-tickets').then((r) => r.data),
+  createMaintenanceTicket: (body: { kioskId: string; title: string; description?: string; severity?: string; assignedTo?: string }) =>
+    api.post<any>('/technical/maintenance-tickets', body).then((r) => r.data),
+  patchMaintenanceTicket: (id: string, body: any) => api.patch(`/technical/maintenance-tickets/${id}`, body).then((r) => r.data),
+  demandHeatmap: (kioskId?: string) => api.get<any>('/technical/analytics/demand-heatmap', { params: kioskId ? { kioskId } : {} }).then((r) => r.data),
+  locationProfitability: () => api.get<{ locations: any[] }>('/technical/analytics/location-profitability').then((r) => r.data),
+  printerDiagnostics: () => api.get<any>('/technical/printer/diagnostics').then((r) => r.data),
+  recoverPrinter: (action: string, kioskId?: string) => api.post<{ success: boolean; message: string }>('/technical/printer/recover', { action, kioskId }).then((r) => r.data),
+  paperStatus: () => api.get<{ trays: any[]; alertThresholdPct: number; criticalThresholdPct: number }>('/technical/paper/status').then((r) => r.data),
+  refillPaper: (printerKey: string, sheetsAdded?: number) => api.post<any>('/technical/paper/refill', { printerKey, sheetsAdded }).then((r) => r.data),
+  peakHourAnalytics: () => api.get<any>('/technical/analytics/peak-hours').then((r) => r.data),
+  machineProfitability: () => api.get<{ machines: any[] }>('/technical/analytics/machine-profitability').then((r) => r.data),
+  revenueAnalytics: () => api.get<any>('/technical/analytics/revenue-analytics').then((r) => r.data),
+  fleetSimulate: (body: { kiosksCount: number; avgJobsPerKioskPerDay: number; avgPagesPerJob?: number; colorRatioPct?: number; duplexRatioPct?: number }) =>
+    api.post<any>('/technical/fleet/simulate', body).then((r) => r.data),
 };
+

@@ -19,7 +19,6 @@ import {
   Users2,
   Building2,
   User,
-  MessageCircle,
   Megaphone,
   Ticket,
 } from 'lucide-react';
@@ -67,7 +66,6 @@ const TITLES: Record<string, string> = {
   configuration: 'Configuration',
   'mimo-gang': 'MIMO GANG',
   company: 'Company Overview',
-  chat: 'Team Chat',
   advertisements: 'Advertisements',
 };
 
@@ -85,7 +83,6 @@ const MORE = [
   { id: 'finance',         label: 'Finance',            icon: IndianRupee },
   { id: 'mimo-gang',       label: 'MIMO GANG',          icon: Users2 },
   { id: 'company',         label: 'Company Overview',   icon: Building2 },
-  { id: 'chat',            label: 'Team Chat',          icon: MessageCircle },
   { id: 'advertisements',  label: 'Advertisements',     icon: Megaphone },
   { id: 'configuration',   label: 'Configuration',      icon: Settings },
 ];

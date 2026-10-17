@@ -1,15 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { LogOut, Loader2, Megaphone, MessageCircle } from 'lucide-react';
+import { LogOut, Loader2, Megaphone } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { marketing } from '../../services/marketing.service';
 import { memberProfileServiceFor } from '../../services/profile.service';
 import { MarketingLoginPage } from '../../components/auth/MarketingLoginPage';
 import { MarketingWorkspace } from './MarketingWorkspace';
-import { ChatPanel } from '../../components/shared/ChatPanel';
 import { ProfileModal } from '../../components/shared/ProfileModal';
 import { ProfileCompletionBanner } from '../../components/shared/ProfileCompletionBanner';
 
-type Tab = 'workspace' | 'chat';
+type Tab = 'workspace';
 
 interface Me {
   member: {
@@ -84,9 +83,6 @@ export const MarketingApp: React.FC = () => {
                 <button onClick={() => setTab('workspace')} className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${tab === 'workspace' ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)]'}`}>
                   <Megaphone className="size-3.5" /> Workspace
                 </button>
-                <button onClick={() => setTab('chat')} className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${tab === 'chat' ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)]'}`}>
-                  <MessageCircle className="size-3.5" /> Chat
-                </button>
               </nav>
             )}
 
@@ -114,7 +110,6 @@ export const MarketingApp: React.FC = () => {
           {me && (
             <nav className="flex items-center gap-1 overflow-x-auto px-4 pb-2 sm:hidden">
               <button onClick={() => setTab('workspace')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'workspace' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>Workspace</button>
-              <button onClick={() => setTab('chat')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'chat' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>Chat</button>
             </nav>
           )}
         </header>
@@ -123,12 +118,8 @@ export const MarketingApp: React.FC = () => {
           <div className="flex min-h-[60dvh] items-center justify-center">
             <Loader2 className="size-6 animate-spin text-[var(--text-3)]" />
           </div>
-        ) : tab === 'workspace' ? (
-          <MarketingWorkspace me={me} />
         ) : (
-          <div className="mx-auto max-w-[800px] px-4 py-6 sm:px-6">
-            <ChatPanel basePath="/marketing" selfId={me.member.id} title="Marketing Team Chat" />
-          </div>
+          <MarketingWorkspace me={me} />
         )}
 
         {me && !showProfile && (

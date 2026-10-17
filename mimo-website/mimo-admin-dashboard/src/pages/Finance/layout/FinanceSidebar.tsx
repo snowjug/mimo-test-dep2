@@ -17,7 +17,6 @@ import {
   PieChart,
   Receipt,
   TrendingUp,
-  MessageCircle,
 } from 'lucide-react';
 
 export type FinanceTab =
@@ -30,8 +29,8 @@ export type FinanceTab =
   | 'wallet'
   | 'settlements'
   | 'expenses'
-  | 'krishna-report'
-  | 'chat';
+  | 'customer-analytics'
+  | 'krishna-report';
 
 export interface FinanceSidebarProps {
   activeTab: FinanceTab;
@@ -50,8 +49,7 @@ const NAV_ITEMS = [
   { id: 'wallet',      label: 'Wallet & Credits',       icon: WalletCards },
   { id: 'settlements', label: 'Settlements & Reports',  icon: FileSpreadsheet },
   { id: 'expenses',    label: 'Revenue & Expenses',     icon: Receipt },
-  { id: 'krishna-report', label: 'Special Krishna Demand Report', icon: TrendingUp },
-  { id: 'chat',         label: 'Team Chat',              icon: MessageCircle },
+  { id: 'customer-analytics', label: 'Customer Analytics', icon: TrendingUp },
 ];
 
 export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
@@ -81,7 +79,7 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
       <nav className="p-3 space-y-1.5 overflow-y-auto flex-1">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = activeTab === item.id || (item.id === 'customer-analytics' && activeTab === 'krishna-report');
           return (
             <button
               key={item.id}
@@ -139,7 +137,7 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate leading-tight">
-                Vastav Krishna Raj
+                Vatsa
               </span>
               <span className="text-[10px] text-slate-400 font-medium truncate leading-tight">
                 Finance Manager

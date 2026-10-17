@@ -337,8 +337,15 @@ export interface UserGrowthReport {
   growthPct: number;
   dailyAverageUsers: number;
   conversionRatePct: number;
+  averageOrderValue?: number;
+  repeatCustomerRatePct?: number;
   paymentsInRange: number;
-  monthlyPayments: { month: string; total: number }[];
+  monthlyPayments: { month: string; monthKey?: string; total: number }[];
+  cohorts?: {
+    cohort: string;
+    size: number;
+    retention: { offset: number; activeCount: number; pct: number }[];
+  }[];
   updatedAt: string;
 }
 

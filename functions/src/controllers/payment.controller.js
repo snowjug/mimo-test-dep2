@@ -668,9 +668,70 @@ const postCashfreeWebhook = async (req, res) => {
       }, { merge: true });
 
       res.status(200).send("Webhook received");
+    } else if (event.type === "SETTLEMENT_SUCCESS" || event.type === "TRANSFER_SUCCESS") {
+      const settlementData = event.data?.settlement || event.data?.transfer || event.data;
+      if (!settlementData || (!settlementData.settlement_id && !settlementData.transfer_id && !settlementData.amount && !settlementData.settlement_amount)) {
+        console.log(`[WEBHOOK] settlement event with no data, acknowledged`);
+        return res.status(200).send("Webhook ignored");
+      }
+      const settlementId = String(settlementData.settlement_id || settlementData.transfer_id || settlementData.cf_settlement_id || Date.now());
+      const now = admin.firestore.FieldValue.serverTimestamp();
+
+      eventRef = db.collection("webhook_events").doc(`cashfree_settle_${settlementId}`);
+      try {
+        await eventRef.create({ settlementId, type: event.type, receivedAt: now });
+      } catch (createErr) {
+        eventRef = null;
+        if (createErr && (createErr.code === 6 || /already exists/i.test(createErr.message || ""))) {
+          console.log(`[WEBHOOK] duplicate settlement event for ${settlementId}, ignored`);
+          return res.status(200).send("Duplicate webhook ignored");
+        }
+        throw createErr;
+      }
+
+      await db.collection("cashfree_settlements").doc(settlementId).set({
+        settlementId,
+        cfSettlementId: settlementData.cf_settlement_id || settlementId,
+        utr: settlementData.utr || settlementData.payment_utr || null,
+        settlementAmount: Number(settlementData.settlement_amount || settlementData.transfer_amount || settlementData.amount || 0),
+        serviceCharge: Number(settlementData.service_charge || settlementData.fee || 0),
+        serviceTax: Number(settlementData.service_tax || settlementData.tax || 0),
+        settlementCurrency: settlementData.settlement_currency || settlementData.currency || "INR",
+        settlementTime: settlementData.settlement_time || settlementData.transfer_time || new Date().toISOString(),
+        settlementTimeMs: settlementData.settlement_time ? new Date(settlementData.settlement_time).getTime() : Date.now(),
+        orderId: settlementData.order_id || null,
+        reconciledStatus: "RECORDED",
+        rawPayload: event,
+        createdAt: now,
+      }, { merge: true });
+
+      console.log(`[WEBHOOK] Settlement ${settlementId} recorded, amount=₹${settlementData.settlement_amount || settlementData.amount}`);
+      res.status(200).send("Settlement webhook processed");
+    } else if (event.type === "REFUND_STATUS_WEBHOOK") {
+      const refundData = event.data?.refund;
+      if (!refundData || !refundData.order_id) {
+        console.log(`[WEBHOOK] refund status event with no order_id, acknowledged`);
+        return res.status(200).send("Webhook ignored");
+      }
+      const orderId = refundData.order_id;
+      const cfRefundId = refundData.cf_refund_id;
+      const status = refundData.refund_status || "SUCCESS";
+      const now = admin.firestore.FieldValue.serverTimestamp();
+
+      const refSnap = await db.collection("refunds").where("orderId", "==", orderId).get();
+      if (!refSnap.empty) {
+        await refSnap.docs[0].ref.update({
+          status,
+          cashfreeRefundId: cfRefundId || null,
+          gatewayStatus: status,
+          processedAt: refundData.processed_at || new Date().toISOString(),
+          updatedAt: now,
+        });
+      }
+      console.log(`[WEBHOOK] Refund status ${status} recorded for order ${orderId}`);
+      res.status(200).send("Refund webhook processed");
     } else {
-      // Every other event type (failed, user dropped, refund, test…) must still be acknowledged, otherwise Cashfree
-      // waits for the 60 s timeout (HTTP 504) and keeps retrying.
+      // Acknowledge other events (e.g. USER_DROPPED, PAYMENT_FAILED, etc.)
       console.log(`[WEBHOOK] event ${event.type || "unknown"} acknowledged, no action`);
       res.status(200).send("Webhook ignored");
     }
