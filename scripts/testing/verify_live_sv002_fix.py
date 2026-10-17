@@ -1,5 +1,9 @@
 import subprocess
 import paramiko
+import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 import json
 import datetime
 import time
@@ -29,9 +33,8 @@ print("\n" + "=" * 60)
 print("2. LIVE SV-002 SSH AUDIT (100.107.95.16)")
 print("=" * 60)
 
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('100.107.95.16', username='pi', password='printpi', timeout=10)
+ssh = new_client()
+connect(ssh, "SV-002", timeout=10)
 
 def run_ssh(cmd):
     stdin, stdout, stderr = ssh.exec_command(cmd)

@@ -1,10 +1,12 @@
 import paramiko
+import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 
-c = paramiko.SSHClient()
-c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+c = new_client()
 try:
-    c.connect('100.70.107.44', username='printpi', password='printpi', timeout=10)
+    connect(c, "CV-001", timeout=10)
     
     print("=== Printer Status ===")
     stdin, stdout, stderr = c.exec_command('lpstat -p Epson_L3250')
@@ -15,7 +17,7 @@ try:
     print(stdout.read().decode().strip())
     
     print("\n=== CUPS Error Log (Last 30 lines) ===")
-    stdin, stdout, stderr = c.exec_command('sudo cat /var/log/cups/error_log | tail -n 30')
+    stdin, stdout, stderr = c.exec_command('@SUDO@ cat /var/log/cups/error_log | tail -n 30')
     print(stdout.read().decode().strip())
     print(stderr.read().decode().strip())
     

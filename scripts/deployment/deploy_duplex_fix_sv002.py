@@ -2,26 +2,21 @@ import paramiko
 import sys
 import os
 import time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-HOST = '100.107.95.16'
-USER = 'pi'
-PASS = 'printpi'
 LOCAL_SRC = r'C:\Users\chand\OneDrive\Desktop\1.0mimo\mimo-test-dep2\pi-listener\firebase_listener.py'
 REMOTE_DST = '/home/pi/mimo/firebase_listener.py'
 
-print(f"=== 1. CONNECTING TO TARGET HOST: {HOST} ({USER}) ===")
-client = paramiko.SSHClient()
-client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect(HOST, username=USER, password=PASS, timeout=20)
+print("=== 1. CONNECTING TO TARGET HOST: SV-002 ===")
+client = new_client()
+connect(client, "SV-002", timeout=20)
 
 def run_cmd(cmd, desc=""):
     print(f"\n---> {desc} [$ {cmd}]")
-    if "sudo " in cmd and "echo printpi | sudo -S" not in cmd:
-        exec_cmd = cmd.replace("sudo ", "echo printpi | sudo -S ")
-    else:
-        exec_cmd = cmd
+    exec_cmd = cmd.replace("sudo ", "@SUDO@ ") if "sudo " in cmd else cmd
     stdin, stdout, stderr = client.exec_command(exec_cmd)
     out = stdout.read().decode('utf-8', errors='replace').strip()
     err = stderr.read().decode('utf-8', errors='replace').strip()

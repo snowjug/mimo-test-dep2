@@ -1,6 +1,8 @@
 import paramiko
 import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 import base64
 import time
 
@@ -20,15 +22,14 @@ def deploy_sv002_base64():
     REMOTE_B64_PATH = "/home/pi/mimo/firebase_listener.py.b64"
     REMOTE_PY_PATH = "/home/pi/mimo/firebase_listener.py"
     
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = new_client()
     try:
-        client.connect('100.107.95.16', username='pi', password='printpi', timeout=15)
+        connect(client, "SV-002", timeout=15)
         print("Connected to SSH!")
         
         # Stop service
         print("Stopping mimo-listener service...")
-        stdin, stdout, stderr = client.exec_command("echo 'printpi' | sudo -S systemctl stop mimo-listener")
+        stdin, stdout, stderr = client.exec_command("@SUDO@ systemctl stop mimo-listener")
         stdout.read()
         
         # Clear remote b64 file
@@ -73,7 +74,7 @@ def deploy_sv002_base64():
         
         # Start service
         print("Starting mimo-listener service...")
-        stdin, stdout, stderr = client.exec_command("echo 'printpi' | sudo -S systemctl start mimo-listener")
+        stdin, stdout, stderr = client.exec_command("@SUDO@ systemctl start mimo-listener")
         stdout.read()
         
         # Check status
@@ -93,15 +94,14 @@ def deploy_cv001_sftp():
     
     REMOTE_PY_PATH = "/home/printpi/firebase_listener.py"
     
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = new_client()
     try:
-        client.connect('100.70.107.44', username='printpi', password='printpi', timeout=15)
+        connect(client, "CV-001", timeout=15)
         print("Connected to SSH!")
         
         # Stop service
         print("Stopping mimo-listener service...")
-        stdin, stdout, stderr = client.exec_command("echo 'printpi' | sudo -S systemctl stop mimo-listener")
+        stdin, stdout, stderr = client.exec_command("@SUDO@ systemctl stop mimo-listener")
         stdout.read()
         
         # Upload via SFTP
@@ -113,7 +113,7 @@ def deploy_cv001_sftp():
         
         # Start service
         print("Starting mimo-listener service...")
-        stdin, stdout, stderr = client.exec_command("echo 'printpi' | sudo -S systemctl start mimo-listener")
+        stdin, stdout, stderr = client.exec_command("@SUDO@ systemctl start mimo-listener")
         stdout.read()
         
         # Check status

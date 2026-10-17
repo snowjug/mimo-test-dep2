@@ -12,6 +12,8 @@ Fixes:
 import paramiko
 import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts", "pi-ops"))
+from pi_config import new_client, connect  # noqa: E402
 import base64
 import time
 
@@ -31,16 +33,15 @@ def run_ssh(client, cmd, label=""):
     return out, err
 
 def deploy_sv002():
-    """Deploy to SV-002 (pi@192.168.8.197) via CV-001 (printpi@100.70.107.44) jump."""
+    """Deploy to SV-002 (pi@@LAN:SV-002@) via CV-001 (printpi@100.70.107.44) jump."""
     print("\n" + "="*60)
-    print("=== DEPLOYING TO SV-002 (pi@192.168.8.197) VIA CV-001 ===")
+    print("=== DEPLOYING TO SV-002 (pi@@LAN:SV-002@) VIA CV-001 ===")
     print("="*60)
 
-    cv_client = paramiko.SSHClient()
-    cv_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    cv_client = new_client()
     try:
         print("Connecting to CV-001 (100.70.107.44)...")
-        cv_client.connect('100.70.107.44', username='printpi', password='printpi', timeout=15)
+        connect(cv_client, "CV-001", timeout=15)
         print("✅ SSH connected to CV-001")
 
         print("Uploading listener to CV-001 temporary path...")
@@ -52,28 +53,28 @@ def deploy_sv002():
         print("✅ Uploaded to CV-001")
 
         print("Stopping and disabling ipp-usb service on SV-002...")
-        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S systemctl stop ipp-usb\"")
-        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S systemctl disable ipp-usb\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@@LAN:SV-002@ \"@SUDO@ systemctl stop ipp-usb\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@@LAN:SV-002@ \"@SUDO@ systemctl disable ipp-usb\"")
 
         print("Enabling printers on SV-002...")
-        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S cupsenable Brother_HL_L2440DW_series\"")
-        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S cupsaccept Brother_HL_L2440DW_series\"")
-        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S cupsenable Epson_L3250\"")
-        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S cupsaccept Epson_L3250\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@@LAN:SV-002@ \"@SUDO@ cupsenable Brother_HL_L2440DW_series\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@@LAN:SV-002@ \"@SUDO@ cupsaccept Brother_HL_L2440DW_series\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@@LAN:SV-002@ \"@SUDO@ cupsenable Epson_L3250\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@@LAN:SV-002@ \"@SUDO@ cupsaccept Epson_L3250\"")
 
         print("Stopping mimo-listener on SV-002...")
-        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S systemctl stop mimo-listener\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@@LAN:SV-002@ \"@SUDO@ systemctl stop mimo-listener\"")
         time.sleep(2)
 
         print("Copying listener from CV-001 to SV-002...")
-        run_ssh(cv_client, "scp -o StrictHostKeyChecking=no /home/printpi/firebase_listener.py.sv002 pi@192.168.8.197:/home/pi/mimo/firebase_listener.py")
+        run_ssh(cv_client, "scp -o StrictHostKeyChecking=no /home/printpi/firebase_listener.py.sv002 pi@@LAN:SV-002@:/home/pi/mimo/firebase_listener.py")
 
         print("Starting mimo-listener on SV-002...")
-        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"echo 'printpi' | sudo -S systemctl start mimo-listener\"")
+        run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@@LAN:SV-002@ \"@SUDO@ systemctl start mimo-listener\"")
         time.sleep(3)
 
         print("Service status on SV-002:")
-        out, _ = run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@192.168.8.197 \"systemctl status mimo-listener --no-pager | head -20\"")
+        out, _ = run_ssh(cv_client, "ssh -o StrictHostKeyChecking=no pi@@LAN:SV-002@ \"systemctl status mimo-listener --no-pager | head -20\"")
         print(out)
 
         print("Cleaning up temporary file on CV-001...")
@@ -120,18 +121,17 @@ StandardError=journal
 WantedBy=multi-user.target
 """
 
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = new_client()
     try:
-        client.connect('100.70.107.44', username='printpi', password='printpi', timeout=15)
+        connect(client, "CV-001", timeout=15)
         print("✅ SSH connected")
 
         print("Stopping and disabling ipp-usb service on CV-001...")
-        run_ssh(client, "echo 'printpi' | sudo -S systemctl stop ipp-usb")
-        run_ssh(client, "echo 'printpi' | sudo -S systemctl disable ipp-usb")
+        run_ssh(client, "@SUDO:SV-002@ systemctl stop ipp-usb")
+        run_ssh(client, "@SUDO:SV-002@ systemctl disable ipp-usb")
 
         print("Stopping mimo-listener...")
-        run_ssh(client, "echo 'printpi' | sudo -S systemctl stop mimo-listener")
+        run_ssh(client, "@SUDO:SV-002@ systemctl stop mimo-listener")
         time.sleep(2)
 
         # Upload listener via SFTP
@@ -152,19 +152,19 @@ WantedBy=multi-user.target
             f.write(SERVICE_CONTENT)
         sftp2.close()
 
-        run_ssh(client, f"echo 'printpi' | sudo -S cp {tmp_service} /etc/systemd/system/mimo-listener.service")
-        run_ssh(client, "echo 'printpi' | sudo -S systemctl daemon-reload")
+        run_ssh(client, f"@SUDO@ cp {tmp_service} /etc/systemd/system/mimo-listener.service")
+        run_ssh(client, "@SUDO@ systemctl daemon-reload")
         print("✅ Service file updated")
 
         # Enable printer and make sure it's not paused
         print("Enabling Brother_HL_L5210DN_series printer...")
-        run_ssh(client, "echo 'printpi' | sudo -S cupsenable Brother_HL_L5210DN_series")
-        run_ssh(client, "echo 'printpi' | sudo -S cupsaccept Brother_HL_L5210DN_series")
+        run_ssh(client, "@SUDO@ cupsenable Brother_HL_L5210DN_series")
+        run_ssh(client, "@SUDO@ cupsaccept Brother_HL_L5210DN_series")
         out, _ = run_ssh(client, "lpstat -p Brother_HL_L5210DN_series")
         print(f"  Printer status: {out}")
 
         print("Starting mimo-listener...")
-        run_ssh(client, "echo 'printpi' | sudo -S systemctl start mimo-listener")
+        run_ssh(client, "@SUDO:SV-002@ systemctl start mimo-listener")
         time.sleep(3)
 
         print("Service status:")
