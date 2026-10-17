@@ -16,6 +16,7 @@ import {
   PieChart,
   Receipt,
   Menu,
+  TrendingUp,
 } from 'lucide-react';
 import type { FinanceTab } from './FinanceSidebar';
 import { FinanceSidebar } from './FinanceSidebar';
@@ -48,7 +49,8 @@ const TITLES: Record<FinanceTab, string> = {
   wallet: 'Wallet & Credits',
   settlements: 'Settlements & Reports',
   expenses: 'Revenue & Expenses',
-  chat: 'Team Chat',
+  'customer-analytics': 'Customer Analytics',
+  'krishna-report': 'Customer Analytics',
 } as Record<FinanceTab, string>;
 
 const TABS: { id: FinanceTab; label: string; icon: React.ElementType }[] = [
@@ -59,6 +61,7 @@ const TABS: { id: FinanceTab; label: string; icon: React.ElementType }[] = [
 ];
 
 const MORE: { id: FinanceTab; label: string; icon: React.ElementType }[] = [
+  { id: 'customer-analytics', label: 'Customer Analytics', icon: TrendingUp },
   { id: 'refunds',     label: 'Refunds & Disputes',     icon: RotateCcw },
   { id: 'analytics',   label: 'Revenue Analytics',      icon: BarChart3 },
   { id: 'pricing',     label: 'Pricing & Coupons',      icon: Tag },
@@ -91,7 +94,7 @@ export const FinanceLayout: React.FC<FinanceLayoutProps> = ({
   }, [activeTab]);
 
   return (
-    <div className="min-h-[100dvh] bg-slate-100 font-sans text-slate-900 antialiased">
+    <div className="min-h-[100dvh] bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 antialiased">
       {/* ── DESKTOP (lg and up): fixed sidebar + topbar grid ── */}
       <div className="finance-layout">
         <FinanceSidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} pendingRefundsCount={pendingRefundsCount} />

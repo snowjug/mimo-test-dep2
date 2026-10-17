@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Wrench, Megaphone, Users2, Plus, X, Loader2, ChevronRight, ChevronDown,
   Check, Ban, CheckCircle2, Circle, UserPlus, UserMinus, CalendarClock, Flame,
+  Camera, ZoomIn, Search, Image as ImageIcon, FileText,
 } from 'lucide-react';
 import { adminCompany } from '../../services/adminCompany.service';
 import { adminGang, LoginStreaks } from '../../services/adminGang.service';
@@ -11,6 +12,8 @@ import { MarketingTask, MarketingTaskStatus, MarketingTaskPriority } from '../..
 import { ContributionGraph } from '../../components/gang/ContributionGraph';
 import { ErrorBanner } from '../../components/insights/InsightBits';
 import { errorMessage } from '../../hooks/useLiveQuery';
+import { ProofImageModal, ProofModalData } from '../../components/shared/ProofImageModal';
+import { tsToIso, timeAgo } from '../../lib/format';
 
 type GangTab = 'technical' | 'marketing' | 'hr';
 
@@ -99,11 +102,18 @@ const NewTechTaskModal: React.FC<{ members: Employee[]; onClose: () => void; onC
   );
 };
 
-const TechTaskRow: React.FC<{ task: TechTask; members: Employee[]; onChange: () => void }> = ({ task, members, onChange }) => {
+const TechTaskRow: React.FC<{
+  task: TechTask;
+  members: Employee[];
+  onChange: () => void;
+  onViewProof: (data: ProofModalData) => void;
+}> = ({ task, members, onChange, onViewProof }) => {
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const status = TECH_STATUS[task.status];
+  const status = TECH_STATUS[task.status] || { label: task.status, dot: 'bg-slate-400' };
   const due = task.dueAtMs ? new Date(task.dueAtMs).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : null;
+  const completedIso = tsToIso(task.completedAt);
+  const completedAgo = completedIso ? timeAgo(completedIso) : null;
 
   const setStatus = async (s: TaskStatus) => {
     setBusy(true);
@@ -116,49 +126,140 @@ const TechTaskRow: React.FC<{ task: TechTask; members: Employee[]; onChange: () 
   };
 
   return (
-    <div>
+    <div className={`transition-colors ${expanded ? 'bg-slate-50/50 dark:bg-slate-800/20' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/40'}`}>
       <button onClick={() => setExpanded((v) => !v)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
         <span className={`size-2 shrink-0 rounded-full ${status.dot}`} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{task.title}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{task.title}</p>
+            {task.proofScreenshotUrl && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                <Camera className="size-3" /> Proof attached
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-[11px] text-slate-500">
             <span className="font-semibold text-slate-700 dark:text-slate-300">{task.assigneeName}</span>
             {task.creatorName && <> &middot; by {task.creatorName}</>}
-            <> &middot; {status.label}</>
-            {due && <> &middot; Due {due}</>}
+            <> &middot; <span className="font-medium">{status.label}</span></>
+            {completedAgo && <> &middot; <span className="text-emerald-600 dark:text-emerald-400 font-medium">Completed {completedAgo}</span></>}
+            {due && !completedAgo && <> &middot; Due {due}</>}
           </p>
         </div>
-        {expanded ? <ChevronDown className="size-4 text-slate-400" /> : <ChevronRight className="size-4 text-slate-400" />}
+        {task.proofScreenshotUrl && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewProof({
+                imageUrl: task.proofScreenshotUrl!,
+                title: task.title,
+                assigneeName: task.assigneeName,
+                proofNote: task.proofNote,
+                completedAt: task.completedAt,
+                status: status.label,
+              });
+            }}
+            className="flex items-center gap-1 shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 transition-colors"
+            title="Inspect submitted proof screenshot"
+          >
+            <ZoomIn className="size-3.5" />
+            <span className="hidden sm:inline">Inspect proof</span>
+          </button>
+        )}
+        {expanded ? <ChevronDown className="size-4 text-slate-400 shrink-0" /> : <ChevronRight className="size-4 text-slate-400 shrink-0" />}
       </button>
+
       {expanded && (
-        <div className="space-y-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-4 py-3">
-          <div>
-            <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">Status</p>
-            <div className="flex flex-wrap gap-1.5">
-              {TECH_STATUS_ORDER.map((s) => (
-                <button
-                  key={s}
-                  disabled={busy || s === task.status}
-                  onClick={() => setStatus(s)}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold disabled:cursor-default ${
-                    s === task.status ? `${TECH_STATUS[s].dot} text-white` : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  {TECH_STATUS[s].label}
-                </button>
-              ))}
+        <div className="space-y-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-4 py-4">
+          {task.description && (
+            <div>
+              <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">Description</p>
+              <p className="text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-700 leading-relaxed">{task.description}</p>
             </div>
-          </div>
-          <div>
-            <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">Reassign</p>
-            <select
-              disabled={busy}
-              value={task.assigneeId}
-              onChange={(e) => reassign(e.target.value)}
-              className="h-9 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-xs outline-none disabled:opacity-50"
-            >
-              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+          )}
+
+          {task.proofScreenshotUrl && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                  <Camera className="size-3.5" /> Submitted Proof of Work
+                </p>
+                {completedAgo && (
+                  <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                    Done {completedAgo}
+                  </span>
+                )}
+              </div>
+
+              {task.proofNote && (
+                <div>
+                  <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400 mb-1">Completion Note / Report</p>
+                  <p className="text-xs text-slate-800 dark:text-slate-200 bg-white/90 dark:bg-slate-900/90 rounded-lg p-2.5 border border-emerald-500/20 leading-relaxed font-sans">
+                    {task.proofNote}
+                  </p>
+                </div>
+              )}
+
+              <div className="relative group max-w-md overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-black/10">
+                <img
+                  src={task.proofScreenshotUrl}
+                  alt={task.title}
+                  className="h-44 w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    onViewProof({
+                      imageUrl: task.proofScreenshotUrl!,
+                      title: task.title,
+                      assigneeName: task.assigneeName,
+                      proofNote: task.proofNote,
+                      completedAt: task.completedAt,
+                      status: status.label,
+                    })
+                  }
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity gap-2 text-white font-semibold text-xs backdrop-blur-xs"
+                >
+                  <ZoomIn className="size-4" /> Click to view full proof screenshot
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div>
+              <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">Change Status</p>
+              <div className="flex flex-wrap gap-1.5">
+                {TECH_STATUS_ORDER.map((s) => (
+                  <button
+                    key={s}
+                    disabled={busy || s === task.status}
+                    onClick={() => setStatus(s)}
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold disabled:cursor-default transition-all ${
+                      s === task.status ? `${TECH_STATUS[s].dot} text-white shadow-xs` : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    {TECH_STATUS[s].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">Reassign</p>
+              <select
+                disabled={busy}
+                value={task.assigneeId}
+                onChange={(e) => reassign(e.target.value)}
+                className="h-9 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-xs outline-none disabled:opacity-50"
+              >
+                {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
           </div>
         </div>
       )}
@@ -170,6 +271,11 @@ const TechnicalTab: React.FC<{ employees: Employee[]; streaks: LoginStreaks }> =
   const [tasks, setTasks] = useState<TechTask[] | null>(null);
   const [error, setError] = useState('');
   const [showNew, setShowNew] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'with_proof' | 'completed' | 'in_progress' | 'blocked'>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [previewProof, setPreviewProof] = useState<ProofModalData | null>(null);
+
   const members = employees.filter((e) => e.department === 'technical' && e.status !== 'offboarded');
 
   const load = useCallback(async () => {
@@ -177,26 +283,164 @@ const TechnicalTab: React.FC<{ employees: Employee[]; streaks: LoginStreaks }> =
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  const allTasks = tasks || [];
+  const withProofCount = allTasks.filter((t) => !!t.proofScreenshotUrl).length;
+  const completedCount = allTasks.filter((t) => t.status === 'completed').length;
+  const inProgressCount = allTasks.filter((t) => t.status === 'in_progress').length;
+  const blockedCount = allTasks.filter((t) => t.status === 'blocked').length;
+
+  const filteredTasks = useMemo(() => {
+    return allTasks.filter((t) => {
+      if (statusFilter === 'with_proof' && !t.proofScreenshotUrl) return false;
+      if (statusFilter === 'completed' && t.status !== 'completed') return false;
+      if (statusFilter === 'in_progress' && t.status !== 'in_progress') return false;
+      if (statusFilter === 'blocked' && t.status !== 'blocked') return false;
+      if (assigneeFilter !== 'all' && t.assigneeId !== assigneeFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = t.title?.toLowerCase().includes(q);
+        const matchAssignee = t.assigneeName?.toLowerCase().includes(q);
+        const matchNote = t.proofNote?.toLowerCase().includes(q);
+        const matchDesc = t.description?.toLowerCase().includes(q);
+        if (!matchTitle && !matchAssignee && !matchNote && !matchDesc) return false;
+      }
+      return true;
+    });
+  }, [allTasks, statusFilter, assigneeFilter, searchQuery]);
+
   return (
     <div>
       <MemberStrip members={members} streaks={streaks} />
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tasks</p>
-        <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-full bg-[#093765] px-3.5 py-2 text-xs font-bold text-white">
+
+      {/* Header & New Task */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Technical Operations &amp; Proofs</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {allTasks.length} total tasks &middot;{' '}
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{withProofCount} with proof screenshot</span>
+          </p>
+        </div>
+        <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-full bg-[#093765] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#0c437a] transition-colors">
           <Plus className="size-3.5" /> New task
         </button>
       </div>
+
+      {/* Filter and Search Bar */}
+      <div className="mb-4 space-y-2.5">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              statusFilter === 'all'
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
+            }`}
+          >
+            All ({allTasks.length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('with_proof')}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              statusFilter === 'with_proof'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+            }`}
+          >
+            <Camera className="size-3.5" />
+            With Proof Photo ({withProofCount})
+          </button>
+          <button
+            onClick={() => setStatusFilter('completed')}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              statusFilter === 'completed'
+                ? 'bg-emerald-700 text-white'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
+            }`}
+          >
+            Completed ({completedCount})
+          </button>
+          <button
+            onClick={() => setStatusFilter('in_progress')}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              statusFilter === 'in_progress'
+                ? 'bg-amber-600 text-white'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
+            }`}
+          >
+            In Progress ({inProgressCount})
+          </button>
+          {blockedCount > 0 && (
+            <button
+              onClick={() => setStatusFilter('blocked')}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                statusFilter === 'blocked'
+                  ? 'bg-rose-600 text-white'
+                  : 'bg-white dark:bg-slate-900 text-rose-600 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50'
+              }`}
+            >
+              Blocked ({blockedCount})
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by task title, technician, or note..."
+              className="h-9 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-9 pr-3 text-xs outline-none focus:border-[#093765]"
+            />
+          </div>
+          <select
+            value={assigneeFilter}
+            onChange={(e) => setAssigneeFilter(e.target.value)}
+            className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs outline-none"
+          >
+            <option value="all">All Technicians</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.loginRef?.id || m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {error && <ErrorBanner message={error} onRetry={load} />}
-      <div className="divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+
+      <div className="divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
         {tasks === null ? (
           <div className="flex justify-center py-10"><Loader2 className="size-5 animate-spin text-slate-400" /></div>
-        ) : tasks.length === 0 ? (
-          <p className="px-4 py-8 text-center text-xs text-slate-400">No technical tasks yet.</p>
+        ) : filteredTasks.length === 0 ? (
+          <div className="px-4 py-12 text-center">
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No tasks found</p>
+            <p className="mt-1 text-xs text-slate-400">
+              {statusFilter === 'with_proof'
+                ? 'No tasks have submitted proof screenshots for the current filters.'
+                : 'No tasks match the selected filters.'}
+            </p>
+          </div>
         ) : (
-          tasks.map((t) => <TechTaskRow key={t.id} task={t} members={members} onChange={load} />)
+          filteredTasks.map((t) => (
+            <TechTaskRow
+              key={t.id}
+              task={t}
+              members={members}
+              onChange={load}
+              onViewProof={setPreviewProof}
+            />
+          ))
         )}
       </div>
+
       {showNew && <NewTechTaskModal members={members} onClose={() => setShowNew(false)} onCreated={load} />}
+
+      {/* Proof Lightbox Modal */}
+      <ProofImageModal data={previewProof} onClose={() => setPreviewProof(null)} />
     </div>
   );
 };

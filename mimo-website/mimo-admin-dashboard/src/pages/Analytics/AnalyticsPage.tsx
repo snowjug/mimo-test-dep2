@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Download } from 'lucide-react';
 import { useRange } from '../../context/RangeContext';
@@ -7,6 +7,7 @@ import { insights } from '../../services/insights.service';
 import { DateRangePicker } from '../../components/ui/DateRangePicker';
 import { LiveIndicator } from '../../components/ui/LiveIndicator';
 import { Delta, ErrorBanner, PeriodComparison, TrendChart, TruncatedNote } from '../../components/insights/InsightBits';
+import { ExecutiveReportsHub } from '../../components/insights/ExecutiveReportsHub';
 import { bucketLabel, describeRange } from '../../lib/dateRange';
 import { inr, int, pct } from '../../lib/format';
 import { exportAnalyticsPdf } from '../../lib/pdfExport';
@@ -26,6 +27,7 @@ const Card: React.FC<{ title: string; subtitle?: string; className?: string; chi
 const NoData: React.FC<{ text?: string }> = ({ text = 'No data in this period' }) => <p className="py-10 text-center text-xs font-semibold text-[var(--text-3)]">{text}</p>;
 
 export const AnalyticsPage: React.FC = () => {
+  const [viewMode, setViewMode] = useState<'kpis' | 'reports'>('kpis');
   const { range, setRange, current, live } = useRange();
   const q = useLiveQuery(() => insights.analytics(current()), [range], { live });
   const a = q.data;
@@ -61,20 +63,53 @@ export const AnalyticsPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-1)]">Analytics &amp; Reports</h1>
-          <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">Demand, utilisation and payment mix · {describeRange(range)}</p>
+          <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">Demand, utilisation, unit economics &amp; strategic reports</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <LiveIndicator updatedAt={q.updatedAt} live={live} fetching={q.fetching} onRefresh={q.refresh} />
-          <DateRangePicker value={range} onChange={setRange} tone="admin" />
-          <button type="button" disabled={!a} onClick={() => a && exportAnalyticsPdf(a, describeRange(range))}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold border border-[var(--border)] bg-[var(--surface)] text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-all cursor-pointer shadow-xs disabled:opacity-50">
-            <Download size={13} className="text-indigo-600 dark:text-indigo-400" /> Export PDF Report
-          </button>
+          <div className="flex rounded-xl bg-[var(--surface-2)] p-1 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setViewMode('kpis')}
+              className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === 'kpis'
+                  ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-xs font-bold'
+                  : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
+              }`}
+            >
+              Fleet Operations &amp; KPIs
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('reports')}
+              className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === 'reports'
+                  ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-xs font-bold'
+                  : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
+              }`}
+            >
+              Strategic Reports &amp; Profitability
+            </button>
+          </div>
+
+          {viewMode === 'kpis' && (
+            <>
+              <LiveIndicator updatedAt={q.updatedAt} live={live} fetching={q.fetching} onRefresh={q.refresh} />
+              <DateRangePicker value={range} onChange={setRange} tone="admin" />
+              <button type="button" disabled={!a} onClick={() => a && exportAnalyticsPdf(a, describeRange(range))}
+                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold border border-[var(--border)] bg-[var(--surface)] text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-all cursor-pointer shadow-xs disabled:opacity-50">
+                <Download size={13} className="text-indigo-600 dark:text-indigo-400" /> Export PDF Report
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {q.error && <ErrorBanner message={q.error} onRetry={q.refresh} />}
-      <TruncatedNote show={a?.truncated} />
+      {viewMode === 'reports' ? (
+        <ExecutiveReportsHub />
+      ) : (
+        <>
+          {q.error && <ErrorBanner message={q.error} onRetry={q.refresh} />}
+          <TruncatedNote show={a?.truncated} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((k) => (
@@ -256,6 +291,8 @@ export const AnalyticsPage: React.FC = () => {
           )}
         </Card>
       </div>
+        </>
+      )}
     </div>
   );
 };

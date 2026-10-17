@@ -29,3 +29,7 @@ __pycache__/
 .vite/
 coverage/
 
+# Claude Code: personal local settings and other agent-session worktrees
+.claude/settings.local.json
+.claude/worktrees/
+

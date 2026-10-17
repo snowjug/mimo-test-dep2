@@ -91,6 +91,22 @@ const getAdminAnalytics = async (req, res) => {
   }
 };
 
+// ─────────────────────────────── GET /admin/analytics/monthly-summary ───────────────────────────────
+const getAdminMonthlySummary = async (req, res) => {
+  try {
+    const months = await A.getMonthlySummary(db, Timestamp);
+    res.json({
+      launchDate: A.LAUNCH_DATE_IST,
+      timezone: "Asia/Kolkata",
+      currency: "INR",
+      months,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    fail(res, err, "monthly-summary");
+  }
+};
+
 // ─────────────────────────────── GET /admin/transactions ───────────────────────────────
 const getAdminTransactions = async (req, res) => {
   try {
@@ -584,6 +600,97 @@ const getAdminIssues = async (req, res) => {
   }
 };
 
+// ─────────────────────────────── GET /admin/settlements/reconciliation ───────────────────────────────
+const getAdminSettlementsReconciliation = async (req, res) => {
+  try {
+    const [txnsSnap, settlementsSnap] = await Promise.all([
+      db.collection("payment_transactions").where("transactionStatus.status", "==", "completed").limit(1000).get().catch(() => ({ docs: [] })),
+      db.collection("cashfree_settlements").limit(1000).get().catch(() => ({ docs: [] })),
+    ]);
+
+    const txns = txnsSnap.docs.map((d) => d.data());
+    const settlements = settlementsSnap.docs.map((d) => d.data());
+
+    const totalCollectedPaise = txns.reduce((a, t) => a + Math.round((Number(t.amount) || 0) * 100), 0);
+    const totalSettledPaise = settlements.reduce((a, s) => a + Math.round((Number(s.amountSettled !== undefined ? s.amountSettled : s.settlementAmount) || 0) * 100), 0);
+    const totalFeesPaise = settlements.reduce((a, s) => a + Math.round((Number(s.serviceCharge || 0) + Number(s.serviceTax || 0)) * 100), 0);
+    const totalAdjustmentsPaise = settlements.reduce((a, s) => a + Math.round((Number(s.adjustment || 0)) * 100), 0);
+
+    const variancePaise = totalCollectedPaise - (totalSettledPaise + totalFeesPaise);
+
+    res.json({
+      status: settlements.length === 0 ? "UNRECONCILED" : Math.abs(variancePaise) < 100 ? "RECONCILED" : "DISCREPANCY_DETECTED",
+      collections: {
+        count: txns.length,
+        totalRupees: totalCollectedPaise / 100,
+      },
+      settlements: {
+        count: settlements.length,
+        totalSettledRupees: totalSettledPaise / 100,
+        totalFeesRupees: totalFeesPaise / 100,
+        totalAdjustmentsRupees: totalAdjustmentsPaise / 100,
+        records: settlements.slice(0, 50).map((s) => ({
+          settlementId: s.cfSettlementId || s.settlementId,
+          utr: s.settlementUtr || s.utr,
+          amount: s.amountSettled !== undefined ? s.amountSettled : s.settlementAmount,
+          fee: s.serviceCharge,
+          tax: s.serviceTax,
+          adjustment: s.adjustment,
+          time: s.settlementDate || s.settlementTime,
+          status: s.settlementStatus || s.reconciledStatus,
+          health: s.health || "Healthy",
+        })),
+      },
+      varianceRupees: variancePaise / 100,
+      settlementRecordsAvailable: settlements.length > 0,
+      note: settlements.length === 0
+        ? "No settlement records in Firestore. Trigger a settlement synchronization to import Cashfree bank settlements."
+        : "Reconciled with Cashfree settlement batches and bank transfer UTR records.",
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    fail(res, err, "settlement-reconciliation");
+  }
+};
+
+const cashfreeSettlementService = require("../services/cashfreeSettlement.service");
+
+// ─────────────────────────────── POST /admin/settlements/sync ───────────────────────────────
+const postAdminSyncSettlements = async (req, res) => {
+  try {
+    const dryRun = req.query.dryRun === "true" || req.body?.dryRun === true;
+    const preferApi = req.query.preferApi !== "false" && req.body?.preferApi !== false;
+    const result = await cashfreeSettlementService.syncCashfreeSettlements({
+      db,
+      dryRun,
+      preferApi,
+    });
+    res.json(result);
+  } catch (err) {
+    fail(res, err, "sync-settlements");
+  }
+};
+
+// ─────────────────────────────── GET /admin/settlements ───────────────────────────────
+const getAdminSettlements = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 500);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const status = req.query.status ? String(req.query.status).trim() : undefined;
+    const monthKey = req.query.monthKey ? String(req.query.monthKey).trim() : undefined;
+
+    const result = await cashfreeSettlementService.getSettlementsList(db, {
+      limit,
+      offset,
+      status,
+      monthKey,
+    });
+    res.json(result);
+  } catch (err) {
+    fail(res, err, "get-settlements");
+  }
+};
+
 module.exports = {
   jobTimeline,
   jobOutcome,
@@ -599,4 +706,8 @@ module.exports = {
   getAdminIssues,
   loadKiosks,
   getAdminFinanceSheetData,
+  getAdminMonthlySummary,
+  getAdminSettlementsReconciliation,
+  postAdminSyncSettlements,
+  getAdminSettlements,
 };

@@ -325,7 +325,7 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
       {/* ── Greeting + quote-of-the-visit ───────────────────────────── */}
       <div className="pt-1">
         <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-          {greeting()}, Vastav
+          {greeting()}, Vatsa
         </h1>
         <p className="mt-1.5 text-[13px] italic leading-relaxed text-slate-500 dark:text-slate-400">
           &ldquo;{quote.line}&rdquo; <span className="not-italic text-slate-400 dark:text-slate-500">— {quote.by}</span>

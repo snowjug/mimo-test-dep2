@@ -11,6 +11,13 @@ app.use(cors({ origin: true }));
 // Keep the exact request bytes (needed to verify webhook signatures). Cloud Functions already provides req.rawBody.
 app.use(express.json({ verify: (req, res, buf) => { if (!req.rawBody) req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    console.log(`[HTTP] ${req.method} ${req.originalUrl || req.url} -> ${res.statusCode} (${Date.now() - start}ms)`);
+  });
+  next();
+});
 app.get("/", (req, res) => res.send("Mimo Firebase Serverless is LIVE 🚀"));
 
 // ================= ROUTES =================

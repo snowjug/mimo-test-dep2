@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { LogOut, Loader2, LayoutDashboard, Users2, CalendarCheck, CalendarClock, MessageCircle } from 'lucide-react';
+import { LogOut, Loader2, LayoutDashboard, Users2, CalendarCheck, CalendarClock } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { hr } from '../../services/hr.service';
 import { memberProfileServiceFor } from '../../services/profile.service';
@@ -8,17 +8,15 @@ import { HrOverview } from './HrOverview';
 import { HrEmployees } from './HrEmployees';
 import { HrAttendance } from './HrAttendance';
 import { HrLeave } from './HrLeave';
-import { ChatPanel } from '../../components/shared/ChatPanel';
 import { ProfileModal } from '../../components/shared/ProfileModal';
 import { ProfileCompletionBanner } from '../../components/shared/ProfileCompletionBanner';
 
-type Tab = 'overview' | 'employees' | 'attendance' | 'leave' | 'chat';
+type Tab = 'overview' | 'employees' | 'attendance' | 'leave';
 const TABS: { value: Tab; label: string; icon: React.ElementType }[] = [
   { value: 'overview', label: 'Overview', icon: LayoutDashboard },
   { value: 'employees', label: 'Employees', icon: Users2 },
   { value: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { value: 'leave', label: 'Leave', icon: CalendarClock },
-  { value: 'chat', label: 'Chat', icon: MessageCircle },
 ];
 
 interface Me {
@@ -144,12 +142,8 @@ export const HrApp: React.FC = () => {
           <HrEmployees />
         ) : tab === 'attendance' ? (
           <HrAttendance />
-        ) : tab === 'leave' ? (
-          <HrLeave />
         ) : (
-          <div className="mx-auto max-w-[800px] px-4 py-6 sm:px-6">
-            <ChatPanel basePath="/hr" selfId={me.member.id} title="HR Team Chat" />
-          </div>
+          <HrLeave />
         )}
 
         {me && !showProfile && (

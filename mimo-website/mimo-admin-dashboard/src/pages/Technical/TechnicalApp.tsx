@@ -1,16 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { LogOut, Wrench, Users2, Loader2, MessageCircle } from 'lucide-react';
+import { LogOut, Wrench, Users2, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { technical } from '../../services/technical.service';
 import { memberProfileServiceFor } from '../../services/profile.service';
 import { TechnicalLoginPage } from '../../components/auth/TechnicalLoginPage';
 import { TechnicalWorkspace } from './TechnicalWorkspace';
 import { TechnicalTeamPage } from './TechnicalTeamPage';
-import { ChatPanel } from '../../components/shared/ChatPanel';
 import { ProfileModal } from '../../components/shared/ProfileModal';
 import { ProfileCompletionBanner } from '../../components/shared/ProfileCompletionBanner';
 
-type Tab = 'workspace' | 'team' | 'chat';
+type Tab = 'workspace' | 'team';
 
 interface Me {
   member: {
@@ -100,15 +99,9 @@ export const TechnicalApp: React.FC = () => {
                     onClick={() => setTab('team')}
                     className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${tab === 'team' ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)]'}`}
                   >
-                    <Users2 className="size-3.5" /> Team
+                    <Users2 className="size-3.5" /> Team &amp; Proofs
                   </button>
                 )}
-                <button
-                  onClick={() => setTab('chat')}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${tab === 'chat' ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)]'}`}
-                >
-                  <MessageCircle className="size-3.5" /> Chat
-                </button>
               </nav>
             )}
 
@@ -141,9 +134,8 @@ export const TechnicalApp: React.FC = () => {
             <nav className="flex items-center gap-1 overflow-x-auto px-4 pb-2 sm:hidden">
               <button onClick={() => setTab('workspace')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'workspace' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>My workspace</button>
               {me.member.role === 'tech_lead' && (
-                <button onClick={() => setTab('team')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'team' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>Team</button>
+                <button onClick={() => setTab('team')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'team' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>Team &amp; Proofs</button>
               )}
-              <button onClick={() => setTab('chat')} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${tab === 'chat' ? 'bg-[var(--surface-2)] text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>Chat</button>
             </nav>
           )}
         </header>
@@ -154,12 +146,8 @@ export const TechnicalApp: React.FC = () => {
           </div>
         ) : tab === 'workspace' ? (
           <TechnicalWorkspace me={me} onRefreshMe={loadMe} />
-        ) : tab === 'team' ? (
-          <TechnicalTeamPage currentMemberId={me.member.id} />
         ) : (
-          <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6">
-            <ChatPanel basePath="/technical" selfId={me.member.id} title="Technical Team Chat" />
-          </div>
+          <TechnicalTeamPage currentMemberId={me.member.id} />
         )}
 
         {me && !showProfile && (

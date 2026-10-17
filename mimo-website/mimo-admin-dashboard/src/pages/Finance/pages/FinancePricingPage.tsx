@@ -12,8 +12,12 @@ import {
   Sparkles,
   Calendar,
   Percent,
+  TrendingUp,
+  Users,
+  ArrowUpRight,
 } from 'lucide-react';
 import api from '../../../api';
+import { inr } from '../../../lib/format';
 import { StatusBadge } from '../components/StatusBadge';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
 
@@ -21,6 +25,16 @@ export interface FinancePricingPageProps {
   loading: boolean;
   onRefresh: () => void;
 }
+
+const formatExpiryDate = (val: any) => {
+  if (!val) return 'No Expiry';
+  if (typeof val === 'object' && ('_seconds' in val || 'seconds' in val)) {
+    const s = val.seconds ?? val._seconds;
+    return new Date(s * 1000).toLocaleDateString();
+  }
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? 'No Expiry' : d.toLocaleDateString();
+};
 
 export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
   // Pricing state
@@ -38,6 +52,8 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
   // Coupons state
   const [coupons, setCoupons] = useState<any[]>([]);
   const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [couponAnalytics, setCouponAnalytics] = useState<any[]>([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [showCreateCoupon, setShowCreateCoupon] = useState(false);
   const [showBulkGenerator, setShowBulkGenerator] = useState(false);
   const [couponCode, setCouponCode] = useState('');
@@ -83,9 +99,24 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
     }
   };
 
+  const fetchCouponAnalytics = async () => {
+    setLoadingAnalytics(true);
+    try {
+      const res = await api.get('/admin/coupons/analytics');
+      if (Array.isArray(res.data?.couponAnalytics)) {
+        setCouponAnalytics(res.data.couponAnalytics);
+      }
+    } catch (e) {
+      console.error('Failed to load coupon analytics:', e);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
     fetchCoupons();
+    fetchCouponAnalytics();
   }, []);
 
   const handleSavePricing = async () => {
@@ -380,7 +411,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                       <StatusBadge status={coupon.isActive !== false ? 'ACTIVE' : 'EXPIRED'} />
                     </td>
                     <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
-                      {coupon.expiryDate ? new Date(coupon.expiryDate).toLocaleDateString() : 'No Expiry'}
+                      {formatExpiryDate(coupon.expiryDate)}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
@@ -390,6 +421,126 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── SECTION C: COUPON PERFORMANCE & REVENUE IMPACT ───────────────────── */}
+      <div className="bg-white dark:bg-slate-900 border border-[#E4E7EB] dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <h2 className="text-base font-extrabold text-[#111318] dark:text-white tracking-tight">
+                Coupon Performance & Revenue Impact
+              </h2>
+            </div>
+            <p className="text-xs text-slate-400">
+              Real-time redemption tracking, student reach, and discount subsidization from Jan 2026.
+            </p>
+          </div>
+          <button
+            onClick={fetchCouponAnalytics}
+            disabled={loadingAnalytics}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${loadingAnalytics ? 'animate-spin' : ''}`} />
+            Refresh Analytics
+          </button>
+        </div>
+
+        {/* Analytics Summary Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+            <span className="text-[11px] font-bold text-slate-500 uppercase">Coupons Monitored</span>
+            <div className="text-xl font-mono font-black text-slate-900 dark:text-white mt-1">
+              {couponAnalytics.length}
+            </div>
+            <span className="text-[10px] text-slate-400">Across campaigns & batches</span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+            <span className="text-[11px] font-bold text-slate-500 uppercase">Total Redemptions</span>
+            <div className="text-xl font-mono font-black text-indigo-600 dark:text-indigo-400 mt-1">
+              {couponAnalytics.reduce((s, c) => s + (c.redemptionCount || 0), 0)}
+            </div>
+            <span className="text-[10px] text-slate-400">Paid checkout orders</span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+            <span className="text-[11px] font-bold text-slate-500 uppercase">Discounts Subsidized</span>
+            <div className="text-xl font-mono font-black text-rose-600 dark:text-rose-400 mt-1">
+              {inr(couponAnalytics.reduce((s, c) => s + (c.totalDiscountINR || 0), 0))}
+            </div>
+            <span className="text-[10px] text-slate-400">Total discount absorbed</span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+            <span className="text-[11px] font-bold text-slate-500 uppercase">Unique Students</span>
+            <div className="text-xl font-mono font-black text-emerald-600 dark:text-emerald-400 mt-1">
+              {couponAnalytics.reduce((s, c) => s + (c.uniqueUsersCount || 0), 0)}
+            </div>
+            <span className="text-[10px] text-slate-400">Distinct student accounts</span>
+          </div>
+        </div>
+
+        {/* Analytics Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-[#F3F4F6] dark:bg-slate-800 border-b border-[#E4E7EB] dark:border-slate-700 text-slate-400 font-semibold text-[10px]">
+                <th className="py-3 px-4">Coupon Code</th>
+                <th className="py-3 px-4">Discount</th>
+                <th className="py-3 px-4">Total Redemptions</th>
+                <th className="py-3 px-4">Subsidized Volume (INR)</th>
+                <th className="py-3 px-4">Unique Students</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Last Redeemed</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {loadingAnalytics ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    Computing coupon redemptions & discount analytics...
+                  </td>
+                </tr>
+              ) : couponAnalytics.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    No redemption analytics available yet.
+                  </td>
+                </tr>
+              ) : (
+                couponAnalytics.map((c) => (
+                  <tr key={c.code} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-[#093765] dark:text-indigo-400">
+                      {c.code}
+                    </td>
+                    <td className="py-3.5 px-4 font-black font-mono text-emerald-600 text-sm">
+                      {c.discountPercentage}% OFF
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800 dark:text-slate-200">
+                      {c.redemptionCount}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-rose-600 dark:text-rose-400">
+                      {inr(c.totalDiscountINR)}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">
+                      {c.uniqueUsersCount}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <StatusBadge status={c.active ? 'ACTIVE' : 'EXPIRED'} />
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px] text-right">
+                      {c.lastRedeemedAt ? new Date(c.lastRedeemedAt).toLocaleDateString() : 'Never'}
                     </td>
                   </tr>
                 ))
