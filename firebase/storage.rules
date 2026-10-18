@@ -4,25 +4,25 @@ rules_version = '2';
 // request.auth is therefore always null for every real request this app makes, so a rule like
 // "allow write: if request.auth != null" would reject 100% of legitimate uploads, not just attackers.
 //
-// WRITE (audit finding F-01, fixed): the client Storage SDK is no longer used to write to any of these
-// paths at all. Every upload now goes through a backend endpoint (POST /upload-url or, for the admin
-// dashboard, POST /admin/upload-url) that mints a short-lived, write-only V4 signed URL scoped to exactly
-// one object under the caller's own prefix (uploads/<userId>/..., profiles/<userId>/...), after the backend
-// has verified the caller's identity via its own JWT auth. The browser never holds a standing write
-// credential to this bucket — see functions/src/controllers/upload.controller.js's postGetUploadUrl and
-// admin.controller.js's postGetAdminUploadUrl. `write: if false` below is therefore safe: nothing legitimate
-// writes through these rules anymore, only through the signed URLs issued outside of them.
+// WRITE and, for /uploads, READ (audit finding F-01, fixed): the client Storage SDK is no longer used to
+// read or write /uploads/** at all. Both now go through backend endpoints -- POST /upload-url (write) and
+// POST /read-url (read), or POST /admin/upload-url for the admin dashboard's own uploads -- that mint a
+// short-lived V4 signed URL scoped to exactly one object, after the backend verifies the caller's identity
+// via its own JWT auth and (for reads) that the object path belongs to them. See
+// functions/src/controllers/upload.controller.js's postGetUploadUrl/postGetReadUrl and admin.controller.js's
+// postGetAdminUploadUrl. Signed URLs are issued and verified by Cloud Storage's own IAM-based signing
+// mechanism (storage.googleapis.com), which is a DIFFERENT code path from these Firebase security rules
+// (which only govern the Firebase client SDK / firebasestorage.googleapis.com) -- `read: if false` and
+// `write: if false` below only block direct, unsigned access; they do not affect the signed-URL flow at all.
 //
-// READ (NOT yet closed — tracked follow-up, not an oversight): several existing frontend flows load an
-// uploaded file's Storage URL directly (e.g. mimo-website/src/app/pages/print-options.tsx uses the
-// uploaded image's URL as an <img src> for the pre-checkout preview). Removing public read here without
-// first migrating those call sites to the new POST /read-url signed-read endpoint (see upload.controller.js's
-// postGetReadUrl, already built and tested) would break that customer-facing preview. Closing this needs a
-// dedicated pass through every such call site with real testing, not a blind rules flip — do not set
-// `read: if false` on uploads/profiles/screensaver below until that migration is done and verified.
+// profiles/screensaver/templates/ads stay read: true -- deliberately, not an oversight. These are lower
+// sensitivity than a customer's own uploaded print document (an avatar, a kiosk marketing video, a shared
+// blank-sheet template, an ad banner) and several existing frontend flows display them by their plain URL.
+// Only /uploads holds potentially-sensitive customer documents, so it's the one path this migration
+// actually needed to close for read, not the others.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /uploads/{allPaths=**} { allow read: if true; allow write: if false; }
+    match /uploads/{allPaths=**} { allow read: if false; allow write: if false; }
     match /profiles/{allPaths=**} { allow read: if true; allow write: if false; }
     match /screensaver/{allPaths=**} { allow read: if true; allow write: if false; }
     match /templates/{allPaths=**} { allow read: if true; allow write: if false; }
