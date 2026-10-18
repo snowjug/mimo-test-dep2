@@ -56,6 +56,9 @@ function applyOps(op, a, b) {
 // same "abort and retry on conflict" guarantee real Firestore transactions provide.
 function createFakeFirestore(seed = {}, { strictTransactions = false } = {}) {
   const state = { store: new Map(), log: { writes: [], reads: 0 }, autoId: 0, version: 0 };
+  // In-memory Cloud Storage objects, keyed by relative path (e.g. "uploads/u1/1_doc.pdf"), for tests that
+  // exercise code going through admin.storage().bucket() (direct Admin SDK access, same as production).
+  const storageObjects = new Map();
 
   const load = (data) => {
     state.store = new Map();
@@ -65,6 +68,7 @@ function createFakeFirestore(seed = {}, { strictTransactions = false } = {}) {
     state.log = { writes: [], reads: 0 };
     state.autoId = 0;
     state.version = 0;
+    storageObjects.clear();
   };
   const col = (name) => { if (!state.store.has(name)) state.store.set(name, new Map()); return state.store.get(name); };
 
@@ -199,6 +203,26 @@ function createFakeFirestore(seed = {}, { strictTransactions = false } = {}) {
     }),
     // Tests that do not care about Firebase Auth get a predictable failure, like a user that does not exist.
     auth: () => ({ getUser: async () => { const e = new Error("fake: user not found in Firebase Auth"); e.code = "auth/user-not-found"; throw e; } }),
+    // Minimal Cloud Storage stand-in: enough for code that downloads/checks-existence/signs a URL for an
+    // object by path, backed by the storageObjects map above (seed via fake.storage.set(path, buffer)).
+    storage: () => ({
+      bucket: () => ({
+        name: "fake-test-bucket",
+        file: (objectPath) => ({
+          download: async () => {
+            if (!storageObjects.has(objectPath)) {
+              const err = new Error(`fake storage: no such object: ${objectPath}`);
+              err.code = 404;
+              throw err;
+            }
+            return [storageObjects.get(objectPath)];
+          },
+          exists: async () => [storageObjects.has(objectPath)],
+          getSignedUrl: async () => [`https://fake-signed.example/${objectPath}`],
+          delete: async () => { storageObjects.delete(objectPath); },
+        }),
+      }),
+    }),
   };
 
   load(seed);
@@ -207,6 +231,12 @@ function createFakeFirestore(seed = {}, { strictTransactions = false } = {}) {
     reset: load,
     get log() { return state.log; },
     data: (name) => Object.fromEntries([...col(name).entries()].map(([id, d]) => [id, clone(d)])),
+    /** Seed/inspect the fake Storage bucket: fake.storage.set("uploads/u1/1_a.pdf", buffer), .has(path), .delete(path). */
+    storage: {
+      set: (objectPath, buffer) => storageObjects.set(objectPath, buffer),
+      has: (objectPath) => storageObjects.has(objectPath),
+      delete: (objectPath) => storageObjects.delete(objectPath),
+    },
     /** Install as the module config/firebase for a test file (call BEFORE requiring code under test). */
     install() {
       const p = require.resolve("../../src/config/firebase");
