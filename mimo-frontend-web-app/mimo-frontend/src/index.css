@@ -70,6 +70,7 @@
   html {
     width: 100%;
     height: 100%;
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -83,6 +84,7 @@
     -webkit-font-smoothing: antialiased;
     width: 100%;
     height: 100%;
+    min-height: 100dvh;
     background: #FAFAF8;
     overflow: hidden;
     position: relative;
@@ -98,7 +100,7 @@
 
   #root {
     width: var(--kiosk-width, 1440px);
-    height: 810px;
+    height: var(--kiosk-height, 810px);
     background: #FAFAF8;
     position: absolute;
     top: 50%;
@@ -110,20 +112,22 @@
 
   #root.theme-cv001,
   #root.theme-sv002 {
-    background: #F8FAFC;
+    background: #1A0A01;
   }
 
   body.theme-cv001,
   body.theme-sv002,
   html.kiosk-full-bleed body.theme-cv001,
-  html.kiosk-full-bleed body.theme-sv002 {
-    background: #F8FAFC;
+  html.kiosk-full-bleed body.theme-sv002,
+  html.theme-sv002,
+  html.kiosk-full-bleed {
+    background: #1A0A01 !important;
   }
 
-  @media (max-width: 1000px) {
+  @media (max-width: 1000px) and (orientation: portrait) {
     #root {
       width: var(--kiosk-width, 1440px);
-      height: 810px;
+      height: var(--kiosk-height, 810px);
       transform: translate(-50%, -50%) rotate(-90deg) scale(var(--kiosk-scale, 1));
       transform-origin: center;
     }
@@ -258,20 +262,21 @@ body.theme-sv002,
    1. GLOBAL CANVAS & BACKDROP FOR CV-001 & SV-002
    ================================================================== */
 body.theme-cv001,
-body.theme-sv002,
 html.kiosk-full-bleed body.theme-cv001,
+#root.theme-cv001 {
+  background: #1A0A01 !important;
+}
+
+body.theme-sv002,
 html.kiosk-full-bleed body.theme-sv002,
-#root.theme-cv001,
+html.theme-sv002,
 #root.theme-sv002 {
   background: #1A0A01 !important;
 }
 
 #root.theme-cv001 .cv001-bg-wrapper > div,
-#root.theme-sv002 .cv001-bg-wrapper > div,
 #root.theme-cv001 .bg-\[\#FFF8EC\],
-#root.theme-sv002 .bg-\[\#FFF8EC\],
-#root.theme-cv001 .bg-parchment-100,
-#root.theme-sv002 .bg-parchment-100 {
+#root.theme-cv001 .bg-parchment-100 {
   background-color: #1A0A01 !important;
   background-image:
     radial-gradient(circle 900px at 70% 45%, rgba(180, 100, 20, 0.28) 0%, rgba(90, 40, 8, 0.16) 45%, transparent 75%),
@@ -280,16 +285,27 @@ html.kiosk-full-bleed body.theme-sv002,
   background-repeat: no-repeat !important;
 }
 
+#root.theme-sv002 .cv001-bg-wrapper > div,
+#root.theme-sv002 .bg-\[\#FFF8EC\],
+#root.theme-sv002 .bg-parchment-100 {
+  background-color: #1A0A01 !important;
+  background-image: none !important;
+}
+
 /* ==================================================================
    2. REFERENCE A — WELCOME SCREEN (FIRST PAGE)
    ================================================================== */
-#root.theme-cv001 .cv001-welcome-screen,
-#root.theme-sv002 .sv002-welcome-screen {
+#root.theme-cv001 .cv001-welcome-screen {
   background-color: #1A0A01 !important;
   background-image: url(/navratri-welcome-bg.png) !important;
   background-size: cover !important;
   background-position: center right !important;
   background-repeat: no-repeat !important;
+}
+
+#root.theme-sv002 .sv002-welcome-screen {
+  background-color: #1A0A01 !important;
+  background-image: none !important;
 }
 
 /* Swipe-to-start track matching Reference A for both MIMO 1.0 & MIMO 2.0 */

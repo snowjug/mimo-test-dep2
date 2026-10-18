@@ -210,21 +210,34 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                 style={{
                     display: isActive ? 'flex' : 'none',
                     backgroundColor: '#1A0A01',
-                    backgroundImage: 'url(/navratri-welcome-bg.png)',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center right',
-                    backgroundRepeat: 'no-repeat',
                 }}
             >
-                {/* Subtle cinematic amber illumination for atmosphere */}
+                {/* Original Goddess Durga Hero Image (Large, Sharp, Fiery — Screenshot 1 scale + Screenshot 2 clarity) */}
                 <div 
-                    className="pointer-events-none absolute inset-0 z-0"
+                    className="pointer-events-none absolute right-0 top-0 bottom-0 z-0 select-none overflow-hidden flex items-center justify-end"
                     style={{
-                        background: 'radial-gradient(circle 700px at 28% 45%, rgba(120, 50, 10, 0.28) 0%, transparent 70%)'
+                        width: '60%',
+                        height: '100%',
                     }}
-                />
+                >
+                    <img 
+                        src="/durga-mimo2.jpg" 
+                        alt="Goddess Durga" 
+                        className="select-none pointer-events-none"
+                        style={{
+                            width: '780px',
+                            maxWidth: 'none',
+                            height: 'auto',
+                            transform: 'translateY(-2%)',
+                            marginRight: '24px',
+                            objectFit: 'contain',
+                            maskImage: 'linear-gradient(to right, transparent 0%, black 18%, black 100%)',
+                            WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 18%, black 100%)',
+                        }}
+                    />
+                </div>
 
-                <main className="relative z-10 flex h-full w-full max-w-[700px] flex-col justify-between pl-16 pr-6 pt-16 pb-10">
+                <main className="relative z-10 flex h-full w-full max-w-[700px] flex-col justify-between pl-16 pr-6 pt-16 pb-12">
                     <motion.section
                         initial={isActive ? { opacity: 0, y: 18 } : false}
                         animate={{ opacity: 1, y: 0 }}
@@ -255,13 +268,8 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                         </p>
                     </motion.section>
 
-                    <div className="flex flex-col items-start gap-5">
-                        <div className="w-full max-w-[460px]">
-                            {swipeTrack}
-                        </div>
-                        <footer className="text-[12px] font-medium text-[#A68868]/60">
-                            &copy; 2026 <strong className="font-semibold text-[#C4A480]/80">VisionPrintt</strong>. All rights reserved.
-                        </footer>
+                    <div className="w-full max-w-[460px]">
+                        {swipeTrack}
                     </div>
                 </main>
             </div>

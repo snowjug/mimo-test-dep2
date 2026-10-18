@@ -33,13 +33,16 @@ function App() {
     const rootEl = document.getElementById('root');
     // Clear themes first
     document.body.classList.remove('theme-cv001', 'theme-sv002');
+    document.documentElement.classList.remove('theme-cv001', 'theme-sv002');
     rootEl?.classList.remove('theme-cv001', 'theme-sv002');
 
     if (dynamicKioskId === 'SV-002') {
       document.body.classList.add('theme-sv002');
+      document.documentElement.classList.add('theme-sv002', 'kiosk-full-bleed');
       rootEl?.classList.add('theme-sv002');
     } else if (dynamicKioskId === 'CV-001' || isFestiveForKiosk) {
       document.body.classList.add('theme-cv001');
+      document.documentElement.classList.add('theme-cv001');
       rootEl?.classList.add('theme-cv001');
     }
   }, [dynamicKioskId, isFestiveForKiosk]);
