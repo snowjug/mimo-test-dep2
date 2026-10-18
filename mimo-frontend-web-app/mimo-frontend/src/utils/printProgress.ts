@@ -13,6 +13,7 @@ export interface PrintProgressInput {
   copies?: number;
   doubleSided?: boolean | string;
   errorMsg?: string;
+  colorMode?: 'color' | 'bw';
 }
 
 export interface PrintProgressResult {
@@ -36,16 +37,33 @@ export interface MilestoneBounds {
 /**
  * Calculates the milestone floor and ceiling percentage for in-flight progress presentation.
  * - Single-sheet job: floor = 1%, ceiling = 90% (strictly < 100% until physically confirmed).
- * - Multi-sheet job:
+ * - Multi-sheet B&W job:
  *     floor = k === 0 ? 1 : Math.round((k / N) * 95)
  *     ceiling = Math.min(95, Math.round(((k + 0.85) / N) * 95))
+ * - Color inkjet job (Epson L3250):
+ *     No hardware PJL telemetry exists to increment k sheet-by-sheet during printing.
+ *     In-flight progress must pace continuously up to 95% without freezing at sheet 1 ceiling.
+ *     floor = k === 0 ? 1 : Math.round((k / N) * 95)
+ *     ceiling = 95 (strictly < 100% until physically confirmed).
  */
 export function calculateMilestoneBounds(
   completedSheets: number,
-  totalSheets: number
+  totalSheets: number,
+  colorMode: 'color' | 'bw' = 'bw'
 ): MilestoneBounds {
   const total = Math.max(1, totalSheets);
   const completed = Math.max(0, Math.min(total, completedSheets));
+
+  if (colorMode === 'color') {
+    if (completed === total) {
+      return { floor: 100, ceiling: 100 };
+    }
+    const floor = completed > 0 ? Math.min(95, Math.round((completed / total) * 95)) : 1;
+    return {
+      floor,
+      ceiling: 95,
+    };
+  }
 
   if (total === 1) {
     return {
@@ -95,9 +113,21 @@ export function stepVisualProgress(
  * Calculates adaptive tick interval (in ms) for smooth visual progress.
  * Fast B&W laser (~3.5-4.5s per sheet): 40ms (<70%), 60ms (<85%), 100ms (<90%)
  * Color inkjet (~20-25s per sheet): 200ms
+ * When totalSheets > 1, scales proportionally so in-flight progress advances smoothly
+ * at the physical speed of the printer without stalling.
  */
-export function getVisualTickDelay(currentProgress: number, colorMode = 'bw'): number {
+export function getVisualTickDelay(currentProgress: number, colorMode = 'bw', totalSheets = 1): number {
   const isColor = colorMode === 'color';
+  if (totalSheets > 1) {
+    if (isColor) {
+      // Epson Color Inkjet: ~12s warmup + ~16s per physical sheet
+      const expectedTotalMs = (12 + totalSheets * 16) * 1000;
+      return Math.max(150, Math.round(expectedTotalMs / 95));
+    }
+    // Brother B&W Laser: ~3.5s warmup + ~2.5s per physical sheet
+    const expectedTotalMs = (3.5 + totalSheets * 2.5) * 1000;
+    return Math.max(40, Math.round(expectedTotalMs / 95));
+  }
   if (isColor) {
     return 200;
   }
@@ -120,6 +150,7 @@ export function calculatePrintProgress({
   copies = 1,
   doubleSided = false,
   errorMsg,
+  colorMode = 'bw',
 }: PrintProgressInput): PrintProgressResult {
   const isDuplex = doubleSided === true || doubleSided === 'double';
   const fallbackSheets = (isDuplex ? Math.ceil(pages / 2) : pages) * copies;
@@ -159,7 +190,7 @@ export function calculatePrintProgress({
     const validRaw = !isNaN(rawCompleted) && rawCompleted >= 0 ? rawCompleted : 0;
     // Monotonic bounds: keep sheets count within [previousSheetsCompleted, total]
     const completed = Math.min(total, Math.max(previousSheetsCompleted, validRaw));
-    const bounds = calculateMilestoneBounds(completed, total);
+    const bounds = calculateMilestoneBounds(completed, total, colorMode);
 
     // Initialise at least to floor when actively printing, clamp within [floor, ceiling]
     const currentClamped = Math.min(
@@ -171,7 +202,12 @@ export function calculatePrintProgress({
     if (total === 1) {
       statusMsg = 'Printing document…';
     } else if (completed === 0) {
-      statusMsg = 'Warming up printer…';
+      if (colorMode === 'color') {
+        const estSheet = Math.min(total, Math.max(1, Math.ceil((currentClamped / 95) * total)));
+        statusMsg = currentClamped < 15 ? 'Warming up printer…' : `Printing sheet ${estSheet} of ${total}…`;
+      } else {
+        statusMsg = 'Warming up printer…';
+      }
     } else {
       statusMsg = `Printing sheet ${completed} of ${total}…`;
     }
@@ -194,7 +230,7 @@ export function calculatePrintProgress({
     const rawCompleted = Number(sheetsCompleted);
     const validRaw = !isNaN(rawCompleted) && rawCompleted >= 0 ? rawCompleted : 0;
     const completed = Math.min(total, Math.max(previousSheetsCompleted, validRaw));
-    const bounds = calculateMilestoneBounds(completed, total);
+    const bounds = calculateMilestoneBounds(completed, total, colorMode);
     const currentClamped = Math.min(
       bounds.ceiling,
       Math.max(bounds.floor, previousProgress)
@@ -204,7 +240,12 @@ export function calculatePrintProgress({
     if (total === 1) {
       statusMsg = 'Printing document…';
     } else if (completed === 0) {
-      statusMsg = 'Warming up printer…';
+      if (colorMode === 'color') {
+        const estSheet = Math.min(total, Math.max(1, Math.ceil((currentClamped / 95) * total)));
+        statusMsg = currentClamped < 15 ? 'Warming up printer…' : `Printing sheet ${estSheet} of ${total}…`;
+      } else {
+        statusMsg = 'Warming up printer…';
+      }
     } else {
       statusMsg = `Printing sheet ${completed} of ${total}…`;
     }

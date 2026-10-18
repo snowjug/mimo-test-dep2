@@ -135,15 +135,17 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     setProgress(100);
     setStatusMsg('Print Completed ✅');
 
-    // 400ms celebration hold before transitioning to summary screen
+    // 800ms celebration hold before transitioning to summary screen
     completionTimerRef.current = window.setTimeout(() => {
       onComplete();
-    }, 400);
+    }, 800);
   }, [clearAllTimers, onComplete]);
 
   // Smooth visual progress tick: advances gradually towards the milestone ceiling
   const startSmoothTick = useCallback(() => {
     if (tickTimerRef.current) return;
+
+    const totalSheets = Math.max(1, pages * copies);
 
     const tick = () => {
       if (isCompletingRef.current) return;
@@ -161,13 +163,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         setProgress(next);
       }
 
-      const delay = getVisualTickDelay(progressRef.current, colorMode);
+      const delay = getVisualTickDelay(progressRef.current, colorMode, totalSheets);
       tickTimerRef.current = window.setTimeout(tick, delay);
     };
 
-    const initialDelay = getVisualTickDelay(progressRef.current, colorMode);
+    const initialDelay = getVisualTickDelay(progressRef.current, colorMode, totalSheets);
     tickTimerRef.current = window.setTimeout(tick, initialDelay);
-  }, [colorMode]);
+  }, [colorMode, pages, copies]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
@@ -217,6 +219,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           copies,
           doubleSided,
           errorMsg: errMsg,
+          colorMode,
         });
 
         sheetsCompletedRef.current = result.sheetsCompleted;
@@ -373,7 +376,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       const isDuplex = doubleSided === true || doubleSided === 'double';
       const fallbackSheets = (isDuplex ? Math.ceil(pages / 2) : pages) * copies;
       const initialTotal = Math.max(1, fallbackSheets);
-      const initialBounds = calculateMilestoneBounds(0, initialTotal);
+      const initialBounds = calculateMilestoneBounds(0, initialTotal, colorMode);
 
       milestoneFloorRef.current = initialBounds.floor;
       milestoneCeilingRef.current = initialBounds.ceiling;
