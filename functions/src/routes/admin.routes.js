@@ -23,6 +23,7 @@ router.get("/admin/settings", adminAuthMiddleware, admin.getAdminSettings);
 router.post("/admin/settings", adminAuthMiddleware, admin.postAdminSettings);
 router.get("/admin/screensaver", adminAuthMiddleware, admin.getAdminScreensaver);
 router.post("/admin/screensaver", adminAuthMiddleware, admin.postAdminScreensaver);
+router.post("/admin/upload-url", adminAuthMiddleware, admin.postGetAdminUploadUrl);
 router.get("/admin/hardware", adminAuthMiddleware, admin.getAdminHardware);
 router.post("/admin/hardware", adminAuthMiddleware, admin.postAdminHardware);
 router.get("/admin/metrics", adminAuthMiddleware, admin.getAdminMetrics);

@@ -131,6 +131,7 @@
   "POST /admin/screensaver",
   "POST /admin/settings",
   "POST /admin/settlements/sync",
+  "POST /admin/upload-url",
   "POST /cashfree-webhook",
   "POST /check-status",
   "POST /create-blank-job",
@@ -160,6 +161,7 @@
   "POST /marketing/tasks",
   "POST /onboarding",
   "POST /payment-success",
+  "POST /read-url",
   "POST /register",
   "POST /request-refund",
   "POST /sessions",
@@ -186,6 +188,7 @@
   "POST /technical/work-sessions/resume",
   "POST /technical/work-sessions/start",
   "POST /upload-profile-photo",
+  "POST /upload-url",
   "POST /whatsapp-webhook",
   "PUT /profile"
 ]

@@ -7,6 +7,8 @@ const upload = require("../controllers/upload.controller");
 const router = express.Router();
 const { writeActionLimiter } = createLimiters(db);
 
+router.post("/upload-url", authMiddleware, writeActionLimiter, upload.postGetUploadUrl);
+router.post("/read-url", authMiddleware, writeActionLimiter, upload.postGetReadUrl);
 router.post("/finalize-upload", authMiddleware, writeActionLimiter, upload.postFinalizeUpload);
 router.post("/generate-text-pdf", authMiddleware, writeActionLimiter, upload.postGenerateTextPdf);
 router.post("/create-blank-job", authMiddleware, writeActionLimiter, upload.postCreateBlankJob);

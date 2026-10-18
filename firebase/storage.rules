@@ -3,21 +3,29 @@ rules_version = '2';
 // customer website nor the admin dashboard ever calls signInWithCustomToken/signInWithEmailAndPassword/etc).
 // request.auth is therefore always null for every real request this app makes, so a rule like
 // "allow write: if request.auth != null" would reject 100% of legitimate uploads, not just attackers.
-// Until there's a real bridge from this app's existing custom-JWT auth to Firebase Auth (e.g. the backend
-// issuing a Firebase custom token after JWT login, and the frontend calling signInWithCustomToken with it,
-// then scoping these rules by request.auth.uid), per-user ownership cannot be enforced here.
 //
-// This is therefore a PARTIAL mitigation, not a full fix: it stops an attacker from touching anything in
-// this bucket OUTSIDE the paths the app actually uses, but within those paths read/write is unchanged
-// (still unauthenticated) because the app's real upload flow (uploadBytesResumable directly from the
-// browser in upload-file.tsx, user-profile.tsx, and the admin dashboard's ConfigurationPage.tsx) has no
-// identity to check. Properly closing this requires the auth bridge described above.
+// WRITE (audit finding F-01, fixed): the client Storage SDK is no longer used to write to any of these
+// paths at all. Every upload now goes through a backend endpoint (POST /upload-url or, for the admin
+// dashboard, POST /admin/upload-url) that mints a short-lived, write-only V4 signed URL scoped to exactly
+// one object under the caller's own prefix (uploads/<userId>/..., profiles/<userId>/...), after the backend
+// has verified the caller's identity via its own JWT auth. The browser never holds a standing write
+// credential to this bucket — see functions/src/controllers/upload.controller.js's postGetUploadUrl and
+// admin.controller.js's postGetAdminUploadUrl. `write: if false` below is therefore safe: nothing legitimate
+// writes through these rules anymore, only through the signed URLs issued outside of them.
+//
+// READ (NOT yet closed — tracked follow-up, not an oversight): several existing frontend flows load an
+// uploaded file's Storage URL directly (e.g. mimo-website/src/app/pages/print-options.tsx uses the
+// uploaded image's URL as an <img src> for the pre-checkout preview). Removing public read here without
+// first migrating those call sites to the new POST /read-url signed-read endpoint (see upload.controller.js's
+// postGetReadUrl, already built and tested) would break that customer-facing preview. Closing this needs a
+// dedicated pass through every such call site with real testing, not a blind rules flip — do not set
+// `read: if false` on uploads/profiles/screensaver below until that migration is done and verified.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /uploads/{allPaths=**} { allow read, write: if true; }
-    match /profiles/{allPaths=**} { allow read, write: if true; }
-    match /screensaver/{allPaths=**} { allow read, write: if true; }
-    match /templates/{allPaths=**} { allow read, write: if true; }
+    match /uploads/{allPaths=**} { allow read: if true; allow write: if false; }
+    match /profiles/{allPaths=**} { allow read: if true; allow write: if false; }
+    match /screensaver/{allPaths=**} { allow read: if true; allow write: if false; }
+    match /templates/{allPaths=**} { allow read: if true; allow write: if false; }
     // Ads are written ONLY server-side (ads.controller.js's postAdminAdImage, via the Admin SDK, which
     // already bypasses these rules entirely) -- never directly from a browser, unlike the paths above.
     // So this only needs read, not write: granting write here would let anyone write arbitrary files to

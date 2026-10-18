@@ -6,8 +6,6 @@ import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine,
 import { toast } from "sonner";
 import api from "../api";
 import { AdBanner } from "../components/AdBanner";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { storage } from "../../lib/firebase";
 import { getTimeLeft, isCodeActive } from "../utils/print-code-expiry";
 
 interface UploadedFile {
@@ -572,77 +570,98 @@ export function UploadFile() {
         return { clientUploadId: nf.clientUploadId!, name: f.name, type: f.type, size: f.size, pageCount };
       }));
 
-      // 2. Upload directly to Firebase Storage with task tracking & cancellation support
+      // 2. Upload via a short-lived, server-minted signed URL (POST /upload-url) rather than writing
+      // directly to Cloud Storage with the client SDK -- the bucket no longer grants public write access
+      // (see firebase/storage.rules), so the backend mints a one-shot, write-only credential scoped to
+      // this user's own uploads/ prefix for exactly this file, and the browser PUTs the bytes to that.
+      // XMLHttpRequest (not fetch) is used specifically because it's the only browser API that exposes
+      // upload progress events and a clean abort() for cancellation, matching what uploadBytesResumable
+      // gave us before.
       const uploadPromises = newFiles.map(async (nf) => {
         const tracker = activeUploadsRef.current.get(nf.clientUploadId!)!;
         const file = tracker.file!;
-        const uniqueFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-        const storageRef = ref(storage, `uploads/${userName.replace(/[^a-zA-Z0-9]/g, '_')}/${uniqueFileName}`);
-        const uploadTask = uploadBytesResumable(storageRef, file);
-
-        tracker.uploadTask = uploadTask;
 
         return new Promise<any>((resolve) => {
-          uploadTask.on(
-            "state_changed",
-            (snapshot) => {
+          (async () => {
+            try {
+              const { data: urlData } = await api.post("/upload-url", {
+                fileName: file.name,
+                contentType: file.type || "application/octet-stream",
+                purpose: "document",
+              });
+
               if (cancelledUploadIdsRef.current.has(nf.clientUploadId!)) {
-                return;
-              }
-              const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-              const displayProgress = progress === 100 ? 99 : progress;
-              setFiles((prev) =>
-                prev.map((f) =>
-                  f.clientUploadId === nf.clientUploadId ? { ...f, progress: displayProgress } : f
-                )
-              );
-            },
-            (error: any) => {
-              // Handle cancellation gracefully without throwing or rejecting concurrent uploads
-              if (cancelledUploadIdsRef.current.has(nf.clientUploadId!) || error?.code === "storage/canceled") {
-                console.log(`[UPLOAD] Upload intentionally cancelled for ${nf.name} (${nf.clientUploadId})`);
-                resolve(null);
-                return;
-              }
-              console.error(`[UPLOAD ERROR] ${nf.name}:`, error);
-              resolve({ error, clientUploadId: nf.clientUploadId, name: nf.name });
-            },
-            async () => {
-              // RACE CHECK 1: Was this upload cancelled before completion callback fired?
-              if (cancelledUploadIdsRef.current.has(nf.clientUploadId!)) {
-                console.log(`[UPLOAD RACE] Upload completed after cancellation for ${nf.name}. Discarding and cleaning up.`);
-                try {
-                  const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                  await api.delete("/remove-file", { data: { fileUrl: downloadURL } }).catch(() => {});
-                } catch (_) {}
                 resolve(null);
                 return;
               }
 
-              try {
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                // RACE CHECK 2: Cancelled while fetching download URL?
+              const xhr = new XMLHttpRequest();
+              // Same shape the old Firebase uploadTask exposed (a .cancel() method), so removeFile()'s
+              // existing cancellation call site (tracker.uploadTask.cancel()) needs no changes.
+              tracker.uploadTask = { cancel: () => xhr.abort() };
+
+              xhr.upload.onprogress = (e) => {
+                if (cancelledUploadIdsRef.current.has(nf.clientUploadId!) || !e.lengthComputable) return;
+                const progress = Math.round((e.loaded / e.total) * 100);
+                const displayProgress = progress === 100 ? 99 : progress;
+                setFiles((prev) =>
+                  prev.map((f) =>
+                    f.clientUploadId === nf.clientUploadId ? { ...f, progress: displayProgress } : f
+                  )
+                );
+              };
+
+              xhr.onabort = () => {
+                console.log(`[UPLOAD] Upload intentionally cancelled for ${nf.name} (${nf.clientUploadId})`);
+                resolve(null);
+              };
+
+              xhr.onerror = () => {
                 if (cancelledUploadIdsRef.current.has(nf.clientUploadId!)) {
-                  await api.delete("/remove-file", { data: { fileUrl: downloadURL } }).catch(() => {});
                   resolve(null);
                   return;
                 }
-                tracker.downloadURL = downloadURL;
+                console.error(`[UPLOAD ERROR] ${nf.name}: network error`);
+                resolve({ error: new Error("Network error during upload"), clientUploadId: nf.clientUploadId, name: nf.name });
+              };
+
+              xhr.onload = () => {
+                // RACE CHECK: cancelled right as the upload finished -- discard and clean up the object.
+                if (cancelledUploadIdsRef.current.has(nf.clientUploadId!)) {
+                  console.log(`[UPLOAD RACE] Upload completed after cancellation for ${nf.name}. Discarding and cleaning up.`);
+                  api.delete("/remove-file", { data: { fileUrl: urlData.fileUrl } }).catch(() => {});
+                  resolve(null);
+                  return;
+                }
+                if (xhr.status < 200 || xhr.status >= 300) {
+                  console.error(`[UPLOAD ERROR] ${nf.name}: HTTP ${xhr.status}`);
+                  resolve({ error: new Error(`Upload failed (HTTP ${xhr.status})`), clientUploadId: nf.clientUploadId, name: nf.name });
+                  return;
+                }
+                tracker.downloadURL = urlData.fileUrl;
                 const meta = filesMeta.find((m) => m.clientUploadId === nf.clientUploadId);
                 resolve({
                   clientUploadId: nf.clientUploadId,
                   name: file.name,
-                  url: downloadURL,
+                  url: urlData.fileUrl,
                   type: file.type,
                   size: file.size,
                   pageCount: meta?.pageCount || 1,
                 });
-              } catch (urlErr) {
-                console.error("Failed to get download URL:", urlErr);
-                resolve({ error: urlErr, clientUploadId: nf.clientUploadId, name: nf.name });
+              };
+
+              xhr.open("PUT", urlData.uploadUrl);
+              xhr.setRequestHeader("Content-Type", urlData.contentType);
+              xhr.send(file);
+            } catch (err: any) {
+              if (cancelledUploadIdsRef.current.has(nf.clientUploadId!)) {
+                resolve(null);
+                return;
               }
+              console.error(`[UPLOAD ERROR] ${nf.name}:`, err);
+              resolve({ error: err, clientUploadId: nf.clientUploadId, name: nf.name });
             }
-          );
+          })();
         });
       });
 

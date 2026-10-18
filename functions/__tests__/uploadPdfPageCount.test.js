@@ -7,9 +7,7 @@ const test = require("node:test");
 require("./helpers/quiet");
 const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
-const { installAxiosStub } = require("./helpers/stubAxios");
 
-const http = installAxiosStub();
 const fake = createFakeFirestore();
 fake.install();
 const { postFinalizeUpload } = require("../src/controllers/upload.controller");
@@ -33,16 +31,18 @@ async function buildPdf(pageCount) {
   return Buffer.from(bytes);
 }
 
-const PDF_URL = "https://firebasestorage.googleapis.com/v0/b/mimo/o/uploads%2Fa%2F1_real.pdf?alt=media&token=t";
+// Matches what POST /upload-url actually hands back (see postGetUploadUrl): storage.googleapis.com/<bucket>/<path>.
+// "fake-test-bucket" is the name fakeFirestore's admin.storage() mock reports, so extractStoragePath resolves
+// this back to the object path "uploads/a/1_real.pdf" the same way production code would for a real bucket.
+const PDF_URL = "https://storage.googleapis.com/fake-test-bucket/uploads/a/1_real.pdf";
 
 test.beforeEach(() => {
   fake.reset({});
-  http.reset();
 });
 
 test("a client-declared pageCount LOWER than the real PDF page count is overridden by the server-verified count", async () => {
   const realBytes = await buildPdf(5);
-  http.on("get", new RegExp(PDF_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), () => ({ data: realBytes }));
+  fake.storage.set("uploads/a/1_real.pdf", realBytes);
 
   const file = {
     name: "sneaky.pdf",
@@ -66,7 +66,7 @@ test("a client-declared pageCount LOWER than the real PDF page count is overridd
 
 test("a client-declared pageCount that matches the real PDF page count is accepted normally", async () => {
   const realBytes = await buildPdf(3);
-  http.on("get", new RegExp(PDF_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), () => ({ data: realBytes }));
+  fake.storage.set("uploads/a/1_real.pdf", realBytes);
 
   const file = {
     name: "honest.pdf",
@@ -89,7 +89,7 @@ test("a client-declared pageCount that matches the real PDF page count is accept
 
 test("a corrupted/unreadable PDF is rejected with a clear 400 error instead of crashing or trusting the client count", async () => {
   const garbageBytes = Buffer.from("not a real pdf at all, just some bytes");
-  http.on("get", new RegExp(PDF_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), () => ({ data: garbageBytes }));
+  fake.storage.set("uploads/a/1_real.pdf", garbageBytes);
 
   const file = {
     name: "broken.pdf",

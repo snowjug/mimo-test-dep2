@@ -147,6 +147,41 @@ const getAdminScreensaver = async (req, res) => {
   }
 };
 
+// Admin-only equivalent of postGetUploadUrl (upload.controller.js) for the two admin-managed, public-READ
+// asset prefixes (screensaver/, ads/) -- see F-01: the bucket no longer grants public WRITE, so even these
+// staff-only uploads need a server-minted, short-lived signed URL rather than a direct client-SDK write.
+const ADMIN_UPLOAD_PREFIXES = { screensaver: "screensaver", ads: "ads" };
+const postGetAdminUploadUrl = async (req, res) => {
+  try {
+    const { fileName, contentType, purpose } = req.body || {};
+    const prefix = ADMIN_UPLOAD_PREFIXES[purpose];
+    if (!prefix) {
+      return res.status(400).json({ error: `purpose must be one of: ${Object.keys(ADMIN_UPLOAD_PREFIXES).join(", ")}` });
+    }
+    if (typeof admin.storage !== "function") {
+      return res.status(500).json({ error: "Storage is not configured." });
+    }
+    const safeName = String(fileName || "file").split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]/g, "_").slice(-150) || "file";
+    const objectPath = `${prefix}/${Date.now()}_${safeName}`;
+    const bucket = admin.storage().bucket();
+    const [uploadUrl] = await bucket.file(objectPath).getSignedUrl({
+      version: "v4",
+      action: "write",
+      expires: Date.now() + 15 * 60 * 1000,
+      contentType: contentType || "application/octet-stream",
+    });
+    res.json({
+      uploadUrl,
+      contentType: contentType || "application/octet-stream",
+      fileUrl: `https://storage.googleapis.com/${bucket.name}/${objectPath}`,
+      expiresInSeconds: 900,
+    });
+  } catch (err) {
+    console.error("[ADMIN-UPLOAD-URL] Failed to mint signed upload URL:", err.message);
+    res.status(500).json({ error: "Could not prepare the upload. Please try again." });
+  }
+};
+
 const postAdminScreensaver = async (req, res) => {
   try {
     const { videos, playSound, idleTimeoutSeconds } = req.body;
@@ -1047,6 +1082,7 @@ module.exports = {
   postAdminSettings,
   getAdminScreensaver,
   postAdminScreensaver,
+  postGetAdminUploadUrl,
   getAdminHardware,
   postAdminHardware,
   getAdminMetrics,

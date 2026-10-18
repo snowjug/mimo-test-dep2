@@ -17,8 +17,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { storage } from "../../lib/firebase";
 import { AppBar, EmptyState, Field, Group, PrimaryButton, Row, Screen, Segmented, StatusPill, inputClass } from "../components/mimo/ui";
 import { initialsOf } from "../components/mimo-header";
 import { cn } from "../components/ui/utils";
@@ -138,15 +136,20 @@ export function UserProfile() {
     if (!file) return;
     setIsUploadingPhoto(true);
     try {
-      const uniqueFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const storageRef = ref(storage, `profiles/${name.replace(/[^a-zA-Z0-9]/g, '_')}/${uniqueFileName}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-      const downloadURL = await new Promise<string>((resolve, reject) => {
-        uploadTask.on("state_changed", null, (error) => reject(error), async () => {
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve(url);
-        });
+      // Signed-URL upload (see F-01 remediation): the bucket no longer grants public write, so the backend
+      // mints a short-lived, write-only credential scoped to this user's own profiles/ prefix.
+      const { data: urlData } = await api.post("/upload-url", {
+        fileName: file.name,
+        contentType: file.type || "application/octet-stream",
+        purpose: "profile",
       });
+      const putRes = await fetch(urlData.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": urlData.contentType },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error(`Upload failed (HTTP ${putRes.status})`);
+      const downloadURL = urlData.fileUrl;
       await api.put("/profile", { photoUrl: downloadURL });
       setPhotoUrl(downloadURL);
       toast.success("Profile photo updated!");
