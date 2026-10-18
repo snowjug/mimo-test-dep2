@@ -389,4 +389,45 @@ test.describe("abuse and edge cases", () => {
     } finally { crypto.randomInt = original; }
   });
 });
+
+test.describe("re-checking out a job that is already a merge (has a files[] array)", () => {
+  // A job can already carry a files[] array if it was itself the product of an earlier merge (e.g. the
+  // customer added more documents to an existing pending job rather than starting a fresh upload). Checking
+  // that job out again must unpack every entry in files[] -- not just look at the single-file fields -- and,
+  // when merging it alongside another predecessor job, must keep the EARLIEST of their retentionStartAt
+  // values (the file's actual age for the 24h cleanup clock never resets just because it was re-merged).
+  test("unpacks every file in an existing files[] array, applies per-file page configs, and keeps the earliest retentionStartAt across predecessors", async () => {
+    const earlier = new Date("2026-01-01T00:00:00Z");
+    const later = new Date("2026-06-01T00:00:00Z");
+    seed({
+      jobs: {
+        merged: {
+          userId: "u1", status: "pending", retentionStartAt: later,
+          files: [
+            { name: "a.pdf", originalFileName: "a.pdf", url: "https://files.example/a.pdf", type: "application/pdf", size: 500, pageCount: 4 },
+            // Custom page range "1-2,4" on a 10-page file selects pages 1,2,4 -> 3 pages, not all 10.
+            { name: "b.pdf", originalFileName: "b.pdf", url: "https://files.example/b.pdf", type: "application/pdf", size: 800, pageCount: 10 },
+          ],
+        },
+        solo: { userId: "u1", status: "pending", fileName: "c.pdf", fileUrl: "https://files.example/c.pdf", mimetype: "application/pdf", size: 200, pageCount: 2, retentionStartAt: earlier },
+      },
+    });
+
+    const res = await checkout({
+      jobIds: ["merged", "solo"],
+      printOptions: { fileConfigs: { "b.pdf": { pageSelection: "custom", pageRange: "1-2,4" } } },
+    });
+
+    assert.strictEqual(res.code, 200, JSON.stringify(res.body));
+    const [job] = Object.values(fake.data("print_jobs"));
+    assert.strictEqual(job.files.length, 3, "a.pdf + b.pdf (unpacked from the existing files[]) + c.pdf (the solo job)");
+    const bEntry = job.files.find((f) => f.name === "b.pdf");
+    assert.strictEqual(bEntry.pageCount, 3, "custom range 1-2,4 on a 10-page file selects exactly 3 pages");
+    assert.strictEqual(job.pageCount, 4 + 3 + 2, "total raw pages across all three files");
+    // retentionStartAt must be the EARLIEST predecessor's, not the merged job's own (later) one, and not
+    // reset to "now" just because this is a re-checkout.
+    const retained = job.retentionStartAt.toDate ? job.retentionStartAt.toDate() : new Date(job.retentionStartAt);
+    assert.strictEqual(retained.getTime(), earlier.getTime());
+  });
+});
 void response; void controller; void mergedJobs;
