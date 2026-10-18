@@ -101,16 +101,26 @@ const postGetReadUrl = async (req, res) => {
 
     const isStaff = !!(req.user && (req.user.isAdmin || req.user.role === "finance" || req.user.role === "technical" || req.user.role === "hr" || req.user.role === "marketing"));
     if (!isStaff) {
-      // Customer path: the object must belong to one of THEIR OWN print_jobs.
       const userId = req.user.userId || req.user.id;
-      if (!jobId) return res.status(403).json({ error: "Not authorized to read this file." });
-      const jobDoc = await db.collection("print_jobs").doc(jobId).get();
-      if (!jobDoc.exists || jobDoc.data().userId !== userId) {
-        return res.status(403).json({ error: "Not authorized to read this file." });
+      // Primary check: every object this backend ever signs a WRITE url for is written under
+      // uploads/<userId>/... or profiles/<userId>/... (see postGetUploadUrl) -- nobody else could have
+      // gotten a signed URL to put something there, so the path itself is sufficient proof of ownership.
+      // This also covers files that aren't attached to any print_jobs doc yet (pre-checkout preview,
+      // sessionStorage-held cart items with no jobId to hand back).
+      const ownsByPath = objectPath === `uploads/${userId}` || objectPath.startsWith(`uploads/${userId}/`)
+        || objectPath === `profiles/${userId}` || objectPath.startsWith(`profiles/${userId}/`);
+      if (!ownsByPath) {
+        // Fallback: an explicit jobId whose print_jobs doc the caller owns and actually references this file
+        // (covers the merged-job case, where the path no longer carries the original uploader's userId alone).
+        if (!jobId) return res.status(403).json({ error: "Not authorized to read this file." });
+        const jobDoc = await db.collection("print_jobs").doc(jobId).get();
+        if (!jobDoc.exists || jobDoc.data().userId !== userId) {
+          return res.status(403).json({ error: "Not authorized to read this file." });
+        }
+        const jobFiles = Array.isArray(jobDoc.data().files) ? jobDoc.data().files : [jobDoc.data()];
+        const owns = jobFiles.some((f) => extractStoragePath(f.url || f.fileUrl, bucket.name, { mode: "reference" }) === objectPath);
+        if (!owns) return res.status(403).json({ error: "Not authorized to read this file." });
       }
-      const jobFiles = Array.isArray(jobDoc.data().files) ? jobDoc.data().files : [jobDoc.data()];
-      const owns = jobFiles.some((f) => extractStoragePath(f.url || f.fileUrl, bucket.name, { mode: "reference" }) === objectPath);
-      if (!owns) return res.status(403).json({ error: "Not authorized to read this file." });
     }
 
     const [readUrl] = await bucket.file(objectPath).getSignedUrl({

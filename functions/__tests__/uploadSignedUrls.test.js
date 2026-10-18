@@ -75,6 +75,13 @@ test.describe("POST /read-url", () => {
     assert.strictEqual(res.code, 403);
   });
 
+  test("a customer can read their OWN file with no jobId at all (pre-checkout preview, before any print_jobs merge exists)", async () => {
+    const res = response();
+    await postGetReadUrl({ user: { userId: "u1" }, body: { fileUrl: "https://storage.googleapis.com/fake-test-bucket/uploads/u1/1_not_yet_a_job.pdf" } }, res);
+    assert.strictEqual(res.code, 200, JSON.stringify(res.body));
+    assert.match(res.body.readUrl, /^https:\/\/fake-signed\.example\//);
+  });
+
   test("staff (admin) can read any file without an ownership check", async () => {
     const res = response();
     await postGetReadUrl({ user: { userId: "staff1", isAdmin: true }, body: { fileUrl: "https://storage.googleapis.com/fake-test-bucket/uploads/u2/1_b.pdf" } }, res);
