@@ -116,20 +116,76 @@ export const PAID_BY_OPTIONS = [
 
 /* ─── Color Palette for Categories & Charts ─────────────────────────── */
 const CATEGORY_COLORS: Record<string, { color: string; hex: string; icon: React.ReactNode }> = {
-  'printing supplies': { color: 'bg-emerald-100 text-emerald-700', hex: '#10b981', icon: <Printer className="w-3.5 h-3.5" /> },
-  'machine components': { color: 'bg-purple-100 text-purple-700', hex: '#8b5cf6', icon: <Layers className="w-3.5 h-3.5" /> },
-  'machine hardware': { color: 'bg-blue-100 text-blue-700', hex: '#3b82f6', icon: <Layers className="w-3.5 h-3.5" /> },
-  'developer & software': { color: 'bg-indigo-100 text-indigo-700', hex: '#6366f1', icon: <Briefcase className="w-3.5 h-3.5" /> },
-  'professional services': { color: 'bg-amber-100 text-amber-700', hex: '#f59e0b', icon: <FileText className="w-3.5 h-3.5" /> },
-  'marketing & branding': { color: 'bg-pink-100 text-pink-700', hex: '#ec4899', icon: <BarChart3 className="w-3.5 h-3.5" /> },
-  'utilities & electrical': { color: 'bg-yellow-100 text-yellow-700', hex: '#eab308', icon: <Zap className="w-3.5 h-3.5" /> },
-  'events & culture': { color: 'bg-rose-100 text-rose-700', hex: '#f43f5e', icon: <Users className="w-3.5 h-3.5" /> },
-  'networking & internet': { color: 'bg-sky-100 text-sky-700', hex: '#0284c7', icon: <Wifi className="w-3.5 h-3.5" /> },
-  'transportation & logistics': { color: 'bg-orange-100 text-orange-700', hex: '#f97316', icon: <Package className="w-3.5 h-3.5" /> },
-  'office & stationary': { color: 'bg-teal-100 text-teal-700', hex: '#14b8a6', icon: <FileText className="w-3.5 h-3.5" /> },
-  'mimo xpress': { color: 'bg-cyan-100 text-cyan-700', hex: '#06b6d4', icon: <Package className="w-3.5 h-3.5" /> },
-  'investments': { color: 'bg-violet-100 text-violet-700', hex: '#7c3aed', icon: <TrendingUp className="w-3.5 h-3.5" /> },
-  'miscellaneous': { color: 'bg-slate-100 text-slate-700', hex: '#64748b', icon: <MoreHorizontal className="w-3.5 h-3.5" /> },
+  'printing supplies': {
+    color: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-500/25',
+    hex: '#10b981',
+    icon: <Printer className="w-3.5 h-3.5" />,
+  },
+  'machine components': {
+    color: 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-purple-500/25',
+    hex: '#8b5cf6',
+    icon: <Layers className="w-3.5 h-3.5" />,
+  },
+  'machine hardware': {
+    color: 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-500/25',
+    hex: '#3b82f6',
+    icon: <Layers className="w-3.5 h-3.5" />,
+  },
+  'developer & software': {
+    color: 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-500/25',
+    hex: '#6366f1',
+    icon: <Briefcase className="w-3.5 h-3.5" />,
+  },
+  'professional services': {
+    color: 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-500/25',
+    hex: '#f59e0b',
+    icon: <FileText className="w-3.5 h-3.5" />,
+  },
+  'marketing & branding': {
+    color: 'bg-pink-50 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border border-pink-200/70 dark:border-pink-500/25',
+    hex: '#ec4899',
+    icon: <BarChart3 className="w-3.5 h-3.5" />,
+  },
+  'utilities & electrical': {
+    color: 'bg-yellow-50 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border border-yellow-200/70 dark:border-yellow-500/25',
+    hex: '#eab308',
+    icon: <Zap className="w-3.5 h-3.5" />,
+  },
+  'events & culture': {
+    color: 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200/70 dark:border-rose-500/25',
+    hex: '#f43f5e',
+    icon: <Users className="w-3.5 h-3.5" />,
+  },
+  'networking & internet': {
+    color: 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-200/70 dark:border-sky-500/25',
+    hex: '#0284c7',
+    icon: <Wifi className="w-3.5 h-3.5" />,
+  },
+  'transportation & logistics': {
+    color: 'bg-orange-50 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-200/70 dark:border-orange-500/25',
+    hex: '#f97316',
+    icon: <Package className="w-3.5 h-3.5" />,
+  },
+  'office & stationary': {
+    color: 'bg-teal-50 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-200/70 dark:border-teal-500/25',
+    hex: '#14b8a6',
+    icon: <FileText className="w-3.5 h-3.5" />,
+  },
+  'mimo xpress': {
+    color: 'bg-cyan-50 dark:bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-200/70 dark:border-cyan-500/25',
+    hex: '#06b6d4',
+    icon: <Package className="w-3.5 h-3.5" />,
+  },
+  'investments': {
+    color: 'bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-200/70 dark:border-violet-500/25',
+    hex: '#7c3aed',
+    icon: <TrendingUp className="w-3.5 h-3.5" />,
+  },
+  'miscellaneous': {
+    color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
+    hex: '#64748b',
+    icon: <MoreHorizontal className="w-3.5 h-3.5" />,
+  },
 };
 
 const CHART_PALETTE = [
@@ -141,7 +197,7 @@ const categoryConfig = (cat: string) => {
   const key = String(cat || '').trim().toLowerCase();
   return (
     CATEGORY_COLORS[key] ?? {
-      color: 'bg-slate-100 text-slate-700',
+      color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
       hex: '#64748b',
       icon: <MoreHorizontal className="w-3.5 h-3.5" />,
     }
@@ -264,7 +320,7 @@ const formatMonthLabel = (monthKey: string) => {
 const statusBadge = (s: EntryStatus, rawStatus?: string) => {
   if (s === 'approved') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-500/25">
         <CheckCircle2 className="w-2.5 h-2.5" />
         {rawStatus || 'Approved'}
       </span>
@@ -272,14 +328,14 @@ const statusBadge = (s: EntryStatus, rawStatus?: string) => {
   }
   if (s === 'rejected') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200/70 dark:border-rose-500/25">
         <AlertTriangle className="w-2.5 h-2.5" />
         Rejected
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-500/25">
       <Clock className="w-2.5 h-2.5" />
       Draft
     </span>
@@ -289,7 +345,7 @@ const statusBadge = (s: EntryStatus, rawStatus?: string) => {
 const psrBadge = (s: PsrStatus) => {
   if (s === 'filed') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-500/25">
         <CheckCircle2 className="w-2.5 h-2.5" />
         PSR Filed
       </span>
@@ -297,14 +353,14 @@ const psrBadge = (s: PsrStatus) => {
   }
   if (s === 'generated') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-500/25">
         <FileText className="w-2.5 h-2.5" />
         PSR Ready
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
       <Clock className="w-2.5 h-2.5" />
       Pending
     </span>
@@ -959,12 +1015,18 @@ export const FinanceExpensesPage: React.FC = () => {
               const pct = (amt / total) * 100;
               return (
                 <div key={cat} className="flex items-center gap-2 sm:gap-3 text-xs">
-                  <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold ${cfg.color} min-w-[140px] sm:min-w-[160px] truncate`}>
+                  <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] sm:text-[11px] font-bold ${cfg.color} min-w-[145px] sm:min-w-[170px] truncate shadow-2xs`}>
                     {cfg.icon}
-                    {cat}
+                    <span className="truncate">{cat}</span>
                   </span>
                   <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                    <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.min(pct, 100)}%`,
+                        backgroundColor: cfg.hex || '#6366f1',
+                      }}
+                    />
                   </div>
                   <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 min-w-[75px] text-right">{inr(amt)}</span>
                   <span className="text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 min-w-[32px] text-right">{pct.toFixed(0)}%</span>

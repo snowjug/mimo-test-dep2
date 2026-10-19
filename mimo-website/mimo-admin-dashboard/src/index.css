@@ -363,28 +363,55 @@ body {
     background-color: rgba(35, 38, 53, 0.5);
   }
   /* Comprehensive dark mode adaptation for colored badge pastels */
-  :where(.dark) .finance-main .bg-emerald-50 {
-    background-color: rgba(16, 185, 129, 0.14) !important;
+  :where(.dark) .finance-main .bg-emerald-50,
+  :where(.dark) .finance-main .bg-emerald-100,
+  :where(.dark) .finance-main .bg-green-50,
+  :where(.dark) .finance-main .bg-green-100 {
+    background-color: rgba(16, 185, 129, 0.15) !important;
     color: #34d399 !important;
+    border-color: rgba(16, 185, 129, 0.25) !important;
   }
-  :where(.dark) .finance-main .bg-amber-50 {
-    background-color: rgba(245, 158, 11, 0.14) !important;
+  :where(.dark) .finance-main .bg-amber-50,
+  :where(.dark) .finance-main .bg-amber-100,
+  :where(.dark) .finance-main .bg-yellow-50,
+  :where(.dark) .finance-main .bg-yellow-100,
+  :where(.dark) .finance-main .bg-orange-50,
+  :where(.dark) .finance-main .bg-orange-100 {
+    background-color: rgba(245, 158, 11, 0.15) !important;
     color: #fbbf24 !important;
+    border-color: rgba(245, 158, 11, 0.25) !important;
   }
   :where(.dark) .finance-main .bg-rose-50,
-  :where(.dark) .finance-main .bg-red-50 {
-    background-color: rgba(244, 63, 94, 0.14) !important;
+  :where(.dark) .finance-main .bg-rose-100,
+  :where(.dark) .finance-main .bg-red-50,
+  :where(.dark) .finance-main .bg-red-100 {
+    background-color: rgba(244, 63, 94, 0.15) !important;
     color: #fb7185 !important;
+    border-color: rgba(244, 63, 94, 0.25) !important;
   }
   :where(.dark) .finance-main .bg-sky-50,
-  :where(.dark) .finance-main .bg-cyan-50 {
-    background-color: rgba(14, 165, 233, 0.14) !important;
+  :where(.dark) .finance-main .bg-sky-100,
+  :where(.dark) .finance-main .bg-cyan-50,
+  :where(.dark) .finance-main .bg-cyan-100,
+  :where(.dark) .finance-main .bg-blue-50,
+  :where(.dark) .finance-main .bg-blue-100,
+  :where(.dark) .finance-main .bg-teal-50,
+  :where(.dark) .finance-main .bg-teal-100 {
+    background-color: rgba(14, 165, 233, 0.15) !important;
     color: #38bdf8 !important;
+    border-color: rgba(14, 165, 233, 0.25) !important;
   }
   :where(.dark) .finance-main .bg-purple-50,
-  :where(.dark) .finance-main .bg-indigo-50 {
-    background-color: rgba(99, 102, 241, 0.14) !important;
-    color: #818cf8 !important;
+  :where(.dark) .finance-main .bg-purple-100,
+  :where(.dark) .finance-main .bg-indigo-50,
+  :where(.dark) .finance-main .bg-indigo-100,
+  :where(.dark) .finance-main .bg-violet-50,
+  :where(.dark) .finance-main .bg-violet-100,
+  :where(.dark) .finance-main .bg-pink-50,
+  :where(.dark) .finance-main .bg-pink-100 {
+    background-color: rgba(99, 102, 241, 0.15) !important;
+    color: #a5b4fc !important;
+    border-color: rgba(99, 102, 241, 0.25) !important;
   }
 }
 
