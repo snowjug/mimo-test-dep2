@@ -9,17 +9,15 @@ import {
   IndianRupee,
   Calendar,
   Eye,
-  EyeOff,
+  Shield,
   Layers,
   Repeat,
   ShoppingBag,
-  Shield,
 } from 'lucide-react';
 import { FinanceMetricCard } from '../components/FinanceMetricCard';
 import { FinanceChartCard } from '../components/FinanceChartCard';
 import { ErrorBanner } from '../../../components/insights/InsightBits';
 import { LiveIndicator } from '../../../components/ui/LiveIndicator';
-import { DateRangePicker } from '../../../components/ui/DateRangePicker';
 import { useRange } from '../../../context/RangeContext';
 import { describeRange } from '../../../lib/dateRange';
 import { inr, int } from '../../../lib/format';
@@ -45,7 +43,7 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
   updatedAt,
   onRefresh,
 }) => {
-  const { range, setRange, live } = useRange();
+  const { range, live } = useRange();
   const [maskPII, setMaskPII] = useState<boolean>(true);
 
   const maxMonthly = Math.max(1, ...(r?.monthlyPayments?.map((m) => m.total) ?? [1]));
@@ -53,30 +51,30 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
   return (
     <div className="space-y-6 animate-fadeIn font-sans pb-12">
       {/* ── HEADER & CONTROLS ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
               Customer Analytics
             </h1>
-            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+            <span className="px-2.5 py-0.5 text-[10.5px] font-bold rounded-full bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-500/30">
               Jan 2026 Baseline
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
             Cohort retention curves, conversion funnel, AOV, and customer spend behavior · {describeRange(range)}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
+        <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
           {/* PII Masking Toggle */}
           <button
             type="button"
             onClick={() => setMaskPII(!maskPII)}
             className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
               maskPII
-                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/25'
+                : 'bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/25'
             }`}
             title="Toggle Student PII Masking for compliance with data privacy standards"
           >
@@ -84,7 +82,6 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
             <span>PII Masking: {maskPII ? 'PROTECTED' : 'UNMASKED'}</span>
           </button>
 
-          <DateRangePicker value={range} onChange={setRange} tone="finance" />
           <LiveIndicator updatedAt={updatedAt} live={live} tone="finance" />
         </div>
       </div>
@@ -92,13 +89,13 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
       {error && <ErrorBanner message={error} onRetry={onRefresh} />}
 
       {/* ── CORE METRICS ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         <FinanceMetricCard
           title="Total Registered Users"
           value={r ? int(r.totalRegisteredUsers) : '—'}
           icon={<Users className="w-4 h-4" />}
           loading={loading}
-          comparisonText="Real accounts (excludes walk-up guests)"
+          comparisonText="Real student accounts"
         />
         <FinanceMetricCard
           title="Guest Sessions"
@@ -107,7 +104,7 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
           iconBgColor="bg-amber-50"
           iconColor="text-amber-600"
           loading={loading}
-          comparisonText="Walk-up QR scans without registration"
+          comparisonText="Walk-up QR scans"
         />
         <FinanceMetricCard
           title="Active Users In Range"
@@ -116,7 +113,7 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
           iconBgColor="bg-emerald-50"
           iconColor="text-emerald-600"
           loading={loading}
-          comparisonText="Printed at least one job in range"
+          comparisonText="Completed 1+ print job"
         />
         <FinanceMetricCard
           title="Conversion Rate"
@@ -125,7 +122,7 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
           iconBgColor="bg-rose-50"
           iconColor="text-rose-600"
           loading={loading}
-          comparisonText="Registered users who paid at least once"
+          comparisonText="Registered to paid order"
         />
         <FinanceMetricCard
           title="Average Order Value"
@@ -134,7 +131,7 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
           iconBgColor="bg-sky-50"
           iconColor="text-sky-600"
           loading={loading}
-          comparisonText="Total revenue ÷ total paid orders"
+          comparisonText="Revenue ÷ total orders"
         />
         <FinanceMetricCard
           title="Repeat Customer Rate"
@@ -143,7 +140,7 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
           iconBgColor="bg-purple-50"
           iconColor="text-purple-600"
           loading={loading}
-          comparisonText="Paying students with 2+ completed orders"
+          comparisonText="Students with 2+ orders"
         />
         <FinanceMetricCard
           title="Current Month New Users"
@@ -152,7 +149,7 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
           iconBgColor="bg-indigo-50"
           iconColor="text-indigo-600"
           loading={loading}
-          comparisonText={r ? `${r.previousMonthNewUsers} last month` : undefined}
+          comparisonText={r ? `${r.previousMonthNewUsers} last month` : 'Monthly acquisition'}
         />
         <FinanceMetricCard
           title="User Growth %"
@@ -162,14 +159,14 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
           iconBgColor="bg-amber-50"
           iconColor="text-amber-600"
           loading={loading}
-          comparisonText="New users, month over month"
+          comparisonText="Month over month"
         />
         <FinanceMetricCard
           title="Daily Average Users"
           value={r ? r.dailyAverageUsers : '—'}
           icon={<Activity className="w-4 h-4" />}
           loading={loading}
-          comparisonText="Active users ÷ days in range"
+          comparisonText="Active users ÷ days"
         />
         <FinanceMetricCard
           title="Payments In Range"
@@ -183,39 +180,41 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
       </div>
 
       {/* ── COHORT RETENTION CURVES ──────────────────────────────────────── */}
-      <div className="bg-white dark:bg-slate-900 border border-[#E4E7EB] dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-3">
           <div>
             <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-100 dark:border-indigo-500/25 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                <Layers className="w-4 h-4" />
+              </div>
               <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
                 Customer Cohort Retention Matrix
               </h2>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Tracking repeat print orders across months since student registration cohort (from Jan 2026 launch).
             </p>
           </div>
-          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 font-mono">
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/60 self-start sm:self-auto">
             {r?.cohorts?.length || 0} Cohorts Tracked
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto rounded-xl border border-slate-200/70 dark:border-slate-800">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold text-[10px]">
+              <tr className="bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700/80 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-wider">
                 <th className="py-3 px-4">Cohort Month</th>
                 <th className="py-3 px-4">Cohort Size</th>
-                <th className="py-3 px-4 text-center">Month 0 (Signup)</th>
-                <th className="py-3 px-4 text-center">Month 1</th>
-                <th className="py-3 px-4 text-center">Month 2</th>
-                <th className="py-3 px-4 text-center">Month 3</th>
-                <th className="py-3 px-4 text-center">Month 4</th>
-                <th className="py-3 px-4 text-center">Month 5+</th>
+                <th className="py-3 px-3 text-center">Month 0 (Signup)</th>
+                <th className="py-3 px-3 text-center">Month 1</th>
+                <th className="py-3 px-3 text-center">Month 2</th>
+                <th className="py-3 px-3 text-center">Month 3</th>
+                <th className="py-3 px-3 text-center">Month 4</th>
+                <th className="py-3 px-3 text-center">Month 5+</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono">
               {!r?.cohorts || r.cohorts.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-slate-400 font-sans">
@@ -224,7 +223,7 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
                 </tr>
               ) : (
                 r.cohorts.map((c) => (
-                  <tr key={c.cohort} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr key={c.cohort} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">
                       {c.cohort}
                     </td>
@@ -235,21 +234,30 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
                       const ret = c.retention?.find((x) => x.offset === offset);
                       const pct = ret?.pct ?? 0;
                       const count = ret?.activeCount ?? 0;
-                      let bgClass = 'bg-slate-50 dark:bg-slate-800/30 text-slate-400';
-                      if (pct >= 50) bgClass = 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold';
-                      else if (pct >= 25) bgClass = 'bg-indigo-100 dark:bg-indigo-950/70 text-indigo-800 dark:text-indigo-300 font-bold';
-                      else if (pct > 0) bgClass = 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 font-medium';
+
+                      let cellBadgeClass = '';
+                      if (pct >= 50) {
+                        cellBadgeClass = 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/35 font-bold';
+                      } else if (pct >= 20) {
+                        cellBadgeClass = 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35 font-bold';
+                      } else if (pct > 0) {
+                        cellBadgeClass = 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/25 font-semibold';
+                      }
 
                       return (
-                        <td key={offset} className="py-2.5 px-3 text-center">
-                          <div className={`py-1 px-2 rounded-lg text-xs ${bgClass}`}>
-                            <span>{pct > 0 ? `${pct}%` : '—'}</span>
-                            {count > 0 && (
-                              <span className="block text-[9px] opacity-75 font-sans">
-                                ({count})
-                              </span>
-                            )}
-                          </div>
+                        <td key={offset} className="py-2.5 px-2 text-center">
+                          {pct > 0 ? (
+                            <div className={`py-1 px-2 rounded-lg text-xs inline-flex flex-col items-center justify-center min-w-[54px] shadow-2xs ${cellBadgeClass}`}>
+                              <span>{pct}%</span>
+                              {count > 0 && (
+                                <span className="text-[9.5px] font-mono opacity-80 mt-0.5 leading-none">
+                                  ({count})
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-600 text-xs font-sans select-none">—</span>
+                          )}
                         </td>
                       );
                     })}
@@ -275,13 +283,13 @@ export const FinanceCustomerAnalyticsPage: React.FC<FinanceCustomerAnalyticsProp
           <div className="space-y-3 mt-1">
             {r.monthlyPayments.map((m) => (
               <div key={m.month}>
-                <div className="flex items-center justify-between text-xs mb-1">
+                <div className="flex items-center justify-between text-xs mb-1.5">
                   <span className="font-semibold text-slate-700 dark:text-slate-300">{m.month}</span>
                   <span className="font-mono font-bold text-slate-900 dark:text-white">{inr(m.total)}</span>
                 </div>
                 <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-[#093765] dark:bg-indigo-500 transition-all duration-300"
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 dark:from-indigo-500 dark:to-sky-400 transition-all duration-300"
                     style={{ width: `${(m.total / maxMonthly) * 100}%` }}
                   />
                 </div>

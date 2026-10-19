@@ -77,26 +77,59 @@ export const FinanceMetricCard: React.FC<FinanceMetricCardProps> = ({
   const isPositive = trend === 'up';
   const isNegative = trend === 'down';
 
+  // Compute theme-adaptive colored glass badge for icons
+  const getThemedIconStyles = () => {
+    const rawBg = iconBgColor || '';
+    const rawColor = iconColor || '';
+
+    if (rawBg.includes('dark:')) {
+      return `${rawBg} ${rawColor}`;
+    }
+
+    if (rawBg.includes('emerald') || rawColor.includes('emerald')) {
+      return 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/25';
+    }
+    if (rawBg.includes('amber') || rawColor.includes('amber')) {
+      return 'bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/25';
+    }
+    if (rawBg.includes('rose') || rawColor.includes('rose') || rawBg.includes('red')) {
+      return 'bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-500/25';
+    }
+    if (rawBg.includes('sky') || rawColor.includes('sky')) {
+      return 'bg-sky-50 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-500/25';
+    }
+    if (rawBg.includes('cyan') || rawColor.includes('cyan')) {
+      return 'bg-cyan-50 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-100 dark:border-cyan-500/25';
+    }
+    if (rawBg.includes('purple') || rawColor.includes('purple')) {
+      return 'bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-500/25';
+    }
+    if (rawBg.includes('indigo') || rawColor.includes('indigo')) {
+      return 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/25';
+    }
+    return 'bg-indigo-50/80 dark:bg-indigo-500/15 text-[#093765] dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/25';
+  };
+
   return (
-    <div className="bg-white dark:bg-slate-900 border border-[#E4E7EB] dark:border-slate-800 hover:border-purple-300 dark:hover:border-slate-700 transition-all duration-200 rounded-2xl p-4 md:p-5 shadow-xs hover:shadow-md flex flex-col justify-between min-w-0">
-      <div className="flex items-center justify-between mb-3">
-        <div className={`w-10 h-10 rounded-xl ${iconBgColor} flex items-center justify-center ${iconColor} shadow-2xs shrink-0`}>
+    <div className="bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-slate-700 transition-all duration-200 rounded-2xl p-4 md:p-4.5 shadow-xs hover:shadow-md flex flex-col justify-between min-w-0">
+      <div className="flex items-center justify-between mb-2.5">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-2xs shrink-0 ${getThemedIconStyles()}`}>
           {icon}
         </div>
         {renderSparkline()}
       </div>
 
       <div className="min-w-0">
-        <span className="text-[12px] font-semibold text-slate-500 dark:text-slate-400 tracking-tight block truncate mb-1">
+        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 tracking-tight block truncate mb-0.5">
           {title}
         </span>
-        <div className="text-xl md:text-2xl font-black text-[#111318] dark:text-white tracking-tight font-mono truncate">
+        <div className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight font-mono truncate">
           {value}
         </div>
       </div>
 
-      {(change || (comparisonText && change !== undefined)) && (
-        <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 text-[11px] min-w-0">
+      {(change || comparisonText) && (
+        <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-1.5 text-[11px] min-w-0">
           {change && (
             <span
               className={`inline-flex items-center font-bold px-1.5 py-0.5 rounded-md shrink-0 text-[10px] ${
@@ -117,8 +150,8 @@ export const FinanceMetricCard: React.FC<FinanceMetricCardProps> = ({
               {change}
             </span>
           )}
-          {change && comparisonText && (
-            <span className="text-slate-400 dark:text-slate-400 truncate">
+          {comparisonText && (
+            <span className="text-slate-400 dark:text-slate-400 text-[10.5px] truncate leading-tight">
               {comparisonText}
             </span>
           )}
