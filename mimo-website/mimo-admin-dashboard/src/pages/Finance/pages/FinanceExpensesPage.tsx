@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus,
   Trash2,
@@ -35,6 +36,7 @@ import {
   Search,
   Scale,
   Sparkles,
+  ArrowUpDown,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -231,6 +233,15 @@ const getEntryMonthKey = (e: JournalEntry): string | null => {
   return null;
 };
 
+const parseDateToMs = (d: string) => {
+  if (!d) return 0;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    return new Date(`${d}T00:00:00Z`).getTime();
+  }
+  const ms = new Date(d).getTime();
+  return isNaN(ms) ? 0 : ms;
+};
+
 const formatIsoDate = (dateStr: string) => {
   if (!dateStr) return '—';
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -325,10 +336,23 @@ export const FinanceExpensesPage: React.FC = () => {
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Filtering state
+  // Filtering & Sorting state
+  type SortOption = 'date_asc' | 'date_desc' | 'amount_desc' | 'amount_asc';
+  const [sortBy, setSortBy] = useState<SortOption>('date_asc');
   const [filterType, setFilterType] = useState<'all' | 'revenue' | 'expense'>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedYear, setSelectedYear] = useState<string>('all');
+
+  /* ── Inspect Entry with auto-scroll ── */
+  const handleInspectEntry = (entry: JournalEntry) => {
+    setInspectingEntry(entry);
+    setTimeout(() => {
+      const modalEl = document.getElementById('inspect-entry-modal-card');
+      if (modalEl) {
+        modalEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 60);
+  };
 
   // New entry form state
   const [form, setForm] = useState({
@@ -427,10 +451,14 @@ export const FinanceExpensesPage: React.FC = () => {
     }));
   }, [sheetData]);
 
-  /* ── Combine spreadsheet entries with persistent database ledger entries ── */
+  /* ── Combine spreadsheet entries with persistent database ledger entries (Default Ascending) ── */
   const allEntries = useMemo(() => {
     const combined = [...spreadsheetEntries, ...persistedEntries];
-    return combined.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
+    return combined.sort((a, b) => {
+      const diff = parseDateToMs(a.date) - parseDateToMs(b.date);
+      if (diff !== 0) return diff;
+      return (a.id || '').localeCompare(b.id || '');
+    });
   }, [spreadsheetEntries, persistedEntries]);
 
   /* ── Extract available month buckets from spreadsheet & persistent records ── */
@@ -446,9 +474,9 @@ export const FinanceExpensesPage: React.FC = () => {
     return Array.from(months).sort((a, b) => (b > a ? 1 : b < a ? -1 : 0));
   }, [sheetData, allEntries]);
 
-  /* ── Filtered entries based on Month & Type filters (Fixes 2025 Year bug) ── */
+  /* ── Filtered & Sorted entries based on Month, Type, and Multi-Sort (Ascending Default) ── */
   const filteredEntries = useMemo(() => {
-    return allEntries.filter((e) => {
+    const list = allEntries.filter((e) => {
       // 1. Year Filter: Strictly match entry year
       if (selectedYear !== 'all') {
         const itemYear = getEntryYear(e);
@@ -478,7 +506,31 @@ export const FinanceExpensesPage: React.FC = () => {
       }
       return true;
     });
-  }, [allEntries, selectedYear, selectedMonth, searchQuery, filterType]);
+
+    return list.sort((a, b) => {
+      if (sortBy === 'date_asc') {
+        const diff = parseDateToMs(a.date) - parseDateToMs(b.date);
+        if (diff !== 0) return diff;
+        return (a.id || '').localeCompare(b.id || '');
+      }
+      if (sortBy === 'date_desc') {
+        const diff = parseDateToMs(b.date) - parseDateToMs(a.date);
+        if (diff !== 0) return diff;
+        return (b.id || '').localeCompare(a.id || '');
+      }
+      if (sortBy === 'amount_desc') {
+        const diff = (b.amount || 0) - (a.amount || 0);
+        if (diff !== 0) return diff;
+        return parseDateToMs(b.date) - parseDateToMs(a.date);
+      }
+      if (sortBy === 'amount_asc') {
+        const diff = (a.amount || 0) - (b.amount || 0);
+        if (diff !== 0) return diff;
+        return parseDateToMs(a.date) - parseDateToMs(b.date);
+      }
+      return 0;
+    });
+  }, [allEntries, selectedYear, selectedMonth, searchQuery, filterType, sortBy]);
 
   /* ── Derived totals ── */
   const currentMonthExpenses = useMemo(() => {
@@ -707,15 +759,15 @@ export const FinanceExpensesPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
               Revenue &amp; Expense Tracker
             </h1>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Live Sheets Sync
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Operational expenses and founder investments synchronized automatically from the MIMO Google Sheet.
           </p>
         </div>
@@ -724,24 +776,24 @@ export const FinanceExpensesPage: React.FC = () => {
             type="button"
             onClick={() => syncSpreadsheetData(true)}
             disabled={isSyncing}
-            className="flex-1 sm:flex-initial flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+            className="flex-1 sm:flex-initial flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
             title="Force immediate refresh from Google Sheets"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isSyncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Syncing...' : 'Sync Now'}
           </button>
           <button
             type="button"
             onClick={exportCsv}
-            className="flex-1 sm:flex-initial flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-2xs transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-2xs transition-all cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-600" />
+            <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             CSV
           </button>
           <button
             type="button"
             onClick={handleAddExpenseClick}
-            className="flex-1 sm:flex-initial flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[#093765] hover:bg-[#062A4E] text-white px-3.5 text-xs font-bold shadow-md transition-all cursor-pointer hover:shadow-lg"
+            className="flex-1 sm:flex-initial flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[#093765] dark:bg-indigo-600 hover:bg-[#062A4E] dark:hover:bg-indigo-700 text-white px-3.5 text-xs font-bold shadow-md transition-all cursor-pointer hover:shadow-lg"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Expense Entry
@@ -750,7 +802,7 @@ export const FinanceExpensesPage: React.FC = () => {
       </div>
 
       {/* Sync Status Banner */}
-      <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900 dark:bg-slate-900/90 border border-transparent dark:border-slate-800 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-emerald-400 shrink-0">
             <FileSpreadsheet className="w-5 h-5" />
@@ -781,20 +833,20 @@ export const FinanceExpensesPage: React.FC = () => {
 
       {/* Sync Warning if Refresh Failed */}
       {syncError && (
-        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2.5">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+        <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
           <div className="flex-1">
             <p className="font-bold">Sync Notice</p>
-            <p className="text-[11px] text-amber-800">{syncError}</p>
+            <p className="text-[11px] text-amber-800 dark:text-amber-300">{syncError}</p>
           </div>
         </div>
       )}
 
       {/* Pipeline Guide Banner */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 via-violet-50 to-purple-50 border border-indigo-200/60 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50/80 via-violet-50/80 to-purple-50/80 dark:from-slate-900 dark:via-indigo-950/30 dark:to-slate-900 border border-indigo-200/60 dark:border-slate-800 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-300">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-bold text-indigo-700 flex items-center gap-1.5">
+            <span className="font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
               <BookOpen className="w-3.5 h-3.5" />
               Pipeline:
             </span>
@@ -804,11 +856,11 @@ export const FinanceExpensesPage: React.FC = () => {
               { label: 'PSR Filing', icon: <Receipt className="w-3 h-3" /> },
             ].map((step, i) => (
               <React.Fragment key={step.label}>
-                <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-slate-200 font-bold text-slate-700 text-[11px]">
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 text-[11px] shadow-2xs">
                   {step.icon}
                   {step.label}
                 </span>
-                {i < 2 && <ArrowRight className="w-3 h-3 text-indigo-400" />}
+                {i < 2 && <ArrowRight className="w-3 h-3 text-indigo-400 dark:text-indigo-500" />}
               </React.Fragment>
             ))}
           </div>
@@ -826,78 +878,78 @@ export const FinanceExpensesPage: React.FC = () => {
       {/* Financial Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {/* Total Operational Expenses */}
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200/60 shadow-2xs">
+        <div className="p-4 rounded-2xl bg-rose-50/80 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-900/40 shadow-2xs">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-rose-700">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-rose-700 dark:text-rose-400">
               Total Expenses ({selectedYear !== 'all' ? selectedYear : 'All-Time'})
             </span>
-            <TrendingDown className="w-4 h-4 text-rose-500" />
+            <TrendingDown className="w-4 h-4 text-rose-500 dark:text-rose-400" />
           </div>
-          <p className="text-xl sm:text-2xl font-black font-mono text-rose-800">
+          <p className="text-xl sm:text-2xl font-black font-mono text-rose-800 dark:text-rose-200">
             {isLoading ? '...' : inr(currentMonthExpenses)}
           </p>
-          <div className="mt-1 flex items-center justify-between text-[11px] text-rose-800/80">
+          <div className="mt-1 flex items-center justify-between text-[11px] text-rose-800/80 dark:text-rose-300/80">
             <span>{selectedMonth !== 'all' ? formatMonthLabel(selectedMonth) : 'All Filtered Periods'}</span>
-            <span className="font-semibold text-[10px] bg-rose-200/60 text-rose-800 px-1.5 py-0.5 rounded">Google Sheets</span>
+            <span className="font-semibold text-[10px] bg-rose-200/60 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 px-1.5 py-0.5 rounded">Google Sheets</span>
           </div>
         </div>
 
         {/* 2026 Year-to-Date Expenses */}
-        <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200/60 shadow-2xs">
+        <div className="p-4 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-900/40 shadow-2xs">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-indigo-700">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-indigo-700 dark:text-indigo-400">
               2026 Expenses (YTD)
             </span>
-            <Layers className="w-4 h-4 text-indigo-500" />
+            <Layers className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
           </div>
-          <p className="text-xl sm:text-2xl font-black font-mono text-indigo-800">
+          <p className="text-xl sm:text-2xl font-black font-mono text-indigo-800 dark:text-indigo-200">
             {isLoading ? '...' : sheetData?.expenses?.totalExpenses2026 !== undefined ? inr(sheetData.expenses.totalExpenses2026) : '—'}
           </p>
-          <div className="mt-1 flex items-center justify-between text-[11px] text-indigo-800/80">
+          <div className="mt-1 flex items-center justify-between text-[11px] text-indigo-800/80 dark:text-indigo-300/80">
             <span>{sheetData?.expenses?.items ? `${sheetData.expenses.items.filter((i) => i.year === 2026).length} Line Items (Jan–Oct)` : '2026 Line Items'}</span>
-            <span className="font-semibold text-[10px] bg-indigo-200/60 text-indigo-800 px-1.5 py-0.5 rounded">2026 Report</span>
+            <span className="font-semibold text-[10px] bg-indigo-200/60 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-1.5 py-0.5 rounded">2026 Report</span>
           </div>
         </div>
 
         {/* 2025 Historical Expenses */}
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 shadow-2xs">
+        <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-600">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-600 dark:text-slate-400">
               2025 Expenses (Historical)
             </span>
             <Clock className="w-4 h-4 text-slate-400" />
           </div>
-          <p className="text-xl sm:text-2xl font-black font-mono text-slate-700">
+          <p className="text-xl sm:text-2xl font-black font-mono text-slate-800 dark:text-slate-100">
             {isLoading ? '...' : sheetData?.expenses?.totalExpenses2025 !== undefined ? inr(sheetData.expenses.totalExpenses2025) : '—'}
           </p>
-          <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
             <span>{sheetData?.expenses?.items ? `${sheetData.expenses.items.filter((i) => i.year === 2025).length} Line Items (Mar–Dec)` : '2025 Line Items'}</span>
-            <span className="font-semibold text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">2025 Report</span>
+            <span className="font-semibold text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded">2025 Report</span>
           </div>
         </div>
 
         {/* Founder Capital Investment */}
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/60 shadow-2xs">
+        <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 shadow-2xs">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-emerald-700">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400">
               Total Founder Investment
             </span>
-            <PieIcon className="w-4 h-4 text-emerald-600" />
+            <PieIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <p className="text-xl sm:text-2xl font-black font-mono text-emerald-800">
+          <p className="text-xl sm:text-2xl font-black font-mono text-emerald-800 dark:text-emerald-200">
             {isLoading ? '...' : sheetData?.psr?.totalInvestment !== undefined ? inr(sheetData.psr.totalInvestment) : '—'}
           </p>
-          <div className="mt-1 flex items-center justify-between text-[11px] text-emerald-800/80">
+          <div className="mt-1 flex items-center justify-between text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
             <span>PSR Capital Structure</span>
-            <span className="font-semibold text-[10px] bg-emerald-200/60 text-emerald-800 px-1.5 py-0.5 rounded">Vishal &amp; Ankit</span>
+            <span className="font-semibold text-[10px] bg-emerald-200/60 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 px-1.5 py-0.5 rounded">Vishal &amp; Ankit</span>
           </div>
         </div>
       </div>
 
       {/* Expense category breakdown */}
       {expenseByCategory.length > 0 && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs min-w-0 overflow-hidden">
-          <h3 className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wider">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs min-w-0 overflow-hidden">
+          <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wider">
             Operational Spend Breakdown by Category ({selectedYear !== 'all' ? selectedYear : 'All-Time'})
           </h3>
           <div className="space-y-2">
@@ -911,11 +963,11 @@ export const FinanceExpensesPage: React.FC = () => {
                     {cfg.icon}
                     {cat}
                   </span>
-                  <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                     <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
                   </div>
-                  <span className="text-xs font-mono font-bold text-slate-700 min-w-[75px] text-right">{inr(amt)}</span>
-                  <span className="text-[10px] sm:text-[11px] text-slate-400 min-w-[32px] text-right">{pct.toFixed(0)}%</span>
+                  <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 min-w-[75px] text-right">{inr(amt)}</span>
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 min-w-[32px] text-right">{pct.toFixed(0)}%</span>
                 </div>
               );
             })}
@@ -924,14 +976,14 @@ export const FinanceExpensesPage: React.FC = () => {
       )}
 
       {/* Inner Tab Navigation */}
-      <div className="grid grid-cols-3 sm:flex items-center gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200 w-full sm:w-fit">
+      <div className="grid grid-cols-3 sm:flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full sm:w-fit">
         {([['journal', 'Expense Ledgers'], ['reports', 'Expense Reports'], ['psr', 'Founder Capital & PSR']] as [Tab, string][]).map(([t, label]) => (
           <button
             key={t}
             type="button"
             onClick={() => setActiveTab(t)}
             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center ${
-              activeTab === t ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              activeTab === t ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             {label}
@@ -946,12 +998,12 @@ export const FinanceExpensesPage: React.FC = () => {
           {showAddEntry && (
             <div
               id="expense-entry-form-section"
-              className="p-5 rounded-2xl bg-white border-2 border-indigo-500/80 shadow-lg ring-4 ring-indigo-500/10 transition-all animate-fadeIn"
+              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-500/80 dark:border-indigo-500 shadow-lg ring-4 ring-indigo-500/10 transition-all animate-fadeIn"
             >
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                     New Expense Ledger Entry
                   </h3>
                   <p className="text-[11px] text-slate-400">
@@ -961,7 +1013,7 @@ export const FinanceExpensesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddEntry(false)}
-                  className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -970,22 +1022,22 @@ export const FinanceExpensesPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {/* Date */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Date *</label>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Date *</label>
                   <input
                     type="date"
                     value={form.date}
                     onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
                 {/* Category Dropdown (Referenced from Information Sheet) */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Category *</label>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Category *</label>
                   <select
                     value={form.category}
                     onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     {EXPENSE_CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -997,11 +1049,11 @@ export const FinanceExpensesPage: React.FC = () => {
 
                 {/* Paid By Dropdown (Exactly 3 Options: Company, Ankit Patel, V Vishal) */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Paid By *</label>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Paid By *</label>
                   <select
                     value={form.paidBy}
                     onChange={(e) => setForm((f) => ({ ...f, paidBy: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     {PAID_BY_OPTIONS.map((opt) => (
                       <option key={opt} value={opt}>
@@ -1013,19 +1065,19 @@ export const FinanceExpensesPage: React.FC = () => {
 
                 {/* Description */}
                 <div className="sm:col-span-2 lg:col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Description *</label>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Description *</label>
                   <input
                     type="text"
                     value={form.description}
                     onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                     placeholder="e.g. A4 Paper restock – 5 reams (Brother HL)"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
                 {/* Amount */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Amount (₹) *</label>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Amount (₹) *</label>
                   <input
                     type="number"
                     min="0"
@@ -1033,46 +1085,46 @@ export const FinanceExpensesPage: React.FC = () => {
                     value={form.amount}
                     onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                     placeholder="0.00"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
                 {/* Invoice Reference */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Invoice / Ref No.</label>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Invoice / Ref No.</label>
                   <input
                     type="text"
                     value={form.reference}
                     onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
                     placeholder="INV-001"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
                 {/* Notes */}
                 <div className="sm:col-span-2 lg:col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Notes / Remarks</label>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Notes / Remarks</label>
                   <input
                     type="text"
                     value={form.notes}
                     onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                     placeholder="Costed more because of transportation delays"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
 
               {/* Ind AS Preview inside Add form */}
               {form.description && form.amount && (
-                <div className="mt-3.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1">
-                    <Scale className="w-3 h-3 text-indigo-600" />
+                <div className="mt-3.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 mb-1 flex items-center gap-1">
+                    <Scale className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
                     Indian Accounting Standards (Ind AS) Automated Journal Mapping:
                   </p>
-                  <p className="font-mono text-[11px] text-slate-800">
+                  <p className="font-mono text-[11px] text-slate-800 dark:text-slate-200">
                     Dr. {toIndAsJournalEntry({ ...form, id: 'preview', amount: parseFloat(form.amount) || 0, status: 'approved' }).debitAccount} ₹{form.amount}
                   </p>
-                  <p className="font-mono text-[11px] text-slate-700 pl-4">
+                  <p className="font-mono text-[11px] text-slate-700 dark:text-slate-300 pl-4">
                     {toIndAsJournalEntry({ ...form, id: 'preview', amount: parseFloat(form.amount) || 0, status: 'approved' }).creditAccount} ₹{form.amount}
                   </p>
                 </div>
@@ -1082,7 +1134,7 @@ export const FinanceExpensesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddEntry(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer transition-all"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-all"
                 >
                   Cancel
                 </button>
@@ -1099,12 +1151,12 @@ export const FinanceExpensesPage: React.FC = () => {
           )}
 
           {/* Table Card */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
             {/* Filters Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex flex-wrap items-center gap-2">
                 {/* Year Filter: Strictly Isolates by Year */}
-                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100">
+                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50">
                   {(['all', '2026', '2025'] as const).map((y) => (
                     <button
                       key={y}
@@ -1114,7 +1166,7 @@ export const FinanceExpensesPage: React.FC = () => {
                         setSelectedMonth('all');
                       }}
                       className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
-                        selectedYear === y ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        selectedYear === y ? 'bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                       }`}
                     >
                       {y === 'all' ? 'All Years' : y}
@@ -1129,7 +1181,7 @@ export const FinanceExpensesPage: React.FC = () => {
                     <select
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(e.target.value)}
-                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     >
                       <option value="all">All Months</option>
                       {availableMonths
@@ -1143,13 +1195,29 @@ export const FinanceExpensesPage: React.FC = () => {
                   </div>
                 )}
 
+                {/* Multi-Sort Selector */}
+                <div className="flex items-center gap-1.5">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOption)}
+                    aria-label="Sort ledgers"
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-2xs"
+                  >
+                    <option value="date_asc">Date: Ascending (Oldest First)</option>
+                    <option value="date_desc">Date: Descending (Newest First)</option>
+                    <option value="amount_desc">Amount: Highest to Lowest</option>
+                    <option value="amount_asc">Amount: Lowest to Highest</option>
+                  </select>
+                </div>
+
                 {/* View Mode Toggle: Register vs Ind AS Journal Book */}
-                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-indigo-50 border border-indigo-100">
+                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-indigo-50/80 dark:bg-slate-800 border border-indigo-100 dark:border-slate-700">
                   <button
                     type="button"
                     onClick={() => setLedgerView('register')}
                     className={`px-2.5 py-1 text-[10.5px] font-bold rounded-md transition-all cursor-pointer ${
-                      ledgerView === 'register' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-indigo-700 hover:bg-white/60'
+                      ledgerView === 'register' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-indigo-700 dark:text-indigo-300 hover:bg-white/60 dark:hover:bg-slate-700'
                     }`}
                   >
                     Register View
@@ -1158,7 +1226,7 @@ export const FinanceExpensesPage: React.FC = () => {
                     type="button"
                     onClick={() => setLedgerView('ind_as_journal')}
                     className={`px-2.5 py-1 text-[10.5px] font-bold rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                      ledgerView === 'ind_as_journal' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-indigo-700 hover:bg-white/60'
+                      ledgerView === 'ind_as_journal' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-indigo-700 dark:text-indigo-300 hover:bg-white/60 dark:hover:bg-slate-700'
                     }`}
                   >
                     <Scale className="w-3 h-3" />
@@ -1175,7 +1243,7 @@ export const FinanceExpensesPage: React.FC = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search ledgers..."
-                    className="h-8 pl-8 pr-2.5 text-[11px] rounded-lg border border-slate-200 bg-slate-50 focus:bg-white outline-none w-44 sm:w-56"
+                    className="h-8 pl-8 pr-2.5 text-[11px] rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-800 outline-none w-44 sm:w-56"
                   />
                 </div>
                 <span className="text-[11px] text-slate-400 whitespace-nowrap">{filteredEntries.length} records</span>
@@ -1187,7 +1255,7 @@ export const FinanceExpensesPage: React.FC = () => {
               <div className="overflow-x-auto mt-3">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-slate-100 text-slate-400 font-bold text-[10px] uppercase">
+                    <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold text-[10px] uppercase">
                       {['Date', 'Category', 'Description', 'Paid By', 'Reference', 'Amount (INR)', 'Source', 'Actions'].map(
                         (h) => (
                           <th key={h} className="text-left py-2.5 px-3 whitespace-nowrap">
@@ -1197,7 +1265,7 @@ export const FinanceExpensesPage: React.FC = () => {
                       )}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
                     {isLoading && filteredEntries.length === 0 && (
                       <tr>
                         <td colSpan={8} className="py-12 text-center text-xs font-semibold text-slate-400">
@@ -1219,8 +1287,8 @@ export const FinanceExpensesPage: React.FC = () => {
                       const cfg = categoryConfig(e.category);
                       const cleanPaid = e.paidBy === 'Ankit' ? 'Ankit Patel' : e.paidBy === 'Vishal' ? 'V Vishal' : (e.paidBy || 'Company');
                       return (
-                        <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 px-3 font-mono text-slate-600 whitespace-nowrap">
+                        <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="py-3 px-3 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
                             {formatIsoDate(e.date)}
                           </td>
                           <td className="py-3 px-3">
@@ -1229,28 +1297,28 @@ export const FinanceExpensesPage: React.FC = () => {
                               {e.category}
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-slate-800 font-semibold max-w-[280px]">
+                          <td className="py-3 px-3 text-slate-800 dark:text-slate-200 font-semibold max-w-[280px]">
                             <p className="truncate">{e.description}</p>
                             {e.notes && <p className="text-[10px] text-slate-400 truncate mt-0.5">{e.notes}</p>}
                           </td>
-                          <td className="py-3 px-3 text-slate-600 whitespace-nowrap text-[11px]">
+                          <td className="py-3 px-3 text-slate-600 dark:text-slate-400 whitespace-nowrap text-[11px]">
                             {cleanPaid}
                           </td>
-                          <td className="py-3 px-3 font-mono text-slate-500 whitespace-nowrap text-[11px]">
+                          <td className="py-3 px-3 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap text-[11px]">
                             {e.reference || '—'}
                           </td>
-                          <td className="py-3 px-3 font-mono font-black text-rose-700 whitespace-nowrap">
+                          <td className="py-3 px-3 font-mono font-black text-rose-700 dark:text-rose-400 whitespace-nowrap">
                             -{inr(e.amount)}
                           </td>
                           <td className="py-3 px-3 whitespace-nowrap">
                             {e.isFromSheet ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                                 Sheet Verified
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                <BookOpen className="w-3 h-3 text-blue-600" />
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                <BookOpen className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                                 Database Ledger
                               </span>
                             )}
@@ -1259,9 +1327,9 @@ export const FinanceExpensesPage: React.FC = () => {
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
-                                onClick={() => setInspectingEntry(e)}
+                                onClick={() => handleInspectEntry(e)}
                                 title="Inspect entry & Ind AS Journal"
-                                className="p-1 text-slate-400 hover:text-indigo-600 cursor-pointer transition-colors"
+                                className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
@@ -1269,7 +1337,7 @@ export const FinanceExpensesPage: React.FC = () => {
                                 type="button"
                                 onClick={() => setEditingEntry(e)}
                                 title="Edit Entry"
-                                className="p-1 text-slate-400 hover:text-amber-600 cursor-pointer transition-colors"
+                                className="p-1 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer transition-colors"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
@@ -1278,7 +1346,7 @@ export const FinanceExpensesPage: React.FC = () => {
                                   type="button"
                                   onClick={() => deleteEntry(e.id)}
                                   title="Delete Entry"
-                                  className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer transition-colors"
+                                  className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer transition-colors"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -1296,24 +1364,24 @@ export const FinanceExpensesPage: React.FC = () => {
             {/* View 2: Automated Indian Accounting Standards (Ind AS) Journal Book */}
             {ledgerView === 'ind_as_journal' && (
               <div className="mt-3 space-y-3">
-                <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-100 flex items-center justify-between text-xs text-indigo-900">
+                <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-between text-xs text-indigo-900 dark:text-indigo-200">
                   <div className="flex items-center gap-2">
-                    <Scale className="w-4 h-4 text-indigo-600" />
+                    <Scale className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                     <div>
                       <p className="font-bold">Automated Ind AS General Journal Book</p>
-                      <p className="text-[11px] text-indigo-700">
+                      <p className="text-[11px] text-indigo-700 dark:text-indigo-300">
                         Formal dual-entry accounting as per Indian Accounting Standards (Ind AS 1 &amp; Ind AS 24 Related Party Disclosures).
                       </p>
                     </div>
                   </div>
-                  <span className="font-mono font-bold text-xs bg-white px-2.5 py-1 rounded-lg border border-indigo-200">
+                  <span className="font-mono font-bold text-xs bg-white dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 text-slate-900 dark:text-white">
                     Balanced: Total Debits = Total Credits ({inr(currentMonthExpenses)})
                   </span>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
                   <table className="w-full text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10.5px] uppercase">
+                    <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-[10.5px] uppercase">
                       <tr>
                         <th className="py-2.5 px-3 text-left w-24">Date</th>
                         <th className="py-2.5 px-3 text-left">Particulars (Debit / Credit Heads &amp; Narration)</th>
@@ -1324,44 +1392,44 @@ export const FinanceExpensesPage: React.FC = () => {
                         <th className="py-2.5 px-3 text-center w-16">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                       {filteredEntries.map((e) => {
                         const indAs = toIndAsJournalEntry(e);
                         return (
                           <React.Fragment key={e.id}>
-                            <tr className="hover:bg-slate-50/70">
-                              <td className="py-2.5 px-3 font-mono text-slate-500 align-top whitespace-nowrap">
+                            <tr className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
+                              <td className="py-2.5 px-3 font-mono text-slate-500 dark:text-slate-400 align-top whitespace-nowrap">
                                 {formatIsoDate(e.date)}
                               </td>
                               <td className="py-2.5 px-3">
-                                <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                                <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                                   <span>{indAs.debitAccount}</span>
-                                  <span className="text-[10px] text-indigo-600 font-mono font-semibold">... Dr.</span>
+                                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-semibold">... Dr.</span>
                                 </p>
-                                <p className="font-semibold text-slate-700 pl-6 mt-0.5">
+                                <p className="font-semibold text-slate-700 dark:text-slate-300 pl-6 mt-0.5">
                                   {indAs.creditAccount}
                                 </p>
-                                <p className="text-[11px] text-slate-500 italic pl-6 mt-1 font-sans">
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 italic pl-6 mt-1 font-sans">
                                   {indAs.narration}
                                 </p>
                               </td>
-                              <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 align-top">
+                              <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 dark:text-slate-400 align-top">
                                 {indAs.voucherNo}
                               </td>
-                              <td className="py-2.5 px-3 font-mono text-[11px] text-slate-400 align-top">
+                              <td className="py-2.5 px-3 font-mono text-[11px] text-slate-400 dark:text-slate-500 align-top">
                                 {indAs.lf}
                               </td>
-                              <td className="py-2.5 px-3 font-mono font-bold text-slate-900 text-right align-top">
+                              <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white text-right align-top">
                                 {inr(indAs.debitAmount)}
                               </td>
-                              <td className="py-2.5 px-3 font-mono font-bold text-slate-700 text-right align-top">
+                              <td className="py-2.5 px-3 font-mono font-bold text-slate-700 dark:text-slate-300 text-right align-top">
                                 {inr(indAs.creditAmount)}
                               </td>
                               <td className="py-2.5 px-3 text-center align-top">
                                 <button
                                   type="button"
-                                  onClick={() => setInspectingEntry(e)}
-                                  className="p-1 text-slate-400 hover:text-indigo-600 cursor-pointer"
+                                  onClick={() => handleInspectEntry(e)}
+                                  className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
                                   title="Inspect Voucher"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
@@ -1372,15 +1440,15 @@ export const FinanceExpensesPage: React.FC = () => {
                         );
                       })}
                     </tbody>
-                    <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-900">
+                    <tfoot className="bg-slate-50 dark:bg-slate-800/80 border-t-2 border-slate-300 dark:border-slate-700 font-black text-slate-900 dark:text-white">
                       <tr>
                         <td colSpan={4} className="py-2.5 px-3 text-right uppercase text-[11px]">
                           Total Balancing Debits &amp; Credits:
                         </td>
-                        <td className="py-2.5 px-3 font-mono text-right text-indigo-700">
+                        <td className="py-2.5 px-3 font-mono text-right text-indigo-700 dark:text-indigo-400">
                           {inr(currentMonthExpenses)}
                         </td>
-                        <td className="py-2.5 px-3 font-mono text-right text-indigo-700">
+                        <td className="py-2.5 px-3 font-mono text-right text-indigo-700 dark:text-indigo-400">
                           {inr(currentMonthExpenses)}
                         </td>
                         <td />
@@ -1417,10 +1485,10 @@ export const FinanceExpensesPage: React.FC = () => {
           </div>
 
           {reports.length === 0 && (
-            <div className="py-16 text-center text-xs font-semibold text-slate-400 bg-white rounded-2xl border border-slate-200">
-              <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-slate-600 font-bold mb-1">No Custom Expense Reports Generated Yet</p>
-              <p className="text-[11px] text-slate-400 max-w-md mx-auto mb-3">
+            <div className="py-16 text-center text-xs font-semibold text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+              <FileText className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+              <p className="text-slate-600 dark:text-slate-300 font-bold mb-1">No Custom Expense Reports Generated Yet</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-400 max-w-md mx-auto mb-3">
                 Click below to select a target month and compile a strictly month-isolated report with charts.
               </p>
               <button
@@ -1474,60 +1542,60 @@ export const FinanceExpensesPage: React.FC = () => {
             });
 
             return (
-              <div key={r.id} className="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-5">
+              <div key={r.id} className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
                 {/* Report Header */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-base text-slate-900">{r.title}</h3>
+                      <h3 className="font-bold text-base text-slate-900 dark:text-white">{r.title}</h3>
                       {statusBadge(r.status)}
                       {psrBadge(r.psrStatus)}
                     </div>
                     <p className="text-[11px] text-slate-400">
-                      Period: <strong className="text-slate-700">{r.period}</strong> &middot; Created {r.createdAt} &middot;{' '}
-                      <span className="font-semibold text-emerald-600">{r.entries.length} Month-Isolated line items</span>
+                      Period: <strong className="text-slate-700 dark:text-slate-300">{r.period}</strong> &middot; Created {r.createdAt} &middot;{' '}
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">{r.entries.length} Month-Isolated line items</span>
                     </p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-[11px] text-slate-400 uppercase font-bold">Total Monthly Expenses</p>
-                    <p className="text-xl sm:text-2xl font-black font-mono text-rose-700">-{inr(r.totalExpenses)}</p>
+                    <p className="text-xl sm:text-2xl font-black font-mono text-rose-700 dark:text-rose-400">-{inr(r.totalExpenses)}</p>
                   </div>
                 </div>
 
                 {/* KPI Metrics Strip */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
                     <p className="text-[10px] font-bold text-slate-400 uppercase">Top Expense Driver</p>
-                    <p className="text-xs font-bold text-slate-800 truncate mt-0.5">
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate mt-0.5">
                       {pieData[0]?.name || '—'}
                     </p>
-                    <p className="text-[10px] text-slate-500 font-mono">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                       {pieData[0] ? inr(pieData[0].value) : '—'} ({pieData[0] && r.totalExpenses ? Math.round((pieData[0].value / r.totalExpenses) * 100) : 0}%)
                     </p>
                   </div>
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
                     <p className="text-[10px] font-bold text-slate-400 uppercase">Company Paid</p>
-                    <p className="text-xs font-bold text-slate-800 font-mono mt-0.5">{inr(companyPaid)}</p>
-                    <p className="text-[10px] text-slate-500">Bank Outflow ({r.totalExpenses ? Math.round((companyPaid / r.totalExpenses) * 100) : 0}%)</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100 font-mono mt-0.5">{inr(companyPaid)}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Bank Outflow ({r.totalExpenses ? Math.round((companyPaid / r.totalExpenses) * 100) : 0}%)</p>
                   </div>
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
                     <p className="text-[10px] font-bold text-slate-400 uppercase">Ankit Patel</p>
-                    <p className="text-xs font-bold text-slate-800 font-mono mt-0.5">{inr(ankitPaid)}</p>
-                    <p className="text-[10px] text-slate-500">Founder Loan ({r.totalExpenses ? Math.round((ankitPaid / r.totalExpenses) * 100) : 0}%)</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100 font-mono mt-0.5">{inr(ankitPaid)}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Founder Loan ({r.totalExpenses ? Math.round((ankitPaid / r.totalExpenses) * 100) : 0}%)</p>
                   </div>
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
                     <p className="text-[10px] font-bold text-slate-400 uppercase">V Vishal</p>
-                    <p className="text-xs font-bold text-slate-800 font-mono mt-0.5">{inr(vishalPaid)}</p>
-                    <p className="text-[10px] text-slate-500">Founder Loan ({r.totalExpenses ? Math.round((vishalPaid / r.totalExpenses) * 100) : 0}%)</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100 font-mono mt-0.5">{inr(vishalPaid)}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Founder Loan ({r.totalExpenses ? Math.round((vishalPaid / r.totalExpenses) * 100) : 0}%)</p>
                   </div>
                 </div>
 
                 {/* ── Visual Charts: Donut Category Breakdown & Monthly Growth ── */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Donut Chart: Categories */}
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <p className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
-                      <PieIcon className="w-3.5 h-3.5 text-indigo-600" />
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40">
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
+                      <PieIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                       Category Composition (Donut Breakdown)
                     </p>
                     {pieData.length > 0 ? (
@@ -1559,9 +1627,9 @@ export const FinanceExpensesPage: React.FC = () => {
                             <div key={d.name} className="flex items-center justify-between text-[11px]">
                               <span className="flex items-center gap-1.5 truncate max-w-[150px]">
                                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-                                <span className="truncate">{d.name}</span>
+                                <span className="truncate text-slate-700 dark:text-slate-300">{d.name}</span>
                               </span>
-                              <span className="font-mono font-bold text-slate-700">
+                              <span className="font-mono font-bold text-slate-700 dark:text-slate-200">
                                 {inr(d.value)} <span className="text-[10px] text-slate-400 font-normal">({r.totalExpenses ? Math.round((d.value / r.totalExpenses) * 100) : 0}%)</span>
                               </span>
                             </div>
@@ -1574,23 +1642,23 @@ export const FinanceExpensesPage: React.FC = () => {
                   </div>
 
                   {/* Growth Rate / Comparison vs Previous Months */}
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <p className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
-                      <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40">
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       Monthly Expense Velocity &amp; Prior Trend
                     </p>
                     <div className="h-44 w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={barData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                          <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`} />
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#e2e8f0'} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#64748b' }} />
+                          <YAxis tick={{ fontSize: 10, fill: isDark ? '#94a3b8' : '#64748b' }} tickFormatter={(v) => `₹${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`} />
                           <RechartsTooltip formatter={(val: any) => [inr(Number(val)), 'Expenses']} />
                           <Bar dataKey="amount" fill="#6366f1" radius={[4, 4, 0, 0]}>
                             {barData.map((entry, index) => (
                               <Cell
                                 key={`bar-${index}`}
-                                fill={entry.isCurrent ? '#4338ca' : '#cbd5e1'}
+                                fill={entry.isCurrent ? '#4338ca' : (isDark ? '#475569' : '#cbd5e1')}
                               />
                             ))}
                           </Bar>
@@ -1603,16 +1671,16 @@ export const FinanceExpensesPage: React.FC = () => {
                 {/* Itemized Entries Table */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-bold text-slate-700 uppercase">
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
                       Itemized Line Items ({r.entries.length})
                     </p>
                     <span className="text-[11px] text-slate-400">Strictly isolated to {r.period}</span>
                   </div>
 
-                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase">
+                        <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase">
                           {['Date', 'Category', 'Description', 'Paid By', 'Amount (INR)'].map((h) => (
                             <th key={h} className="text-left py-2 px-3 whitespace-nowrap">
                               {h}
@@ -1620,32 +1688,32 @@ export const FinanceExpensesPage: React.FC = () => {
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                         {r.entries.map((e) => {
                           const cfg = categoryConfig(e.category);
                           const cleanPaid = e.paidBy === 'Ankit' ? 'Ankit Patel' : e.paidBy === 'Vishal' ? 'V Vishal' : (e.paidBy || 'Company');
                           return (
-                            <tr key={e.id} className="hover:bg-slate-50">
-                              <td className="py-2.5 px-3 font-mono text-slate-500 whitespace-nowrap">{formatIsoDate(e.date)}</td>
+                            <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                              <td className="py-2.5 px-3 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatIsoDate(e.date)}</td>
                               <td className="py-2.5 px-3">
                                 <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${cfg.color} w-fit`}>
                                   {cfg.icon}
                                   {e.category}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3 text-slate-700 font-semibold max-w-[220px] truncate">{e.description}</td>
-                              <td className="py-2.5 px-3 text-slate-600">{cleanPaid}</td>
-                              <td className="py-2.5 px-3 font-mono font-bold text-rose-700 whitespace-nowrap">-{inr(e.amount)}</td>
+                              <td className="py-2.5 px-3 text-slate-700 dark:text-slate-200 font-semibold max-w-[220px] truncate">{e.description}</td>
+                              <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">{cleanPaid}</td>
+                              <td className="py-2.5 px-3 font-mono font-bold text-rose-700 dark:text-rose-400 whitespace-nowrap">-{inr(e.amount)}</td>
                             </tr>
                           );
                         })}
                       </tbody>
                       <tfoot>
-                        <tr className="border-t-2 border-slate-200 font-black text-slate-900 bg-slate-50">
+                        <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-black text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-800">
                           <td className="py-2.5 px-3" colSpan={4}>
                             Month Total
                           </td>
-                          <td className="py-2.5 px-3 font-mono text-rose-700">-{inr(r.totalExpenses)}</td>
+                          <td className="py-2.5 px-3 font-mono text-rose-700 dark:text-rose-400">-{inr(r.totalExpenses)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -1653,7 +1721,7 @@ export const FinanceExpensesPage: React.FC = () => {
                 </div>
 
                 {/* Actions Footer */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
                   <p className="text-[11px] text-slate-400">
                     {r.psrStatus === 'pending' && 'Approve this report and generate a PSR for filing.'}
                     {r.psrStatus === 'generated' && 'PSR generated — ready for periodic filing.'}
@@ -1695,9 +1763,9 @@ export const FinanceExpensesPage: React.FC = () => {
       {/* ─── PSR Automation Tab ─── */}
       {activeTab === 'psr' && (
         <div className="space-y-4">
-          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs">
-            <h3 className="font-bold text-sm text-slate-900 mb-1">Founder Capital Structure &amp; Profit Sharing Ratio (PSR)</h3>
-            <p className="text-xs text-slate-400 mb-4">
+          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-1">Founder Capital Structure &amp; Profit Sharing Ratio (PSR)</h3>
+            <p className="text-xs text-slate-400 dark:text-slate-400 mb-4">
               Synchronized directly from the Google Sheet PSR tab (`gid=1895235794`).
             </p>
 
@@ -1711,29 +1779,29 @@ export const FinanceExpensesPage: React.FC = () => {
                 const withdrawn = Math.max(0, totalInvested - netInvested);
 
                 return (
-                  <div key={founderName} className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div key={founderName} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold text-slate-800 text-sm">{founderName}</span>
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                      <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{founderName}</span>
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
                         {profitShare !== null ? `${profitShare.toFixed(2)}% Profit Share` : '—'}
                       </span>
                     </div>
                     <div className="space-y-1 text-xs">
-                      <div className="flex justify-between text-slate-600">
+                      <div className="flex justify-between text-slate-600 dark:text-slate-300">
                         <span>Equity Ownership:</span>
                         <span className="font-mono font-semibold">{ownership !== null ? `${ownership.toFixed(2)}%` : '—'}</span>
                       </div>
-                      <div className="flex justify-between text-slate-600">
+                      <div className="flex justify-between text-slate-600 dark:text-slate-300">
                         <span>Total Invested:</span>
                         <span className="font-mono font-semibold">{inr(totalInvested)}</span>
                       </div>
-                      <div className="flex justify-between text-slate-600">
+                      <div className="flex justify-between text-slate-600 dark:text-slate-300">
                         <span>Withdrawn:</span>
                         <span className="font-mono font-semibold">{inr(withdrawn)}</span>
                       </div>
-                      <div className="flex justify-between font-bold text-slate-900 pt-1 border-t border-slate-200">
+                      <div className="flex justify-between font-bold text-slate-900 dark:text-white pt-1 border-t border-slate-200 dark:border-slate-700">
                         <span>Net Investment:</span>
-                        <span className="font-mono text-emerald-700">{inr(netInvested)}</span>
+                        <span className="font-mono text-emerald-700 dark:text-emerald-400">{inr(netInvested)}</span>
                       </div>
                     </div>
                   </div>
@@ -1744,51 +1812,51 @@ export const FinanceExpensesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Modal 1: Select Month for Report Generation ─── */}
-      {showGenerateModal && (
+      {/* ─── Modal 1: Select Month for Report Generation (Portaled) ─── */}
+      {showGenerateModal && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn"
           onClick={() => setShowGenerateModal(false)}
         >
           <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 space-y-4"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                   Generate Expense Report
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-400 dark:text-slate-400 mt-0.5">
                   Select month to compile with charts and strict month isolation.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowGenerateModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                 Target Period / Month
               </label>
               <select
                 value={reportTargetMonth}
                 onChange={(e) => setReportTargetMonth(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {availableMonths.map((m) => (
-                  <option key={m} value={m}>
+                  <option key={m} value={m} className="dark:bg-slate-800 dark:text-slate-100">
                     {formatMonthLabel(m)}
                   </option>
                 ))}
               </select>
-              <p className="text-[11px] text-slate-400 mt-1.5">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400 mt-1.5">
                 Only expenses incurred in {formatMonthLabel(reportTargetMonth)} will be included.
               </p>
             </div>
@@ -1797,7 +1865,7 @@ export const FinanceExpensesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowGenerateModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 Cancel
               </button>
@@ -1810,65 +1878,67 @@ export const FinanceExpensesPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* ─── Modal 2: Inspect Entry & Ind AS Journal Details ─── */}
-      {inspectingEntry && (
+      {/* ─── Modal 2: Inspect Entry & Ind AS Journal Details (Portaled & Auto-Centered) ─── */}
+      {inspectingEntry && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn"
           onClick={() => setInspectingEntry(null)}
         >
           <div
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 space-y-4"
+            id="inspect-entry-modal-card"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded">
                   Transaction Details
                 </span>
-                <h3 className="text-base font-bold text-slate-900 mt-1">{inspectingEntry.description}</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1">{inspectingEntry.description}</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setInspectingEntry(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* General Info Grid */}
-            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-150 dark:border-slate-700/80">
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Date</span>
-                <p className="font-semibold text-slate-800">{formatIsoDate(inspectingEntry.date)}</p>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase">Date</span>
+                <p className="font-semibold text-slate-800 dark:text-slate-100">{formatIsoDate(inspectingEntry.date)}</p>
               </div>
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Amount</span>
-                <p className="font-mono font-bold text-rose-700 text-sm">-{inr(inspectingEntry.amount)}</p>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase">Amount</span>
+                <p className="font-mono font-bold text-rose-700 dark:text-rose-400 text-sm">-{inr(inspectingEntry.amount)}</p>
               </div>
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Category</span>
-                <p className="font-semibold text-slate-800">{inspectingEntry.category}</p>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase">Category</span>
+                <p className="font-semibold text-slate-800 dark:text-slate-100">{inspectingEntry.category}</p>
               </div>
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Paid By</span>
-                <p className="font-semibold text-slate-800">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase">Paid By</span>
+                <p className="font-semibold text-slate-800 dark:text-slate-100">
                   {inspectingEntry.paidBy === 'Ankit' ? 'Ankit Patel' : inspectingEntry.paidBy === 'Vishal' ? 'V Vishal' : (inspectingEntry.paidBy || 'Company')}
                 </p>
               </div>
               {inspectingEntry.reference && (
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Ref / Invoice</span>
-                  <p className="font-mono text-slate-700">{inspectingEntry.reference}</p>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase">Ref / Invoice</span>
+                  <p className="font-mono text-slate-700 dark:text-slate-300">{inspectingEntry.reference}</p>
                 </div>
               )}
               {inspectingEntry.notes && (
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Notes</span>
-                  <p className="text-slate-600">{inspectingEntry.notes}</p>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase">Notes</span>
+                  <p className="text-slate-600 dark:text-slate-300">{inspectingEntry.notes}</p>
                 </div>
               )}
             </div>
@@ -1877,28 +1947,28 @@ export const FinanceExpensesPage: React.FC = () => {
             {(() => {
               const indAs = toIndAsJournalEntry(inspectingEntry);
               return (
-                <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200/80 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-indigo-900 border-b border-indigo-200/60 pb-1.5">
+                <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-indigo-900 dark:text-indigo-200 border-b border-indigo-200/60 dark:border-indigo-800/60 pb-1.5">
                     <span className="flex items-center gap-1.5">
-                      <Scale className="w-3.5 h-3.5 text-indigo-600" />
+                      <Scale className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                       Ind AS Automated Journal Voucher
                     </span>
-                    <span className="font-mono text-[10px] text-indigo-700">{indAs.voucherNo}</span>
+                    <span className="font-mono text-[10px] text-indigo-700 dark:text-indigo-300">{indAs.voucherNo}</span>
                   </div>
                   <div className="space-y-1 font-mono text-xs">
-                    <div className="flex justify-between text-slate-900 font-bold">
+                    <div className="flex justify-between text-slate-900 dark:text-white font-bold">
                       <span>Dr. {indAs.debitAccount}</span>
                       <span>{inr(indAs.debitAmount)}</span>
                     </div>
-                    <div className="flex justify-between text-slate-700 pl-4 font-semibold">
+                    <div className="flex justify-between text-slate-700 dark:text-slate-300 pl-4 font-semibold">
                       <span>{indAs.creditAccount}</span>
                       <span>{inr(indAs.creditAmount)}</span>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-600 italic font-sans pt-1">
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 italic font-sans pt-1">
                     {indAs.narration}
                   </p>
-                  <p className="text-[10px] text-indigo-800/80 font-medium pt-0.5">
+                  <p className="text-[10px] text-indigo-800/80 dark:text-indigo-300/80 font-medium pt-0.5">
                     Rule: {indAs.ruleExplanation}
                   </p>
                 </div>
@@ -1919,31 +1989,32 @@ export const FinanceExpensesPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* ─── Modal 3: Edit Entry ─── */}
-      {editingEntry && (
+      {/* ─── Modal 3: Edit Entry (Portaled) ─── */}
+      {editingEntry && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn"
           onClick={() => setEditingEntry(null)}
         >
           <div
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 space-y-4"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
-                  <Pencil className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Pencil className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                   Edit Expense Ledger Entry
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Update details and recalculate journal entries.</p>
+                <p className="text-xs text-slate-400 dark:text-slate-400 mt-0.5">Update details and recalculate journal entries.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingEntry(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1951,35 +2022,35 @@ export const FinanceExpensesPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Date</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Date</label>
                 <input
                   type="date"
                   value={editingEntry.date}
                   onChange={(e) => setEditingEntry((prev) => prev ? { ...prev, date: e.target.value } : null)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Amount (₹)</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Amount (₹)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={editingEntry.amount}
                   onChange={(e) => setEditingEntry((prev) => prev ? { ...prev, amount: parseFloat(e.target.value) || 0 } : null)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono font-bold"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Category (Information Sheet)</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Category (Information Sheet)</label>
                 <select
                   value={editingEntry.category}
                   onChange={(e) => setEditingEntry((prev) => prev ? { ...prev, category: e.target.value } : null)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-semibold"
                 >
                   {EXPENSE_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
+                    <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">
                       {c}
                     </option>
                   ))}
@@ -1987,14 +2058,14 @@ export const FinanceExpensesPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Paid By</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Paid By</label>
                 <select
                   value={editingEntry.paidBy || 'Company'}
                   onChange={(e) => setEditingEntry((prev) => prev ? { ...prev, paidBy: e.target.value } : null)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-semibold"
                 >
                   {PAID_BY_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
+                    <option key={opt} value={opt} className="dark:bg-slate-800 dark:text-white">
                       {opt}
                     </option>
                   ))}
@@ -2002,32 +2073,32 @@ export const FinanceExpensesPage: React.FC = () => {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Description</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Description</label>
                 <input
                   type="text"
                   value={editingEntry.description}
                   onChange={(e) => setEditingEntry((prev) => prev ? { ...prev, description: e.target.value } : null)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Reference / Invoice</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Reference / Invoice</label>
                 <input
                   type="text"
                   value={editingEntry.reference || ''}
                   onChange={(e) => setEditingEntry((prev) => prev ? { ...prev, reference: e.target.value } : null)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Notes</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Notes</label>
                 <input
                   type="text"
                   value={editingEntry.notes || ''}
                   onChange={(e) => setEditingEntry((prev) => prev ? { ...prev, notes: e.target.value } : null)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs"
                 />
               </div>
             </div>
@@ -2036,7 +2107,7 @@ export const FinanceExpensesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setEditingEntry(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 Cancel
               </button>
@@ -2050,7 +2121,8 @@ export const FinanceExpensesPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -146,32 +146,55 @@ export const FinanceDashboardPage: React.FC<FinanceDashboardPageProps> = ({
     fetchMonthlySummary();
   }, []);
 
+  const HISTORICAL_MONTHLY_INCOME: Record<string, { gross: number; net: number; refunds: number }> = {
+    'Jan 2026': { gross: 152.30, net: 152.30, refunds: 0 },
+    'Feb 2026': { gross: 1472.54, net: 1472.54, refunds: 0 },
+    'Mar 2026': { gross: 4070.95, net: 4070.95, refunds: 0 },
+    'Apr 2026': { gross: 5606.10, net: 5606.10, refunds: 0 },
+    'May 2026': { gross: 5903.80, net: 5903.80, refunds: 0 },
+  };
+
   const allMonthlyData = useMemo(() => {
-    if (serverMonths.length > 0) return serverMonths;
-    if (!cur) return [];
+    let list: MonthlyRecord[] = [];
+    if (serverMonths.length > 0) {
+      list = serverMonths;
+    } else if (cur) {
+      const livGross = cur.grossCollections ?? cur.revenue ?? 0;
+      const livRef = cur.refundedAmount ?? 0;
+      const livNet = cur.netCollections ?? cur.netRevenue ?? Math.max(0, livGross - livRef);
+      const livOrders = cur.orders ?? 0;
+      const livPages = cur.pages ?? 0;
 
-    const livGross = cur.grossCollections ?? cur.revenue ?? 0;
-    const livRef = cur.refundedAmount ?? 0;
-    const livNet = cur.netCollections ?? cur.netRevenue ?? Math.max(0, livGross - livRef);
-    const livOrders = cur.orders ?? 0;
-    const livPages = cur.pages ?? 0;
+      list = [
+        {
+          month: 'Current Active Range',
+          label: 'Current Active Range',
+          shortLabel: 'Current',
+          monthIndex: 1,
+          gross: livGross,
+          refunds: livRef,
+          net: livNet,
+          orders: livOrders,
+          pages: livPages,
+          quarter: 'Active',
+          isCurrent: true,
+          settlementStatus: 'UNRECONCILED' as const,
+        },
+      ];
+    }
 
-    return [
-      {
-        month: 'Current Active Range',
-        label: 'Current Active Range',
-        shortLabel: 'Current',
-        monthIndex: 1,
-        gross: livGross,
-        refunds: livRef,
-        net: livNet,
-        orders: livOrders,
-        pages: livPages,
-        quarter: 'Active',
-        isCurrent: true,
-        settlementStatus: 'UNRECONCILED' as const,
-      },
-    ];
+    return list.map((m) => {
+      const hist = HISTORICAL_MONTHLY_INCOME[m.month];
+      if (hist) {
+        return {
+          ...m,
+          gross: hist.gross,
+          net: hist.net,
+          refunds: hist.refunds,
+        };
+      }
+      return m;
+    });
   }, [serverMonths, cur]);
 
   const totalGross = useMemo(() => allMonthlyData.reduce((a, m) => a + m.gross, 0), [allMonthlyData]);
