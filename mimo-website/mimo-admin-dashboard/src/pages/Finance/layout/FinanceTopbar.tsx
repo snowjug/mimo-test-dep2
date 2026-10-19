@@ -132,7 +132,7 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
           <button
             type="button"
             title={pendingRefundsCount ? `${pendingRefundsCount} refund request(s) waiting for review` : 'No refund requests waiting'}
-            className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-[#E4E7EB] bg-white transition-all cursor-pointer shadow-2xs relative"
+            className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl border border-[#E4E7EB] dark:border-slate-800 bg-white dark:bg-slate-900 transition-all cursor-pointer shadow-2xs relative"
           >
             <Bell className="w-4 h-4" />
             {pendingRefundsCount > 0 && (
@@ -147,7 +147,7 @@ export const FinanceTopbar: React.FC<FinanceTopbarProps> = ({
         <button
           type="button"
           onClick={onOpenProfile}
-          className="flex items-center gap-2 pl-2 border-l border-slate-200 cursor-pointer"
+          className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800 cursor-pointer"
           title="My profile"
         >
           {profileAvatarUrl ? (

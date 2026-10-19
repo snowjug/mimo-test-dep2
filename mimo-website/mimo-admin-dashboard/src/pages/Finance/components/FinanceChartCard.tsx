@@ -18,20 +18,20 @@ export const FinanceChartCard: React.FC<FinanceChartCardProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`bg-white border border-slate-150/80 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col ${className}`}>
+    <div className={`bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col ${className}`}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2.5">
           {icon && (
-            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-[#093765]">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/40 flex items-center justify-center text-[#093765] dark:text-indigo-400">
               {icon}
             </div>
           )}
           <div>
-            <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
               {title}
             </h3>
             {subtitle && (
-              <p className="text-xs text-slate-400 font-normal">
+              <p className="text-xs text-slate-400 dark:text-slate-400 font-normal">
                 {subtitle}
               </p>
             )}

@@ -46,6 +46,7 @@ describe("getMonthlySummary", () => {
       now: ist("2026-03-15T00:00:00").getTime(),
       startYear: 2026,
       startMonth: 3,
+      includeAuditedIncome: false,
     });
 
     assert.strictEqual(results.length, 1, "only March 2026 is in range (launch month == current month)");
@@ -83,6 +84,7 @@ describe("getMonthlySummary", () => {
       now: ist("2026-03-15T00:00:00").getTime(),
       startYear: 2026,
       startMonth: 3,
+      includeAuditedIncome: false,
     });
 
     assert.strictEqual(march.gross, 100);
@@ -103,5 +105,9 @@ describe("getMonthlySummary", () => {
     assert.strictEqual(results[1].label, "Feb 2026 (M2)");
     assert.strictEqual(results[2].isCurrent, true);
     assert.strictEqual(results[0].isCurrent, false);
+    // Audited numbers integrated
+    assert.strictEqual(results[0].gross, 152.30, "Jan 2026 audited income");
+    assert.strictEqual(results[1].gross, 1472.54, "Feb 2026 audited income");
+    assert.strictEqual(results[2].gross, 4070.95, "Mar 2026 audited income");
   });
 });

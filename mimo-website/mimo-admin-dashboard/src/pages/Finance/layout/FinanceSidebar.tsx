@@ -165,14 +165,14 @@ const FleetPill: React.FC = () => {
   const ok = !!sum && sum.offline === 0;
   const dot = !sum ? 'bg-slate-300' : ok ? 'bg-emerald-500' : 'bg-amber-500';
   return (
-    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-[#E4E7EB] shadow-2xs">
+    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-[#E4E7EB] dark:border-slate-700 shadow-2xs">
       <div className="flex items-center gap-2.5">
         <span className="relative flex h-2.5 w-2.5 shrink-0">
           {ok && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
           <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${dot}`} />
         </span>
         <div className="flex flex-col">
-          <span className="text-[12px] font-bold text-slate-800 leading-none">Machines</span>
+          <span className="text-[12px] font-bold text-slate-800 dark:text-slate-100 leading-none">Machines</span>
           <span className="text-[11px] text-slate-400 font-medium mt-0.5 leading-none">
             {q.error ? 'Status unavailable' : sum ? `${sum.online} of ${sum.total} online` : 'Checking…'}
           </span>

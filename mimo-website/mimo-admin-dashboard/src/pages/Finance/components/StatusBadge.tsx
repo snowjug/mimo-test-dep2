@@ -22,7 +22,7 @@ export interface StatusBadgeProps {
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'sm' }) => {
   const norm = String(status || '').toUpperCase().trim();
 
-  let styles = 'bg-slate-100 text-slate-700 border-slate-200';
+  let styles = 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
   let dotColor = 'bg-slate-400';
   let displayLabel = norm || 'UNKNOWN';
 
@@ -33,7 +33,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'sm' })
     case 'APPROVED':
     case 'ACTIVE':
     case 'PRINTED':
-      styles = 'bg-emerald-50/90 text-emerald-700 border-emerald-200';
+      styles = 'bg-emerald-50/90 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/80';
       dotColor = 'bg-emerald-500';
       displayLabel = norm === 'PAID' || norm === 'COMPLETED' ? 'Success' : norm === 'ACTIVE' ? 'Active' : 'Approved';
       break;
@@ -41,7 +41,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'sm' })
     case 'PENDING':
     case 'PROCESSING':
     case 'QUEUED':
-      styles = 'bg-amber-50/90 text-amber-700 border-amber-200';
+      styles = 'bg-amber-50/90 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/80';
       dotColor = 'bg-amber-500';
       displayLabel = norm === 'PROCESSING' ? 'Processing' : 'Pending';
       break;
@@ -49,26 +49,26 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'sm' })
     case 'FAILED':
     case 'ERROR':
     case 'REJECTED':
-      styles = 'bg-rose-50/90 text-rose-700 border-rose-200';
+      styles = 'bg-rose-50/90 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/80';
       dotColor = 'bg-rose-500';
       displayLabel = norm === 'REJECTED' ? 'Rejected' : 'Failed';
       break;
 
     case 'REFUNDED':
     case 'REFUND_SUCCESS':
-      styles = 'bg-purple-50 text-purple-700 border-purple-200';
-      dotColor = 'bg-[#093765]';
+      styles = 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800/80';
+      dotColor = 'bg-[#093765] dark:bg-sky-400';
       displayLabel = 'Refunded';
       break;
 
     case 'EXPIRED':
-      styles = 'bg-slate-100 text-slate-500 border-slate-200';
+      styles = 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700';
       dotColor = 'bg-slate-400';
       displayLabel = 'Expired';
       break;
 
     default:
-      styles = 'bg-slate-100 text-slate-700 border-slate-200';
+      styles = 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
       dotColor = 'bg-slate-400';
       displayLabel = norm;
   }

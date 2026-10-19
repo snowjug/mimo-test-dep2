@@ -276,7 +276,7 @@ body {
     height: 100vh;
     width: 100vw;
     overflow: hidden;
-    background-color: #f8fafc;
+    background-color: #f1f5f9;
   }
   :where(.dark) .finance-layout {
     background-color: #0c0d10;
@@ -325,10 +325,41 @@ body {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 24px 32px;
-    background-color: #f8fafc;
+    background-color: #f1f5f9;
   }
   :where(.dark) .finance-main {
     background-color: #0c0d10;
+    color: #f1f5f9;
+  }
+  :where(.dark) .finance-main .bg-white:not([data-keep-light]) {
+    background-color: #0f172a;
+  }
+  :where(.dark) .finance-main .bg-\[\#F3F4F6\] {
+    background-color: #1e293b;
+  }
+  :where(.dark) .finance-main .bg-\[\#FAFAFB\] {
+    background-color: #0f172a;
+  }
+  :where(.dark) .finance-main .border-\[\#E4E7EB\],
+  :where(.dark) .finance-main .border-slate-200,
+  :where(.dark) .finance-main .border-slate-100 {
+    border-color: #1e293b;
+  }
+  :where(.dark) .finance-main .text-\[\#111318\],
+  :where(.dark) .finance-main .text-slate-900,
+  :where(.dark) .finance-main .text-slate-800 {
+    color: #f8fafc;
+  }
+  :where(.dark) .finance-main .text-slate-700,
+  :where(.dark) .finance-main .text-slate-600 {
+    color: #94a3b8;
+  }
+  :where(.dark) .finance-main table thead {
+    background-color: #1e293b;
+    color: #94a3b8;
+  }
+  :where(.dark) .finance-main table tbody tr:hover {
+    background-color: rgba(30, 41, 59, 0.5);
   }
 }
 
