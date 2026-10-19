@@ -15,8 +15,10 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
-const TOKEN_KEYS = ['financeToken', 'adminToken', 'technicalToken', 'hrToken', 'marketingToken'];
+const TOKEN_KEYS = ['adminToken', 'financeToken', 'technicalToken', 'hrToken', 'marketingToken'];
 const ROUTE_PREFIX_TOKEN: Record<string, string> = {
+  '/admin': 'adminToken',
+  '/finance': 'financeToken',
   '/technical': 'technicalToken',
   '/hr': 'hrToken',
   '/marketing': 'marketingToken',
