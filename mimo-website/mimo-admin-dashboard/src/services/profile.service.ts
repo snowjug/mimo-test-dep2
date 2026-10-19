@@ -54,7 +54,14 @@ export const memberProfileServiceFor = (basePath: string) => ({
 
 /** Admin/Finance: shared role-level profile, no password change (see profile.controller.js). */
 export const staffProfileService = {
-  get: () => api.get<{ profile: StaffProfile }>('/staff/profile').then((r) => r.data.profile),
+  get: () =>
+    api
+      .get<{ profile: StaffProfile }>('/staff/profile')
+      .then((r) => r.data.profile)
+      .catch((err) => {
+        if (err?.response?.status === 404) return null;
+        throw err;
+      }),
   update: (fields: { name?: string; dob?: string }, avatar?: File | null) => {
     const form = new FormData();
     if (fields.name !== undefined) form.append('name', fields.name);
