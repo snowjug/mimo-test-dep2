@@ -22,7 +22,7 @@ export const FinanceChartCard: React.FC<FinanceChartCardProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2.5">
           {icon && (
-            <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/40 flex items-center justify-center text-[#093765] dark:text-indigo-400">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-100 dark:border-indigo-500/25 flex items-center justify-center text-[#093765] dark:text-indigo-400 shrink-0">
               {icon}
             </div>
           )}
