@@ -11,6 +11,14 @@ const GOOD = {
   JWT_SECRET: "j".repeat(48), ADMIN_EMAIL: "ops@example.com", ADMIN_PASSWORD: "correct-horse-battery-staple",
   CASHFREE_ENV: "production", CASHFREE_APP_ID: "app-id-value", CASHFREE_SECRET_KEY: "cf-secret-value",
   GMAIL_APP_PASSWORD: "gmail-app-pass-value", WA_ACCESS_TOKEN: "wa-access-token-value",
+  // Mission 37: added to REQUIRED alongside the pre-existing entries above — these must be present in every
+  // "good" fixture from here on, or every pre-existing test below would start failing on this unrelated change.
+  FINANCE_EMAIL: "finance@example.com", FINANCE_PASSWORD: "finance-correct-horse-battery",
+  MIMO_SA_PROJECT_ID: "mimo-v2-11868", MIMO_SA_CLIENT_EMAIL: "sa@mimo-v2-11868.iam.gserviceaccount.com",
+  // Single-line on purpose: the run() helper below joins FUNCTIONS_ENV_FILE as KEY="VALUE" per line, so a
+  // real embedded newline would break that (test-harness-only) encoding. Multiline-value round-tripping is
+  // already covered by the "toDotenv round-trips awkward values" test above.
+  MIMO_SA_PRIVATE_KEY: "fake-single-line-private-key-value-for-tests-only",
 };
 
 const run = (env, live) => {
@@ -123,4 +131,44 @@ test("without a live secret reference GMAIL_APP_PASSWORD is still required", () 
   const r = run(rest);
   assert.strictEqual(r.status, 1);
   assert.ok(r.stderr.includes("GMAIL_APP_PASSWORD"));
+});
+
+// Mission 37: FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* were previously live production configuration that
+// this script's allow-list did not recognize, so every CI deploy silently dropped them (unrelated to the
+// WhatsApp Flow feature, found while integrating it). These tests prove the fix without ever asserting on,
+// or printing, a real value.
+test("CLI: FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* survive filtering and are written, never printed", () => {
+  const r = run(GOOD);
+  assert.strictEqual(r.status, 0, r.stderr);
+  const writtenEnv = parseDotenv(fs.readFileSync(r.out, "utf8"));
+  for (const k of ["FINANCE_EMAIL", "FINANCE_PASSWORD", "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY"]) {
+    assert.strictEqual(writtenEnv[k], GOOD[k], `${k} did not round-trip into .env`);
+  }
+  const shown = r.stdout.replace(/::add-mask::.*/g, "");
+  for (const k of ["FINANCE_EMAIL", "FINANCE_PASSWORD", "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY"]) {
+    assert.ok(!shown.includes(GOOD[k]), `${k}'s value leaked to log output`);
+  }
+});
+
+test("CLI: missing FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* fails closed (exit 1), naming the keys but not any value", () => {
+  const { FINANCE_EMAIL, FINANCE_PASSWORD, MIMO_SA_PROJECT_ID, MIMO_SA_CLIENT_EMAIL, MIMO_SA_PRIVATE_KEY, ...rest } = GOOD;
+  const r = run(rest);
+  assert.strictEqual(r.status, 1);
+  for (const k of ["FINANCE_EMAIL", "FINANCE_PASSWORD", "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY"]) {
+    assert.ok(r.stderr.includes(k), `${k} should be named as missing`);
+  }
+  assert.ok(!r.written);
+});
+
+test("mergeSources no longer drops FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* as reserved/unrecognized", () => {
+  const { merged, dropped } = mergeSources({
+    live: { FINANCE_EMAIL: "f@example.com", MIMO_SA_PROJECT_ID: "p" },
+    secretEnv: { FINANCE_PASSWORD: "pw", MIMO_SA_CLIENT_EMAIL: "c", MIMO_SA_PRIVATE_KEY: "k" },
+  });
+  assert.strictEqual(merged.FINANCE_EMAIL, "f@example.com");
+  assert.strictEqual(merged.MIMO_SA_PROJECT_ID, "p");
+  assert.strictEqual(merged.FINANCE_PASSWORD, "pw");
+  assert.strictEqual(merged.MIMO_SA_CLIENT_EMAIL, "c");
+  assert.strictEqual(merged.MIMO_SA_PRIVATE_KEY, "k");
+  assert.ok(!dropped.some((n) => n.startsWith("FINANCE_") || n.startsWith("MIMO_SA_")));
 });
