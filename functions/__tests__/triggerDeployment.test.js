@@ -9,11 +9,13 @@ const { createFakeFirestore } = require("./helpers/fakeFirestore");
 process.env.JWT_SECRET = "trigger-deployment-test-secret-fixture-32"; // must be >= 32 chars (see src/config/env.js)
 createFakeFirestore().install();
 const { scheduledPrintTimeoutSweep } = require("../src/triggers/printTimeout.trigger");
+const { scheduledWhatsappFlowWorkerSweep } = require("../src/triggers/whatsappFlowWorker.trigger");
 const triggers = {
   ...require("../src/triggers/printJob.triggers"),
   ...require("../src/triggers/retention.trigger"),
   ...require("../src/triggers/orphanStorage.trigger"),
   scheduledPrintTimeoutSweep,
+  scheduledWhatsappFlowWorkerSweep,
 };
 
 // name -> [region, event document / schedule]   (live state checked with `firebase functions:list` on 2026-09-27)
@@ -26,9 +28,10 @@ const EXPECTED = {
   printerHardwareNotification: ["asia-south1", "hardware/printers"],
   colourPaperUsageNotification: ["asia-south1", "print_jobs/{jobId}"],
   scheduledPrintTimeoutSweep: ["us-central1", "every 2 minutes"],
+  scheduledWhatsappFlowWorkerSweep: ["us-central1", "every 2 minutes"], // Mission 37: not yet deployed — added here ahead of deployment per this test's own contract
 };
 
-test("the exported triggers are exactly the seven deployed ones plus the new orphan-storage sweep (not yet deployed)", () => {
+test("the exported triggers are exactly the nine deployed (or about-to-be-deployed) ones", () => {
   assert.deepStrictEqual(Object.keys(triggers).sort(), Object.keys(EXPECTED).sort());
 });
 

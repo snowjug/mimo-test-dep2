@@ -160,6 +160,80 @@ async function sendWhatsAppCTAButton(to, bodyText, buttonText, url) {
   }
 }
 
+/**
+ * Mission 21 (carried into Mission 37): classifies the outcome of sending the SAME `interactive`/`cta_url`
+ * message sendWhatsAppCTAButton already sends — a SIBLING function, not a replacement. sendWhatsAppCTAButton
+ * is left byte-for-byte unchanged (the chatbot's behavior must not change); this exists only because the
+ * Flow's durable notification state machine (createOrderOperation.js) needs a real confirmed/
+ * definite-failure/ambiguous signal that sendWhatsAppCTAButton's own catch-and-fall-back-to-text design never
+ * surfaces to its caller (it never throws). No new message type, no new provider, no new credential — same
+ * endpoint, same payload shape, same WA_ACCESS_TOKEN.
+ *
+ * Classification (requirement 4/5 of Mission 21):
+ *   - Meta responded with a 2xx AND the documented `messages[0].id` success shape -> "confirmed".
+ *   - Meta responded with an HTTP error status (`err.response` present) -> the request was definitely
+ *     rejected -> "definite_failure". Safe to retry (the message was never sent).
+ *   - No HTTP response at all (timeout, DNS/network failure, connection reset) -> we cannot tell whether
+ *     Meta received and processed the request before the connection broke -> "ambiguous". NEVER classified
+ *     as a safe-to-retry failure, to avoid sending the user a duplicate message for a request that may have
+ *     already gone through.
+ * @returns {Promise<{classification:"confirmed", messageId:string}>}
+ * @throws {WhatsAppSendError} with `.classification` set to "definite_failure" or "ambiguous"
+ */
+class WhatsAppSendError extends Error {
+  constructor(classification, message, cause) {
+    super(message);
+    this.name = "WhatsAppSendError";
+    this.classification = classification;
+    this.cause = cause;
+  }
+}
+
+async function sendWhatsAppCTAButtonTracked(to, bodyText, buttonText, url) {
+  const normalized = to.replace(/[^\d]/g, "");
+  let res;
+  try {
+    res = await axios.post(getWaApiUrl(), {
+      messaging_product: "whatsapp",
+      to: normalized,
+      type: "interactive",
+      interactive: {
+        type: "cta_url",
+        body: { text: bodyText },
+        action: {
+          name: "cta_url",
+          parameters: {
+            display_text: buttonText.substring(0, 20),
+            url: url
+          }
+        }
+      }
+    }, {
+      headers: {
+        Authorization: `Bearer ${WA_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      timeout: 10000, // bounded wait, matching the existing Cashfree-call convention — past this, we
+      // genuinely do not know whether Meta received the request, hence "ambiguous" below, not a retry.
+    });
+  } catch (err) {
+    if (err.response) {
+      // Meta answered with an error status: the message was NOT accepted. Definite, safe to retry.
+      throw new WhatsAppSendError("definite_failure", err.response.data?.error?.message || err.message, err);
+    }
+    // No response at all (timeout/network/connection reset): cannot distinguish "never sent" from "sent, but
+    // the response never arrived." Ambiguous — never auto-retried.
+    throw new WhatsAppSendError("ambiguous", err.message, err);
+  }
+  const messageId = res.data && Array.isArray(res.data.messages) && res.data.messages[0] && res.data.messages[0].id;
+  if (!messageId) {
+    // Resolved without throwing but without Meta's documented success shape: cannot tell delivered from not.
+    throw new WhatsAppSendError("ambiguous", "WhatsApp API response did not confirm delivery");
+  }
+  console.log(`[WHATSAPP] CTA button (tracked) sent to ${normalized}`);
+  return { classification: "confirmed", messageId };
+}
+
 // ── Helper: send native WhatsApp order receipt card (like Namma Metro) ─────────
 async function sendWhatsAppOrderCard(to, { orderId, fileName, colorMode, copies, totalAmount, status, printCode }) {
   try {
@@ -383,8 +457,11 @@ module.exports = {
   _askForCoupon,
   _finalizePayment,
   sendWhatsAppButtons,
+  sendWhatsAppCTAButton,
+  sendWhatsAppCTAButtonTracked,
   sendWhatsAppList,
   sendWhatsAppMessage,
   sendWhatsAppOrderCard,
+  WhatsAppSendError,
   waContext,
 };

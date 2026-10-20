@@ -32,6 +32,7 @@ app.use(require("./routes/technical.routes"));
 app.use(require("./routes/hr.routes"));
 app.use(require("./routes/marketing.routes"));
 app.use(require("./routes/whatsapp.routes"));
+app.use(require("./routes/whatsappFlowEndpoint.routes")); // Mission 37: real Meta Flow Data Exchange endpoint, additive
 
 // ================= KIOSK SYNC ROUTES (ISOLATED & PROTECTED) =================
 const { createKioskRouter } = require("./routes/kiosk.routes");
