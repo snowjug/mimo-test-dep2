@@ -22,14 +22,29 @@ const ALLOWED = [
   "WA_PHONE_NUMBER_ID", "WA_ACCESS_TOKEN", "WA_VERIFY_TOKEN",
   "CONVERTER_SERVICE_URL", "INTERNAL_CONVERTER_SECRET", "INTERNAL_WEBHOOK_SECRET", "INTERNAL_API_KEY",
   "PI_BASE_URL", "PRINTER_NAME",
+  // Mission 37: these were already live production configuration (confirmed present on a prior deployed
+  // revision) that this allow-list did not yet recognize, so every deploy through this script silently
+  // dropped them — unrelated to the WhatsApp Flow feature itself, but found while integrating it. Finance
+  // login (admin.controller.js) reads the first pair with no code fallback; the Admin SDK explicit-credential
+  // path (config/firebase.js) reads the second trio with no code fallback either — both fail closed (a
+  // disabled finance dashboard / no Admin SDK credential), never silently insecure, if these are still unset.
+  "FINANCE_EMAIL", "FINANCE_PASSWORD",
+  "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY",
 ];
 const ALLOWED_PATTERNS = [/^[A-Z0-9]+_(PI_URL|PRINTER_NAME)$/];
 
 // Without these the API silently falls back to public defaults (sandbox payments, forgeable tokens, no admin login).
+// This script's only caller is deploy-functions.yml's production `deploy` job (gated `if: github.ref ==
+// 'refs/heads/main'`) — there is no separate local/staging invocation, so REQUIRED is already, in practice,
+// a production-only gate; adding to it here cannot break a local/test workflow that never runs this script.
 const REQUIRED = [
   "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD",
   "CASHFREE_ENV", "CASHFREE_APP_ID", "CASHFREE_SECRET_KEY",
   "GMAIL_APP_PASSWORD", "WA_ACCESS_TOKEN",
+  // Mission 37: finance login and the Admin SDK explicit-credential path are both real, already-deployed
+  // production features with no safe code fallback — treated the same as the other REQUIRED entries above.
+  "FINANCE_EMAIL", "FINANCE_PASSWORD",
+  "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY",
 ];
 // Have code fallbacks; missing is worth a warning, not a stop.
 const RECOMMENDED = ["GOOGLE_CLIENT_ID", "WA_PHONE_NUMBER_ID", "WA_VERIFY_TOKEN"];

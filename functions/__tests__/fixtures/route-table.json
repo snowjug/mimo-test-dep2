@@ -189,6 +189,7 @@
   "POST /technical/work-sessions/start",
   "POST /upload-profile-photo",
   "POST /upload-url",
+  "POST /whatsapp-flow-endpoint",
   "POST /whatsapp-webhook",
   "PUT /profile"
 ]
