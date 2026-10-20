@@ -216,6 +216,16 @@ test.describe("GET /verify-payment twice (duplicate verification)", () => {
     assert.strictEqual(fake.data("print_jobs").a.status, "pending");
     assert.strictEqual(fake.data("print_jobs").a.printCode, undefined);
   });
+
+  test("an unexpected internal error (not an OrderServiceError) during verification is answered safely, 500, never a crash", async () => {
+    // A matching order with no `req.user` at all makes the ownership check (`req.user.userId`) throw --
+    // a realistic "something upstream did not attach identity" failure, not a contrived input.
+    seed({ extra: { orders: { o1: { orderId: "order_1", userId: "u1", amount: 20, status: "INITIATED" } } } });
+    const res = response();
+    await controller.getVerifyPayment({ params: { orderId: "order_1" } }, res);
+    assert.strictEqual(res.code, 500);
+    assert.strictEqual(res.body, "Verification failed");
+  });
 });
 
 // ───────────────────────── POST /request-refund ─────────────────────────
@@ -279,6 +289,15 @@ test.describe("POST /request-refund", () => {
       assert.strictEqual((await call({ orderId: "order_1" })).code, 200);
     }
   });
+
+  test("an unexpected internal error (no identity attached to the request) is answered safely, 500, never a crash", async () => {
+    seed({ extra: { orders: { o1: order() } } });
+    const res = response();
+    // No `user` on the request at all -- req.user.userId throws before any Firestore read happens.
+    await controller.postRequestRefund({ body: { orderId: "order_1" } }, res);
+    assert.strictEqual(res.code, 500);
+    assert.strictEqual(res.body.error, "Failed to submit refund request");
+  });
 });
 
 // ───────────────────────── POST /check-status ─────────────────────────
@@ -315,6 +334,15 @@ test.describe("POST /check-status (print-code status polling)", () => {
     seed({ jobs: jobs({ status: "failed", printerStatus: "Cancelled by user" }) });
     const res = await call("1234");
     assert.strictEqual(res.code, 404);
+  });
+
+  test("an unexpected internal error (malformed request, no body at all) is answered safely, 500, never a crash", async () => {
+    seed({});
+    const res = response();
+    // Destructuring `req.body` when it does not exist throws before the printCode validation even runs.
+    await controller.postCheckStatus({}, res);
+    assert.strictEqual(res.code, 500);
+    assert.strictEqual(res.body.error, "Status check failed");
   });
 });
 
