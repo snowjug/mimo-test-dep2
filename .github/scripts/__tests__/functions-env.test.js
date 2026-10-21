@@ -136,7 +136,8 @@ test("without a live secret reference GMAIL_APP_PASSWORD is still required", () 
 // Mission 37: FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* were previously live production configuration that
 // this script's allow-list did not recognize, so every CI deploy silently dropped them (unrelated to the
 // WhatsApp Flow feature, found while integrating it). These tests prove the fix without ever asserting on,
-// or printing, a real value.
+// or printing, a real value. (Mission 49 moved MIMO_SA_* from REQUIRED to RECOMMENDED — see the dedicated
+// tests below — but they must still round-trip into .env when supplied, which this test still covers.)
 test("CLI: FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* survive filtering and are written, never printed", () => {
   const r = run(GOOD);
   assert.strictEqual(r.status, 0, r.stderr);
@@ -150,14 +151,39 @@ test("CLI: FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* survive filtering and are wr
   }
 });
 
-test("CLI: missing FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* fails closed (exit 1), naming the keys but not any value", () => {
-  const { FINANCE_EMAIL, FINANCE_PASSWORD, MIMO_SA_PROJECT_ID, MIMO_SA_CLIENT_EMAIL, MIMO_SA_PRIVATE_KEY, ...rest } = GOOD;
+test("CLI: missing FINANCE_EMAIL/FINANCE_PASSWORD fails closed (exit 1), naming the keys but not any value", () => {
+  const { FINANCE_EMAIL, FINANCE_PASSWORD, ...rest } = GOOD;
   const r = run(rest);
   assert.strictEqual(r.status, 1);
-  for (const k of ["FINANCE_EMAIL", "FINANCE_PASSWORD", "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY"]) {
+  for (const k of ["FINANCE_EMAIL", "FINANCE_PASSWORD"]) {
     assert.ok(r.stderr.includes(k), `${k} should be named as missing`);
   }
   assert.ok(!r.written);
+});
+
+// Mission 49: config/firebase.js falls back to Application Default Credentials (the Cloud Run service's
+// own runtime identity) when MIMO_SA_* are unset, so they no longer block a deploy — only a warning.
+test("CLI: missing MIMO_SA_* (ADC intended) does not block deploy, but is still recommended", () => {
+  const { MIMO_SA_PROJECT_ID, MIMO_SA_CLIENT_EMAIL, MIMO_SA_PRIVATE_KEY, ...rest } = GOOD;
+  const r = run(rest);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.ok(r.written);
+  const writtenEnv = parseDotenv(fs.readFileSync(r.out, "utf8"));
+  for (const k of ["MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY"]) {
+    assert.ok(!(k in writtenEnv), `${k} should not appear in .env when unset`);
+    assert.ok(r.stdout.includes(k), `${k} should still produce a recommendation warning`);
+  }
+});
+
+// Mission 49: when MIMO_SA_* ARE supplied, config/firebase.js still prefers them over ADC — explicit-
+// credential support must keep working, unchanged.
+test("CLI: explicit MIMO_SA_* credentials, when supplied, are still written and preferred over ADC", () => {
+  const r = run(GOOD);
+  assert.strictEqual(r.status, 0, r.stderr);
+  const writtenEnv = parseDotenv(fs.readFileSync(r.out, "utf8"));
+  for (const k of ["MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY"]) {
+    assert.strictEqual(writtenEnv[k], GOOD[k], `${k} did not round-trip into .env`);
+  }
 });
 
 test("mergeSources no longer drops FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* as reserved/unrecognized", () => {
