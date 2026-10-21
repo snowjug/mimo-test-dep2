@@ -25,9 +25,10 @@ const ALLOWED = [
   // Mission 37: these were already live production configuration (confirmed present on a prior deployed
   // revision) that this allow-list did not yet recognize, so every deploy through this script silently
   // dropped them — unrelated to the WhatsApp Flow feature itself, but found while integrating it. Finance
-  // login (admin.controller.js) reads the first pair with no code fallback; the Admin SDK explicit-credential
-  // path (config/firebase.js) reads the second trio with no code fallback either — both fail closed (a
-  // disabled finance dashboard / no Admin SDK credential), never silently insecure, if these are still unset.
+  // login (admin.controller.js) reads the first pair, falling back to a hardcoded production credential
+  // pair in source when unset (not a disabled dashboard — see REQUIRED below). The Admin SDK explicit-
+  // credential path (config/firebase.js) reads the second trio, falling back to Application Default
+  // Credentials (the Cloud Run service's own runtime identity) when they are unset — see RECOMMENDED below.
   "FINANCE_EMAIL", "FINANCE_PASSWORD",
   "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY",
 ];
@@ -41,13 +42,26 @@ const REQUIRED = [
   "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD",
   "CASHFREE_ENV", "CASHFREE_APP_ID", "CASHFREE_SECRET_KEY",
   "GMAIL_APP_PASSWORD", "WA_ACCESS_TOKEN",
-  // Mission 37: finance login and the Admin SDK explicit-credential path are both real, already-deployed
-  // production features with no safe code fallback — treated the same as the other REQUIRED entries above.
+  // Mission 49: FINANCE_EMAIL/FINANCE_PASSWORD remain REQUIRED. Their omission does not disable finance
+  // login the way an earlier version of this comment claimed — admin.controller.js falls back to a
+  // hardcoded "mimo.finance"/"MimoFinance@2025" production credential pair committed in source
+  // (7eac655b) — but deciding whether that static fallback is an acceptable substitute for a real
+  // configured credential is a security-policy call this script does not make unilaterally. Keeping this
+  // required forces a repository admin to either supply real values or explicitly decide otherwise.
   "FINANCE_EMAIL", "FINANCE_PASSWORD",
-  "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY",
 ];
 // Have code fallbacks; missing is worth a warning, not a stop.
-const RECOMMENDED = ["GOOGLE_CLIENT_ID", "WA_PHONE_NUMBER_ID", "WA_VERIFY_TOKEN"];
+// Mission 49: MIMO_SA_PROJECT_ID/MIMO_SA_CLIENT_EMAIL/MIMO_SA_PRIVATE_KEY moved here from REQUIRED. An
+// earlier comment claimed the Admin SDK explicit-credential path in config/firebase.js has no fallback;
+// it does — when these are unset, config/firebase.js calls admin.initializeApp() without a `credential`,
+// which makes the SDK use Application Default Credentials (the Cloud Run service's own runtime service
+// account). That is Google's recommended, already-live production mechanism, not a weaker substitute, so
+// requiring explicit values here was blocking every deploy for no safety benefit. Explicit-credential
+// support is unchanged: if these ARE supplied, config/firebase.js still uses them in preference to ADC.
+const RECOMMENDED = [
+  "GOOGLE_CLIENT_ID", "WA_PHONE_NUMBER_ID", "WA_VERIFY_TOKEN",
+  "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY",
+];
 
 // Bound with `secrets: [...]` in functions/index.js. When the live function already has the Secret Manager
 // reference, the value must NOT also be written to .env (Google rejects the overlap) and is not required here.
