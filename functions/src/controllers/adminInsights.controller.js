@@ -306,8 +306,13 @@ const hardwareFor = (hardware, kioskId) =>
       // Some Pis already decrement paperLevel themselves on every print (stamping lastPaperDeduction each
       // time) — that value is already current. Re-subtracting the page-counter delta on top of it double
       // counts the same consumption and can drive the shown level to 0 while real paper remains. Only apply
-      // the page-counter correction when nothing is already live-decrementing paperLevel for us.
-      const selfReporting = p.lastPaperDeduction !== undefined && p.lastPaperDeduction !== null;
+      // the page-counter correction when nothing is already live-decrementing paperLevel for us. A stamp older
+      // than the last refill means that Pi stopped decrementing (the stamp is a leftover from an old Pi
+      // version), so it no longer counts — otherwise the level stays frozen at the refill value forever.
+      const lastDeductionMs = A.toMillis(p.lastPaperDeduction);
+      const refilledMs = A.toMillis(p.paperRefilledAt);
+      const deductionIsStale = Number.isFinite(lastDeductionMs) && Number.isFinite(refilledMs) && lastDeductionMs < refilledMs;
+      const selfReporting = p.lastPaperDeduction !== undefined && p.lastPaperDeduction !== null && !deductionIsStale;
       // B&W: the Pi reports the printer's own page counter, so paper left = level at refill − sheets printed since.
       const tracked = !selfReporting && type !== "color" && paperLevel !== null && Number.isFinite(p.pageCount) && Number.isFinite(p.paperRefillPageCount);
       if (tracked) paperLevel -= Math.max(0, p.pageCount - p.paperRefillPageCount);

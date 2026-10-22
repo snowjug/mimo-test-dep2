@@ -111,6 +111,29 @@ test("a printer already live-decrementing paperLevel itself is trusted as-is, no
   assert.strictEqual(computed.paperSource, "computed");
 });
 
+test("a lastPaperDeduction older than the last refill is ignored, so the page counter still moves the level", () => {
+  // Live case: CV-001's old Pi stamped lastPaperDeduction on 8 Oct, then the tray was refilled on 12 Oct and
+  // nothing decrements paperLevel any more. The leftover stamp used to freeze the level at 250 forever.
+  const [stale] = hardwareFor({
+    "CV-001": {
+      type: "bw", paperLevel: 250, pageCount: 17742, paperRefillPageCount: 17682,
+      lastPaperDeduction: new Date("2026-10-08T11:19:28Z"), paperRefilledAt: new Date("2026-10-12T03:16:49Z"),
+    },
+  }, "CV-001");
+  assert.strictEqual(stale.paperLevel, 190);
+  assert.strictEqual(stale.paperSource, "computed");
+
+  // A deduction stamped after the refill means a Pi is still decrementing live: trust it as-is.
+  const [live] = hardwareFor({
+    "CV-001": {
+      type: "bw", paperLevel: 200, pageCount: 17742, paperRefillPageCount: 17682,
+      lastPaperDeduction: new Date("2026-10-13T09:00:00Z"), paperRefilledAt: new Date("2026-10-12T03:16:49Z"),
+    },
+  }, "CV-001");
+  assert.strictEqual(live.paperLevel, 200);
+  assert.strictEqual(live.paperSource, "pi-live");
+});
+
 test("refill sets the tray to 250 and remembers the page counter", async () => {
   fake.reset({ hardware: { printers: { "SV-002-BW": { type: "bw", pageCount: 5959, paperLevel: 12 } } } });
   const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };

@@ -9,6 +9,7 @@ const profile = require("./profile.controller");
 const chat = require("./chat.controller");
 const { logFinancialAudit } = require("../utils/auditLogger");
 const { toPaise, toRupees } = require("../utils/money");
+const { cachedCollectionGet } = require("../utils/scanCache");
 
 // Constant-time password comparison: both sides are hashed to a fixed 32-byte SHA-256 digest first, so
 // a length mismatch (almost guaranteed between a real password and an attacker's guess) can never make
@@ -237,9 +238,9 @@ const postAdminHardware = async (req, res) => {
 const getAdminMetrics = async (req, res) => {
   try {
     const [ordersSnap, usersSnap, jobsSnap, metricsDoc] = await Promise.all([
-      db.collection("orders").get(),
-      db.collection("users").get(),
-      db.collection("print_jobs").get(),
+      cachedCollectionGet(db, "orders"),
+      cachedCollectionGet(db, "users"),
+      cachedCollectionGet(db, "print_jobs"),
       db.collection("system").doc("metrics").get()
     ]);
 
@@ -679,10 +680,10 @@ const getAdminRefundRequests = async (req, res) => {
 const getAdminUsers = async (req, res) => {
   try {
     const [usersSnap, ordersSnap, txnSnap, jobsSnap] = await Promise.all([
-      db.collection("users").get(),
-      db.collection("orders").get(),
-      db.collection("payment_transactions").get(),
-      db.collection("print_jobs").get()
+      cachedCollectionGet(db, "users"),
+      cachedCollectionGet(db, "orders"),
+      cachedCollectionGet(db, "payment_transactions"),
+      cachedCollectionGet(db, "print_jobs")
     ]);
 
     // Aggregate user spending and job statistics. Merging orders + payment_transactions (the same helper

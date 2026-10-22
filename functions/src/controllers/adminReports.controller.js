@@ -5,6 +5,7 @@
  */
 const { admin, db } = require("../config/firebase");
 const A = require("../services/analytics.service");
+const { cachedCollectionGet } = require("../utils/scanCache");
 
 const Timestamp = admin.firestore.Timestamp;
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -14,9 +15,9 @@ const getAdminUserGrowthReport = async (req, res) => {
     const range = A.parseRange(req.query);
 
     const [usersSnap, ordersSnap, txnSnap, jobsSnap] = await Promise.all([
-      db.collection("users").get(),
-      db.collection("orders").get(),
-      db.collection("payment_transactions").get(),
+      cachedCollectionGet(db, "users"),
+      cachedCollectionGet(db, "orders"),
+      cachedCollectionGet(db, "payment_transactions"),
       db.collection("print_jobs")
         .where("createdAt", ">=", Timestamp.fromMillis(range.from))
         .where("createdAt", "<", Timestamp.fromMillis(range.to))
