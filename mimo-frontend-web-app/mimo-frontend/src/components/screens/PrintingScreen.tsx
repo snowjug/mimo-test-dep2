@@ -474,7 +474,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   return (
     <div
-      className={`screen ${isActive ? 'visible' : ''} flex flex-row items-center justify-center gap-24 overflow-hidden px-24 ${
+      className={`screen ${isActive ? 'visible' : ''} flex flex-row items-center justify-between gap-12 lg:gap-16 xl:gap-24 overflow-hidden px-14 lg:px-20 xl:px-24 w-full h-full ${
         isFestiveMode ? 'bg-parchment-100' : 'bg-[#FAFAF8]'
       }`}
       style={{ display: isActive ? 'flex' : 'none' }}
@@ -541,13 +541,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
       {/* ── Left text card ── */}
       <div
-        className={`relative z-10 flex max-w-[720px] flex-1 flex-col items-start gap-6 rounded-[28px] border px-14 py-11 text-left backdrop-blur-xl ${
+        className={`relative z-10 flex flex-1 max-w-[780px] xl:max-w-[840px] flex-col items-start gap-6 rounded-[28px] border px-12 lg:px-14 py-11 text-left backdrop-blur-xl ${
           isFestiveMode
             ? 'border-gold-600/30 bg-gradient-to-br from-white to-parchment-200 shadow-[0_20px_50px_rgba(74,45,20,0.12)]'
             : 'border-gold-600/25 bg-white/80 shadow-[0_20px_50px_rgba(74,45,20,0.06)]'
         }`}
       >
-        <div className="min-h-[170px]">
+        <div className="min-h-[170px] w-full">
           <h2 className={`mb-5 text-[64px] font-extrabold leading-[1.06] tracking-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
             {typedTitle}
           </h2>
@@ -568,7 +568,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       </div>
 
       {/* ── Right: circular progress ── */}
-      <div className="relative z-10 flex items-center justify-center">
+      <div className="relative z-10 flex shrink-0 items-center justify-center pr-2 lg:pr-6 xl:pr-10">
         <div className="relative flex h-[380px] w-[380px] items-center justify-center">
           {isFestiveMode && (
             <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.22]">
