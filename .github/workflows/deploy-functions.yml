@@ -1,8 +1,14 @@
 name: Deploy Firebase Functions
 
-# Deploys the production API (`functions:api`) when backend code on main changes. The 6 Firestore/scheduler triggers are
-# deliberately NOT deployed on push: 3 of them are live in asia-south1 while this code has no region (a deploy would create
-# duplicate us-central1 copies). They are opt-in via the manual input below.
+# Everything Firebase-side deploys from a push to main:
+#   - `rules`  job: Firestore + Storage security rules (firebase/*.rules). Independent of the API gate below, so a
+#                rules fix can never be held back by a failing API deploy. (Rules used to be deployed by hand and
+#                had drifted: production still allowed public write to pricing and to /uploads.)
+#   - `deploy` job: the production API (`functions:api`), then the 6 Firestore/scheduler triggers when trigger code
+#                (or code they share) changed. The trigger regions are pinned in code and by
+#                functions/__tests__/triggerDeployment.test.js, so this updates the live copies instead of creating
+#                duplicates. A trigger failure turns the run red but leaves the healthy API in place.
+# Firestore indexes are NOT deployed here: `firebase deploy` would offer to delete indexes missing from the file.
 # Environment variables are NOT in git. They come from (1) the live function's current configuration and
 # (2) the optional FUNCTIONS_ENV_FILE repository secret. The deploy stops before touching production when
 # required configuration is missing or insecure (default admin password, weak/public JWT secret).
@@ -12,6 +18,8 @@ on:
       - main
     paths:
       - "functions/**"
+      - "firebase/**"
+      - "firebase.json"
       - ".github/workflows/deploy-functions.yml"
       - ".github/scripts/functions-env.js"
   workflow_dispatch:
@@ -21,7 +29,7 @@ on:
         type: string
         default: ""
       deploy_triggers:
-        description: "Also deploy the 6 Firestore/scheduler triggers (read docs/deployment/CI_CD.md section 5 first: region mismatch)"
+        description: "Force-deploy the 6 Firestore/scheduler triggers (a push deploys them automatically only when trigger code changed)"
         type: boolean
         default: false
       deploy_print_timeout_sweep:
@@ -60,6 +68,26 @@ jobs:
         run: npm test
       - name: Deployment-gate tests
         run: node --test .github/scripts/__tests__/functions-env.test.js
+
+  rules:
+    name: Deploy Firestore and Storage rules
+    needs: test
+    # Production deploys come from main only; a rollback run (explicit ref) only concerns the API.
+    if: github.ref == 'refs/heads/main' && inputs.ref == ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy Firestore and Storage rules
+        run: firebase deploy --only "firestore:rules,storage" --project "$PROJECT_ID"
 
   deploy:
     name: Deploy to Firebase
@@ -150,10 +178,27 @@ jobs:
           check "Admin login rejects bad credentials" 401 -X POST -H "content-type: application/json" \
             -d '{"email":"ci-smoke-test","password":"not-a-real-password"}' "$API_URL/admin/login"
 
+      # The triggers import shared services/config/utils, so those count as trigger code. If the previous commit is
+      # not in this checkout (history was rewritten) assume changed: redeploying unchanged functions is harmless.
+      - name: Did trigger code change?
+        id: triggers
+        if: github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          changed=false
+          if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            changed=true
+          elif git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -qE '^functions/(src/(triggers|services|config|utils)/|index\.js|package(-lock)?\.json)'; then
+            changed=true
+          fi
+          echo "Trigger code changed: $changed"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
       # Runs only after the API is deployed and verified, so a trigger problem can never take the API down.
       # A failure here turns the run red but leaves the healthy API in place.
       - name: Deploy Firestore/scheduler triggers
-        if: inputs.deploy_triggers
+        if: inputs.deploy_triggers || steps.triggers.outputs.changed == 'true'
         env:
           FIREBASE_FUNCTIONS_DISCOVERY_TIMEOUT: "60000"
         run: |

@@ -9,7 +9,7 @@ Northflank) were **not** accessed. Actions needed from a repository admin are in
 | Component | Source | Deployed to | Trigger | Auto on `main`? | Failure is visible as |
 |---|---|---|---|---|---|
 | Backend API (`api`) | `functions/` | Firebase Functions `us-central1`, project `mimo-v2-11868` | `deploy-functions.yml` on push to `main` touching `functions/**` (14 successful runs in history) | **Yes** | Red run in GitHub Actions |
-| Firestore/scheduler triggers (6) | `functions/src/triggers/` | Firebase Functions, `us-central1` (3) and `asia-south1` (3 e-mail triggers), Node 22 | **By hand** with the Firebase CLI — procedure in §6 | **No** | — |
+| Firestore/scheduler triggers (6) | `functions/src/triggers/` | Firebase Functions, `us-central1` (3) and `asia-south1` (3 e-mail triggers), Node 22 | `deploy-functions.yml` on push to `main`, when trigger code or the services/config/utils it shares changed (or the manual `deploy_triggers` input) | **Yes** | Red run in GitHub Actions (the API stays up) |
 | Customer site | `mimo-website/` | Vercel project `mimo_v2` → `printmimo.tech` | Vercel Git integration on every push | **Yes** (statuses seen on every commit) | Vercel status on the commit; `post-deploy-smoke.yml` on `main` |
 | Admin + Finance | `mimo-website/mimo-admin-dashboard/` | Built into the customer site (`/admin/`, `/finance`) | same as customer site | **Yes** | same |
 | Kiosk UI | `mimo-frontend-web-app/mimo-frontend/` | Vercel (project `mimo-frontend` and others; the tablets load `mimo-kiosk-app.vercel.app`; also `mimo-frontend-three.vercel.app`, `mimo-2-0.vercel.app`) — project↔domain mapping is set in Vercel and not verified | Vercel Git integration | **Yes** | same |
@@ -17,8 +17,8 @@ Northflank) were **not** accessed. Actions needed from a repository admin are in
 | Legacy backend | `backend/` | **Two live copies:** Northflank `mimo-backend` and Vercel project `mimo-kiosk-backend` (`mimo-kiosk-backend.vercel.app`, uses `backend/vercel.json`), both rebuilt on every push, plus a GHCR image | Northflank integration; `backend-image.yml` on `backend/**` (85 successful runs) | Yes — frozen, untouched | Northflank / Actions |
 | Raspberry Pi listeners | `pi-listener/`, `pi_scripts/` | The two Pis (Tailscale + SSH) | Manual (`scripts/deployment/*.py`, SSH with password) | **No** | — (only a syntax check in CI) |
 | Android kiosk shell | `LENOVO TABLET APP/` | The tablets (Device Owner, ADB) | Manual | **No** | — |
-| Firestore rules/indexes | `backend/firestore.rules`, `backend/firestore.indexes.json` | Firebase | Manual `firebase deploy` | **No** | — |
-| Storage rules | `firebase/storage.rules` | Firebase | Manual `firebase deploy` | **No** | — |
+| Firestore + Storage rules | `firebase/firestore.rules`, `firebase/storage.rules` | Firebase | `deploy-functions.yml` `rules` job on every push to `main` (independent of the API deploy) | **Yes** | Red run in GitHub Actions |
+| Firestore indexes | `firebase/firestore.indexes.json` | Firebase | Manual `firebase deploy --only firestore:indexes` (CI does not deploy them: the CLI offers to delete indexes missing from the file) | **No** | — |
 
 ## 2. Pipeline
 
@@ -28,7 +28,8 @@ push / PR (any branch) ──► ci.yml  changed folders only:  functions tests 
 
 push to main
   functions/**  ──► deploy-functions.yml   tests → live env + optional FUNCTIONS_ENV_FILE → SECURITY GATE
-                                           → deploy api → public invoker → smoke test   (triggers: manual opt-in)
+  firebase/**                              → deploy api → public invoker → smoke test → triggers (if trigger code changed)
+                                           rules job (parallel to the API deploy): Firestore + Storage rules
   converter/**  ──► deploy-converter.yml   build → deploy → invoker → health check (must be up AND private)
   backend/**    ──► backend-image.yml      (unchanged)
   any push      ──► Vercel builds the web apps ──► post-deploy-smoke.yml checks the public sites once Vercel reports success

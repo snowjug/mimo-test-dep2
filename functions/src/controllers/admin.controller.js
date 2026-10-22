@@ -625,7 +625,12 @@ const getAdminRefundRequests = async (req, res) => {
           amount: Number(data.refundAmount || data.amount || data.originalAmount || 0),
           refundAmount: Number(data.refundAmount || data.amount || 0),
           reason: data.note || "Admin processed refund",
-          status: String(data.status || "processed").toLowerCase(),
+          // A `refunds` doc exists only after the gateway accepted the refund. Its own `status` is Cashfree's
+          // refund_status (PENDING / SUCCESS / ...), where PENDING just means "in flight at the bank". Showing
+          // that as the request status made finished refunds look approvable, and every "approve" then failed
+          // with "already refunded". The request is always processed; the gateway state is kept separately.
+          status: "processed",
+          gatewayStatus: data.status ? String(data.status).toUpperCase() : null,
           requestedAt: refDate,
           createdAt: refDate,
         });
