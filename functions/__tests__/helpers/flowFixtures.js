@@ -5,7 +5,7 @@ const zlib = require("zlib");
 const http = require("http");
 const path = require("path");
 const { createRequire } = require("module");
-const functionsRequire = createRequire(path.resolve(__dirname, "../../../functions/package.json"));
+const functionsRequire = createRequire(path.resolve(__dirname, "../../package.json"));
 const { PDFDocument } = functionsRequire("pdf-lib");
 
 const TEST_APP_SECRET = "test-app-secret-not-real";

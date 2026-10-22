@@ -9,12 +9,8 @@ const path = require("path");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "whatsapp-flow-worker-sweep-test-fixture-32"; // must be >= 32 chars (see src/config/env.js) — flowOrchestrator.js now transitively loads order.service.js -> config/env.js (Mission 38)
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
-const { createFakeBucket } = require(
-  path.join(__dirname, "..", "..", "prototypes", "whatsapp-flow-endpoint", "test", "fakeBucket.js")
-);
-const fixtures = require(
-  path.join(__dirname, "..", "..", "prototypes", "whatsapp-flow-endpoint", "test", "fixtures.js")
-);
+const { createFakeBucket } = require("./helpers/flowFakeBucket.js");
+const fixtures = require("./helpers/flowFixtures.js");
 const { submitJob, getJob, DEFAULT_LEASE_MS } = require("../src/whatsapp-flow/durableJobStore.js");
 const { DEFAULT_JOB_COLLECTION } = require("../src/whatsapp-flow/flowOrchestrator.js");
 

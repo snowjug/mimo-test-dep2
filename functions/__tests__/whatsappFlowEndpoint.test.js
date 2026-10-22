@@ -10,12 +10,8 @@ const assert = require("node:assert");
 const path = require("path");
 
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
-const { createFakeBucket } = require(
-  path.join(__dirname, "..", "..", "prototypes", "whatsapp-flow-endpoint", "test", "fakeBucket.js")
-);
-const fixtures = require(
-  path.join(__dirname, "..", "..", "prototypes", "whatsapp-flow-endpoint", "test", "fixtures.js")
-);
+const { createFakeBucket } = require("./helpers/flowFakeBucket.js");
+const fixtures = require("./helpers/flowFixtures.js");
 const { generateFlowToken, prepareFlowTokenBinding, markBindingSent } = require("../src/whatsapp-flow/flowTokenBinding.js");
 
 const ENV_PATH = require.resolve("../src/config/env");

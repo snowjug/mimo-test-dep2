@@ -1,8 +1,0 @@
-# Crontab configuration for MIMO 2.0 (SV-002) Colour Printer Ink Automated Cleaning
-# Schedules daily cleaning at 6:00 AM IST.
-# Includes safety idle verification (will not disturb active customer prints)
-# and notifies visionprintt@gmail.com upon completion.
-#
-# Install on SV-002 via: crontab -e
-# or place in /etc/cron.d/mimo-epson-clean
-0 6 * * * /usr/bin/python3 /home/pi/mimo/clean_epson.py >> /home/pi/mimo/clean_epson.log 2>&1

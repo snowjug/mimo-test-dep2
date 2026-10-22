@@ -1,6 +1,0 @@
-[Unit]
-Description=Mimo Kiosk Migration Automatic Rollback Action
-
-[Service]
-Type=oneshot
-ExecStart=/home/pi/mimo/mimo-rollback-action.sh
