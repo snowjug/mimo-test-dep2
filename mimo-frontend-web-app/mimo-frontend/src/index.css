@@ -70,6 +70,7 @@
   html {
     width: 100%;
     height: 100%;
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -83,6 +84,7 @@
     -webkit-font-smoothing: antialiased;
     width: 100%;
     height: 100%;
+    min-height: 100dvh;
     background: #FAFAF8;
     overflow: hidden;
     position: relative;
@@ -108,24 +110,16 @@
     flex-shrink: 0;
   }
 
-  #root.theme-cv001 {
-    background: var(--color-parchment-100);
+  #root.theme-cv001,
+  #root.theme-sv002 {
+    background: #F8FAFC;
   }
 
   body.theme-cv001,
-  html.kiosk-full-bleed body.theme-cv001 {
-    background: var(--color-parchment-100);
-  }
-
-  #root.theme-mimo3 {
+  body.theme-sv002,
+  html.kiosk-full-bleed body.theme-cv001,
+  html.kiosk-full-bleed body.theme-sv002 {
     background: #F8FAFC;
-    color: #0F172A;
-  }
-
-  body.theme-mimo3,
-  html.kiosk-full-bleed body.theme-mimo3 {
-    background: #F8FAFC;
-    color: #0F172A;
   }
 
   @media (max-width: 1000px) {
@@ -210,48 +204,538 @@
     50% { opacity: 0.15; }
   }
 
-  @keyframes devotionalFlame {
-    0%, 100% { transform: scale(1, 1) rotate(0deg); opacity: 1; }
-    25% { transform: scale(0.92, 1.08) rotate(-2.5deg); opacity: 0.94; }
-    50% { transform: scale(1.06, 0.94) rotate(2deg); opacity: 1; }
-    75% { transform: scale(0.96, 1.04) rotate(-1.5deg); opacity: 0.96; }
-  }
-
-  @keyframes hanumanBreathe {
-    0% {
-      filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.55)) drop-shadow(0 0 35px rgba(234, 88, 12, 0.35));
-      transform: scale(1);
-    }
-    100% {
-      filter: drop-shadow(0 0 32px rgba(245, 158, 11, 0.9)) drop-shadow(0 0 70px rgba(234, 88, 12, 0.6));
-      transform: scale(1.018);
-    }
-  }
-
-  @keyframes divineAuraPulse {
-    0%, 100% {
-      opacity: 0.25;
-      transform: scale(0.95);
-    }
-    50% {
-      opacity: 0.6;
-      transform: scale(1.08);
-    }
-  }
-
-  @keyframes divineShimmer {
-    0% {
-      background-position: -200% 0;
-    }
-    100% {
-      background-position: 200% 0;
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .navaratri-flame,
     .navaratri-sway {
       animation: none;
     }
+  }
+}
+
+
+/* ==================================================================
+   MIMO 1.0 (CV-001) & MIMO 2.0 (SV-002) — NAVARATRI DIVINE GOLDEN DESIGN SYSTEM
+   ------------------------------------------------------------------
+   - Reference A: Golden Navaratri Goddess & Lion Welcome Screen (CV-001)
+     & Supplied Goddess Durga Hero Screen (SV-002)
+   - Reference B: Carved Bronze & Champagne Gold Code Entry & Remaining Screens
+   - Scoped strictly to `.theme-cv001` and `.theme-sv002`.
+   - Preserves all touchscreen gestures, accessibility, and high contrast.
+   ================================================================== */
+
+body.theme-cv001,
+body.theme-sv002,
+#root.theme-cv001,
+#root.theme-sv002 {
+  --n-bg-dark: #1A0A01;
+  --n-bg-card: rgba(28, 12, 5, 0.85);
+  --n-bg-surface: rgba(45, 20, 8, 0.78);
+  --n-gold-light: #FBF0DC;
+  --n-gold-main: #E5B878;
+  --n-gold-deep: #C4924A;
+  --n-gold-border: rgba(212, 165, 89, 0.45);
+  --n-gold-glow: rgba(243, 201, 126, 0.55);
+  --n-text-cream: #FFF8EE;
+  --n-text-warm: #E2C59F;
+  --n-text-muted: #B89772;
+  --n-ruby: #9B1B3E;
+  --n-ruby-deep: #7A1230;
+
+  /* Remap theme tokens */
+  --color-mahogany-600: #E2C59F;
+  --color-mahogany-700: #FBF0DC;
+  --color-mahogany-800: #FFF8EE;
+  --color-gold-300: #F3D29E;
+  --color-gold-500: #E5B878;
+  --color-gold-600: #D8A55A;
+  --color-parchment-100: #1A0A01;
+  --color-parchment-200: #261005;
+
+  background-color: var(--n-bg-dark) !important;
+  color: var(--n-text-cream) !important;
+  font-family: var(--font-sans);
+}
+
+/* ==================================================================
+   1. GLOBAL CANVAS & BACKDROP FOR CV-001 & SV-002
+   ================================================================== */
+body.theme-cv001,
+body.theme-sv002,
+html.kiosk-full-bleed body.theme-cv001,
+html.kiosk-full-bleed body.theme-sv002,
+#root.theme-cv001,
+#root.theme-sv002 {
+  background: #1A0A01 !important;
+}
+
+#root.theme-cv001 .cv001-bg-wrapper > div,
+#root.theme-sv002 .cv001-bg-wrapper > div,
+#root.theme-cv001 .bg-\[\#FFF8EC\],
+#root.theme-sv002 .bg-\[\#FFF8EC\],
+#root.theme-cv001 .bg-parchment-100,
+#root.theme-sv002 .bg-parchment-100 {
+  background-color: #1A0A01 !important;
+  background-image:
+    radial-gradient(circle 900px at 70% 45%, rgba(180, 100, 20, 0.28) 0%, rgba(90, 40, 8, 0.16) 45%, transparent 75%),
+    radial-gradient(circle 600px at 25% 40%, rgba(140, 70, 15, 0.20) 0%, transparent 65%),
+    linear-gradient(180deg, #1C0C04 0%, #120602 100%) !important;
+  background-repeat: no-repeat !important;
+}
+
+/* ==================================================================
+   2. REFERENCE A — WELCOME SCREEN (FIRST PAGE)
+   ================================================================== */
+#root.theme-cv001 .cv001-welcome-screen,
+#root.theme-sv002 .sv002-welcome-screen {
+  background-color: #1A0A01 !important;
+  background-image: url(/navratri-welcome-bg.png) !important;
+  background-size: cover !important;
+  background-position: center right !important;
+  background-repeat: no-repeat !important;
+}
+
+/* Swipe-to-start track matching Reference A for both MIMO 1.0 & MIMO 2.0 */
+#root.theme-cv001 .cv001-welcome-screen .rounded-full.border,
+#root.theme-sv002 .sv002-welcome-screen .rounded-full.border {
+  border: 1.5px solid rgba(212, 165, 89, 0.65) !important;
+  background: rgba(28, 12, 6, 0.90) !important;
+  box-shadow: 0 0 18px rgba(212, 165, 89, 0.18), inset 0 2px 6px rgba(0, 0, 0, 0.6) !important;
+  height: 74px !important;
+  max-width: 440px !important;
+  padding: 6px !important;
+}
+
+#root.theme-cv001 .cv001-welcome-screen [class*="CaretRight"],
+#root.theme-sv002 .sv002-welcome-screen [class*="CaretRight"],
+#root.theme-cv001 .cv001-welcome-screen svg.text-mahogany-600\/35,
+#root.theme-sv002 .sv002-welcome-screen svg.text-mahogany-600\/35,
+#root.theme-cv001 .cv001-welcome-screen svg.text-gold-600\/30,
+#root.theme-sv002 .sv002-welcome-screen svg.text-gold-600\/30 {
+  color: rgba(212, 165, 89, 0.65) !important;
+}
+
+/* Draggable thumb matching Reference A */
+#root.theme-cv001 .cv001-welcome-screen div[class*="cursor-grab"],
+#root.theme-sv002 .sv002-welcome-screen div[class*="cursor-grab"] {
+  background: linear-gradient(135deg, #9E371B 0%, #7A2410 100%) !important;
+  border: 1px solid rgba(243, 201, 126, 0.65) !important;
+  box-shadow: 0 4px 14px rgba(120, 30, 10, 0.5) !important;
+  height: 60px !important;
+  padding-left: 6px !important;
+  padding-right: 22px !important;
+}
+
+#root.theme-cv001 .cv001-welcome-screen div[class*="cursor-grab"] > span:first-child,
+#root.theme-sv002 .sv002-welcome-screen div[class*="cursor-grab"] > span:first-child {
+  background: linear-gradient(135deg, #F3D29E 0%, #D8A55A 100%) !important;
+  color: #451B06 !important;
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+#root.theme-cv001 .cv001-welcome-screen div[class*="cursor-grab"] > span:last-child,
+#root.theme-sv002 .sv002-welcome-screen div[class*="cursor-grab"] > span:last-child {
+  color: #FFF6E9 !important;
+  font-family: var(--font-sans) !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.14em !important;
+}
+
+/* ==================================================================
+   3. REFERENCE B — CODE ENTRY SCREEN & GLOBAL GARLAND REMOVAL
+   ================================================================== */
+
+/* Global: completely remove top flower garland from every page */
+.toran,
+svg.toran,
+svg[class*="toran"],
+[class*="toran"],
+.navaratri-sway {
+  display: none !important;
+}
+
+/* Circular back button */
+#root.theme-cv001 button[aria-label="Go back to home"],
+#root.theme-sv002 button[aria-label="Go back to home"] {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 9999px !important;
+  border: 1px solid rgba(212, 165, 89, 0.40) !important;
+  background: rgba(29, 12, 4, 0.80) !important;
+  color: #FFF8EE !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(212, 165, 89, 0.15) !important;
+  backdrop-filter: blur(8px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.15s ease !important;
+}
+
+#root.theme-cv001 button[aria-label="Go back to home"]:hover,
+#root.theme-sv002 button[aria-label="Go back to home"]:hover {
+  border-color: #E5B878 !important;
+  box-shadow: 0 0 18px rgba(229, 184, 120, 0.35) !important;
+}
+
+#root.theme-cv001 button[aria-label="Go back to home"]:active,
+#root.theme-sv002 button[aria-label="Go back to home"]:active {
+  transform: scale(0.94) !important;
+}
+
+/* Left Code Display Panel Typography */
+#root.theme-cv001 .screen:has(#key-1) p[lang="hi"],
+#root.theme-sv002 .screen:has(#key-1) p[lang="hi"] {
+  color: #DFCBB5 !important;
+  font-family: var(--font-deva) !important;
+  font-size: 22px !important;
+  font-weight: 500 !important;
+}
+
+#root.theme-cv001 .screen:has(#key-1) h2,
+#root.theme-sv002 .screen:has(#key-1) h2 {
+  color: #FFF8EE !important;
+  font-family: var(--font-serif) !important;
+  font-size: 42px !important;
+  font-weight: 600 !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 4 Circular Code Indicators */
+#root.theme-cv001 .screen:has(#key-1) div[class*="rounded-full"][class*="shrink-0"],
+#root.theme-sv002 .screen:has(#key-1) div[class*="rounded-full"][class*="shrink-0"] {
+  width: 80px !important;
+  height: 80px !important;
+  border-radius: 9999px !important;
+  border: 1px solid rgba(212, 165, 89, 0.35) !important;
+  background: rgba(20, 6, 1, 0.60) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Active indicator slot */
+#root.theme-cv001 .screen:has(#key-1) div[class*="rounded-full"][class*="shrink-0"]:has(span),
+#root.theme-sv002 .screen:has(#key-1) div[class*="rounded-full"][class*="shrink-0"]:has(span) {
+  border-color: #E5B878 !important;
+  background: rgba(27, 10, 3, 0.85) !important;
+  box-shadow: 0 0 24px rgba(229, 184, 120, 0.55), inset 0 0 10px rgba(229, 184, 120, 0.22) !important;
+}
+
+#root.theme-cv001 .screen:has(#key-1) div[class*="rounded-full"][class*="shrink-0"] span,
+#root.theme-sv002 .screen:has(#key-1) div[class*="rounded-full"][class*="shrink-0"] span {
+  background: #E5B878 !important;
+  box-shadow: 0 0 8px #E5B878 !important;
+}
+
+/* Filled indicator slot */
+#root.theme-cv001 .screen:has(#key-1) div[class*="rounded-full"][class*="shrink-0"]:has(svg),
+#root.theme-sv002 .screen:has(#key-1) div[class*="rounded-full"][class*="shrink-0"]:has(svg) {
+  border-color: #E5B878 !important;
+  background: rgba(30, 11, 3, 0.90) !important;
+  box-shadow: 0 0 22px rgba(229, 184, 120, 0.45) !important;
+}
+
+/* Keypad Panel Container */
+#root.theme-cv001 .screen:has(#key-1) .rounded-\[28px\].border,
+#root.theme-sv002 .screen:has(#key-1) .rounded-\[28px\].border {
+  border: 1px solid rgba(212, 165, 89, 0.35) !important;
+  background: rgba(24, 8, 2, 0.80) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 30px rgba(212, 165, 89, 0.12), inset 0 0 30px rgba(212, 165, 89, 0.04) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+#root.theme-cv001 .screen:has(#key-1) span.rotate-45,
+#root.theme-sv002 .screen:has(#key-1) span.rotate-45 {
+  background: #E5B878 !important;
+  box-shadow: 0 0 6px rgba(229, 184, 120, 0.8) !important;
+}
+
+/* All Keypad Number buttons (1-9, 0) - perfectly circular */
+#root.theme-cv001 button[id^="key-"],
+#root.theme-sv002 button[id^="key-"] {
+  width: 80px !important;
+  height: 80px !important;
+  border-radius: 9999px !important;
+  aspect-ratio: 1 / 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(34, 14, 5, 0.75) !important;
+  border: 1px solid rgba(212, 165, 89, 0.35) !important;
+  color: #FFF8EE !important;
+  font-family: var(--font-serif) !important;
+  font-size: 36px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#root.theme-cv001 button[id^="key-"]:hover,
+#root.theme-sv002 button[id^="key-"]:hover {
+  border-color: #E5B878 !important;
+  background: rgba(47, 20, 7, 0.85) !important;
+  box-shadow: 0 0 18px rgba(229, 184, 120, 0.40) !important;
+}
+
+#root.theme-cv001 button[id^="key-"]:active,
+#root.theme-sv002 button[id^="key-"]:active,
+#root.theme-cv001 button[id^="key-"]:focus-visible,
+#root.theme-sv002 button[id^="key-"]:focus-visible {
+  transform: scale(0.95) !important;
+  background: rgba(61, 26, 10, 0.95) !important;
+  border-color: #F3C97E !important;
+  box-shadow: 0 0 22px rgba(229, 184, 120, 0.60) !important;
+}
+
+/* Keypad Backspace button */
+#root.theme-cv001 button#key-del,
+#root.theme-sv002 button#key-del {
+  color: #FFF8EE !important;
+}
+
+#root.theme-cv001 button#key-del svg,
+#root.theme-sv002 button#key-del svg {
+  width: 28px !important;
+  height: 28px !important;
+  color: #FFF8EE !important;
+}
+
+/* Keypad Submit button */
+#root.theme-cv001 button#key-submit,
+#root.theme-sv002 button#key-submit {
+  color: #FFF8EE !important;
+}
+
+#root.theme-cv001 button#key-submit svg,
+#root.theme-sv002 button#key-submit svg {
+  width: 28px !important;
+  height: 28px !important;
+  color: #FFF8EE !important;
+}
+
+#root.theme-cv001 button#key-submit:not(:disabled),
+#root.theme-sv002 button#key-submit:not(:disabled) {
+  border-color: #E5B878 !important;
+  background: rgba(34, 14, 5, 0.75) !important;
+  box-shadow: 0 0 24px rgba(229, 184, 120, 0.50), inset 0 0 10px rgba(229, 184, 120, 0.20) !important;
+  cursor: pointer !important;
+}
+
+#root.theme-cv001 button#key-submit:not(:disabled):hover,
+#root.theme-sv002 button#key-submit:not(:disabled):hover {
+  box-shadow: 0 0 28px rgba(229, 184, 120, 0.60) !important;
+}
+
+#root.theme-cv001 button#key-submit:disabled,
+#root.theme-sv002 button#key-submit:disabled {
+  border-color: rgba(212, 165, 89, 0.25) !important;
+  background: rgba(27, 10, 3, 0.50) !important;
+  color: rgba(255, 248, 238, 0.30) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
+/* ==================================================================
+   4. PRINTING PROGRESS SCREEN
+   ================================================================== */
+#root.theme-cv001 .screen:has(circle[stroke*="progressGradient"]) h1,
+#root.theme-sv002 .screen:has(circle[stroke*="progressGradient"]) h1,
+#root.theme-cv001 .screen:has(circle[stroke*="progressGradient"]) h2,
+#root.theme-sv002 .screen:has(circle[stroke*="progressGradient"]) h2 {
+  color: #FFF8EE !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+#root.theme-cv001 .screen:has(circle[stroke*="progressGradient"]) p,
+#root.theme-sv002 .screen:has(circle[stroke*="progressGradient"]) p {
+  color: #DFC29A !important;
+}
+
+#root.theme-cv001 svg circle[stroke="url(#progressGradient)"],
+#root.theme-sv002 svg circle[stroke="url(#progressGradient)"] {
+  stroke: url(#progressGradient) !important;
+  filter: drop-shadow(0 0 16px rgba(243, 201, 126, 0.65)) !important;
+}
+
+#root.theme-cv001 svg circle[stroke="#ffffff"],
+#root.theme-sv002 svg circle[stroke="#ffffff"] {
+  stroke-opacity: 0.15 !important;
+}
+
+#root.theme-cv001 svg[width="380"] > circle[stroke-width="10"],
+#root.theme-sv002 svg[width="380"] > circle[stroke-width="10"] {
+  stroke: rgba(212, 165, 89, 0.20) !important;
+}
+
+#root.theme-cv001 svg[width="380"] tspan[font-size="92px"],
+#root.theme-sv002 svg[width="380"] tspan[font-size="92px"] {
+  fill: #FFF8EE !important;
+  font-weight: 800 !important;
+}
+
+#root.theme-cv001 svg[width="380"] tspan[font-size="32px"],
+#root.theme-sv002 svg[width="380"] tspan[font-size="32px"] {
+  fill: #E5B878 !important;
+  font-weight: 700 !important;
+}
+
+/* Printing Screen Job Metadata Badges */
+#root.theme-cv001 .screen:has(circle[stroke*="progressGradient"]) .flex.items-center.gap-2.rounded-full,
+#root.theme-sv002 .screen:has(circle[stroke*="progressGradient"]) .flex.items-center.gap-2.rounded-full,
+#root.theme-cv001 .screen:has(circle[stroke*="progressGradient"]) .rounded-full.border,
+#root.theme-sv002 .screen:has(circle[stroke*="progressGradient"]) .rounded-full.border {
+  background: rgba(45, 20, 8, 0.75) !important;
+  border: 1px solid rgba(212, 165, 89, 0.40) !important;
+  color: #F7E4C8 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ==================================================================
+   5. SUMMARY & COLLECTION SCREEN
+   ================================================================== */
+#root.theme-cv001 .screen h1.text-\[46px\],
+#root.theme-sv002 .screen h1.text-\[46px\] {
+  color: #FFF8EE !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 800 !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+#root.theme-cv001 .screen h1.text-\[46px\] span,
+#root.theme-sv002 .screen h1.text-\[46px\] span {
+  color: #E5B878 !important;
+}
+
+/* Physical recessed dispense slot with champagne-gold bezel */
+#root.theme-cv001 .h-\[150px\].rounded-2xl,
+#root.theme-sv002 .h-\[150px\].rounded-2xl {
+  border: 2px solid rgba(212, 165, 89, 0.60) !important;
+  background: linear-gradient(180deg, #180802 0%, #2A1105 100%) !important;
+  box-shadow: inset 0 4px 14px rgba(0, 0, 0, 0.85), 0 0 24px rgba(212, 165, 89, 0.20) !important;
+}
+
+#root.theme-cv001 .h-\[100px\].bg-gradient-to-b,
+#root.theme-sv002 .h-\[100px\].bg-gradient-to-b {
+  background-image: linear-gradient(180deg, #100501 0%, #220B03 100%) !important;
+}
+
+#root.theme-cv001 .top-\[142px\].h-3,
+#root.theme-sv002 .top-\[142px\].h-3 {
+  background: #E5B878 !important;
+}
+
+/* Primary buttons ("Yes, done" / "Done") */
+#root.theme-cv001 .screen button.rounded-full.bg-gradient-to-br,
+#root.theme-sv002 .screen button.rounded-full.bg-gradient-to-br {
+  background: linear-gradient(135deg, #F5D59E 0%, #D8A55A 50%, #BD893B 100%) !important;
+  border: 1.5px solid #FFF3DE !important;
+  color: #2D1405 !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 28px rgba(245, 213, 158, 0.55), 0 6px 18px rgba(0, 0, 0, 0.4) !important;
+  transition: transform 0.1s ease !important;
+}
+
+#root.theme-cv001 .screen button.rounded-full.bg-gradient-to-br:active,
+#root.theme-sv002 .screen button.rounded-full.bg-gradient-to-br:active {
+  transform: scale(0.96) !important;
+}
+
+/* Secondary actions ("Report a problem" / "Back to Home") */
+#root.theme-cv001 .screen button.rounded-full.border-2,
+#root.theme-sv002 .screen button.rounded-full.border-2,
+#root.theme-cv001 .screen button.rounded-full.border,
+#root.theme-sv002 .screen button.rounded-full.border {
+  border: 1.5px solid rgba(212, 165, 89, 0.45) !important;
+  background: rgba(35, 15, 6, 0.78) !important;
+  color: #F7E4C8 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+}
+
+#root.theme-cv001 .screen button.rounded-full.border-2:active,
+#root.theme-sv002 .screen button.rounded-full.border-2:active,
+#root.theme-cv001 .screen button.rounded-full.border:active,
+#root.theme-sv002 .screen button.rounded-full.border:active {
+  transform: scale(0.96) !important;
+}
+
+#root.theme-cv001 .screen button.min-w-\[250px\],
+#root.theme-sv002 .screen button.min-w-\[250px\] {
+  border: 1.5px solid rgba(212, 165, 89, 0.40) !important;
+  border-radius: 18px !important;
+  background: rgba(35, 15, 6, 0.85) !important;
+  color: #FFF8EE !important;
+  font-weight: 700 !important;
+}
+
+/* ==================================================================
+   6. SYSTEM ERROR & RECOVERY SCREEN
+   ================================================================== */
+#root.theme-cv001 .screen > div.rounded-full.bg-gradient-to-br,
+#root.theme-sv002 .screen > div.rounded-full.bg-gradient-to-br {
+  border: 1.5px solid rgba(212, 165, 89, 0.50) !important;
+  background: rgba(155, 27, 62, 0.30) !important;
+}
+
+#root.theme-cv001 .screen .rounded-\[24px\],
+#root.theme-sv002 .screen .rounded-\[24px\] {
+  border: 1.5px solid rgba(212, 165, 89, 0.40) !important;
+  background: rgba(28, 10, 5, 0.90) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* ==================================================================
+   7. TOAST NOTIFICATIONS & SCREENSAVER
+   ================================================================== */
+#root.theme-cv001 > .fixed.top-9,
+#root.theme-sv002 > .fixed.top-9 {
+  border-radius: 16px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(212, 165, 89, 0.20) !important;
+}
+
+#root.theme-cv001 > .fixed.top-9.bg-white\/95,
+#root.theme-sv002 > .fixed.top-9.bg-white\/95 {
+  border: 1.5px solid rgba(212, 165, 89, 0.50) !important;
+  background: rgba(26, 11, 4, 0.95) !important;
+  color: #FFF8EE !important;
+}
+
+body.theme-cv001 > div > div.bottom-10.rounded-full,
+body.theme-sv002 > div > div.bottom-10.rounded-full {
+  border: 1.5px solid rgba(212, 165, 89, 0.60) !important;
+  background: rgba(26, 11, 4, 0.92) !important;
+  color: #FFF8EE !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(212, 165, 89, 0.25) !important;
+}
+
+body.theme-cv001 > div > div.bottom-10.rounded-full svg,
+body.theme-sv002 > div > div.bottom-10.rounded-full svg {
+  color: #E5B878 !important;
+}
+
+/* ==================================================================
+   8. FOCUS & REDUCED MOTION
+   ================================================================== */
+#root.theme-cv001 button:focus-visible,
+#root.theme-sv002 button:focus-visible {
+  outline: 3px solid #E5B878 !important;
+  outline-offset: 3px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root.theme-cv001 .animate-bounce,
+  #root.theme-sv002 .animate-bounce,
+  #root.theme-cv001 .navaratri-flame,
+  #root.theme-sv002 .navaratri-flame,
+  #root.theme-cv001 .navaratri-sway,
+  #root.theme-sv002 .navaratri-sway {
+    animation: none !important;
   }
 }

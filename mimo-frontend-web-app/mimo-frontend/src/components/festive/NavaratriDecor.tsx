@@ -1,25 +1,8 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useId } from 'react';
 
 // Every screen stays mounted (hidden with display:none), so SVG gradient ids must be
 // unique per instance — a url(#id) that resolves into a hidden screen renders blank.
 const useSvgId = (prefix: string) => `${prefix}-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-
-// Unscaled #root width: 1440 normally, wider on full-bleed kiosks (see main.tsx).
-const readCanvasWidth = () => document.getElementById('root')?.offsetWidth || 1440;
-
-const useCanvasWidth = () => {
-    const [width, setWidth] = useState(readCanvasWidth);
-    useEffect(() => {
-        const onResize = () => setWidth(readCanvasWidth());
-        window.addEventListener('resize', onResize);
-        window.addEventListener('orientationchange', onResize);
-        return () => {
-            window.removeEventListener('resize', onResize);
-            window.removeEventListener('orientationchange', onResize);
-        };
-    }, []);
-    return width;
-};
 
 const MAROON = '#7A1230';
 const GOLD = '#C9973E';
@@ -71,102 +54,60 @@ export const Marigold: React.FC<{ x: number; y: number; r?: number; tone?: numbe
     );
 };
 
-const LEAF_DOWN = 'M0 0 C 9 10 10 28 0 44 C -10 28 -9 10 0 0 Z';
 const LEAF_UP = 'M0 0 C 10 -12 11 -34 0 -52 C -11 -34 -10 -12 0 0 Z';
 
-// Toran: the marigold-and-mango-leaf door garland hung for Navaratri. Nine swags, one per night.
-export const Toran: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
-    const leafGrad = useSvgId('toran-leaf');
-    const bandGrad = useSvgId('toran-band');
-    const W = useCanvasWidth();
-    const swags = Math.max(9, Math.round(W / 160));
-    const span = W / swags;
-    const cordY = 16;
-    const dip = compact ? 30 : 52;
-    const leafScale = compact ? 0.62 : 1;
-    const strandCount = compact ? 2 : 3;
-    const height = compact ? 88 : 128;
+// Toran: globally removed per requirement. Returns null so all pages render cleanly without flower garland.
+export const Toran: React.FC<{ compact?: boolean }> = () => null;
 
-    const pointOnSwag = (x0: number, t: number) => {
-        const x1 = x0 + span;
-        const cx = x0 + span / 2;
-        const cy = cordY + dip * 2;
-        const x = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x1;
-        const y = (1 - t) * (1 - t) * cordY + 2 * (1 - t) * t * cy + t * t * cordY;
-        return { x, y };
-    };
+// Subtle flowing golden contour lines for kiosk bottom corners matching reference design
+export const GoldenCornerWaves: React.FC = () => (
+    <svg
+        className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden"
+        viewBox="0 0 1440 810"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        {/* Bottom-left golden contour curves */}
+        <path
+            d="M -10 630 C 80 670 120 760 260 765 C 340 770 410 805 480 810"
+            stroke="#D4A559"
+            strokeOpacity="0.32"
+            strokeWidth="1.5"
+        />
+        <path
+            d="M -10 670 C 90 705 140 795 280 800 C 350 805 430 825 490 820"
+            stroke="#D4A559"
+            strokeOpacity="0.22"
+            strokeWidth="1.2"
+        />
+        <path
+            d="M -10 710 C 100 740 160 820 300 815"
+            stroke="#D4A559"
+            strokeOpacity="0.14"
+            strokeWidth="1"
+        />
 
-    return (
-        <svg
-            className="pointer-events-none absolute inset-x-0 top-0 z-[5]"
-            width={W}
-            height={height}
-            viewBox={`0 0 ${W} ${height}`}
-        >
-            <defs>
-                <linearGradient id={leafGrad} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#65A30D" />
-                    <stop offset="100%" stopColor="#365314" />
-                </linearGradient>
-                <linearGradient id={bandGrad} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#5A0E24" />
-                    <stop offset="100%" stopColor={MAROON} />
-                </linearGradient>
-            </defs>
-
-            {/* Mango leaves hanging under each swag */}
-            {Array.from({ length: swags }, (_, i) => {
-                const mid = pointOnSwag(i * span, 0.5);
-                return (
-                    <g key={`ml-${i}`} transform={`translate(${mid.x} ${mid.y - 2}) scale(${leafScale})`}>
-                        <path d={LEAF_DOWN} fill={`url(#${leafGrad})`} />
-                        <path d="M0 3 L0 40" stroke="#A3E635" strokeOpacity="0.55" strokeWidth="1" />
-                    </g>
-                );
-            })}
-
-            {/* Marigold swags */}
-            {Array.from({ length: swags }, (_, i) =>
-                Array.from({ length: 7 }, (_, k) => {
-                    const p = pointOnSwag(i * span, (k + 1) / 8);
-                    return <Marigold key={`s-${i}-${k}`} x={p.x} y={p.y} r={compact ? 7 : 9} tone={(i + k) % 3} />;
-                }),
-            )}
-
-            {/* Hanging strands at each anchor */}
-            {Array.from({ length: swags - 1 }, (_, i) => {
-                const x = (i + 1) * span;
-                const step = compact ? 14 : 18;
-                const bellY = cordY + step * (strandCount + 1);
-                return (
-                    <g key={`st-${i}`} className="navaratri-sway" style={{ animationDelay: `${-i * 0.7}s` }}>
-                        <line x1={x} y1={cordY} x2={x} y2={bellY - 4} stroke={MAROON} strokeWidth="1.2" />
-                        {Array.from({ length: strandCount }, (_, k) => (
-                            <Marigold key={k} x={x} y={cordY + step * (k + 1)} r={compact ? 6.5 : 8} tone={(i + k + 1) % 3} />
-                        ))}
-                        <circle cx={x} cy={bellY} r={compact ? 3.5 : 4.5} fill={GOLD} stroke="#8A6425" strokeWidth="0.8" />
-                        <path
-                            d={`M${x} ${bellY + 3} l-3 ${compact ? 7 : 10} M${x} ${bellY + 3} l0 ${compact ? 8 : 11} M${x} ${bellY + 3} l3 ${compact ? 7 : 10}`}
-                            stroke="#B91C1C"
-                            strokeWidth="1.2"
-                            strokeLinecap="round"
-                        />
-                    </g>
-                );
-            })}
-
-            {/* Fabric band + mauli cord */}
-            <rect x="0" y="0" width={W} height={cordY - 2} fill={`url(#${bandGrad})`} />
-            <line x1="0" y1={cordY - 2} x2={W} y2={cordY - 2} stroke={GOLD} strokeWidth="2" />
-            {Array.from({ length: Math.ceil(W / 20) }, (_, i) => (
-                <circle key={`d-${i}`} cx={10 + i * 20} cy={(cordY - 2) / 2} r="1.6" fill={GOLD} fillOpacity="0.8" />
-            ))}
-            {Array.from({ length: swags + 1 }, (_, i) => (
-                <circle key={`a-${i}`} cx={i * span} cy={cordY} r="4" fill={GOLD} stroke="#8A6425" strokeWidth="0.8" />
-            ))}
-        </svg>
-    );
-};
+        {/* Bottom-right golden contour curves */}
+        <path
+            d="M 1450 630 C 1360 670 1320 760 1180 765 C 1100 770 1030 805 960 810"
+            stroke="#D4A559"
+            strokeOpacity="0.32"
+            strokeWidth="1.5"
+        />
+        <path
+            d="M 1450 670 C 1350 705 1300 795 1160 800 C 1090 805 1010 825 950 820"
+            stroke="#D4A559"
+            strokeOpacity="0.22"
+            strokeWidth="1.2"
+        />
+        <path
+            d="M 1450 710 C 1340 740 1280 820 1140 815"
+            stroke="#D4A559"
+            strokeOpacity="0.14"
+            strokeWidth="1"
+        />
+    </svg>
+);
 
 // Lotus-petal mandala / rangoli, drawn in gold line work.
 export const Mandala: React.FC<{ size: number; className?: string; style?: React.CSSProperties; spin?: boolean }> = ({

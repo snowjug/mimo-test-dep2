@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Check, ArrowDown, WarningCircle } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
-import { DiyaRow, FestiveBackdrop, Toran, ZariBorder } from '../festive/NavaratriDecor';
+import { DiyaRow, FestiveBackdrop, ZariBorder } from '../festive/NavaratriDecor';
 
 const DandiyaSticks: React.FC = () => (
     <svg width="130" height="130" viewBox="0 0 130 130" className="pointer-events-none absolute -right-6 top-2">
@@ -58,7 +58,7 @@ const ISSUES: { id: string; label: string }[] = [
 type ReportState = 'ask' | 'choose' | 'sending' | 'sent' | 'failed';
 
 export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId, printCode }) => {
-    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+    const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
     const timeoutRef = useRef<number | null>(null);
     const [renderKey, setRenderKey] = useState(0);
     const [report, setReport] = useState<ReportState>('ask');
@@ -138,7 +138,6 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
             {isFestiveMode && (
                 <>
                     <FestiveBackdrop />
-                    <Toran compact />
                     <ZariBorder />
                 </>
             )}
