@@ -27,14 +27,15 @@ interface PrintingScreenProps {
 
 export {
   calculatePrintProgress,
-  calculateMilestoneBounds,
-  stepVisualProgress,
-  getVisualTickDelay,
+  verifiedPercent,
   type PrintProgressInput,
   type PrintProgressResult,
-  type MilestoneBounds,
 } from '../../utils/printProgress';
-import { calculatePrintProgress, calculateMilestoneBounds, getVisualTickDelay } from '../../utils/printProgress';
+import { calculatePrintProgress } from '../../utils/printProgress';
+
+// /kiosk/print moves the job to "printing" before it answers, so a job still "paid" this long after the
+// printing screen opened was never started (the print request was lost or refused): say so, don't keep waiting.
+const PRINT_START_GRACE_MS = 20000;
 
 export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   isActive,
@@ -62,9 +63,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const collectTimerRef = useRef<number | null>(null);
 
   const progressRef         = useRef(0);   // mirror of progress for closures
-  const sheetsCompletedRef  = useRef(0);   // tracked sheets completed
-  const milestoneFloorRef   = useRef(0);   // presentation milestone floor
-  const milestoneCeilingRef = useRef(0);   // presentation milestone ceiling
+  const sheetsCompletedRef  = useRef(0);   // verified sheets completed (from the printer's page counter)
+  const hasStartedRef       = useRef(false); // backend has reported the job as printing at least once
   const activePrintCodeRef  = useRef(printCode);
   const isPollingRef        = useRef(false);
   const tickTimerRef        = useRef<number | null>(null);
@@ -130,8 +130,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
     // Immediate 100% completion upon physical hardware verification confirmation
     progressRef.current = 100;
-    milestoneFloorRef.current = 100;
-    milestoneCeilingRef.current = 100;
     setProgress(100);
     setStatusMsg('Print Completed ✅');
 
@@ -140,34 +138,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       onComplete();
     }, 400);
   }, [clearAllTimers, onComplete]);
-
-  // Smooth visual progress tick: advances gradually towards the milestone ceiling
-  const startSmoothTick = useCallback(() => {
-    if (tickTimerRef.current) return;
-
-    const tick = () => {
-      if (isCompletingRef.current) return;
-
-      const currentProgress = progressRef.current;
-      const ceiling = milestoneCeilingRef.current;
-      const floor = milestoneFloorRef.current;
-
-      if (currentProgress < floor) {
-        progressRef.current = floor;
-        setProgress(floor);
-      } else if (currentProgress < ceiling) {
-        const next = Math.min(ceiling, currentProgress + 1);
-        progressRef.current = next;
-        setProgress(next);
-      }
-
-      const delay = getVisualTickDelay(progressRef.current, colorMode);
-      tickTimerRef.current = window.setTimeout(tick, delay);
-    };
-
-    const initialDelay = getVisualTickDelay(progressRef.current, colorMode);
-    tickTimerRef.current = window.setTimeout(tick, initialDelay);
-  }, [colorMode]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
@@ -196,10 +166,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           { cache: 'no-store', signal: controller.signal }
         );
         window.clearTimeout(timeoutId);
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
 
         // If printCode changed or screen deactivated while in flight, discard response
         if (!isActive || activePrintCodeRef.current !== printCode || isCompletingRef.current) {
+          return;
+        }
+
+        // A non-2xx answer (rate limit, server error) carries no job state: keep the last verified progress and
+        // retry; the 45s network-stall detector below still applies because this is not a successful poll.
+        if (!res.ok) {
+          const retryAfterSec = Number(res.headers.get('Retry-After'));
+          schedulePoll(res.status === 429 && retryAfterSec > 0 ? retryAfterSec * 1000 : 1000);
           return;
         }
 
@@ -220,8 +198,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         });
 
         sheetsCompletedRef.current = result.sheetsCompleted;
-        milestoneFloorRef.current = result.milestoneFloor;
-        milestoneCeilingRef.current = result.milestoneCeiling;
 
         if (result.isCompleted) {
           setPrintDone(true);
@@ -236,15 +212,20 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         }
 
         if (result.isPrinting) {
+          hasStartedRef.current = true;
           if (result.progress > progressRef.current) {
             progressRef.current = result.progress;
             setProgress(result.progress);
           }
-          setStatusMsg(result.statusMsg);
-          startSmoothTick();
-        } else {
-          setStatusMsg(result.statusMsg);
+        } else if (
+          result.isWaiting && data.status === 'paid' && !hasStartedRef.current &&
+          Date.now() - startTimeRef.current >= PRINT_START_GRACE_MS
+        ) {
+          clearAllTimers();
+          if (onError) onError('Your print could not be started. Your code has not been used — please enter it again.');
+          return;
         }
+        setStatusMsg(result.statusMsg);
 
         schedulePoll(200);
       } catch {
@@ -256,7 +237,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         isPollingRef.current = false;
       }
     }, delayMs);
-  }, [printCode, isActive, pages, copies, doubleSided, onError, clearAllTimers, printTimeoutMs, startSmoothTick]);
+  }, [printCode, isActive, pages, copies, doubleSided, onError, clearAllTimers, printTimeoutMs]);
 
   // ─── demo mode fallback (used ONLY when printCode is '0000'/'9999' or missing) ──
 
@@ -316,8 +297,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       setProgress(0);
       progressRef.current = 0;
       sheetsCompletedRef.current = 0;
-      milestoneFloorRef.current = 0;
-      milestoneCeilingRef.current = 0;
+      hasStartedRef.current = false;
       isPollingRef.current = false;
       lastProgressRef.current = 0;
       startTimeRef.current = Date.now();
@@ -336,8 +316,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     setProgress(0);
     progressRef.current = 0;
     sheetsCompletedRef.current = 0;
-    milestoneFloorRef.current = 0;
-    milestoneCeilingRef.current = 0;
+    hasStartedRef.current = false;
     isPollingRef.current = false;
     isCompletingRef.current = false;
     lastProgressRef.current = 0;
@@ -369,22 +348,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         animateTo100AndComplete();
       }
     } else if (printCode && !isDemoPrintCode(printCode)) {
-      // Initialize in-flight milestone bounds for active printing immediately
-      const isDuplex = doubleSided === true || doubleSided === 'double';
-      const fallbackSheets = (isDuplex ? Math.ceil(pages / 2) : pages) * copies;
-      const initialTotal = Math.max(1, fallbackSheets);
-      const initialBounds = calculateMilestoneBounds(0, initialTotal);
-
-      milestoneFloorRef.current = initialBounds.floor;
-      milestoneCeilingRef.current = initialBounds.ceiling;
-      progressRef.current = initialBounds.floor;
-      setProgress(initialBounds.floor);
-      setStatusMsg(initialTotal === 1 ? 'Printing document…' : 'Warming up printer…');
-
-      startSmoothTick();
-      schedulePoll(200); // Live polling driven by backend sheet progress
-    } else {
-      startDemoTick(); // Demo mode simulation
+      // Live job: 0% until the printer's page counter verifies the first sheet; the bar only ever shows
+      // verified sheets (see utils/printProgress.ts), never elapsed time.
+      setStatusMsg('Sending your document to the printer…');
+      schedulePoll(0);
+    } else if (isDemoPrintCode(printCode)) {
+      startDemoTick(); // Demo mode simulation ('0000' / '9999' only — never for a missing code)
     }
 
     return () => {

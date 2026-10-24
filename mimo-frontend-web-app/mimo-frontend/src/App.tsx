@@ -51,6 +51,8 @@ function App() {
   const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>('idle');
   const [printError, setPrintError] = useState<string | undefined>(undefined);
   const [showRefundBanner, setShowRefundBanner] = useState(false);
+  // True once /kiosk/print accepted the job (or gave no answer); false when it refused it.
+  const [canResumePrint, setCanResumePrint] = useState(false);
   const [showScreensaver, setShowScreensaver] = useState(false);
   const [idleTimeout, setIdleTimeout] = useState(60);
   // True while a submitted code is being verified/triggered on the backend. The idle timer must not
@@ -208,34 +210,37 @@ function App() {
 
           // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS FIRST (pre-flight health check & enqueue)
           if (code !== "0000" && code !== "9999") {
+            let printRes: Response | null = null;
             try {
-              const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
+              printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                   printCode: code,
                   kioskId: dynamicKioskId
                 }),
               });
-
-              const printData = await printRes.json();
-              
-              if (!printRes.ok) {
-                console.warn("kiosk/print API warning:", printData.error);
-                // If printer/kiosk health check failed, display immediately without loading animations!
-                if (printData.error && (printData.error.toLowerCase().includes("not working") || printData.error.toLowerCase().includes("offline") || printData.error.toLowerCase().includes("error"))) {
-                  setPrintError(printData.error);
-                  setCurrentScreen("system-error-screen");
-                  resolve();
-                  return;
-                }
-              }
             } catch (printErr: any) {
+              // No answer at all: the job may or may not have been started. The printing screen polls the real
+              // job status and reports "could not be started" if it is still unprinted after a short grace period.
               console.warn("kiosk/print network warning:", printErr.message);
             }
+
+            // Any HTTP refusal (400 wrong machine / already redeemed, 403 restricted, 409 code collision, 429, 5xx)
+            // means this kiosk did not start the job: never show the printing screen or a success for it.
+            if (printRes && !printRes.ok) {
+              const printData = await printRes.json().catch(() => ({}));
+              console.warn("kiosk/print refused:", printRes.status, printData.error);
+              setCanResumePrint(false);
+              setPrintError(printData.error || "This print could not be started. Please try again or contact support.");
+              setCurrentScreen("system-error-screen");
+              resolve();
+              return;
+            }
           }
+          setCanResumePrint(true);
 
           setPrintStatus("printing");
           setCurrentScreen("printing-screen");
@@ -271,9 +276,18 @@ function App() {
   }, []);
 
   // ================= RETRY =================
+  // Only a job this kiosk actually started can be resumed (re-polled). Otherwise go back to code entry: re-polling
+  // a refused or cleared code could show another kiosk's or a demo completion as this customer's success.
   const handleRetry = useCallback(() => {
-    setCurrentScreen('printing-screen');
-  }, []);
+    if (canResumePrint && code) {
+      setCurrentScreen('printing-screen');
+      return;
+    }
+    setCode('');
+    setPrintError(undefined);
+    setShowRefundBanner(false);
+    setCurrentScreen('code-entry-screen');
+  }, [canResumePrint, code]);
 
   const goToCodeEntry = useCallback(() => setCurrentScreen('code-entry-screen'), []);
   const goToSummary = useCallback(() => setCurrentScreen('summary-screen'), []);

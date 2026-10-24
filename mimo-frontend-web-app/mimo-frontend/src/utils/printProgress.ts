@@ -1,5 +1,9 @@
 /**
  * Pure evaluation function and data contracts for print progress synchronization.
+ *
+ * Progress is driven only by what the printer has verified: the Pi reads the Brother's page counter and writes
+ * `sheetsCompleted` (capped at total - 1) while paper comes out, and `completed` once the last sheet is counted.
+ * Nothing here advances with elapsed time, so the bar can never run ahead of the paper.
  */
 
 export interface PrintProgressInput {
@@ -17,93 +21,25 @@ export interface PrintProgressInput {
 
 export interface PrintProgressResult {
   progress: number;
-  milestoneFloor: number;
-  milestoneCeiling: number;
   statusMsg: string;
   sheetsCompleted: number;
   totalSheets: number;
   isPrinting: boolean;
+  /** Backend says the job has not been started on a printer (still `paid`, or no usable status). */
+  isWaiting: boolean;
   isCompleted: boolean;
   isFailed: boolean;
   errorMessage?: string;
 }
 
-export interface MilestoneBounds {
-  floor: number;
-  ceiling: number;
-}
-
 /**
- * Calculates the milestone floor and ceiling percentage for in-flight progress presentation.
- * - Single-sheet job: floor = 1%, ceiling = 90% (strictly < 100% until physically confirmed).
- * - Multi-sheet job:
- *     floor = k === 0 ? 1 : Math.round((k / N) * 95)
- *     ceiling = Math.min(95, Math.round(((k + 0.85) / N) * 95))
+ * Percentage for `completed` verified sheets out of `total`. Strictly below 100 until the job itself is
+ * reported completed: only the Pi's completion (final sheet counted) may show 100%.
  */
-export function calculateMilestoneBounds(
-  completedSheets: number,
-  totalSheets: number
-): MilestoneBounds {
-  const total = Math.max(1, totalSheets);
-  const completed = Math.max(0, Math.min(total, completedSheets));
-
-  if (total === 1) {
-    return {
-      floor: 1,
-      ceiling: 90,
-    };
-  }
-
-  if (completed === 0) {
-    const ceiling = Math.min(95, Math.max(1, Math.round((0.85 / total) * 95)));
-    return {
-      floor: 1,
-      ceiling,
-    };
-  }
-
-  const floor = Math.min(95, Math.round((completed / total) * 95));
-  const ceiling = Math.min(95, Math.round(((completed + 0.85) / total) * 95));
-
-  return {
-    floor,
-    ceiling: Math.max(floor, ceiling),
-  };
-}
-
-/**
- * Pure visual step progression helper.
- * Advances progress by step towards ceiling while respecting milestone bounds.
- */
-export function stepVisualProgress(
-  currentProgress: number,
-  bounds: MilestoneBounds,
-  isCompleted = false,
-  isFailed = false,
-  step = 1
-): number {
-  if (isCompleted) return 100;
-  if (isFailed) return currentProgress;
-  if (currentProgress < bounds.floor) return bounds.floor;
-  if (currentProgress < bounds.ceiling) {
-    return Math.min(bounds.ceiling, currentProgress + step);
-  }
-  return currentProgress;
-}
-
-/**
- * Calculates adaptive tick interval (in ms) for smooth visual progress.
- * Fast B&W laser (~3.5-4.5s per sheet): 40ms (<70%), 60ms (<85%), 100ms (<90%)
- * Color inkjet (~20-25s per sheet): 200ms
- */
-export function getVisualTickDelay(currentProgress: number, colorMode = 'bw'): number {
-  const isColor = colorMode === 'color';
-  if (isColor) {
-    return 200;
-  }
-  if (currentProgress < 70) return 40;
-  if (currentProgress < 85) return 60;
-  return 100;
+export function verifiedPercent(completed: number, total: number): number {
+  const t = Math.max(1, total);
+  const c = Math.max(0, Math.min(t, completed));
+  return Math.min(99, Math.floor((c / t) * 100));
 }
 
 /**
@@ -123,115 +59,50 @@ export function calculatePrintProgress({
 }: PrintProgressInput): PrintProgressResult {
   const isDuplex = doubleSided === true || doubleSided === 'double';
   const fallbackSheets = (isDuplex ? Math.ceil(pages / 2) : pages) * copies;
-  const total = Number(totalSheets) || Math.max(1, fallbackSheets);
+  const total = Number(totalSheets) > 0 ? Number(totalSheets) : Math.max(1, fallbackSheets);
+  const base = { totalSheets: total, isPrinting: false, isWaiting: false, isCompleted: false, isFailed: false };
 
   if (status === 'completed' || isPrinted === true) {
-    return {
-      progress: 100,
-      milestoneFloor: 100,
-      milestoneCeiling: 100,
-      statusMsg: 'Print Completed ✅',
-      sheetsCompleted: total,
-      totalSheets: total,
-      isPrinting: false,
-      isCompleted: true,
-      isFailed: false,
-    };
+    return { ...base, progress: 100, statusMsg: 'Print Completed ✅', sheetsCompleted: total, isCompleted: true };
   }
 
   if (status === 'failed' || status === 'refunded') {
+    const message = errorMsg || 'Printer reported an error.';
     return {
+      ...base,
       progress: previousProgress,
-      milestoneFloor: previousProgress,
-      milestoneCeiling: previousProgress,
-      statusMsg: errorMsg || 'Printer reported an error.',
+      statusMsg: message,
       sheetsCompleted: previousSheetsCompleted,
-      totalSheets: total,
-      isPrinting: false,
-      isCompleted: false,
       isFailed: true,
-      errorMessage: errorMsg || 'Printer reported an error.',
+      errorMessage: message,
     };
   }
 
   if (status === 'printing') {
-    const rawCompleted = Number(sheetsCompleted);
-    const validRaw = !isNaN(rawCompleted) && rawCompleted >= 0 ? rawCompleted : 0;
-    // Monotonic bounds: keep sheets count within [previousSheetsCompleted, total]
-    const completed = Math.min(total, Math.max(previousSheetsCompleted, validRaw));
-    const bounds = calculateMilestoneBounds(completed, total);
-
-    // Initialise at least to floor when actively printing, clamp within [floor, ceiling]
-    const currentClamped = Math.min(
-      bounds.ceiling,
-      Math.max(bounds.floor, previousProgress)
-    );
+    const raw = Number(sheetsCompleted);
+    const valid = Number.isFinite(raw) && raw >= 0 ? raw : 0;
+    // Monotonic: a delayed or out-of-order response can never move the bar backwards.
+    const completed = Math.min(total, Math.max(previousSheetsCompleted, valid));
+    const progress = Math.max(previousProgress, verifiedPercent(completed, total));
 
     let statusMsg: string;
     if (total === 1) {
-      statusMsg = 'Printing document…';
+      statusMsg = 'Printing your page…';
     } else if (completed === 0) {
-      statusMsg = 'Warming up printer…';
+      statusMsg = `Printing ${total} sheets…`;
     } else {
-      statusMsg = `Printing sheet ${completed} of ${total}…`;
+      statusMsg = `${completed} of ${total} sheets printed…`;
     }
 
-    return {
-      progress: currentClamped,
-      milestoneFloor: bounds.floor,
-      milestoneCeiling: bounds.ceiling,
-      statusMsg,
-      sheetsCompleted: completed,
-      totalSheets: total,
-      isPrinting: true,
-      isCompleted: false,
-      isFailed: false,
-    };
+    return { ...base, progress, statusMsg, sheetsCompleted: completed, isPrinting: true };
   }
 
-  // Status 'paid' or initial queue wait while job is already in flight on the printing screen
-  if (previousProgress > 0) {
-    const rawCompleted = Number(sheetsCompleted);
-    const validRaw = !isNaN(rawCompleted) && rawCompleted >= 0 ? rawCompleted : 0;
-    const completed = Math.min(total, Math.max(previousSheetsCompleted, validRaw));
-    const bounds = calculateMilestoneBounds(completed, total);
-    const currentClamped = Math.min(
-      bounds.ceiling,
-      Math.max(bounds.floor, previousProgress)
-    );
-
-    let statusMsg: string;
-    if (total === 1) {
-      statusMsg = 'Printing document…';
-    } else if (completed === 0) {
-      statusMsg = 'Warming up printer…';
-    } else {
-      statusMsg = `Printing sheet ${completed} of ${total}…`;
-    }
-
-    return {
-      progress: currentClamped,
-      milestoneFloor: bounds.floor,
-      milestoneCeiling: bounds.ceiling,
-      statusMsg,
-      sheetsCompleted: completed,
-      totalSheets: total,
-      isPrinting: true,
-      isCompleted: false,
-      isFailed: false,
-    };
-  }
-
-  // Initial queue wait before in-flight progress begins
+  // 'paid' (not yet started on a printer), or an unusable response: no progress is claimed.
   return {
-    progress: 0,
-    milestoneFloor: 0,
-    milestoneCeiling: 0,
-    statusMsg: 'Warming up printer…',
-    sheetsCompleted: 0,
-    totalSheets: total,
-    isPrinting: false,
-    isCompleted: false,
-    isFailed: false,
+    ...base,
+    progress: previousProgress,
+    statusMsg: 'Waiting for the printer to start…',
+    sheetsCompleted: previousSheetsCompleted,
+    isWaiting: true,
   };
 }
