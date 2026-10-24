@@ -17,6 +17,7 @@ const { createLimiters } = require("../middleware/rateLimit");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
 const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
 const { unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
+const { sessionStages } = require("../services/printStages.service");
 const { getTransporter } = require("../services/email.service");
 const { loadMachinesMap, loadMachineTemplatesMap, describeDestination } = require("../services/machineRegistry.service");
 
@@ -262,7 +263,8 @@ function createKioskRouter(dependencies) {
       }
 
       if (anyPrinting) {
-        const responsePayload = { status: "printing", isPrinted: false, sheetsCompleted, totalSheets };
+        // Additive: older kiosks ignore the two stage fields (null until the Pi has stamped every job).
+        const responsePayload = { status: "printing", isPrinted: false, sheetsCompleted, totalSheets, ...sessionStages(currentSessionDocs) };
         const contractCheck = validateKioskJobStatusResponse(responsePayload);
         if (!contractCheck.valid) {
           console.error("[SYNC CONTRACT ERROR]", contractCheck.error);
