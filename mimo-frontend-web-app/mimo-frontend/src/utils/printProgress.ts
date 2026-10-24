@@ -33,13 +33,15 @@ export interface PrintProgressResult {
 }
 
 /**
- * Percentage for `completed` verified sheets out of `total`. Strictly below 100 until the job itself is
- * reported completed: only the Pi's completion (final sheet counted) may show 100%.
+ * Percentage for a job the backend reports as printing, with `completed` of `total` sheets verified by the
+ * printer's page counter: 1% once printing is confirmed (no sheet out yet), then each verified sheet's share of
+ * 1-99%. Strictly below 100 until the job itself is reported completed: only the Pi's completion (final sheet
+ * counted) may show 100%.
  */
 export function verifiedPercent(completed: number, total: number): number {
   const t = Math.max(1, total);
   const c = Math.max(0, Math.min(t, completed));
-  return Math.min(99, Math.floor((c / t) * 100));
+  return Math.min(99, 1 + Math.floor((c / t) * 98));
 }
 
 /**

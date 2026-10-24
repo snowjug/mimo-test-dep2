@@ -2,7 +2,8 @@
 // Run: node --test --experimental-strip-types scripts/test_active_print.mts   (Node 22.6+; flag not needed on 23.6+)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { saveActivePrint, loadActivePrint, clearActivePrint, MAX_RESUME_AGE_MS } from '../src/utils/activePrint.ts';
+import { saveActivePrint, loadActivePrint, clearActivePrint, markActivePrintCompleted, MAX_RESUME_AGE_MS, SUMMARY_RESUME_MS }
+  from '../src/utils/activePrint.ts';
 
 class MemoryStorage {
   data = new Map<string, string>();
@@ -61,4 +62,18 @@ test('no kiosk id or no storage: never resumes, never throws', () => {
     removeItem() { throw new Error('denied'); } } as unknown as Storage;
   assert.doesNotThrow(() => saveActivePrint({ code: '4821', kioskId: 'CV-001', job, startedAt: T0 }, broken));
   assert.equal(loadActivePrint('CV-001', T0, broken), null);
+});
+
+test('completed print: a reload within the summary lifetime reopens the summary, later it does not', () => {
+  const s = new MemoryStorage() as unknown as Storage;
+  saveActivePrint({ code: '4821', kioskId: 'CV-001', job, startedAt: T0 }, s);
+  markActivePrintCompleted(T0 + 40_000, s);
+  assert.equal(loadActivePrint('CV-001', T0 + 45_000, s)?.completedAt, T0 + 40_000);
+  assert.equal(loadActivePrint('CV-001', T0 + 40_000 + SUMMARY_RESUME_MS, s), null);
+});
+
+test('marking completed without a saved print is a no-op', () => {
+  const s = new MemoryStorage() as unknown as Storage;
+  markActivePrintCompleted(T0, s);
+  assert.equal(loadActivePrint('CV-001', T0, s), null);
 });

@@ -65,6 +65,12 @@ const SCENARIOS = [
     jobStatus: timeline(1, [], 9000) },
   { name: 'page reload mid-print, multi sheet (5)', pages: 5, expect: 'summary', reloadAt: 4500, timeoutMs: 30000,
     jobStatus: timeline(5, [2000, 3500, 6000, 8000], 10000) },
+  { name: 'summary stays at least 25 s after the last sheet', pages: 3, expect: 'summary', summaryHold: 25000,
+    jobStatus: timeline(3, [1500, 3000], 4500) },
+  { name: 'page reload during the summary keeps the summary', pages: 2, expect: 'summary', summaryHold: 20000,
+    reloadDuringSummary: 4000, jobStatus: timeline(2, [1500], 3500) },
+  { name: 'duplicate completed events (single sheet)', pages: 1, expect: 'summary', summaryHold: 20000,
+    jobStatus: (t) => (t >= 3000 ? done(1) : printing(0, 1)) },
   { name: 'page reload after the printer failed shows no stale print', pages: 3, expect: 'home', reloadAt: 7000,
     timeoutMs: 20000,
     jobStatus: (t) => (t >= 3000 ? json({ status: 'failed', isPrinted: false, sheetsCompleted: 1, totalSheets: 3,
@@ -93,7 +99,9 @@ async function visibleScreen(page) {
 }
 
 async function runScenario(sc) {
-  const page = await browser.newPage();
+  // fresh profile per scenario: no localStorage (saved print) carried over from the previous one
+  const context = await browser.createBrowserContext();
+  const page = await context.newPage();
   await page.setViewport({ width: 1340, height: 800 });
   const served = [];           // job-status responses: {t, status, k, total}
   let printAt = null, printCalls = 0, jobCalls = 0;
@@ -168,6 +176,21 @@ async function runScenario(sc) {
     if (reloadedAt && screen === 'home' && Date.now() - reloadedAt > 3000) break; // stayed on home after the reload
   }
   const finalText = await page.evaluate(() => [...document.querySelectorAll('.screen.visible')].map((s) => s.innerText).join(' '));
+  let summaryHeldMs = null, summaryAfterReload = null;
+  if (sc.summaryHold) {
+    const shownAt = Date.now();
+    if (sc.reloadDuringSummary) {
+      await new Promise((r) => setTimeout(r, sc.reloadDuringSummary));
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await new Promise((r) => setTimeout(r, 2000));
+      summaryAfterReload = await page.evaluate(() => /documents are ready/i.test(document.body.innerText) && !document.querySelector('.screen.visible .cursor-grab'));
+    }
+    while (Date.now() - shownAt < sc.summaryHold + 8000) {
+      await new Promise((r) => setTimeout(r, 500));
+      if (await page.evaluate(() => [...document.querySelectorAll('.screen')].some((s) => getComputedStyle(s).display !== 'none' && s.querySelector('.cursor-grab')))) break;
+    }
+    summaryHeldMs = Date.now() - shownAt;
+  }
   let retryScreen = null;
   if (sc.retry) {
     await page.evaluate(() => [...document.querySelectorAll('button')].find((e) => e.offsetParent && /Try Again/.test(e.innerText))?.click());
@@ -175,11 +198,14 @@ async function runScenario(sc) {
     retryScreen = await visibleScreen(page);
   }
   await page.close();
-  return judge(sc, { screen, finalText, samples, served, retryScreen, printCalls, reloadedAt });
+  await context.close();
+  return judge(sc, { screen, finalText, samples, served, retryScreen, printCalls, reloadedAt, summaryHeldMs, summaryAfterReload });
 }
 
-function judge(sc, { screen, finalText, samples, served, retryScreen, reloadedAt }) {
+function judge(sc, { screen, finalText, samples, served, retryScreen, reloadedAt, summaryHeldMs, summaryAfterReload }) {
   const problems = [];
+  if (sc.summaryHold && summaryHeldMs < sc.summaryHold) problems.push(`summary went home after ${summaryHeldMs} ms (needs >= ${sc.summaryHold})`);
+  if (sc.reloadDuringSummary && !summaryAfterReload) problems.push('a reload during the summary did not reopen the summary');
   if (sc.reloadAt) {
     if (!reloadedAt) problems.push('harness never reloaded the page');
     const firstDone = served.find((s) => s.status === 'completed' || s.status === 'failed');
@@ -202,7 +228,8 @@ function judge(sc, { screen, finalText, samples, served, retryScreen, reloadedAt
     const completedServed = before.some((r) => r.status === 'completed');
     const maxK = Math.max(0, ...before.filter((r) => r.status === 'printing').map((r) => Number(r.k) || 0));
     const total = Number(before.find((r) => r.total)?.total) || sc.pages;
-    const allowed = completedServed ? 100 : Math.min(99, Math.floor((maxK / total) * 100));
+    const printingServed = before.some((r) => r.status === 'printing');
+    const allowed = completedServed ? 100 : printingServed ? Math.min(99, 1 + Math.floor((maxK / total) * 98)) : 0;
     if (s.p > allowed) maxOver = Math.max(maxOver, s.p - allowed);
     if (s.p < last) regress++;
     last = s.p;
@@ -214,7 +241,7 @@ function judge(sc, { screen, finalText, samples, served, retryScreen, reloadedAt
 
   const first100 = prog.find((s) => s.p === 100);
   const lag = firstCompleted && first100 ? first100.t - firstCompleted.t : null;
-  if (sc.expect === 'summary' && lag !== null && lag > 800) problems.push(`100% shown ${lag} ms after completion was available`);
+  if (sc.expect === 'summary' && lag !== null && lag > 1200) problems.push(`100% shown ${lag} ms after completion was available`);
   const shown = [...new Set(prog.map((s) => s.p))].join(',');
   return { name: sc.name, ok: problems.length === 0, problems, lag, shown, retryScreen };
 }

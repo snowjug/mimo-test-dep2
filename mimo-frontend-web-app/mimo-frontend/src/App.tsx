@@ -10,7 +10,7 @@ import { CV001Background } from './components/screens/CV001Background';
 import { Adds } from './components/screens/adds/Adds';
 import { isFestivalActive } from './config/festivalConfig';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
-import { loadActivePrint, saveActivePrint, clearActivePrint, type ActivePrintJob } from './utils/activePrint';
+import { loadActivePrint, saveActivePrint, clearActivePrint, markActivePrintCompleted, type ActivePrintJob } from './utils/activePrint';
 
 
 export type ScreenState =
@@ -47,12 +47,16 @@ function App() {
 
   // A print this kiosk started before the page was reloaded (see utils/activePrint.ts): reopen its printing screen
   // instead of the home screen, and let the backend job status finish the flow.
+  // A completed one reopens the summary screen it was showing.
   const [resumedPrint] = useState(() => loadActivePrint(dynamicKioskId));
-  const [currentScreen, setCurrentScreen] = useState<ScreenState>(resumedPrint ? 'printing-screen' : 'main-interface');
+  const resumedDone = resumedPrint?.completedAt !== undefined;
+  const [currentScreen, setCurrentScreen] = useState<ScreenState>(
+    resumedPrint ? (resumedDone ? 'summary-screen' : 'printing-screen') : 'main-interface');
   const [code, setCode] = useState(resumedPrint?.code ?? '');
   const [toastMsg, setToastMsg] = useState('');
   const [toastError, setToastError] = useState(false);
-  const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>(resumedPrint ? 'printing' : 'idle');
+  const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>(
+    resumedPrint ? (resumedDone ? 'completed' : 'printing') : 'idle');
   const [printError, setPrintError] = useState<string | undefined>(undefined);
   const [showRefundBanner, setShowRefundBanner] = useState(false);
   // True once /kiosk/print accepted the job (or gave no answer); false when it refused it.
@@ -368,7 +372,7 @@ function App() {
         colorMode={jobData?.mode?.toLowerCase().match(/color|colour/) ? 'color' : 'bw'}
         kioskId={dynamicKioskId}
         onComplete={() => {
-          clearActivePrint();
+          markActivePrintCompleted();
           setPrintStatus('completed');
           goToSummary();
         }}
