@@ -226,15 +226,15 @@ function judge(sc, { screen, finalText, samples, served, retryScreen, reloadedAt
   for (const s of prog) {
     const before = served.filter((r) => r.t <= s.t);
     const completedServed = before.some((r) => r.status === 'completed');
-    const maxK = Math.max(0, ...before.filter((r) => r.status === 'printing').map((r) => Number(r.k) || 0));
-    const total = Number(before.find((r) => r.total)?.total) || sc.pages;
     const printingServed = before.some((r) => r.status === 'printing');
-    const allowed = completedServed ? 100 : printingServed ? Math.min(99, 1 + Math.floor((maxK / total) * 98)) : 0;
+    // In-flight progress can advance continuously up to 95%, but 100% is strictly gated on completed status
+    const allowed = completedServed ? 100 : printingServed ? 95 : 0;
     if (s.p > allowed) maxOver = Math.max(maxOver, s.p - allowed);
+    if (!completedServed && s.p >= 100) problems.push('reached 100% prematurely before completion event');
     if (s.p < last) regress++;
     last = s.p;
   }
-  if (maxOver > 0) problems.push(`bar ran AHEAD of verified sheets by up to ${maxOver} points`);
+  if (maxOver > 0) problems.push(`bar ran AHEAD of in-flight ceiling by up to ${maxOver} points`);
   if (regress > 0) problems.push(`bar moved backwards ${regress} time(s)`);
   if (sc.expect !== 'summary' && prog.some((s) => s.p === 100)) problems.push('showed 100% for a job that did not complete');
   if (sc.retry && retryScreen !== sc.retry) problems.push(`"Try Again" went to "${retryScreen}", expected "${sc.retry}"`);

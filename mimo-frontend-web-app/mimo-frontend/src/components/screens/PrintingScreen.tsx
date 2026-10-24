@@ -27,17 +27,23 @@ interface PrintingScreenProps {
 
 export {
   calculatePrintProgress,
+  calculateMilestoneBounds,
+  getVisualTickDelay,
+  stepVisualProgress,
   verifiedPercent,
+  type MilestoneBounds,
   type PrintProgressInput,
   type PrintProgressResult,
 } from '../../utils/printProgress';
-import { calculatePrintProgress } from '../../utils/printProgress';
+import {
+  calculatePrintProgress,
+  calculateMilestoneBounds,
+  getVisualTickDelay,
+} from '../../utils/printProgress';
 
 // /kiosk/print moves the job to "printing" before it answers, so a job still "paid" this long after the
 // printing screen opened was never started (the print request was lost or refused): say so, don't keep waiting.
 const PRINT_START_GRACE_MS = 20000;
-// How long the ring takes to ease from one verified value to the next.
-const PROGRESS_EASE_MS = 500;
 
 export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   isActive,
@@ -65,6 +71,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const collectTimerRef = useRef<number | null>(null);
 
   const progressRef         = useRef(0);   // mirror of progress for closures
+  const milestoneFloorRef   = useRef(0);   // current milestone floor
+  const milestoneCeilingRef = useRef(0);   // current milestone ceiling
   const sheetsCompletedRef  = useRef(0);   // verified sheets completed (from the printer's page counter)
   const hasStartedRef       = useRef(false); // backend has reported the job as printing at least once
   const activePrintCodeRef  = useRef(printCode);
@@ -83,26 +91,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   }, [printCode]);
 
   const isCompleted = progress >= 100;
-
-  // What the ring and number show: eases toward the verified `progress` and never past it, so each verified step
-  // animates instead of jumping. It only moves between real values; it never advances on its own.
-  const [shownProgress, setShownProgress] = useState(0);
-  const shownRef = useRef(0);
-  useEffect(() => {
-    const from = shownRef.current;
-    const to = progress;
-    const start = performance.now();
-    let raf = 0;
-    const step = (now: number) => {
-      const t = to <= from ? 1 : Math.min(1, (now - start) / PROGRESS_EASE_MS);
-      const value = Math.round(from + (to - from) * (1 - Math.pow(1 - t, 3)));
-      shownRef.current = value;
-      setShownProgress(value);
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [progress]);
 
   // Print duration budget: mirrors the backend/Pi's own per-sheet timing — the colour inkjet
   // genuinely needs far longer per sheet than the B&W laser (see pi_scripts/firebase_listener.py's
@@ -152,14 +140,47 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
     // Immediate 100% completion upon physical hardware verification confirmation
     progressRef.current = 100;
+    milestoneFloorRef.current = 100;
+    milestoneCeilingRef.current = 100;
     setProgress(100);
     setStatusMsg('Print Completed ✅');
 
-    // Let the ring finish easing to 100% and hold it briefly before the summary screen
+    // 800ms celebration hold before transitioning to summary screen
     completionTimerRef.current = window.setTimeout(() => {
       onComplete();
-    }, PROGRESS_EASE_MS + 400);
+    }, 800);
   }, [clearAllTimers, onComplete]);
+
+  // Smooth visual progress tick: advances gradually towards the milestone ceiling
+  const startSmoothTick = useCallback(() => {
+    if (tickTimerRef.current) return;
+
+    const isDuplex = doubleSided === true || doubleSided === 'double';
+    const totalSheets = Math.max(1, (isDuplex ? Math.ceil(pages / 2) : pages) * copies);
+
+    const tick = () => {
+      if (isCompletingRef.current) return;
+
+      const currentProgress = progressRef.current;
+      const ceiling = milestoneCeilingRef.current;
+      const floor = milestoneFloorRef.current;
+
+      if (currentProgress < floor) {
+        progressRef.current = floor;
+        setProgress(floor);
+      } else if (currentProgress < ceiling) {
+        const next = Math.min(ceiling, currentProgress + 1);
+        progressRef.current = next;
+        setProgress(next);
+      }
+
+      const delay = getVisualTickDelay(progressRef.current, colorMode, totalSheets);
+      tickTimerRef.current = window.setTimeout(tick, delay);
+    };
+
+    const initialDelay = getVisualTickDelay(progressRef.current, colorMode, totalSheets);
+    tickTimerRef.current = window.setTimeout(tick, initialDelay);
+  }, [colorMode, pages, copies, doubleSided]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
@@ -219,9 +240,12 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           errorMsg: errMsg,
           piReceivedAt: data.piReceivedAt,
           sentToPrinterAt: data.sentToPrinterAt,
+          colorMode,
         });
 
         sheetsCompletedRef.current = result.sheetsCompleted;
+        milestoneFloorRef.current = result.milestoneFloor;
+        milestoneCeilingRef.current = result.milestoneCeiling;
 
         if (result.isCompleted) {
           setPrintDone(true);
@@ -241,6 +265,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             progressRef.current = result.progress;
             setProgress(result.progress);
           }
+          startSmoothTick();
         } else if (
           result.isWaiting && data.status === 'paid' && !hasStartedRef.current &&
           Date.now() - startTimeRef.current >= PRINT_START_GRACE_MS
@@ -261,7 +286,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         isPollingRef.current = false;
       }
     }, delayMs);
-  }, [printCode, isActive, pages, copies, doubleSided, onError, clearAllTimers, printTimeoutMs]);
+  }, [printCode, isActive, pages, copies, doubleSided, onError, clearAllTimers, printTimeoutMs, colorMode, startSmoothTick]);
 
   // ─── demo mode fallback (used ONLY when printCode is '0000'/'9999' or missing) ──
 
@@ -320,6 +345,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       clearAllTimers();
       setProgress(0);
       progressRef.current = 0;
+      milestoneFloorRef.current = 0;
+      milestoneCeilingRef.current = 0;
       sheetsCompletedRef.current = 0;
       hasStartedRef.current = false;
       isPollingRef.current = false;
@@ -336,9 +363,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       return;
     }
 
-    // Explicitly start at 0% on screen activation
+    // Reset progress tracking on screen activation
     setProgress(0);
     progressRef.current = 0;
+    milestoneFloorRef.current = 0;
+    milestoneCeilingRef.current = 0;
     sheetsCompletedRef.current = 0;
     hasStartedRef.current = false;
     isPollingRef.current = false;
@@ -372,9 +401,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         animateTo100AndComplete();
       }
     } else if (printCode && !isDemoPrintCode(printCode)) {
-      // Live job: 0% until the printer's page counter verifies the first sheet; the bar only ever shows
-      // verified sheets (see utils/printProgress.ts), never elapsed time.
+      // Live job: start smoothly at 1% for active visual feedback
+      const isDuplex = doubleSided === true || doubleSided === 'double';
+      const totalSheets = Math.max(1, (isDuplex ? Math.ceil(pages / 2) : pages) * copies);
+      const initialBounds = calculateMilestoneBounds(0, totalSheets, colorMode);
+
+      progressRef.current = 1;
+      milestoneFloorRef.current = initialBounds.floor;
+      milestoneCeilingRef.current = initialBounds.ceiling;
+      setProgress(1);
+
       setStatusMsg('Sending your document to the printer…');
+      startSmoothTick();
       schedulePoll(0);
     } else if (isDemoPrintCode(printCode)) {
       startDemoTick(); // Demo mode simulation ('0000' / '9999' only — never for a missing code)
@@ -445,15 +483,15 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   const radius         = 140;
   const circumference  = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (shownProgress / 100) * circumference;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   // Comet tail: multiple points trailing behind the leading edge
   const cometTailPoints = useMemo(() => {
-    if (shownProgress <= 0 || shownProgress >= 100) return [];
+    if (progress <= 0 || progress >= 100) return [];
     const tailLength = 18; // degrees of arc the tail spans
     const points = [];
     for (let i = 0; i <= 10; i++) {
-      const tailAngle = -Math.PI / 2 + ((shownProgress / 100) * 360 - i * (tailLength / 10)) * (Math.PI / 180);
+      const tailAngle = -Math.PI / 2 + ((progress / 100) * 360 - i * (tailLength / 10)) * (Math.PI / 180);
       const x = 190 + radius * Math.cos(tailAngle);
       const y = 190 + radius * Math.sin(tailAngle);
       const opacity = 1 - i / 10;
@@ -461,7 +499,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       points.push({ x, y, opacity, r, key: i });
     }
     return points;
-  }, [shownProgress, radius]);
+  }, [progress, radius]);
 
   // ─── render ───────────────────────────────────────────────────────────────
 
@@ -554,7 +592,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           )}
           {isFestiveMode && (
             <div className="mt-7">
-              <DiyaRow count={9} size={34} gap={16} litCount={Math.floor((shownProgress * 9) / 100)} />
+              <DiyaRow count={9} size={34} gap={16} litCount={Math.floor((progress * 9) / 100)} />
             </div>
           )}
         </div>
@@ -572,11 +610,11 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
             className="pointer-events-none absolute h-[300px] w-[300px] rounded-full blur-[70px] transition-opacity duration-300"
             style={{
               background: isFestiveMode ? 'var(--color-mahogany-600)' : 'var(--color-gold-500)',
-              opacity: 0.1 + (shownProgress / 100) * 0.2,
+              opacity: 0.1 + (progress / 100) * 0.2,
             }}
           />
 
-          {isActive && shownProgress < 100 && (
+          {isActive && progress < 100 && (
             <>
               <span
                 className={`pointer-events-none absolute inset-[45px] rounded-full border-2 ${
@@ -633,7 +671,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 letterSpacing="-2px"
                 style={{ fontVariantNumeric: 'tabular-nums' }}
               >
-                {shownProgress}
+                {progress}
               </tspan>
               <tspan fontSize="32px" fontWeight="700" fill={isFestiveMode ? '#b47b37' : '#C8860A'} dx="4">%</tspan>
             </text>
@@ -644,8 +682,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 fill="transparent"
                 stroke="url(#progressGradient)"
                 strokeWidth="10"
-                strokeDasharray={shownProgress === 100 ? 'none' : circumference}
-                strokeDashoffset={shownProgress === 100 ? 0 : strokeDashoffset}
+                strokeDasharray={progress === 100 ? 'none' : circumference}
+                strokeDashoffset={progress === 100 ? 0 : strokeDashoffset}
                 strokeLinecap="round"
                 filter="url(#neonGlow)"
                 style={{ transition: 'stroke-dashoffset 0.14s linear' }}
@@ -655,8 +693,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
                 fill="transparent"
                 stroke="#ffffff"
                 strokeWidth="3"
-                strokeDasharray={shownProgress === 100 ? 'none' : circumference}
-                strokeDashoffset={shownProgress === 100 ? 0 : strokeDashoffset}
+                strokeDasharray={progress === 100 ? 'none' : circumference}
+                strokeDashoffset={progress === 100 ? 0 : strokeDashoffset}
                 strokeLinecap="round"
                 opacity="0.75"
                 style={{ transition: 'stroke-dashoffset 0.18s linear' }}
