@@ -204,3 +204,45 @@ test('legacy verifiedPercent helper preserved for compatibility', () => {
   assert.equal(verifiedPercent(20, 21), 94);
   assert.equal(verifiedPercent(50, 3), 99);
 });
+
+test('color print: continuous bounds and pacing for Epson inkjet', () => {
+  // In color mode, hardware PJL counter does not exist to stream sheet-by-sheet updates.
+  // Milestone ceiling stays at 95% to allow continuous pacing across the entire job.
+  const cBounds = calculateMilestoneBounds(0, 3, 'color');
+  assert.equal(cBounds.floor, 1);
+  assert.equal(cBounds.ceiling, 95);
+
+  const cPoll = poll({ status: 'printing', sheetsCompleted: 0, totalSheets: 3, colorMode: 'color' });
+  assert.equal(cPoll.progress, 1);
+  assert.equal(cPoll.milestoneFloor, 1);
+  assert.equal(cPoll.milestoneCeiling, 95);
+  assert.equal(cPoll.isCompleted, false);
+
+  // Completed transitions directly to 100%
+  const cDone = poll({ status: 'completed', isPrinted: true, totalSheets: 3, colorMode: 'color' });
+  assert.equal(cDone.progress, 100);
+  assert.equal(cDone.isCompleted, true);
+});
+
+test('completion arriving early while UI is still below 95%: cleanly transitions to 100%', () => {
+  // UI is currently ticking at 38% when the backend completion arrives
+  const earlyDone = poll(
+    { status: 'completed', isPrinted: true, sheetsCompleted: 1, totalSheets: 1 },
+    { previousProgress: 38, previousSheetsCompleted: 0 }
+  );
+  assert.equal(earlyDone.progress, 100);
+  assert.equal(earlyDone.isCompleted, true);
+  assert.equal(earlyDone.statusMsg, 'Print Completed ✅');
+});
+
+test('printer cancellation or refund during active print: halts progress and marks failed', () => {
+  // Print is active at 52% when an error / cancellation / refund occurs
+  const cancelled = poll(
+    { status: 'failed', errorMsg: 'Print job cancelled by operator' },
+    { previousProgress: 52, previousSheetsCompleted: 2 }
+  );
+  assert.equal(cancelled.isFailed, true);
+  assert.equal(cancelled.isCompleted, false);
+  assert.equal(cancelled.progress, 52); // Never jumps to 100%
+  assert.equal(cancelled.errorMessage, 'Print job cancelled by operator');
+});
