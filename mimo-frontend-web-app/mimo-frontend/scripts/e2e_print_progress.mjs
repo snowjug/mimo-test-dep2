@@ -61,6 +61,14 @@ const SCENARIOS = [
   { name: 'print request lost, job never started (stalled at paid)', pages: 2, expect: 'error',
     expectText: 'could not be started', print: 'abort', timeoutMs: 40000,
     jobStatus: () => json({ status: 'paid', isPrinted: false, sheetsCompleted: 0, totalSheets: 2 }) },
+  { name: 'page reload mid-print, single sheet', pages: 1, expect: 'summary', reloadAt: 3000, timeoutMs: 30000,
+    jobStatus: timeline(1, [], 9000) },
+  { name: 'page reload mid-print, multi sheet (5)', pages: 5, expect: 'summary', reloadAt: 4500, timeoutMs: 30000,
+    jobStatus: timeline(5, [2000, 3500, 6000, 8000], 10000) },
+  { name: 'page reload after the printer failed shows no stale print', pages: 3, expect: 'home', reloadAt: 7000,
+    timeoutMs: 20000,
+    jobStatus: (t) => (t >= 3000 ? json({ status: 'failed', isPrinted: false, sheetsCompleted: 1, totalSheets: 3,
+      printerStatus: 'Paper Jam' }) : printing(t >= 1500 ? 1 : 0, 3)) },
   { name: 'retry after failure must not fake success', pages: 3, expect: 'error', retry: 'code-entry',
     jobStatus: (t) => (t >= 2500 ? json({ status: 'failed', isPrinted: false, sheetsCompleted: 0, totalSheets: 3,
       printerStatus: 'Printer offline' }) : printing(0, 3)) },
@@ -73,6 +81,7 @@ async function visibleScreen(page) {
   return page.evaluate(() => {
     const s = [...document.querySelectorAll('.screen.visible')].find((el) => el.offsetParent !== null || getComputedStyle(el).display !== 'none');
     if (!s) return 'none';
+    if (s.querySelector('.cursor-grab')) return 'home';
     if (s.querySelector('[aria-label="Submit code"]')) return 'code-entry';
     if ([...s.querySelectorAll('tspan')].some((t) => t.getAttribute('font-size') === '92px')) return 'printing';
     if (/Try Again|Returning home|refund/i.test(s.innerText) && !/Print Completed/i.test(s.innerText) && s.querySelector('button')) {
@@ -111,6 +120,19 @@ async function runScenario(sc) {
     return req.continue();
   });
 
+  // Sampler runs in every document, so it keeps recording across a page reload (what the tablet's WebView does
+  // when the Activity is recreated or the renderer restarts).
+  const samples = [];
+  await page.exposeFunction('__push', (s) => samples.push(s));
+  await page.evaluateOnNewDocument(() => {
+    setInterval(() => {
+      const vis = [...document.querySelectorAll('.screen')].filter((s) => getComputedStyle(s).display !== 'none');
+      const tsp = [...document.querySelectorAll('tspan')].find((t) => t.getAttribute('font-size') === '92px' && t.closest('.screen.visible'));
+      const home = vis.some((s) => s.querySelector('.cursor-grab'));
+      window.__push?.({ t: Date.now(), p: tsp ? Number(tsp.textContent) : null, home, screen: vis.map((s) => s.innerText.slice(0, 40)).join('|') });
+    }, 25);
+  });
+
   await page.goto(`http://localhost:${PORT}/?kioskId=CV-001`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.cursor-grab', { visible: true, timeout: 15000 });
   await new Promise((r) => setTimeout(r, 800));
@@ -123,32 +145,29 @@ async function runScenario(sc) {
   await page.mouse.up();
   await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="Submit code"]')].some((e) => e.offsetParent), { timeout: 10000 });
 
-  // start sampling before submitting
-  await page.evaluate(() => {
-    window.__samples = [];
-    setInterval(() => {
-      const tsp = [...document.querySelectorAll('tspan')].find((t) => t.getAttribute('font-size') === '92px' && t.closest('.screen.visible'));
-      const screen = [...document.querySelectorAll('.screen.visible')].map((s) => s.innerText.slice(0, 40)).join('|');
-      window.__samples.push({ t: Date.now(), p: tsp ? Number(tsp.textContent) : null, screen });
-    }, 25);
-  });
   for (const d of '4821') {
     await page.evaluate((d) => [...document.querySelectorAll(`#key-${d}`)].find((e) => e.offsetParent).click(), d);
   }
   await page.evaluate(() => [...document.querySelectorAll('[aria-label="Submit code"]')].find((e) => e.offsetParent).click());
 
-  // wait for a terminal screen
+  // wait for a terminal screen (optionally reloading the page part-way through the print, like the tablet does)
   const deadline = Date.now() + (sc.timeoutMs || 25000);
-  let screen = 'none';
+  let screen = 'none', reloadedAt = null;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 200));
+    if (sc.reloadAt && !reloadedAt && printAt && Date.now() - printAt >= sc.reloadAt) {
+      reloadedAt = Date.now();
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await new Promise((r) => setTimeout(r, 1500));
+    }
     screen = await visibleScreen(page);
-    if (screen !== 'printing' && screen !== 'code-entry' && screen !== 'none' && printCalls > 0) {
+    const reloadPending = sc.reloadAt && !reloadedAt;
+    if (!reloadPending && screen !== 'printing' && screen !== 'code-entry' && screen !== 'none' && printCalls > 0) {
       if (screen === 'summary-or-other' || screen === 'summary' || screen === 'error') break;
     }
+    if (reloadedAt && screen === 'home' && Date.now() - reloadedAt > 3000) break; // stayed on home after the reload
   }
   const finalText = await page.evaluate(() => [...document.querySelectorAll('.screen.visible')].map((s) => s.innerText).join(' '));
-  const samples = await page.evaluate(() => window.__samples);
   let retryScreen = null;
   if (sc.retry) {
     await page.evaluate(() => [...document.querySelectorAll('button')].find((e) => e.offsetParent && /Try Again/.test(e.innerText))?.click());
@@ -156,11 +175,18 @@ async function runScenario(sc) {
     retryScreen = await visibleScreen(page);
   }
   await page.close();
-  return judge(sc, { screen, finalText, samples, served, retryScreen, printCalls });
+  return judge(sc, { screen, finalText, samples, served, retryScreen, printCalls, reloadedAt });
 }
 
-function judge(sc, { screen, finalText, samples, served, retryScreen }) {
+function judge(sc, { screen, finalText, samples, served, retryScreen, reloadedAt }) {
   const problems = [];
+  if (sc.reloadAt) {
+    if (!reloadedAt) problems.push('harness never reloaded the page');
+    const firstDone = served.find((s) => s.status === 'completed' || s.status === 'failed');
+    const homeMidPrint = samples.find((s) => s.home && s.t > reloadedAt + 1200 && (!firstDone || s.t < firstDone.t));
+    if (homeMidPrint) problems.push('after the reload the kiosk showed the HOME screen while the job was still printing');
+    samples = samples.filter((s) => s.t < reloadedAt || s.t > reloadedAt + 1200); // the reload itself blanks the page
+  }
   const isSummary = /printed successfully|Print Completed|Collect|Thank/i.test(finalText) && !/Try Again/.test(finalText);
   const isError = /Try Again|Returning home/.test(finalText) && !isSummary;
   const landed = isSummary ? 'summary' : isError ? 'error' : screen;
