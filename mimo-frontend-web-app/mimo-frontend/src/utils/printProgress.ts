@@ -17,6 +17,8 @@ export interface PrintProgressInput {
   copies?: number;
   doubleSided?: boolean | string;
   errorMsg?: string;
+  piReceivedAt?: string | null;
+  sentToPrinterAt?: string | null;
 }
 
 export interface PrintProgressResult {
@@ -58,6 +60,8 @@ export function calculatePrintProgress({
   copies = 1,
   doubleSided = false,
   errorMsg,
+  piReceivedAt,
+  sentToPrinterAt,
 }: PrintProgressInput): PrintProgressResult {
   const isDuplex = doubleSided === true || doubleSided === 'double';
   const fallbackSheets = (isDuplex ? Math.ceil(pages / 2) : pages) * copies;
@@ -85,13 +89,26 @@ export function calculatePrintProgress({
     const valid = Number.isFinite(raw) && raw >= 0 ? raw : 0;
     // Monotonic: a delayed or out-of-order response can never move the bar backwards.
     const completed = Math.min(total, Math.max(previousSheetsCompleted, valid));
-    const progress = Math.max(previousProgress, verifiedPercent(completed, total));
+    let progress = Math.max(previousProgress, verifiedPercent(completed, total));
+
+    // Staged progression before the first physical sheet exits:
+    // sentToPrinterAt (CUPS accepted the job): advances to 5%
+    // piReceivedAt (Pi listener acquired the job): advances to 2%
+    if (completed === 0) {
+      if (sentToPrinterAt) {
+        progress = Math.max(progress, 5);
+      } else if (piReceivedAt) {
+        progress = Math.max(progress, 2);
+      }
+    }
+    // Strictly cap below 100% until the completion signal arrives from the hardware
+    progress = Math.min(99, progress);
 
     let statusMsg: string;
     if (total === 1) {
-      statusMsg = 'Printing your page…';
+      statusMsg = sentToPrinterAt ? 'Printing your page…' : piReceivedAt ? 'Preparing your page…' : 'Printing your page…';
     } else if (completed === 0) {
-      statusMsg = `Printing ${total} sheets…`;
+      statusMsg = sentToPrinterAt ? `Sending ${total} sheets to printer…` : piReceivedAt ? `Preparing ${total} sheets…` : `Printing ${total} sheets…`;
     } else {
       statusMsg = `${completed} of ${total} sheets printed…`;
     }

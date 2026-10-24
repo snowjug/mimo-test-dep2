@@ -217,6 +217,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           copies,
           doubleSided,
           errorMsg: errMsg,
+          piReceivedAt: data.piReceivedAt,
+          sentToPrinterAt: data.sentToPrinterAt,
         });
 
         sheetsCompletedRef.current = result.sheetsCompleted;
@@ -233,7 +235,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           return;
         }
 
-        if (result.isPrinting) {
+        if (result.isPrinting || data.piReceivedAt || data.sentToPrinterAt) {
           hasStartedRef.current = true;
           if (result.progress > progressRef.current) {
             progressRef.current = result.progress;

@@ -58,3 +58,26 @@ test('verifiedPercent bounds', () => {
   assert.equal(verifiedPercent(20, 21), 94);
   assert.equal(verifiedPercent(50, 3), 99);
 });
+
+test('staged progress with piReceivedAt and sentToPrinterAt before first sheet verified', () => {
+  const p1 = poll({ status: 'printing', sheetsCompleted: 0, totalSheets: 1, piReceivedAt: '2026-10-24T12:00:00.000Z' });
+  assert.equal(p1.progress, 2);
+  assert.equal(p1.statusMsg, 'Preparing your page…');
+
+  const p2 = poll({ status: 'printing', sheetsCompleted: 0, totalSheets: 1, piReceivedAt: '2026-10-24T12:00:00.000Z', sentToPrinterAt: '2026-10-24T12:00:05.000Z' });
+  assert.equal(p2.progress, 5);
+  assert.equal(p2.statusMsg, 'Printing your page…');
+
+  // Multi-sheet message formatting
+  const p3 = poll({ status: 'printing', sheetsCompleted: 0, totalSheets: 3, piReceivedAt: '2026-10-24T12:00:00.000Z' });
+  assert.equal(p3.progress, 2);
+  assert.equal(p3.statusMsg, 'Preparing 3 sheets…');
+
+  const p4 = poll({ status: 'printing', sheetsCompleted: 0, totalSheets: 3, sentToPrinterAt: '2026-10-24T12:00:05.000Z' });
+  assert.equal(p4.progress, 5);
+  assert.equal(p4.statusMsg, 'Sending 3 sheets to printer…');
+
+  // Strictly stays below 100%
+  assert.ok(p4.progress < 100);
+});
+
