@@ -11,20 +11,20 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
     "axios": "^1.15.2",
-    "firebase": "^13.0.0",
+    "firebase": "^13.1.0",
     "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.8",
+    "jspdf-autotable": "^5.0.9",
     "lucide-react": "0.487.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "recharts": "^2.15.2"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "4.1.12",
+    "@tailwindcss/vite": "4.3.3",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "4.7.0",
-    "tailwindcss": "4.1.12",
+    "tailwindcss": "4.3.3",
     "typescript": "^5.9.3",
     "vite": "^6.4.1"
   }
