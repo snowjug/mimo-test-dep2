@@ -1,0 +1,10 @@
+[
+ {
+  "dst": "192.168.50.1",
+  "dev": "eth0",
+  "lladdr": "aa:bb:cc:dd:ee:01",
+  "state": [
+   "STALE"
+  ]
+ }
+]

@@ -1,0 +1,32 @@
+{
+ "kiosk_id": "ZZ-000",
+ "interfaces": [
+  "eth0"
+ ],
+ "cycle_interval_s": 60,
+ "cycle_budget_s": 20,
+ "command_timeout_s": 3,
+ "connect_timeout_s": 3,
+ "tcp_attempts": 2,
+ "stale_after_s": 180,
+ "min_fail_streak": 1,
+ "endpoints": [
+  {
+   "name": "alpha",
+   "host": "alpha.example.test",
+   "port": 443
+  },
+  {
+   "name": "beta",
+   "host": "beta.example.test",
+   "port": 443
+  }
+ ],
+ "listener_unit": "mimo-listener.service",
+ "check_cups": true,
+ "tailscale_enabled": true,
+ "disk_path": "/",
+ "disk_free_min_mb": 200,
+ "mem_available_min_mb": 50,
+ "temp_max_c": 80
+}

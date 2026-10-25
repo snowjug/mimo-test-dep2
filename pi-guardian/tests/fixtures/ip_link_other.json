@@ -1,0 +1,13 @@
+[
+ {
+  "ifindex": 9,
+  "ifname": "docker0",
+  "flags": [
+   "BROADCAST",
+   "MULTICAST",
+   "UP",
+   "LOWER_UP"
+  ],
+  "operstate": "UP"
+ }
+]

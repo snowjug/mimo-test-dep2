@@ -1,0 +1,10 @@
+[
+ {
+  "ifindex": 2,
+  "ifname": "eth0",
+  "flags": [
+   "BROADCAST"
+  ],
+  "mtu": 1500
+ }
+]

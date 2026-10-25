@@ -1,0 +1,46 @@
+[Unit]
+Description=MIMO Edge Guardian (read-only health reporting)
+# Deliberately NOT ordered relative to the print listener's own unit (mimo-listener.service /
+# printpi.service, whichever is live) -- Guardian shares no process, code, or dependency with it.
+# If Guardian fails, hangs, or is stopped, printing must keep working.
+After=network-online.target
+Wants=network-online.target
+# Deliberately no After=/Requires= on mimo-listener.service in either direction -- CLAUDE.md
+# requires Guardian never be a dependency of the print path, and vice versa.
+#
+# Give up instead of restart-looping forever: at most 5 failures in 10 minutes, then the unit is
+# marked failed and stays stopped (`systemctl status` will show it) rather than endlessly cycling
+# and writing restart events to the journal indefinitely.
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# Dedicated, unprivileged system user -- guardian/runner.py's entire command allowlist (ip,
+# systemctl show, lpstat -r, tailscale status --json, getent) needs no root/sudo, confirmed by
+# reading runner.py directly. Create once: useradd --system --no-create-home --shell /usr/sbin/nologin mimo-guardian
+User=mimo-guardian
+Group=mimo-guardian
+# Match this kiosk's provisioned kiosk_id (see guardian-config.json and guardian.env alongside it).
+ExecStart=/usr/bin/python3 -m guardian.service --config /etc/mimo-guardian/guardian-config.json
+WorkingDirectory=/opt/mimo-guardian
+# Holds GUARDIAN_API_HOST / GUARDIAN_DERIVED_KEY_HEX / GUARDIAN_KEY_VERSION. Never committed to
+# git; created on the device only. Owned by mimo-guardian:mimo-guardian, mode 600.
+EnvironmentFile=/etc/mimo-guardian/guardian.env
+Restart=on-failure
+RestartSec=10
+# Hard resource ceilings: even a bug in Guardian can never meaningfully compete with the print
+# listener/CUPS for CPU or memory on a resource-constrained kiosk. Normal operation (one bounded
+# 60s collection cycle) should sit far below these -- they are a safety ceiling, not a target.
+MemoryMax=64M
+CPUQuota=10%
+# Guardian is observe-only: no capability grants, no privileged syscalls, nothing beyond what the
+# read-only probes/runner already need (stdlib subprocess + sockets).
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/mimo-guardian
+# /proc and /sys must stay readable: Phase 1 checks read memory/temperature/boot-id from them.
+
+[Install]
+WantedBy=multi-user.target
