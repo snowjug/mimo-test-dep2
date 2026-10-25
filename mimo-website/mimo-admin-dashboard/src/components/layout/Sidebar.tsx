@@ -2,20 +2,18 @@ import React from 'react';
 import {
   LayoutDashboard,
   Printer,
-  Cpu,
   AlertTriangle,
   Users,
   BarChart2,
   Ticket,
   IndianRupee,
-  Settings,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Activity,
-  Users2,
   Building2,
   Megaphone,
+  ShieldCheck,
 } from 'lucide-react';
 
 export interface NavItemDef {
@@ -42,13 +40,17 @@ export interface SidebarProps {
 const NAV_CORE: NavItemDef[] = [
   { id: 'overview',   label: 'Executive Overview',   icon: LayoutDashboard },
   { id: 'operations', label: 'Print Operations',     icon: Printer, badge: 'LIVE', badgeType: 'live' },
-  { id: 'kiosks',     label: 'Kiosk Network',        icon: Cpu },
-  { id: 'mimo-gang',  label: 'MIMO GANG',            icon: Users2 },
   { id: 'incidents',  label: 'Incident Management',  icon: AlertTriangle, badgeType: 'alert' },
 ];
 
 const NAV_COMPANY: NavItemDef[] = [
   { id: 'company',    label: 'Company Overview',     icon: Building2 },
+];
+
+// Kiosk Network and System Configuration live inside Edge Guardian as sub-tabs (GuardianPage),
+// not as separate top-level nav entries — see GuardianPage.tsx for the boundary this preserves.
+const NAV_INFRA: NavItemDef[] = [
+  { id: 'guardian',   label: 'Edge Guardian',        icon: ShieldCheck },
 ];
 
 const NAV_ANALYTICS: NavItemDef[] = [
@@ -60,10 +62,6 @@ const NAV_ANALYTICS: NavItemDef[] = [
 
 const NAV_FINANCE: NavItemDef[] = [
   { id: 'finance',    label: 'Finance Center',       icon: IndianRupee },
-];
-
-const NAV_SETTINGS: NavItemDef[] = [
-  { id: 'configuration', label: 'System Configuration', icon: Settings },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -84,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const active = activeTab === item.id;
     const isIncidents = item.id === 'incidents';
     const alertCount = isIncidents && incidentCount > 0 ? incidentCount : null;
-    const fleetBadge = item.id === 'kiosks' && fleet ? `${fleet.online}/${fleet.total} online` : null;
+    const fleetBadge = item.id === 'guardian' && fleet ? `${fleet.online}/${fleet.total} online` : null;
 
     return (
       <button
@@ -129,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             )}
 
-            {/* Info Badge (live fleet status for Kiosk Network) */}
+            {/* Info Badge (live fleet status for Edge Guardian) */}
             {(fleetBadge || (item.badgeType === 'info' && item.badge)) && (
               <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                 active
@@ -224,9 +222,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4 ${isCollapsedView ? 'px-2' : 'px-3'}`}>
         <Section label="Core" items={NAV_CORE} />
         <Section label="Company" items={NAV_COMPANY} />
+        <Section label="Infrastructure" items={NAV_INFRA} />
         <Section label="Analytics" items={NAV_ANALYTICS} />
         <Section label="Finance" items={NAV_FINANCE} />
-        <Section label="Settings" items={NAV_SETTINGS} />
       </nav>
 
       {/* ── SECTION 3: FLEET STATUS (live from /admin/kiosks) ───────── */}
