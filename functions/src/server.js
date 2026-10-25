@@ -4,6 +4,7 @@ const express = require("express");
 const { CASHFREE_BASE_URL, cashfreeHeaders } = require("./config/env");
 const { admin, db } = require("./config/firebase");
 const { isColorJob } = require("./services/printJob.service");
+const { blockProductionWrites } = require("./middleware/blockProductionWrites");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -12,6 +13,12 @@ app.use(cors({ origin: true }));
 app.use(express.json({ verify: (req, res, buf) => { if (!req.rawBody) req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 app.get("/", (req, res) => res.send("Mimo Firebase Serverless is LIVE 🚀"));
+app.use(require("./routes/localTarget.routes"));
+
+// Local-dev safety switch: when LOCAL_TARGET=production, blocks every write-capable request
+// before any route below runs. No-op unless that env var is explicitly set. See
+// src/middleware/blockProductionWrites.js.
+app.use(blockProductionWrites);
 
 // ================= ROUTES =================
 app.use(require("./routes/auth.routes"));
@@ -40,5 +47,12 @@ app.use("/kiosk", kioskRouter);
 
 // ================= DOCUMENT SCANNER ROUTES =================
 app.use("/scanner", require("./document-scanner/scanner.routes"));
+
+// ================= MIMO EDGE GUARDIAN (PHASE 2B/2E, ISOLATED FROM THE KIOSK/PRINT ROUTER ABOVE) =================
+// POST /kiosk/guardian/health (Phase 2B) and the read-only GET /admin/guardian/health (Phase 2E).
+// Shares no code with createKioskRouter/kiosk.routes.js, and never touches system_status,
+// kiosk_commands or print_jobs. See docs/architecture/MIMO_EDGE_GUARDIAN_PHASE_2A_CONTRACT.md.
+app.use(require("./routes/guardianHealth.routes"));
+app.use(require("./routes/guardianAdminHealth.routes"));
 
 module.exports = app;
