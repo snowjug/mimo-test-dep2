@@ -1,7 +1,7 @@
 const axios = require("axios");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const { CASHFREE_BASE_URL, SECRET_KEY, cashfreeHeaders } = require("../config/env");
+const { CASHFREE_BASE_URL, getSecretKey, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const { claimRefund, releaseRefund, refundIdFor, REFUND_BLOCKED_MESSAGES } = require("../services/refund.service");
 const { normalizeOrders } = require("../services/analytics.service");
@@ -37,7 +37,7 @@ const postAdminLogin = (req, res) => {
     reqIdentifier.toLowerCase() === envAdminEmail.toLowerCase() &&
     passwordsMatch(reqPassword, envAdminPassword)
   ) {
-    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, SECRET_KEY, { expiresIn: "30d" });
+    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, getSecretKey(), { expiresIn: "30d" });
     return res.json({ token, role: "admin", message: "Admin Login Successful" });
   }
 
@@ -48,7 +48,7 @@ const postAdminLogin = (req, res) => {
     reqIdentifier.toLowerCase() === envFinanceEmail.toLowerCase() &&
     passwordsMatch(reqPassword, envFinancePassword)
   ) {
-    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, SECRET_KEY, { expiresIn: "30d" });
+    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, getSecretKey(), { expiresIn: "30d" });
     return res.json({ token, role: "finance", message: "Finance Login Successful" });
   }
 

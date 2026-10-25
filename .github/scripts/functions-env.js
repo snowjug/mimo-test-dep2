@@ -36,7 +36,11 @@ const RECOMMENDED = ["GOOGLE_CLIENT_ID", "WA_PHONE_NUMBER_ID", "WA_VERIFY_TOKEN"
 
 // Bound with `secrets: [...]` in functions/index.js. When the live function already has the Secret Manager
 // reference, the value must NOT also be written to .env (Google rejects the overlap) and is not required here.
-const SECRET_MANAGED = ["GMAIL_APP_PASSWORD"];
+// JWT_SECRET/ADMIN_EMAIL/ADMIN_PASSWORD moved to Secret Manager (see functions/index.js and
+// functions/src/config/env.js's getSecretKey()) after a plain functions/.env value for these was found live
+// in production -- Firebase bundles a plain `.env` into every deploy, which is how that happened. Secret
+// Manager is now the only place a real value for these three is ever written.
+const SECRET_MANAGED = ["GMAIL_APP_PASSWORD", "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD"];
 
 const PUBLIC_JWT_FALLBACK = "fallback_secret_key_change_me_in_prod";
 const WEAK_PASSWORDS = new Set(["admin", "password", "123456", "12345678", "admin123", "administrator", "root", "changeme", "printpi", "mimo", "mimo123"]);

@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { SECRET_KEY, googleClient } = require("../config/env");
+const { getSecretKey, googleClient } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 
 // ================= REGISTER =================
@@ -19,7 +19,7 @@ const postRegister = async (req, res) => {
       mimo_coins: { balance: 0, total_earned: 0, total_used: 0 },
     });
     await userRef.update({ id: userRef.id });
-    const token = jwt.sign({ userId: userRef.id }, SECRET_KEY, { expiresIn: "30d" });
+    const token = jwt.sign({ userId: userRef.id }, getSecretKey(), { expiresIn: "30d" });
     res.json({ jwtToken: token });
   } catch (err) {
     console.error(err);
@@ -41,7 +41,7 @@ const postLogin = async (req, res) => {
     const valid = await bcrypt.compare(password, storedPassword);
     if (!valid) return res.status(400).json({ error: "Wrong password" });
     await doc.ref.update({ lastLoginAt: admin.firestore.FieldValue.serverTimestamp() });
-    const token = jwt.sign({ userId: doc.id }, SECRET_KEY, { expiresIn: "30d" });
+    const token = jwt.sign({ userId: doc.id }, getSecretKey(), { expiresIn: "30d" });
     res.json({ jwtToken: token });
   } catch (err) {
     console.error(err);
@@ -79,7 +79,7 @@ const postGoogleLogin = async (req, res) => {
       mobileNumber = snapshot.docs[0].data().mobileNumber || "";
       await snapshot.docs[0].ref.update({ lastLoginAt: now });
     }
-    const jwtToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "30d" });
+    const jwtToken = jwt.sign({ userId }, getSecretKey(), { expiresIn: "30d" });
     res.json({ jwtToken, name, email, userId, mobileNumber });
   } catch (err) {
     console.error(err);
@@ -144,7 +144,7 @@ const postGuestSession = async (req, res) => {
     await userRef.update({ id: userRef.id });
     // Short-lived on purpose: a guest's job/file retention is already 24h (same as everyone else), so a
     // week-long token comfortably covers "come back and check the release code" without lingering forever.
-    const jwtToken = jwt.sign({ userId: userRef.id }, SECRET_KEY, { expiresIn: "7d" });
+    const jwtToken = jwt.sign({ userId: userRef.id }, getSecretKey(), { expiresIn: "7d" });
     res.json({ jwtToken, name: username, userId: userRef.id, isGuest: true });
   } catch (err) {
     console.error(err);

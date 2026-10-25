@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const express = require("express");
 const http = require("node:http");
 const axios = require("axios");
-const { SECRET_KEY } = require("../src/config/env");
+const { getSecretKey } = require("../src/config/env");
 const {
   fetchFinanceSheetData,
   parseExpenseRows,
@@ -437,7 +437,7 @@ describe("googleSheets.service (New Revenue & Expense Spreadsheet)", () => {
     });
 
     it("rejects authenticated customer / unauthorized role with 403 Forbidden", async () => {
-      const customerToken = jwt.sign({ userId: "customer-1", role: "customer" }, SECRET_KEY);
+      const customerToken = jwt.sign({ userId: "customer-1", role: "customer" }, getSecretKey());
       try {
         await axios.get(`${baseUrl}/admin/finance-sheet`, {
           headers: { Authorization: `Bearer ${customerToken}` },
@@ -452,7 +452,7 @@ describe("googleSheets.service (New Revenue & Expense Spreadsheet)", () => {
     });
 
     it("allows finance role token to access /admin/finance-sheet", async () => {
-      const financeToken = jwt.sign({ isAdmin: false, role: "finance", email: "finance@mimo.com" }, SECRET_KEY);
+      const financeToken = jwt.sign({ isAdmin: false, role: "finance", email: "finance@mimo.com" }, getSecretKey());
       const res = await axios.get(`${baseUrl}/admin/finance-sheet`, {
         headers: { Authorization: `Bearer ${financeToken}` },
       });
@@ -463,7 +463,7 @@ describe("googleSheets.service (New Revenue & Expense Spreadsheet)", () => {
     });
 
     it("blocks finance role token from general admin endpoints (e.g. /admin/coupons)", async () => {
-      const financeToken = jwt.sign({ isAdmin: false, role: "finance", email: "finance@mimo.com" }, SECRET_KEY);
+      const financeToken = jwt.sign({ isAdmin: false, role: "finance", email: "finance@mimo.com" }, getSecretKey());
       try {
         await axios.get(`${baseUrl}/admin/coupons`, {
           headers: { Authorization: `Bearer ${financeToken}` },
@@ -478,7 +478,7 @@ describe("googleSheets.service (New Revenue & Expense Spreadsheet)", () => {
     });
 
     it("allows admin role token to access /admin/finance-sheet", async () => {
-      const adminToken = jwt.sign({ isAdmin: true, role: "admin", email: "admin@mimo.com" }, SECRET_KEY);
+      const adminToken = jwt.sign({ isAdmin: true, role: "admin", email: "admin@mimo.com" }, getSecretKey());
       const res = await axios.get(`${baseUrl}/admin/finance-sheet`, {
         headers: { Authorization: `Bearer ${adminToken}` },
       });

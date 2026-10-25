@@ -20,14 +20,22 @@ if (!process.env.WA_VERIFY_TOKEN) {
 const WA_APP_SECRET = process.env.WA_APP_SECRET || "";
 
 // JWT_SECRET has no fallback: a weak/guessable/default signing key lets anyone forge admin tokens.
-// This module runs at Cloud Functions cold start, so throwing here fails the deploy/boot loudly and
-// immediately instead of silently signing tokens with an insecure key.
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-  throw new Error(
-    "JWT_SECRET environment variable must be set and at least 32 characters long. Refusing to start with a missing or weak secret."
-  );
+// Validated lazily, on first actual use, NOT at module load: JWT_SECRET is bound from Secret
+// Manager at runtime (functions/index.js's secrets: [...]), and Firebase's local "analyze source
+// code" deploy step never populates secret-bound env vars -- only the real deployed revision gets
+// them. A module-load-time throw here would make `firebase deploy` fail locally before the code
+// ever reaches the cloud, every time, with no way to supply a secret-bound value in advance (see
+// guardian/secret.js's identical reasoning for GUARDIAN_MASTER_KEY). Every caller must call
+// getSecretKey() at the point it actually signs/verifies a token, not destructure a bare constant.
+function getSecretKey() {
+  const key = process.env.JWT_SECRET;
+  if (!key || key.length < 32) {
+    throw new Error(
+      "JWT_SECRET environment variable must be set and at least 32 characters long. Refusing to sign or verify with a missing or weak secret."
+    );
+  }
+  return key;
 }
-const SECRET_KEY = process.env.JWT_SECRET;
 
 const googleClient = new (require("google-auth-library").OAuth2Client)(process.env.GOOGLE_CLIENT_ID || "144514765704-a3nm5kgbtehioia9eki37s3t8doasfi1.apps.googleusercontent.com");
 
@@ -53,7 +61,7 @@ module.exports = {
   CASHFREE_BASE_URL,
   CONVERTER_SERVICE_URL,
   INTERNAL_CONVERTER_SECRET,
-  SECRET_KEY,
+  getSecretKey,
   WA_ACCESS_TOKEN,
   WA_APP_SECRET,
   WA_PHONE_NUMBER_ID,
