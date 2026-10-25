@@ -1,0 +1,10 @@
+[
+ {
+  "dst": "default",
+  "gateway": "192.168.50.1",
+  "dev": "eth0",
+  "protocol": "dhcp",
+  "metric": 100,
+  "flags": []
+ }
+]

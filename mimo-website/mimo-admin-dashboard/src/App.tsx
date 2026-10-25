@@ -7,20 +7,19 @@ import { AppShell } from './components/layout/AppShell';
 // Admin and Finance are separate portals, so each (and each admin page) ships as its own chunk.
 const OverviewPage = lazy(() => import('./pages/Overview/OverviewPage').then((m) => ({ default: m.OverviewPage })));
 const OperationsPage = lazy(() => import('./pages/Operations/OperationsPage').then((m) => ({ default: m.OperationsPage })));
-const KiosksPage = lazy(() => import('./pages/Kiosks/KiosksPage').then((m) => ({ default: m.KiosksPage })));
 const IncidentsPage = lazy(() => import('./pages/Incidents/IncidentsPage').then((m) => ({ default: m.IncidentsPage })));
 const AnalyticsPage = lazy(() => import('./pages/Analytics/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
 const UsersPage = lazy(() => import('./pages/Users/UsersPage').then((m) => ({ default: m.UsersPage })));
 const CouponsPage = lazy(() => import('./pages/Coupons/CouponsPage').then((m) => ({ default: m.CouponsPage })));
 const FinancePage = lazy(() => import('./pages/Finance/FinancePage').then((m) => ({ default: m.FinancePage })));
-const ConfigurationPage = lazy(() => import('./pages/Configuration/ConfigurationPage').then((m) => ({ default: m.ConfigurationPage })));
 const FinanceApp = lazy(() => import('./pages/Finance/FinanceApp').then((m) => ({ default: m.FinanceApp })));
 const TechnicalApp = lazy(() => import('./pages/Technical/TechnicalApp').then((m) => ({ default: m.TechnicalApp })));
 const HrApp = lazy(() => import('./pages/Hr/HrApp').then((m) => ({ default: m.HrApp })));
 const MarketingApp = lazy(() => import('./pages/Marketing/MarketingApp').then((m) => ({ default: m.MarketingApp })));
 const AdminCompanyPage = lazy(() => import('./pages/Company/AdminCompanyPage').then((m) => ({ default: m.AdminCompanyPage })));
-const MimoGangPage = lazy(() => import('./pages/Gang/MimoGangPage').then((m) => ({ default: m.MimoGangPage })));
+const AdminChatPage = lazy(() => import('./pages/Chat/AdminChatPage').then((m) => ({ default: m.AdminChatPage })));
 const AdvertisementsPage = lazy(() => import('./pages/Advertisements/AdvertisementsPage').then((m) => ({ default: m.AdvertisementsPage })));
+const GuardianPage = lazy(() => import('./pages/Guardian/GuardianPage').then((m) => ({ default: m.GuardianPage })));
 
 const PageSkeleton = () => (
   <div aria-busy="true" aria-label="Loading" className="space-y-3">
@@ -42,16 +41,17 @@ function DashboardApp() {
   const getInitialTab = () => {
     const path = window.location.pathname.toLowerCase();
     if (path.includes('operation')) return 'operations';
-    if (path.includes('kiosk')) return 'kiosks';
     if (path.includes('incident')) return 'incidents';
     if (path.includes('user') || path.includes('customer')) return 'users';
     if (path.includes('coupon')) return 'coupons';
     if (path.includes('analytic')) return 'analytics';
     if (path.includes('finance')) return 'finance';
-    if (path.includes('config') || path.includes('setting')) return 'configuration';
+    // Kiosk Network and System Configuration now live inside Edge Guardian as sub-tabs.
+    if (path.includes('kiosk') || path.includes('config') || path.includes('setting')) return 'guardian';
     if (path.includes('company')) return 'company';
-    if (path.includes('mimo-gang')) return 'mimo-gang';
+    if (path.includes('chat')) return 'chat';
     if (path.includes('advertisements') || path.includes('ads')) return 'advertisements';
+    if (path.includes('guardian')) return 'guardian';
     return 'overview';
   };
 
@@ -126,16 +126,15 @@ function DashboardApp() {
       <Suspense fallback={<PageSkeleton />}>
       {activeTab === 'overview' && <OverviewPage />}
       {activeTab === 'operations' && <OperationsPage />}
-      {activeTab === 'kiosks' && <KiosksPage />}
       {activeTab === 'incidents' && <IncidentsPage onNavigate={handleTabChange} />}
       {activeTab === 'analytics' && <AnalyticsPage />}
       {activeTab === 'users' && <UsersPage />}
       {activeTab === 'coupons' && <CouponsPage />}
       {activeTab === 'finance' && <FinancePage />}
-      {activeTab === 'configuration' && <ConfigurationPage />}
       {activeTab === 'company' && <AdminCompanyPage />}
-      {activeTab === 'mimo-gang' && <MimoGangPage />}
+      {activeTab === 'chat' && <AdminChatPage />}
       {activeTab === 'advertisements' && <AdvertisementsPage />}
+      {activeTab === 'guardian' && <GuardianPage />}
       </Suspense>
     </AppShell>
   );

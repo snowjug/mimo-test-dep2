@@ -1,0 +1,18 @@
+{
+  "kiosk_id": "ZZ-000",
+  "interfaces": [],
+  "cycle_interval_s": 60,
+  "cycle_budget_s": 20,
+  "command_timeout_s": 3,
+  "connect_timeout_s": 3,
+  "tcp_attempts": 2,
+  "stale_after_s": 180,
+  "min_fail_streak": 2,
+  "endpoints": [
+    {"name": "firestore", "host": "firestore.googleapis.com", "port": 443},
+    {"name": "storage", "host": "storage.googleapis.com", "port": 443}
+  ],
+  "listener_unit": "mimo-listener.service",
+  "check_cups": true,
+  "tailscale_enabled": false
+}

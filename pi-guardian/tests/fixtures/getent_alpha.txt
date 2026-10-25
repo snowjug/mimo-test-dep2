@@ -1,0 +1,3 @@
+198.51.100.10  STREAM alpha.example.test
+198.51.100.10  DGRAM
+198.51.100.10  RAW

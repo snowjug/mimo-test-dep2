@@ -133,6 +133,27 @@ test("without a live secret reference GMAIL_APP_PASSWORD is still required", () 
   assert.ok(r.stderr.includes("GMAIL_APP_PASSWORD"));
 });
 
+test("JWT_SECRET/ADMIN_EMAIL/ADMIN_PASSWORD as Secret Manager references satisfy the requirement and are kept out of .env", () => {
+  const doc = liveDoc({});
+  for (const name of ["JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD"]) {
+    doc.spec.template.spec.containers[0].env.push({ name, valueFrom: { secretKeyRef: { name, key: "latest" } } });
+  }
+  assert.deepStrictEqual(parseLiveSecretRefs(doc).sort(), ["ADMIN_EMAIL", "ADMIN_PASSWORD", "JWT_SECRET"]);
+  const { JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, ...rest } = GOOD;
+  const r = run(rest, doc);
+  assert.strictEqual(r.status, 0, r.stderr);
+  const written = parseDotenv(fs.readFileSync(r.out, "utf8"));
+  assert.ok(!("JWT_SECRET" in written) && !("ADMIN_EMAIL" in written) && !("ADMIN_PASSWORD" in written));
+  assert.ok(r.stdout.includes("ADMIN_EMAIL") && r.stdout.includes("ADMIN_PASSWORD") && r.stdout.includes("JWT_SECRET"));
+});
+
+test("without a live secret reference JWT_SECRET is still required", () => {
+  const { JWT_SECRET, ...rest } = GOOD;
+  const r = run(rest);
+  assert.strictEqual(r.status, 1);
+  assert.ok(r.stderr.includes("JWT_SECRET"));
+});
+
 // Mission 37: FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* were previously live production configuration that
 // this script's allow-list did not recognize, so every CI deploy silently dropped them (unrelated to the
 // WhatsApp Flow feature, found while integrating it). These tests prove the fix without ever asserting on,

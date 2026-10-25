@@ -1,7 +1,7 @@
 const axios = require("axios");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const { CASHFREE_BASE_URL, SECRET_KEY, cashfreeHeaders } = require("../config/env");
+const { CASHFREE_BASE_URL, getSecretKey, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const { OrderServiceError, createOrderForUser, fulfillPaidOrder } = require("../services/order.service");
 
@@ -80,7 +80,7 @@ const getVerifyPayment = async (req, res) => {
 
     if (order_status === "PAID" && userId) {
       try {
-        const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+        const dummyToken = jwt.sign({ userId }, getSecretKey(), { expiresIn: "1h" });
         const internalRes = await axios.post(
           `http://localhost:${process.env.PORT || 8080}/payment-success`,
           { orderId },
@@ -201,7 +201,7 @@ const postCashfreeWebhook = async (req, res) => {
 
       if (existingCodeCheck.empty) {
         try {
-          const dummyToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: "1h" });
+          const dummyToken = jwt.sign({ userId }, getSecretKey(), { expiresIn: "1h" });
           await axios.post(
             `http://localhost:${process.env.PORT || 8080}/payment-success`,
             { orderId },

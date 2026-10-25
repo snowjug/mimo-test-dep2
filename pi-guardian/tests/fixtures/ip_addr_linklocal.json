@@ -1,0 +1,21 @@
+[
+ {
+  "ifindex": 2,
+  "ifname": "eth0",
+  "flags": [
+   "BROADCAST",
+   "MULTICAST",
+   "UP",
+   "LOWER_UP"
+  ],
+  "operstate": "UP",
+  "addr_info": [
+   {
+    "family": "inet",
+    "local": "169.254.10.5",
+    "prefixlen": 16,
+    "scope": "link"
+   }
+  ]
+ }
+]

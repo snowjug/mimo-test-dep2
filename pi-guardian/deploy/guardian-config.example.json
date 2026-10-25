@@ -1,0 +1,18 @@
+{
+  "kiosk_id": "CV-001",
+  "cycle_interval_s": 60,
+  "cycle_budget_s": 20,
+  "stale_after_s": 180,
+  "min_fail_streak": 2,
+  "endpoints": [
+    { "name": "backend", "host": "api-upqxuj7evq-uc.a.run.app", "port": 443, "tls": true },
+    { "name": "dns", "host": "8.8.8.8", "port": 53, "tls": false }
+  ],
+  "listener_unit": "mimo-listener.service",
+  "check_cups": true,
+  "tailscale_enabled": false,
+  "disk_path": "/",
+  "disk_free_min_mb": 200,
+  "mem_available_min_mb": 50,
+  "temp_max_c": 80
+}

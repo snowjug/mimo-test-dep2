@@ -1,0 +1,37 @@
+[
+ {
+  "ifindex": 1,
+  "ifname": "lo",
+  "flags": [
+   "LOOPBACK",
+   "UP",
+   "LOWER_UP"
+  ],
+  "mtu": 65536,
+  "operstate": "UNKNOWN"
+ },
+ {
+  "ifindex": 2,
+  "ifname": "eth0",
+  "flags": [
+   "BROADCAST",
+   "MULTICAST",
+   "UP",
+   "LOWER_UP"
+  ],
+  "mtu": 1500,
+  "operstate": "UP"
+ },
+ {
+  "ifindex": 3,
+  "ifname": "wlan0",
+  "flags": [
+   "BROADCAST",
+   "MULTICAST",
+   "UP",
+   "LOWER_UP"
+  ],
+  "mtu": 1500,
+  "operstate": "UP"
+ }
+]

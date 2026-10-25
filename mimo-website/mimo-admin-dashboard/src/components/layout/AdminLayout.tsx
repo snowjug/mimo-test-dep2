@@ -2,12 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Printer,
-  Cpu,
   Users,
   AlertTriangle,
   BarChart2,
   IndianRupee,
-  Settings,
   LogOut,
   Bell,
   Sun,
@@ -16,14 +14,16 @@ import {
   RefreshCcw,
   ChevronRight,
   X,
-  Users2,
   Building2,
   User,
+  MessageCircle,
   Megaphone,
   Ticket,
+  ShieldCheck,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
+import api from '../../api';
 import { insights } from '../../services/insights.service';
 import { defaultRange } from '../../lib/dateRange';
 import { timeAgo } from '../../lib/format';
@@ -57,22 +57,23 @@ export interface AdminLayoutProps {
 const TITLES: Record<string, string> = {
   overview: 'Overview',
   operations: 'Operations',
-  kiosks: 'Kiosks',
   incidents: 'Incidents',
   analytics: 'Analytics',
   users: 'Customers',
   coupons: 'Coupon Codes',
   finance: 'Finance',
-  configuration: 'Configuration',
-  'mimo-gang': 'MIMO GANG',
   company: 'Company Overview',
+  chat: 'Team Chat',
   advertisements: 'Advertisements',
+  guardian: 'Edge Guardian',
 };
 
+// Kiosk Network and System Configuration live inside Edge Guardian as sub-tabs now, not as their
+// own bottom-tab/More entries — see GuardianPage.tsx.
 const TABS = [
   { id: 'overview',   label: 'Overview',   icon: LayoutDashboard },
   { id: 'operations', label: 'Operations', icon: Printer },
-  { id: 'kiosks',     label: 'Kiosks',     icon: Cpu },
+  { id: 'guardian',   label: 'Guardian',   icon: ShieldCheck },
   { id: 'incidents',  label: 'Incidents',  icon: AlertTriangle },
 ];
 
@@ -81,10 +82,9 @@ const MORE = [
   { id: 'users',           label: 'Customers',          icon: Users },
   { id: 'coupons',         label: 'Coupon Codes',       icon: Ticket },
   { id: 'finance',         label: 'Finance',            icon: IndianRupee },
-  { id: 'mimo-gang',       label: 'MIMO GANG',          icon: Users2 },
   { id: 'company',         label: 'Company Overview',   icon: Building2 },
+  { id: 'chat',            label: 'Team Chat',          icon: MessageCircle },
   { id: 'advertisements',  label: 'Advertisements',     icon: Megaphone },
-  { id: 'configuration',   label: 'Configuration',      icon: Settings },
 ];
 
 /** Bottom sheet used for "More" and the alerts list. */
@@ -134,6 +134,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const loadStaffProfile = () => staffProfileService.get().then(setStaffProfile).catch(() => {});
   useEffect(() => { loadStaffProfile(); }, []);
 
+  // Local-dev-only: ask the backend whether it's currently pointed at real production Firestore
+  // (see functions/src/routes/localTarget.routes.js) so we can show a persistent warning banner.
+  // Fails silently (stays false) against the deployed production backend, which doesn't need this.
+  const [isLiveProduction, setIsLiveProduction] = useState(false);
+  useEffect(() => {
+    api.get('/admin/_local-target')
+      .then((r) => setIsLiveProduction(r.data?.target === 'production'))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     setSheet(null);
     document.getElementById('admin-scroll')?.scrollTo(0, 0);
@@ -148,7 +158,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     'relative flex size-10 items-center justify-center rounded-full text-slate-600 dark:text-slate-300 active:bg-slate-100 dark:active:bg-slate-800 transition-colors';
 
   return (
-    <div className={`min-h-[100dvh] bg-slate-100 dark:bg-slate-950 font-sans antialiased ${isDark ? 'dark text-slate-100' : 'text-slate-900'}`}>
+    <div className={`min-h-[100dvh] bg-slate-100 dark:bg-slate-950 font-sans antialiased ${isDark ? 'dark text-slate-100' : 'text-slate-900'} ${isLiveProduction ? 'pt-[26px]' : ''}`}>
+      {isLiveProduction && (
+        <div
+          role="alert"
+          className="fixed inset-x-0 top-0 z-[100] flex items-center justify-center gap-2 bg-rose-600 px-4 py-1.5 text-center text-[12px] font-semibold text-white shadow-md"
+        >
+          <AlertTriangle size={14} strokeWidth={2.25} />
+          Connected to LIVE production data — write actions are disabled
+        </div>
+      )}
       {/* ── DESKTOP (lg and up): fixed sidebar + topbar, unchanged phone shell hidden ── */}
       <div className="hidden h-screen w-screen overflow-hidden lg:flex">
         <Sidebar

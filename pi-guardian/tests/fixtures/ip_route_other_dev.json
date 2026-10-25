@@ -1,0 +1,10 @@
+[
+ {
+  "dst": "default",
+  "gateway": "10.9.9.1",
+  "dev": "wlan0",
+  "protocol": "dhcp",
+  "metric": 600,
+  "flags": []
+ }
+]

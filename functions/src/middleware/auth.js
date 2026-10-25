@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const { SECRET_KEY } = require("../config/env");
+const { getSecretKey } = require("../config/env");
 const { db } = require("../config/firebase");
 
 // ================= AUTH MIDDLEWARE =================
@@ -7,7 +7,7 @@ const authMiddleware = async (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    const verified = jwt.verify(token.replace("Bearer ", ""), getSecretKey(), { algorithms: ["HS256"] });
     let userId = verified.userId || verified.id || verified.user?.id;
     if (!userId) return res.status(403).json({ error: "Invalid token payload" });
     // Resolve userId to actual Firestore doc ID
@@ -30,7 +30,7 @@ const adminAuthMiddleware = (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    const verified = jwt.verify(token.replace("Bearer ", ""), getSecretKey(), { algorithms: ["HS256"] });
     if (!verified.isAdmin) return res.status(403).json({ error: "Forbidden: Admins only" });
     req.admin = verified;
     next();
@@ -46,7 +46,7 @@ const staffAuthMiddleware = (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    const verified = jwt.verify(token.replace("Bearer ", ""), getSecretKey(), { algorithms: ["HS256"] });
     if (!verified.isAdmin && verified.role !== "finance") return res.status(403).json({ error: "Forbidden" });
     req.staff = { role: verified.isAdmin ? "admin" : "finance", email: verified.email };
     next();
@@ -64,7 +64,7 @@ const technicalAuthMiddleware = async (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    const verified = jwt.verify(token.replace("Bearer ", ""), getSecretKey(), { algorithms: ["HS256"] });
     const memberId = verified.technicalMemberId;
     if (!memberId) return res.status(403).json({ error: "Invalid token payload" });
     const doc = await db.collection("technical_team").doc(memberId).get();
@@ -93,7 +93,7 @@ const hrAuthMiddleware = async (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    const verified = jwt.verify(token.replace("Bearer ", ""), getSecretKey(), { algorithms: ["HS256"] });
     const memberId = verified.hrMemberId;
     if (!memberId) return res.status(403).json({ error: "Invalid token payload" });
     const doc = await db.collection("hr_team").doc(memberId).get();
@@ -123,7 +123,7 @@ const marketingAuthMiddleware = async (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    const verified = jwt.verify(token.replace("Bearer ", ""), getSecretKey(), { algorithms: ["HS256"] });
     const memberId = verified.marketingMemberId;
     if (!memberId) return res.status(403).json({ error: "Invalid token payload" });
     const doc = await db.collection("marketing_team").doc(memberId).get();
@@ -143,7 +143,7 @@ const financeOrAdminAuthMiddleware = (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).json({ error: "Access Denied" });
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY, { algorithms: ["HS256"] });
+    const verified = jwt.verify(token.replace("Bearer ", ""), getSecretKey(), { algorithms: ["HS256"] });
     const hasAccess = verified.isAdmin === true || verified.role === "finance" || verified.role === "admin";
     if (!hasAccess) return res.status(403).json({ error: "Forbidden: Finance or Admin access required" });
     req.admin = verified;

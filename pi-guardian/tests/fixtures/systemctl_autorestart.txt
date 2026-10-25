@@ -1,0 +1,4 @@
+LoadState=loaded
+ActiveState=activating
+SubState=auto-restart
+NRestarts=7

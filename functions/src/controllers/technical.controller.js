@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const { SECRET_KEY } = require("../config/env");
+const { getSecretKey } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const A = require("../services/analytics.service");
 const { loadKiosks } = require("./adminInsights.controller");
@@ -42,7 +42,7 @@ const postTechnicalLogin = async (req, res) => {
     const ok = await bcrypt.compare(password, member.passwordHash || "");
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-    const token = jwt.sign({ technicalMemberId: doc.id, role: member.role }, SECRET_KEY, { expiresIn: "30d" });
+    const token = jwt.sign({ technicalMemberId: doc.id, role: member.role }, getSecretKey(), { expiresIn: "30d" });
     await recordLogin("technical_team", doc.id);
     res.json({ token, member: { id: doc.id, name: member.name, role: member.role, email: member.email, avatarUrl: member.avatarUrl || null, dob: member.dob || null, joiningLetterUrl: member.joiningLetterUrl || null, collegeIdUrl: member.collegeIdUrl || null, citizenshipIdUrl: member.citizenshipIdUrl || null } });
   } catch (err) {

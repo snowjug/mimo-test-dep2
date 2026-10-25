@@ -1,0 +1,23 @@
+[
+ {
+  "ifindex": 1,
+  "ifname": "lo",
+  "flags": [
+   "LOOPBACK",
+   "UP",
+   "LOWER_UP"
+  ],
+  "operstate": "UNKNOWN"
+ },
+ {
+  "ifindex": 2,
+  "ifname": "eth0",
+  "flags": [
+   "NO-CARRIER",
+   "BROADCAST",
+   "MULTICAST",
+   "UP"
+  ],
+  "operstate": "DOWN"
+ }
+]

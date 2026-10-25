@@ -1,7 +1,7 @@
 const axios = require("axios");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const { CASHFREE_BASE_URL, SECRET_KEY, cashfreeHeaders } = require("../config/env");
+const { CASHFREE_BASE_URL, getSecretKey, cashfreeHeaders } = require("../config/env");
 const { admin, db } = require("../config/firebase");
 const { claimRefund, releaseRefund, refundIdFor, REFUND_BLOCKED_MESSAGES } = require("../services/refund.service");
 const { normalizeOrders } = require("../services/analytics.service");
@@ -33,31 +33,25 @@ const postAdminLogin = (req, res) => {
   const reqIdentifier = (email || username || "").trim();
   const reqPassword   = (password || "").trim();
 
-  // Admin credentials (env vars or verified production credentials)
-  const isAdminMatch =
-    (envAdminEmail &&
-      envAdminPassword &&
-      reqIdentifier.toLowerCase() === envAdminEmail.toLowerCase() &&
-      passwordsMatch(reqPassword, envAdminPassword)) ||
-    (reqIdentifier.toLowerCase() === "mimo.admin" &&
-      passwordsMatch(reqPassword, "MimoAdmin@2025"));
-
-  if (isAdminMatch) {
-    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, SECRET_KEY, { expiresIn: "30d" });
+  // Admin credentials
+  if (
+    envAdminEmail &&
+    envAdminPassword &&
+    reqIdentifier.toLowerCase() === envAdminEmail.toLowerCase() &&
+    passwordsMatch(reqPassword, envAdminPassword)
+  ) {
+    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, getSecretKey(), { expiresIn: "30d" });
     return res.json({ token, role: "admin", message: "Admin Login Successful" });
   }
 
-  // Finance credentials (env vars or verified production credentials)
-  const isFinanceMatch =
-    (envFinanceEmail &&
-      envFinancePassword &&
-      reqIdentifier.toLowerCase() === envFinanceEmail.toLowerCase() &&
-      passwordsMatch(reqPassword, envFinancePassword)) ||
-    (reqIdentifier.toLowerCase() === "mimo.finance" &&
-      passwordsMatch(reqPassword, "MimoFinance@2025"));
-
-  if (isFinanceMatch) {
-    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, SECRET_KEY, { expiresIn: "30d" });
+  // Finance credentials
+  if (
+    envFinanceEmail &&
+    envFinancePassword &&
+    reqIdentifier.toLowerCase() === envFinanceEmail.toLowerCase() &&
+    passwordsMatch(reqPassword, envFinancePassword)
+  ) {
+    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, getSecretKey(), { expiresIn: "30d" });
     return res.json({ token, role: "finance", message: "Finance Login Successful" });
   }
 

@@ -1,0 +1,48 @@
+{
+ "commands": {
+  "ip -j link show": {
+   "stdout_file": "../ip_link_up.json"
+  },
+  "ip -j addr show": {
+   "stdout_file": "../ip_addr_ok.json"
+  },
+  "ip -j route show default": {
+   "stdout_file": "../ip_route_ok.json"
+  },
+  "ip -j neigh show": {
+   "stdout_file": "../ip_neigh_reachable.json"
+  },
+  "systemctl show -p LoadState -p ActiveState -p SubState -p NRestarts mimo-listener.service": {
+   "stdout_file": "../systemctl_active.txt"
+  },
+  "lpstat -r": {
+   "stdout_file": "../lpstat_running.txt"
+  },
+  "tailscale status --json": {
+   "stdout_file": "../tailscale_running.json"
+  },
+  "getent ahostsv4 alpha.example.test": {
+   "stdout_file": "../getent_alpha.txt"
+  },
+  "getent ahostsv4 beta.example.test": {
+   "stdout_file": "../getent_beta.txt"
+  }
+ },
+ "tcp": {
+  "198.51.100.10:443": [
+   "OK"
+  ],
+  "198.51.100.20:443": [
+   "OK"
+  ]
+ },
+ "tls": {
+  "198.51.100.10:443": "OK",
+  "198.51.100.20:443": "OK"
+ },
+ "files": {
+  "/proc/meminfo": "../meminfo_ok.txt",
+  "/sys/class/thermal/thermal_zone0/temp": "../temp_ok.txt"
+ },
+ "disk_free_mb": 4096
+}
