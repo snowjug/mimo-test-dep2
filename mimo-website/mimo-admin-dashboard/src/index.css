@@ -227,7 +227,7 @@ body {
   to   { opacity:0; transform: translateX(100%) scale(.96); max-height: 0; margin-bottom: 0; }
 }
 
-.animate-fadeIn  { animation: fadeIn  .2s ease forwards; opacity: 0; }
+.animate-fadeIn  { animation: fadeIn .2s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-slideIn { animation: slideIn .2s ease forwards; }
 
 /* Tactile feedback: a physical-feeling push on tap/click, and a gentle lift on hover for stat/info cards. */
@@ -297,8 +297,8 @@ body {
     z-index: 30;
   }
   :where(.dark) .finance-sidebar {
-    background-color: #17181c;
-    border-right: 1px solid #212227;
+    background-color: #121318;
+    border-right: 1px solid #1e2029;
   }
   .finance-topbar {
     grid-column: 2;
@@ -314,8 +314,8 @@ body {
     z-index: 20;
   }
   :where(.dark) .finance-topbar {
-    background-color: #17181c;
-    border-bottom: 1px solid #212227;
+    background-color: #121318;
+    border-bottom: 1px solid #1e2029;
   }
   .finance-main {
     grid-column: 2;
@@ -329,6 +329,89 @@ body {
   }
   :where(.dark) .finance-main {
     background-color: #0c0d10;
+    color: #f1f5f9;
+  }
+  :where(.dark) .finance-main .bg-white:not([data-keep-light]) {
+    background-color: #161821;
+  }
+  :where(.dark) .finance-main .bg-\[\#F3F4F6\],
+  :where(.dark) .finance-main .bg-slate-50 {
+    background-color: #1d202c;
+  }
+  :where(.dark) .finance-main .bg-\[\#FAFAFB\] {
+    background-color: #161821;
+  }
+  :where(.dark) .finance-main .border-\[\#E4E7EB\],
+  :where(.dark) .finance-main .border-slate-200,
+  :where(.dark) .finance-main .border-slate-100 {
+    border-color: #232635;
+  }
+  :where(.dark) .finance-main .text-\[\#111318\],
+  :where(.dark) .finance-main .text-slate-900,
+  :where(.dark) .finance-main .text-slate-800 {
+    color: #f8fafc;
+  }
+  :where(.dark) .finance-main .text-slate-700,
+  :where(.dark) .finance-main .text-slate-600 {
+    color: #94a3b8;
+  }
+  :where(.dark) .finance-main table thead {
+    background-color: #1c1f2b;
+    color: #94a3b8;
+  }
+  :where(.dark) .finance-main table tbody tr:hover {
+    background-color: rgba(35, 38, 53, 0.5);
+  }
+  /* Comprehensive dark mode adaptation for colored badge pastels */
+  :where(.dark) .finance-main .bg-emerald-50,
+  :where(.dark) .finance-main .bg-emerald-100,
+  :where(.dark) .finance-main .bg-green-50,
+  :where(.dark) .finance-main .bg-green-100 {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #34d399 !important;
+    border-color: rgba(16, 185, 129, 0.25) !important;
+  }
+  :where(.dark) .finance-main .bg-amber-50,
+  :where(.dark) .finance-main .bg-amber-100,
+  :where(.dark) .finance-main .bg-yellow-50,
+  :where(.dark) .finance-main .bg-yellow-100,
+  :where(.dark) .finance-main .bg-orange-50,
+  :where(.dark) .finance-main .bg-orange-100 {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+    border-color: rgba(245, 158, 11, 0.25) !important;
+  }
+  :where(.dark) .finance-main .bg-rose-50,
+  :where(.dark) .finance-main .bg-rose-100,
+  :where(.dark) .finance-main .bg-red-50,
+  :where(.dark) .finance-main .bg-red-100 {
+    background-color: rgba(244, 63, 94, 0.15) !important;
+    color: #fb7185 !important;
+    border-color: rgba(244, 63, 94, 0.25) !important;
+  }
+  :where(.dark) .finance-main .bg-sky-50,
+  :where(.dark) .finance-main .bg-sky-100,
+  :where(.dark) .finance-main .bg-cyan-50,
+  :where(.dark) .finance-main .bg-cyan-100,
+  :where(.dark) .finance-main .bg-blue-50,
+  :where(.dark) .finance-main .bg-blue-100,
+  :where(.dark) .finance-main .bg-teal-50,
+  :where(.dark) .finance-main .bg-teal-100 {
+    background-color: rgba(14, 165, 233, 0.15) !important;
+    color: #38bdf8 !important;
+    border-color: rgba(14, 165, 233, 0.25) !important;
+  }
+  :where(.dark) .finance-main .bg-purple-50,
+  :where(.dark) .finance-main .bg-purple-100,
+  :where(.dark) .finance-main .bg-indigo-50,
+  :where(.dark) .finance-main .bg-indigo-100,
+  :where(.dark) .finance-main .bg-violet-50,
+  :where(.dark) .finance-main .bg-violet-100,
+  :where(.dark) .finance-main .bg-pink-50,
+  :where(.dark) .finance-main .bg-pink-100 {
+    background-color: rgba(99, 102, 241, 0.15) !important;
+    color: #a5b4fc !important;
+    border-color: rgba(99, 102, 241, 0.25) !important;
   }
 }
 

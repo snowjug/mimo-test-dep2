@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { WarningOctagon, Clock, ArrowClockwise, House, HandHeart } from '@phosphor-icons/react';
-import { FestiveBackdrop, Toran, ZariBorder } from '../festive/NavaratriDecor';
+import { FestiveBackdrop, ZariBorder } from '../festive/NavaratriDecor';
 import { isFestivalActive } from '../../config/festivalConfig';
 
 interface SystemErrorScreenProps {
@@ -29,7 +29,7 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({
     showRefundBanner,
     kioskId,
 }) => {
-    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+    const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
     const firstName = jobData?.userName?.split(' ')[0] || 'there';
     const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
 
@@ -54,8 +54,8 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({
 
     return (
         <div
-            className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col items-center justify-between overflow-hidden px-20 text-center ${
-                isFestiveMode ? 'bg-parchment-100 pb-10 pt-[104px]' : 'bg-[#FAFAF8] py-8'
+            className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col items-center justify-between overflow-hidden px-20 py-8 text-center ${
+                isFestiveMode ? 'bg-parchment-100' : 'bg-[#FAFAF8]'
             }`}
             style={{ display: isActive ? 'flex' : 'none' }}
         >
@@ -68,7 +68,6 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({
             {isFestiveMode && (
                 <>
                     <FestiveBackdrop />
-                    <Toran compact />
                     <ZariBorder />
                 </>
             )}

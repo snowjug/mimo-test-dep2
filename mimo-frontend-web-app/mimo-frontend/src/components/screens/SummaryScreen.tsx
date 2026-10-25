@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { Check, ArrowDown, WarningCircle } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
-import { DiyaRow, FestiveBackdrop, Toran, ZariBorder } from '../festive/NavaratriDecor';
+import { DiyaRow, FestiveBackdrop, ZariBorder } from '../festive/NavaratriDecor';
 
 const DandiyaSticks: React.FC = () => (
     <svg width="130" height="130" viewBox="0 0 130 130" className="pointer-events-none absolute -right-6 top-2">
@@ -46,9 +46,9 @@ interface SummaryScreenProps {
 
 const BACKEND_URL = 'https://api-upqxuj7evq-uc.a.run.app';
 const DEMO_CODES = ['0000', '9999'];
-const AUTO_RESET_MS = 10000;
-// While the customer is choosing what went wrong they need longer than the normal 10s.
-const REPORT_RESET_MS = 30000;
+const AUTO_RESET_MS = 30000;
+// While the customer is choosing what went wrong they need longer than the normal session timeout.
+const REPORT_RESET_MS = 45000;
 const ISSUES: { id: string; label: string }[] = [
     { id: 'blank', label: 'Blank pages' },
     { id: 'missing', label: 'Pages missing' },
@@ -58,18 +58,22 @@ const ISSUES: { id: string; label: string }[] = [
 type ReportState = 'ask' | 'choose' | 'sending' | 'sent' | 'failed';
 
 export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId, printCode }) => {
-    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+    const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
     const timeoutRef = useRef<number | null>(null);
-    const [renderKey, setRenderKey] = useState(0);
     const [report, setReport] = useState<ReportState>('ask');
+    const reportRef = useRef<ReportState>('ask');
 
-    const armReset = (ms: number) => {
+    useEffect(() => {
+        reportRef.current = report;
+    }, [report]);
+
+    const armReset = useCallback((ms: number) => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         timeoutRef.current = window.setTimeout(() => {
             timeoutRef.current = null;
             onReset();
         }, ms);
-    };
+    }, [onReset]);
 
     const sendReport = async (issue: string) => {
         setReport('sending');
@@ -93,34 +97,44 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
     };
 
     useEffect(() => {
-        let keyTimer: number | null = null;
         if (isActive) {
-            keyTimer = window.setTimeout(() => {
-                setReport('ask');
-                setRenderKey(prev => prev + 1);
-            }, 0);
-            timeoutRef.current = window.setTimeout(() => {
-                onReset();
-                timeoutRef.current = null;
-            }, AUTO_RESET_MS);
+            setReport('ask');
+            armReset(AUTO_RESET_MS);
+
+            // Keep session alive if user is actively touching/interacting with screen
+            const handleUserActivity = () => {
+                const currentReport = reportRef.current;
+                const timeoutMs = (currentReport === 'choose' || currentReport === 'sending')
+                    ? REPORT_RESET_MS
+                    : AUTO_RESET_MS;
+                armReset(timeoutMs);
+            };
+
+            window.addEventListener('pointerdown', handleUserActivity);
+            window.addEventListener('touchstart', handleUserActivity);
+            window.addEventListener('click', handleUserActivity);
+            window.addEventListener('keydown', handleUserActivity);
+
+            return () => {
+                if (timeoutRef.current) {
+                    clearTimeout(timeoutRef.current);
+                    timeoutRef.current = null;
+                }
+                window.removeEventListener('pointerdown', handleUserActivity);
+                window.removeEventListener('touchstart', handleUserActivity);
+                window.removeEventListener('click', handleUserActivity);
+                window.removeEventListener('keydown', handleUserActivity);
+            };
         } else {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
                 timeoutRef.current = null;
             }
         }
-        return () => {
-            if (keyTimer) clearTimeout(keyTimer);
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-                timeoutRef.current = null;
-            }
-        };
-    }, [isActive, onReset]);
+    }, [isActive, armReset]);
 
     return (
         <div
-            key={renderKey}
             className={`screen ${isActive ? 'visible' : ''} flex h-full flex-col items-center justify-center overflow-hidden px-20 pb-24 ${
                 isFestiveMode ? 'bg-parchment-100' : 'bg-[#FAFAF8]'
             }`}
@@ -138,7 +152,6 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
             {isFestiveMode && (
                 <>
                     <FestiveBackdrop />
-                    <Toran compact />
                     <ZariBorder />
                 </>
             )}

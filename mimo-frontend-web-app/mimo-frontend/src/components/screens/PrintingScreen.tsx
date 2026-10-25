@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Printer } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
-import { DiyaRow, FestiveBackdrop, Mandala, Toran, ZariBorder } from '../festive/NavaratriDecor';
+import { DiyaRow, FestiveBackdrop, Mandala, ZariBorder } from '../festive/NavaratriDecor';
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
 // '0000' and '9999' are both faked entirely client-side in App.tsx (no print_jobs doc is ever created for
@@ -28,13 +28,22 @@ interface PrintingScreenProps {
 export {
   calculatePrintProgress,
   calculateMilestoneBounds,
-  stepVisualProgress,
   getVisualTickDelay,
+  stepVisualProgress,
+  verifiedPercent,
+  type MilestoneBounds,
   type PrintProgressInput,
   type PrintProgressResult,
-  type MilestoneBounds,
 } from '../../utils/printProgress';
-import { calculatePrintProgress, calculateMilestoneBounds, getVisualTickDelay } from '../../utils/printProgress';
+import {
+  calculatePrintProgress,
+  calculateMilestoneBounds,
+  getVisualTickDelay,
+} from '../../utils/printProgress';
+
+// /kiosk/print moves the job to "printing" before it answers, so a job still "paid" this long after the
+// printing screen opened was never started (the print request was lost or refused): say so, don't keep waiting.
+const PRINT_START_GRACE_MS = 20000;
 
 export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   isActive,
@@ -50,7 +59,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   colorMode = 'bw',
   kioskId,
 }) => {
-  const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+  const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
   const [progress, setProgress]         = useState(0);
   const [typedTitle, setTypedTitle]     = useState('');
   const [typedSub, setTypedSub]         = useState('');
@@ -62,9 +71,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const collectTimerRef = useRef<number | null>(null);
 
   const progressRef         = useRef(0);   // mirror of progress for closures
-  const sheetsCompletedRef  = useRef(0);   // tracked sheets completed
-  const milestoneFloorRef   = useRef(0);   // presentation milestone floor
-  const milestoneCeilingRef = useRef(0);   // presentation milestone ceiling
+  const milestoneFloorRef   = useRef(0);   // current milestone floor
+  const milestoneCeilingRef = useRef(0);   // current milestone ceiling
+  const sheetsCompletedRef  = useRef(0);   // verified sheets completed (from the printer's page counter)
+  const hasStartedRef       = useRef(false); // backend has reported the job as printing at least once
   const activePrintCodeRef  = useRef(printCode);
   const isPollingRef        = useRef(false);
   const tickTimerRef        = useRef<number | null>(null);
@@ -135,15 +145,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     setProgress(100);
     setStatusMsg('Print Completed ✅');
 
-    // 400ms celebration hold before transitioning to summary screen
+    // 800ms celebration hold before transitioning to summary screen
     completionTimerRef.current = window.setTimeout(() => {
       onComplete();
-    }, 400);
+    }, 800);
   }, [clearAllTimers, onComplete]);
 
   // Smooth visual progress tick: advances gradually towards the milestone ceiling
   const startSmoothTick = useCallback(() => {
     if (tickTimerRef.current) return;
+
+    const isDuplex = doubleSided === true || doubleSided === 'double';
+    const totalSheets = Math.max(1, (isDuplex ? Math.ceil(pages / 2) : pages) * copies);
 
     const tick = () => {
       if (isCompletingRef.current) return;
@@ -161,13 +174,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         setProgress(next);
       }
 
-      const delay = getVisualTickDelay(progressRef.current, colorMode);
+      const delay = getVisualTickDelay(progressRef.current, colorMode, totalSheets);
       tickTimerRef.current = window.setTimeout(tick, delay);
     };
 
-    const initialDelay = getVisualTickDelay(progressRef.current, colorMode);
+    const initialDelay = getVisualTickDelay(progressRef.current, colorMode, totalSheets);
     tickTimerRef.current = window.setTimeout(tick, initialDelay);
-  }, [colorMode]);
+  }, [colorMode, pages, copies, doubleSided]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
@@ -196,10 +209,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           { cache: 'no-store', signal: controller.signal }
         );
         window.clearTimeout(timeoutId);
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
 
         // If printCode changed or screen deactivated while in flight, discard response
         if (!isActive || activePrintCodeRef.current !== printCode || isCompletingRef.current) {
+          return;
+        }
+
+        // A non-2xx answer (rate limit, server error) carries no job state: keep the last verified progress and
+        // retry; the 45s network-stall detector below still applies because this is not a successful poll.
+        if (!res.ok) {
+          const retryAfterSec = Number(res.headers.get('Retry-After'));
+          schedulePoll(res.status === 429 && retryAfterSec > 0 ? retryAfterSec * 1000 : 1000);
           return;
         }
 
@@ -217,6 +238,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           copies,
           doubleSided,
           errorMsg: errMsg,
+          piReceivedAt: data.piReceivedAt,
+          sentToPrinterAt: data.sentToPrinterAt,
+          colorMode,
         });
 
         sheetsCompletedRef.current = result.sheetsCompleted;
@@ -235,16 +259,22 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           return;
         }
 
-        if (result.isPrinting) {
+        if (result.isPrinting || data.piReceivedAt || data.sentToPrinterAt) {
+          hasStartedRef.current = true;
           if (result.progress > progressRef.current) {
             progressRef.current = result.progress;
             setProgress(result.progress);
           }
-          setStatusMsg(result.statusMsg);
           startSmoothTick();
-        } else {
-          setStatusMsg(result.statusMsg);
+        } else if (
+          result.isWaiting && data.status === 'paid' && !hasStartedRef.current &&
+          Date.now() - startTimeRef.current >= PRINT_START_GRACE_MS
+        ) {
+          clearAllTimers();
+          if (onError) onError('Your print could not be started. Your code has not been used — please enter it again.');
+          return;
         }
+        setStatusMsg(result.statusMsg);
 
         schedulePoll(200);
       } catch {
@@ -256,7 +286,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         isPollingRef.current = false;
       }
     }, delayMs);
-  }, [printCode, isActive, pages, copies, doubleSided, onError, clearAllTimers, printTimeoutMs, startSmoothTick]);
+  }, [printCode, isActive, pages, copies, doubleSided, onError, clearAllTimers, printTimeoutMs, colorMode, startSmoothTick]);
 
   // ─── demo mode fallback (used ONLY when printCode is '0000'/'9999' or missing) ──
 
@@ -315,9 +345,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       clearAllTimers();
       setProgress(0);
       progressRef.current = 0;
-      sheetsCompletedRef.current = 0;
       milestoneFloorRef.current = 0;
       milestoneCeilingRef.current = 0;
+      sheetsCompletedRef.current = 0;
+      hasStartedRef.current = false;
       isPollingRef.current = false;
       lastProgressRef.current = 0;
       startTimeRef.current = Date.now();
@@ -332,12 +363,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       return;
     }
 
-    // Explicitly start at 0% on screen activation
+    // Reset progress tracking on screen activation
     setProgress(0);
     progressRef.current = 0;
-    sheetsCompletedRef.current = 0;
     milestoneFloorRef.current = 0;
     milestoneCeilingRef.current = 0;
+    sheetsCompletedRef.current = 0;
+    hasStartedRef.current = false;
     isPollingRef.current = false;
     isCompletingRef.current = false;
     lastProgressRef.current = 0;
@@ -369,22 +401,21 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         animateTo100AndComplete();
       }
     } else if (printCode && !isDemoPrintCode(printCode)) {
-      // Initialize in-flight milestone bounds for active printing immediately
+      // Live job: start smoothly at 1% for active visual feedback
       const isDuplex = doubleSided === true || doubleSided === 'double';
-      const fallbackSheets = (isDuplex ? Math.ceil(pages / 2) : pages) * copies;
-      const initialTotal = Math.max(1, fallbackSheets);
-      const initialBounds = calculateMilestoneBounds(0, initialTotal);
+      const totalSheets = Math.max(1, (isDuplex ? Math.ceil(pages / 2) : pages) * copies);
+      const initialBounds = calculateMilestoneBounds(0, totalSheets, colorMode);
 
+      progressRef.current = 1;
       milestoneFloorRef.current = initialBounds.floor;
       milestoneCeilingRef.current = initialBounds.ceiling;
-      progressRef.current = initialBounds.floor;
-      setProgress(initialBounds.floor);
-      setStatusMsg(initialTotal === 1 ? 'Printing document…' : 'Warming up printer…');
+      setProgress(1);
 
+      setStatusMsg('Sending your document to the printer…');
       startSmoothTick();
-      schedulePoll(200); // Live polling driven by backend sheet progress
-    } else {
-      startDemoTick(); // Demo mode simulation
+      schedulePoll(0);
+    } else if (isDemoPrintCode(printCode)) {
+      startDemoTick(); // Demo mode simulation ('0000' / '9999' only — never for a missing code)
     }
 
     return () => {
@@ -474,7 +505,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
   return (
     <div
-      className={`screen ${isActive ? 'visible' : ''} flex flex-row items-center justify-center gap-24 overflow-hidden px-24 ${
+      className={`screen ${isActive ? 'visible' : ''} flex flex-row items-center justify-between gap-12 lg:gap-16 xl:gap-24 overflow-hidden px-14 lg:px-20 xl:px-24 w-full h-full ${
         isFestiveMode ? 'bg-parchment-100' : 'bg-[#FAFAF8]'
       }`}
       style={{ display: isActive ? 'flex' : 'none' }}
@@ -491,7 +522,6 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       {isFestiveMode && (
         <>
           <FestiveBackdrop />
-          <Toran compact />
           <ZariBorder />
         </>
       )}
@@ -542,13 +572,13 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
       {/* ── Left text card ── */}
       <div
-        className={`relative z-10 flex max-w-[720px] flex-1 flex-col items-start gap-6 rounded-[28px] border px-14 py-11 text-left backdrop-blur-xl ${
+        className={`relative z-10 flex flex-1 max-w-[780px] xl:max-w-[840px] flex-col items-start gap-6 rounded-[28px] border px-12 lg:px-14 py-11 text-left backdrop-blur-xl ${
           isFestiveMode
             ? 'border-gold-600/30 bg-gradient-to-br from-white to-parchment-200 shadow-[0_20px_50px_rgba(74,45,20,0.12)]'
             : 'border-gold-600/25 bg-white/80 shadow-[0_20px_50px_rgba(74,45,20,0.06)]'
         }`}
       >
-        <div className="min-h-[170px]">
+        <div className="min-h-[170px] w-full">
           <h2 className={`mb-5 text-[64px] font-extrabold leading-[1.06] tracking-tight ${isFestiveMode ? 'text-mahogany-800' : 'text-[#1A1714]'}`}>
             {typedTitle}
           </h2>
@@ -569,7 +599,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       </div>
 
       {/* ── Right: circular progress ── */}
-      <div className="relative z-10 flex items-center justify-center">
+      <div className="relative z-10 flex shrink-0 items-center justify-center pr-2 lg:pr-6 xl:pr-10">
         <div className="relative flex h-[380px] w-[380px] items-center justify-center">
           {isFestiveMode && (
             <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.22]">

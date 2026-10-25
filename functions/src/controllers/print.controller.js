@@ -16,9 +16,16 @@ const postGetDocumentsByCode = async (req, res) => {
 
     if (snapshot.empty) {
       // Secondary check: was this code already used (completed / refunded / printing)?
+      // Bounded to the last 24h -- matches the window printCode.service.js's CODE_VALIDITY_MS already
+      // documents codes as valid for. Without this bound, a code recycled from a job months old (now
+      // free to reissue) permanently shadows any brand-new job that is handed the same code, incorrectly
+      // telling the customer their code was "already used" (confirmed production incident, 2026-10-16:
+      // printCode 9670 collided with a September job and blocked a same-day paid job from printing).
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const usedSnap = await db.collection("print_jobs")
         .where("printCode", "==", printCode)
         .where("status", "in", ["completed", "printing", "refunded", "printed", "expired"])
+        .where("createdAt", ">=", dayAgo)
         .limit(1)
         .get();
       if (!usedSnap.empty) {
@@ -29,6 +36,16 @@ const postGetDocumentsByCode = async (req, res) => {
         return res.status(409).json({ error: msg });
       }
       return res.status(404).json({ error: "Invalid or expired print code" });
+    }
+
+    // Print-code allocation is atomic (printCode.service.js) and this should never find more than one
+    // "paid" job for the same code -- but if it ever does (e.g. data predating the atomic-allocation fix,
+    // or the same class of collision fixed in kiosk.routes.js's /print handler after a real production
+    // incident), fail loudly instead of guessing: silently picking docs[0] could expose one customer's
+    // document metadata (filename, page count) in a response meant for a different customer.
+    if (snapshot.size > 1) {
+      console.error(`[PRINT-CODE COLLISION] code ${printCode} matches ${snapshot.size} paid jobs: ${snapshot.docs.map((d) => d.id).join(", ")}`);
+      return res.status(409).json({ error: "This code matched more than one order. Please contact support — do not retry." });
     }
 
     // Capability-based routing validation, driven by the machine registry: a machine must be a known, ACTIVE
@@ -44,6 +61,21 @@ const postGetDocumentsByCode = async (req, res) => {
     if (isColor && !dest.supportsColor) {
       return res.status(400).json({
         error: "This is a Color print job. This machine can only print black & white. Please use a colour-capable machine."
+      });
+    }
+
+    const isExplicitlyRestricted = Boolean(
+      firstJob.strictKiosk === true ||
+      firstJob.directKioskRestriction === true ||
+      firstJob.printOptions?.strictKiosk === true ||
+      firstJob.printOptions?.directKioskRestriction === true
+    );
+    const restrictedKiosk = isExplicitlyRestricted
+      ? (firstJob.printOptions?.directKioskId || firstJob.directKioskId || firstJob.kioskId)
+      : null;
+    if (restrictedKiosk && restrictedKiosk !== kioskId) {
+      return res.status(403).json({
+        error: `This print job is restricted to machine ${restrictedKiosk}.`
       });
     }
 

@@ -57,9 +57,23 @@ const CONVERTER_SERVICE_URL = process.env.CONVERTER_SERVICE_URL || "https://mimo
 
 const INTERNAL_CONVERTER_SECRET = process.env.INTERNAL_CONVERTER_SECRET || "";
 
+// ================= WHATSAPP FLOW ENDPOINT (Mission 16, carried into Mission 37) =================
+// No hardcoded fallback on purpose: unlike WA_ACCESS_TOKEN/WA_PHONE_NUMBER_ID above (pre-existing, not
+// introduced by this change), these have no legacy value to preserve. An unset value must leave the Flow
+// endpoint refusing requests (see whatsappFlow.controller.js), never silently running with an invented key
+// or secret. Intended source: Secret Manager, bound the same way GMAIL_APP_PASSWORD already is on `exports.api`.
+const FLOW_PRIVATE_KEY_PEM = process.env.FLOW_PRIVATE_KEY_PEM || "";
+const FLOW_APP_SECRET = process.env.FLOW_APP_SECRET || "";
+const FLOW_APP_SECRET_PREVIOUS = process.env.FLOW_APP_SECRET_PREVIOUS || ""; // optional, for secret rotation
+const FLOW_ID = process.env.FLOW_ID || ""; // the real, Meta-configured Flow ID; never invented
+
 module.exports = {
   CASHFREE_BASE_URL,
   CONVERTER_SERVICE_URL,
+  FLOW_APP_SECRET,
+  FLOW_APP_SECRET_PREVIOUS,
+  FLOW_ID,
+  FLOW_PRIVATE_KEY_PEM,
   INTERNAL_CONVERTER_SECRET,
   getSecretKey,
   WA_ACCESS_TOKEN,

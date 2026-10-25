@@ -305,7 +305,19 @@ export interface Incident {
   tab: string;
   jobId?: string;
   orderId?: string | null;
+  userId?: string | null;
+  userName?: string | null;
+  userEmail?: string | null;
+  userPhone?: string | null;
+  fileName?: string | null;
+  failureReason?: string | null;
+  status?: string | null;
+  amount?: number | null;
   refundStatus?: string | null;
+  refundAmount?: number | null;
+  pageCount?: number | null;
+  copies?: number | null;
+  colorMode?: string | null;
 }
 
 export interface IncidentsResponse {
@@ -325,8 +337,15 @@ export interface UserGrowthReport {
   growthPct: number;
   dailyAverageUsers: number;
   conversionRatePct: number;
+  averageOrderValue?: number;
+  repeatCustomerRatePct?: number;
   paymentsInRange: number;
-  monthlyPayments: { month: string; total: number }[];
+  monthlyPayments: { month: string; monthKey?: string; total: number }[];
+  cohorts?: {
+    cohort: string;
+    size: number;
+    retention: { offset: number; activeCount: number; pct: number }[];
+  }[];
   updatedAt: string;
 }
 

@@ -1,10 +1,12 @@
-import React from 'react';
-import { IndianRupee, TrendingUp, Layers, Printer, Download, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { IndianRupee, TrendingUp, Layers, Printer, Download, Clock, Sliders, DollarSign } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { FinanceMetricCard } from '../components/FinanceMetricCard';
 import { FinanceChartCard } from '../components/FinanceChartCard';
 import { ErrorBanner, PeriodComparison, TrendChart, TruncatedNote } from '../../../components/insights/InsightBits';
+import { ExecutiveReportsHub } from '../../../components/insights/ExecutiveReportsHub';
 import { useRange } from '../../../context/RangeContext';
+import { useTheme } from '../../../context/ThemeContext';
 import { bucketLabel, describeRange, pctChange } from '../../../lib/dateRange';
 import { inr, int } from '../../../lib/format';
 import type { Analytics } from '../../../types/insights.types';
@@ -24,7 +26,17 @@ const chg = (cur: number, prev?: number | null) => {
 };
 
 export const FinanceAnalyticsPage: React.FC<FinanceAnalyticsPageProps> = ({ analytics: a, loading, error, onRefresh }) => {
+  const [viewMode, setViewMode] = useState<'overview' | 'strategic'>('overview');
   const { range } = useRange();
+  const { isDark } = useTheme();
+  const gridStroke = isDark ? '#334155' : '#E4E7EB';
+  const tooltipStyle = {
+    borderRadius: 12,
+    fontSize: 12,
+    backgroundColor: isDark ? '#1e293b' : '#ffffff',
+    borderColor: isDark ? '#334155' : '#e2e8f0',
+    color: isDark ? '#f8fafc' : '#0f172a',
+  };
   const cur = a?.current;
   const prev = a?.previous?.summary;
   const machines = a?.byKiosk.length || 1;
@@ -46,11 +58,41 @@ export const FinanceAnalyticsPage: React.FC<FinanceAnalyticsPageProps> = ({ anal
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-[#111318] tracking-tight">Revenue Analytics</h1>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">Trends, machine performance and peak demand · {describeRange(range)}</p>
+          <h1 className="text-xl font-black text-[#111318] dark:text-white tracking-tight">Finance Intelligence &amp; Analytics</h1>
+          <p className="text-xs text-slate-400 font-medium mt-0.5">Trends, unit economics, fleet simulation &amp; machine profitability</p>
         </div>
-        <button type="button" onClick={exportCsv} disabled={!a} className="px-4 py-2.5 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-50 self-start"><Download className="w-3.5 h-3.5" /> Export CSV</button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 text-xs font-semibold">
+            <button
+              onClick={() => setViewMode('overview')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === 'overview' ? 'bg-white dark:bg-slate-700 text-[#093765] dark:text-blue-400 shadow-xs' : 'text-slate-500'
+              }`}
+            >
+              Revenue Trend
+            </button>
+            <button
+              onClick={() => setViewMode('strategic')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === 'strategic' ? 'bg-white dark:bg-slate-700 text-[#093765] dark:text-blue-400 shadow-xs' : 'text-slate-500'
+              }`}
+            >
+              Strategic Reports &amp; Profitability
+            </button>
+          </div>
+          {viewMode === 'overview' && (
+            <button type="button" onClick={exportCsv} disabled={!a} className="px-3.5 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+              <Download className="w-3.5 h-3.5" /> CSV
+            </button>
+          )}
+        </div>
       </div>
+
+      {viewMode === 'strategic' ? (
+        <ExecutiveReportsHub />
+      ) : (
+        <>
+
 
       {error && <ErrorBanner message={error} onRetry={onRefresh} />}
       <TruncatedNote show={a?.truncated} />
@@ -77,10 +119,10 @@ export const FinanceAnalyticsPage: React.FC<FinanceAnalyticsPageProps> = ({ anal
           <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={revenueBars} margin={{ left: -10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E4E7EB" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
                 <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip formatter={(v: number) => inr(v)} contentStyle={{ borderRadius: 12, fontSize: 12 }} />
+                <Tooltip formatter={(v: number) => inr(v)} contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="Revenue" fill="#093765" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                 <Bar dataKey="Refunds" fill="#F43F5E" radius={[4, 4, 0, 0]} isAnimationActive={false} />
@@ -97,7 +139,7 @@ export const FinanceAnalyticsPage: React.FC<FinanceAnalyticsPageProps> = ({ anal
                   <Pie data={modePie} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={3} isAnimationActive={false}>
                     {modePie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => `${int(v)} pages`} contentStyle={{ borderRadius: 12, fontSize: 12 }} />
+                  <Tooltip formatter={(v: number) => `${int(v)} pages`} contentStyle={tooltipStyle} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -109,9 +151,9 @@ export const FinanceAnalyticsPage: React.FC<FinanceAnalyticsPageProps> = ({ anal
           {!a ? <div className="h-40 bg-slate-50 rounded-xl animate-pulse" /> : (
             <ul className="space-y-4">
               {a.byKiosk.map((k) => (
-                <li key={k.kioskId} className="p-3 rounded-xl border border-[#E4E7EB]">
-                  <div className="flex justify-between"><span className="text-sm font-bold text-slate-800">{k.name} <span className="font-mono text-xs text-slate-400">{k.kioskId}</span></span><span className="font-black font-mono text-slate-900">{inr(k.revenue)}</span></div>
-                  <p className="text-[11px] text-slate-500 mt-1">{k.jobs} jobs · {k.completed} printed · {int(k.pages)} pages · {k.failed} failed</p>
+                <li key={k.kioskId} className="p-3 rounded-xl border border-[#E4E7EB] dark:border-slate-800 bg-white dark:bg-slate-900/60">
+                  <div className="flex justify-between"><span className="text-sm font-bold text-slate-800 dark:text-slate-100">{k.name} <span className="font-mono text-xs text-slate-400">{k.kioskId}</span></span><span className="font-black font-mono text-slate-900 dark:text-white">{inr(k.revenue)}</span></div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{k.jobs} jobs · {k.completed} printed · {int(k.pages)} pages · {k.failed} failed</p>
                 </li>
               ))}
             </ul>
@@ -123,10 +165,10 @@ export const FinanceAnalyticsPage: React.FC<FinanceAnalyticsPageProps> = ({ anal
             <div className="h-52">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={a.byHour} margin={{ left: -20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E4E7EB" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
                   <XAxis dataKey="hour" tickFormatter={(h: number) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'a' : 'p'}`} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval={1} />
                   <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <Tooltip labelFormatter={(h: number) => `${h}:00 – ${h}:59`} contentStyle={{ borderRadius: 12, fontSize: 12 }} />
+                  <Tooltip labelFormatter={(h: number) => `${h}:00 – ${h}:59`} contentStyle={tooltipStyle} />
                   <Bar dataKey="jobs" name="Jobs" fill="#093765" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
@@ -134,6 +176,9 @@ export const FinanceAnalyticsPage: React.FC<FinanceAnalyticsPageProps> = ({ anal
           )}
         </FinanceChartCard>
       </div>
+        </>
+      )}
     </div>
   );
 };
+

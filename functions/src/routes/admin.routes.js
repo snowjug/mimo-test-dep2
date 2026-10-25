@@ -9,6 +9,7 @@ const adminHr = require("../controllers/adminHr.controller");
 const adminReports = require("../controllers/adminReports.controller");
 const adminGang = require("../controllers/adminGang.controller");
 const ads = require("../controllers/ads.controller");
+const tools = require("../controllers/technicalTools.controller");
 
 const router = express.Router();
 const { loginLimiter } = createLimiters(db);
@@ -22,14 +23,27 @@ router.get("/admin/settings", adminAuthMiddleware, admin.getAdminSettings);
 router.post("/admin/settings", adminAuthMiddleware, admin.postAdminSettings);
 router.get("/admin/screensaver", adminAuthMiddleware, admin.getAdminScreensaver);
 router.post("/admin/screensaver", adminAuthMiddleware, admin.postAdminScreensaver);
+router.post("/admin/upload-url", adminAuthMiddleware, admin.postGetAdminUploadUrl);
 router.get("/admin/hardware", adminAuthMiddleware, admin.getAdminHardware);
 router.post("/admin/hardware", adminAuthMiddleware, admin.postAdminHardware);
 router.get("/admin/metrics", adminAuthMiddleware, admin.getAdminMetrics);
 router.post("/admin/reset-metrics", adminAuthMiddleware, admin.postAdminResetMetrics);
 router.get("/admin/recent-prints", adminAuthMiddleware, admin.getAdminRecentPrints);
-router.get("/admin/users", adminAuthMiddleware, admin.getAdminUsers);
-router.get("/admin/analytics", adminAuthMiddleware, insights.getAdminAnalytics);
-router.get("/admin/transactions", adminAuthMiddleware, insights.getAdminTransactions);
+router.get("/admin/users", financeOrAdminAuthMiddleware, admin.getAdminUsers);
+router.get("/admin/analytics", financeOrAdminAuthMiddleware, insights.getAdminAnalytics);
+router.get("/admin/analytics/monthly-summary", financeOrAdminAuthMiddleware, insights.getAdminMonthlySummary);
+
+// Executive, Financial & Fleet Intelligence Reports (Finance & Admin)
+router.get("/admin/analytics/location-profitability", financeOrAdminAuthMiddleware, tools.getLocationProfitability);
+router.get("/admin/analytics/machine-profitability", financeOrAdminAuthMiddleware, tools.getMachineProfitability);
+router.post("/admin/analytics/fleet-simulate", financeOrAdminAuthMiddleware, tools.postFleetSimulate);
+router.get("/admin/analytics/failures", financeOrAdminAuthMiddleware, tools.getFailureAnalytics);
+router.get("/admin/analytics/customer-usage", financeOrAdminAuthMiddleware, tools.getCustomerUsageAnalytics);
+router.get("/admin/analytics/demand-heatmap", financeOrAdminAuthMiddleware, tools.getPrintDemandHeatmap);
+router.get("/admin/analytics/peak-hours", financeOrAdminAuthMiddleware, tools.getPeakHourAnalytics);
+router.get("/admin/analytics/revenue-analytics", financeOrAdminAuthMiddleware, tools.getRevenueAnalytics);
+
+router.get("/admin/transactions", financeOrAdminAuthMiddleware, insights.getAdminTransactions);
 router.get("/admin/jobs", adminAuthMiddleware, insights.getAdminJobs);
 router.get("/admin/kiosks", adminAuthMiddleware, insights.getAdminKiosks);
 router.post("/admin/kiosks/:kioskId/restart", adminAuthMiddleware, kioskCommands.postAdminKioskRestart);
@@ -38,13 +52,23 @@ router.post("/admin/kiosks/:kioskId/verify", adminAuthMiddleware, kioskCommands.
 router.get("/admin/incidents", adminAuthMiddleware, insights.getAdminIncidents);
 router.get("/admin/finance-sheet", financeOrAdminAuthMiddleware, insights.getAdminFinanceSheetData);
 router.get("/admin/issues", adminAuthMiddleware, insights.getAdminIssues);
-router.post("/admin/refund", adminAuthMiddleware, admin.postAdminRefund);
-router.get("/admin/refund-requests", adminAuthMiddleware, admin.getAdminRefundRequests);
+router.post("/admin/refund", financeOrAdminAuthMiddleware, admin.postAdminRefund);
+router.post("/admin/refund/bulk", financeOrAdminAuthMiddleware, admin.postAdminBulkRefund);
+router.get("/admin/refund-requests", financeOrAdminAuthMiddleware, admin.getAdminRefundRequests);
+router.get("/admin/financial-audit-logs", financeOrAdminAuthMiddleware, admin.getAdminFinancialAuditLogs);
+router.get("/admin/coupons/analytics", financeOrAdminAuthMiddleware, admin.getAdminCouponsAnalytics);
+router.get("/admin/expenses", financeOrAdminAuthMiddleware, admin.getAdminExpenses);
+router.post("/admin/expenses", financeOrAdminAuthMiddleware, admin.postAdminExpense);
+router.patch("/admin/expenses/:id", financeOrAdminAuthMiddleware, admin.patchAdminExpense);
+router.delete("/admin/expenses/:id", financeOrAdminAuthMiddleware, admin.deleteAdminExpense);
+router.get("/admin/settlements/reconciliation", financeOrAdminAuthMiddleware, insights.getAdminSettlementsReconciliation);
+router.post("/admin/settlements/sync", financeOrAdminAuthMiddleware, insights.postAdminSyncSettlements);
+router.get("/admin/settlements", financeOrAdminAuthMiddleware, insights.getAdminSettlements);
 
 router.get("/admin/employees", adminAuthMiddleware, adminHr.getAdminEmployees);
 router.get("/admin/hr-overview", adminAuthMiddleware, adminHr.getAdminHrOverview);
 router.get("/admin/company-activity", adminAuthMiddleware, adminHr.getAdminCompanyActivity);
-router.get("/admin/user-growth-report", adminAuthMiddleware, adminReports.getAdminUserGrowthReport);
+router.get("/admin/user-growth-report", financeOrAdminAuthMiddleware, adminReports.getAdminUserGrowthReport);
 
 // MIMO GANG — unified Technical/HR/Marketing view, admin-editable
 router.get("/admin/gang/login-streaks", adminAuthMiddleware, adminGang.getLoginStreaks);

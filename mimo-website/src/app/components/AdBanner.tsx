@@ -37,44 +37,46 @@ function normalizeUrl(url: string | null | undefined): string | undefined {
   return `https://${trimmed}`;
 }
 
-function AdSlide({ ad }: { ad: Ad }) {
+function AdSlide({ ad, onImageLoad }: { ad: Ad; onImageLoad?: () => void }) {
   const hasImage = Boolean(ad.imageUrl);
   const hasCaption = Boolean(ad.caption);
 
   return hasImage && !hasCaption ? (
-    // CASE 1: Banner mode (image only, no caption)
+    // CASE 1: Banner mode (image only, no caption) - full image shown cleanly without any cropping
     <div className="p-2 sm:p-2.5">
-      <div className="w-full overflow-hidden rounded-[14px] bg-ink-4/5 flex items-center justify-center">
+      <div className="w-full overflow-hidden rounded-[14px] bg-surface flex items-center justify-center">
         <img
           src={ad.imageUrl!}
           alt="Announcement banner"
-          loading="lazy"
+          loading="eager"
           decoding="async"
-          className="w-full max-h-56 sm:max-h-64 object-cover rounded-[14px]"
+          className="w-full h-auto max-h-[220px] sm:max-h-[240px] object-contain rounded-[14px] block"
           draggable={false}
+          onLoad={onImageLoad}
         />
       </div>
     </div>
   ) : (
     // CASE 2: Card mode (image + caption, or caption only)
-    <div className="flex items-center gap-3.5 sm:gap-4 p-3 sm:p-3.5">
+    <div className="flex items-center gap-4 p-3.5 sm:p-4">
       {hasImage && (
-        <div className="shrink-0 overflow-hidden rounded-[12px] bg-ink-4/10 w-24 sm:w-28 h-32 sm:h-36 flex items-center justify-center" aria-hidden="true">
+        <div className="shrink-0 overflow-hidden rounded-[14px] bg-surface-2 w-24 sm:w-28 h-28 sm:h-32 flex items-center justify-center" aria-hidden="true">
           <img
             src={ad.imageUrl!}
             alt=""
             width={112}
-            height={144}
-            loading="lazy"
+            height={128}
+            loading="eager"
             decoding="async"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
             draggable={false}
+            onLoad={onImageLoad}
           />
         </div>
       )}
       {hasCaption && (
         <div className="flex min-w-0 flex-1 flex-col py-1">
-          <p className="text-[16px] sm:text-[17px] font-semibold leading-snug tracking-tight text-ink line-clamp-4">
+          <p className="text-[15px] sm:text-[16px] font-semibold leading-snug tracking-tight text-ink line-clamp-3">
             {ad.caption}
           </p>
         </div>
@@ -176,12 +178,17 @@ export function AdBanner() {
   const trackPercentOffset = -index * 100;
   const dragPercent = trackRef.current?.clientWidth ? (dragOffset / trackRef.current.clientWidth) * 100 : 0;
 
+  const handleImageLoad = () => {
+    const el = slideRefs.current[index];
+    if (el) setTrackHeight(el.offsetHeight);
+  };
+
   return (
-    <section aria-label="Advertisement" className="mt-8">
-      <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-3">Announcements</h2>
+    <section aria-label="Advertisement" className="mt-5 sm:mt-6">
+      <h2 className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-wider text-ink-3">Announcements</h2>
 
       <div
-        className="relative overflow-hidden rounded-[20px] bg-surface select-none"
+        className="relative overflow-hidden rounded-[20px] bg-surface select-none border border-hairline/60 shadow-xs"
         style={{ height: trackHeight, transition: isDragging ? undefined : "height 300ms ease" }}
       >
         <div
@@ -203,7 +210,7 @@ export function AdBanner() {
             const slideLink = normalizeUrl(ad.link);
             const slide = (
               <div ref={(el) => { slideRefs.current[i] = el; }} className="w-full shrink-0">
-                <AdSlide ad={ad} />
+                <AdSlide ad={ad} onImageLoad={handleImageLoad} />
               </div>
             );
             return (

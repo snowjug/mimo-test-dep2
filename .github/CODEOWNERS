@@ -37,6 +37,4 @@
 
 # Devices in production
 /pi_scripts/                                       @snowjug @Dibya81
-/pi-listener/                                      @snowjug @Dibya81
 /scripts/pi-ops/                                   @snowjug @Dibya81
-/scripts/pi-setup/                                 @snowjug @Dibya81

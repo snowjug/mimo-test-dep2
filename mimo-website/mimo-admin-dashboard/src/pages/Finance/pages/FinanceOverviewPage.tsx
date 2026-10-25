@@ -19,6 +19,7 @@ import {
   Calendar,
   Layers,
   ArrowUpRight,
+  ArrowDownRight,
   TrendingDown,
   ShieldCheck,
   Building2,
@@ -49,8 +50,15 @@ import { FinanceDetailsDrawer } from '../components/FinanceDetailsDrawer';
 import { ErrorBanner, TruncatedNote } from '../../../components/insights/InsightBits';
 import { LiveIndicator } from '../../../components/ui/LiveIndicator';
 import { useRange } from '../../../context/RangeContext';
-import { describeRange, pctChange, bucketLabel } from '../../../lib/dateRange';
+import { describeRange, pctChange, bucketLabel, presetRange, toDateKey } from '../../../lib/dateRange';
 import { clockTime, dateTime, inr, int } from '../../../lib/format';
+
+const fmtDateShort = (key?: string) => {
+  if (!key) return '';
+  const parts = key.split('-').map(Number);
+  if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return key;
+  return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+};
 import { exportFinancePdf } from '../../../lib/pdfExport';
 import { insights } from '../../../services/insights.service';
 import { pickQuote } from '../quotes';
@@ -99,46 +107,76 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
   const [selected, setSelected] = useState<TransactionRow | null>(null);
   const [activeChartTab, setActiveChartTab] = useState<'waterfall' | 'monthly' | 'hourly'>('waterfall');
 
-  // Month 1 Baseline State
-  const [launchMonthData, setLaunchMonthData] = useState<{
-    revenue: number;
-    pages: number;
-    orders: number;
-    refunds: number;
+  // Weekly Comparison Benchmark State (Last Week vs This Week)
+  const [weeklyBenchmarkData, setWeeklyBenchmarkData] = useState<{
+    thisWeek: {
+      revenue: number;
+      pages: number;
+      orders: number;
+      refunds: number;
+      from: string;
+      to: string;
+    };
+    lastWeek: {
+      revenue: number;
+      pages: number;
+      orders: number;
+      refunds: number;
+      from: string;
+      to: string;
+    };
   } | null>(null);
-  const [loadingLaunch, setLoadingLaunch] = useState(false);
+  const [loadingWeekly, setLoadingWeekly] = useState(false);
 
-  // Fetch Launch Month (May 2026) Baseline
+  // Fetch Weekly Benchmark (This Week: Last 7 days, Last Week: Prior 7 days)
   useEffect(() => {
     let isMounted = true;
-    const fetchLaunchMonth = async () => {
-      setLoadingLaunch(true);
+    const fetchWeeklyBenchmark = async () => {
+      setLoadingWeekly(true);
       try {
-        const res = await insights.analytics(
-          { preset: 'custom', from: '2026-05-01', to: '2026-05-31' },
-          false
-        );
+        const r7d = presetRange('7d');
+        const res = await insights.analytics(r7d, true);
         if (isMounted && res?.current) {
-          setLaunchMonthData({
-            revenue: res.current.revenue || 0,
-            pages: res.current.pages || 0,
-            orders: res.current.orders || 0,
-            refunds: res.current.refundedAmount || 0,
+          const curSum = res.current;
+          const prevSum = res.previous?.summary;
+
+          const [fy, fm, fd] = r7d.from.split('-').map(Number);
+          const fromDate = new Date(fy, fm - 1, fd);
+          const lastWeekFrom = toDateKey(new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate() - 7));
+          const lastWeekTo = toDateKey(new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate() - 1));
+
+          setWeeklyBenchmarkData({
+            thisWeek: {
+              revenue: curSum.grossCollections ?? curSum.revenue ?? 0,
+              pages: curSum.pages || 0,
+              orders: curSum.orders || 0,
+              refunds: curSum.refundedAmount || 0,
+              from: r7d.from,
+              to: r7d.to,
+            },
+            lastWeek: {
+              revenue: prevSum?.grossCollections ?? prevSum?.revenue ?? 0,
+              pages: prevSum?.pages || 0,
+              orders: prevSum?.orders || 0,
+              refunds: prevSum?.refundedAmount || 0,
+              from: lastWeekFrom,
+              to: lastWeekTo,
+            },
           });
         }
       } catch {
         if (isMounted) {
-          setLaunchMonthData(null);
+          setWeeklyBenchmarkData(null);
         }
       } finally {
-        if (isMounted) setLoadingLaunch(false);
+        if (isMounted) setLoadingWeekly(false);
       }
     };
-    fetchLaunchMonth();
+    fetchWeeklyBenchmark();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [updatedAt]);
 
   const cur = a?.current;
   const prev = a?.previous?.summary;
@@ -184,53 +222,59 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
     });
   }, [a]);
 
-  // Verified Progression (Only verified baseline and active range, without fake numbers)
+  // Verified Progression (Week-over-Week)
   const monthlyProgression = useMemo(() => {
     const list: { month: string; Revenue: number; NetRevenue: number; Pages: number; Orders: number }[] = [];
-    if (launchMonthData && launchMonthData.revenue > 0) {
+    if (weeklyBenchmarkData) {
       list.push({
-        month: 'May 2026 (Launch)',
-        Revenue: launchMonthData.revenue,
-        NetRevenue: Math.max(0, launchMonthData.revenue - (launchMonthData.refunds || 0)),
-        Pages: launchMonthData.pages,
-        Orders: launchMonthData.orders,
+        month: 'Last Week',
+        Revenue: weeklyBenchmarkData.lastWeek.revenue,
+        NetRevenue: Math.max(0, weeklyBenchmarkData.lastWeek.revenue - (weeklyBenchmarkData.lastWeek.refunds || 0)),
+        Pages: weeklyBenchmarkData.lastWeek.pages,
+        Orders: weeklyBenchmarkData.lastWeek.orders,
       });
-    }
-    if (cur && totalGross > 0) {
       list.push({
-        month: 'Current Range',
-        Revenue: totalGross,
-        NetRevenue: netRevenue,
-        Pages: cur.pages || 0,
-        Orders: cur.orders || 0,
+        month: 'This Week',
+        Revenue: weeklyBenchmarkData.thisWeek.revenue,
+        NetRevenue: Math.max(0, weeklyBenchmarkData.thisWeek.revenue - (weeklyBenchmarkData.thisWeek.refunds || 0)),
+        Pages: weeklyBenchmarkData.thisWeek.pages,
+        Orders: weeklyBenchmarkData.thisWeek.orders,
       });
     }
     return list;
-  }, [launchMonthData, totalGross, netRevenue, cur]);
+  }, [weeklyBenchmarkData]);
 
-  // Launch Growth Comparisons
-  const launchBenchmark = useMemo(() => {
-    const lRev = launchMonthData?.revenue || 0;
-    const lPages = launchMonthData?.pages || 0;
-    const lOrders = launchMonthData?.orders || 0;
+  // Weekly Growth Comparisons (Last Week vs This Week)
+  const weeklyBenchmark = useMemo(() => {
+    const thisRev = weeklyBenchmarkData?.thisWeek.revenue ?? 0;
+    const thisPages = weeklyBenchmarkData?.thisWeek.pages ?? 0;
+    const thisOrders = weeklyBenchmarkData?.thisWeek.orders ?? 0;
 
-    const hasBaseline = lRev > 0;
-    const revMultiplier = hasBaseline ? (totalGross / lRev).toFixed(1) : '—';
-    const revGrowthPct = hasBaseline ? Math.round(((totalGross - lRev) / lRev) * 100) : 0;
-    const pageGrowthPct = lPages > 0 ? Math.round((((cur?.pages || 0) - lPages) / lPages) * 100) : 0;
-    const orderGrowthPct = lOrders > 0 ? Math.round((((cur?.orders || 0) - lOrders) / lOrders) * 100) : 0;
+    const lastRev = weeklyBenchmarkData?.lastWeek.revenue ?? 0;
+    const lastPages = weeklyBenchmarkData?.lastWeek.pages ?? 0;
+    const lastOrders = weeklyBenchmarkData?.lastWeek.orders ?? 0;
+
+    const hasBaseline = weeklyBenchmarkData !== null;
+    const revMultiplier = lastRev > 0 ? (thisRev / lastRev).toFixed(1) : (thisRev > 0 ? '—' : '1.0');
+    const revGrowthPct = lastRev > 0 ? Math.round(((thisRev - lastRev) / lastRev) * 100) : (thisRev > 0 ? 100 : 0);
+    const pageGrowthPct = lastPages > 0 ? Math.round(((thisPages - lastPages) / lastPages) * 100) : (thisPages > 0 ? 100 : 0);
+    const orderGrowthPct = lastOrders > 0 ? Math.round(((thisOrders - lastOrders) / lastOrders) * 100) : (thisOrders > 0 ? 100 : 0);
 
     return {
       hasBaseline,
+      thisRev,
+      thisPages,
+      thisOrders,
+      lastRev,
+      lastPages,
+      lastOrders,
       revMultiplier,
       revGrowthPct,
       pageGrowthPct,
       orderGrowthPct,
-      lRev,
-      lPages,
-      lOrders,
+      isRevUp: revGrowthPct >= 0,
     };
-  }, [launchMonthData, totalGross, cur]);
+  }, [weeklyBenchmarkData]);
 
   // Hourly Peak Intensity
   const hourlyRevenueData = useMemo(() => {
@@ -281,7 +325,7 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
       {/* ── Greeting + quote-of-the-visit ───────────────────────────── */}
       <div className="pt-1">
         <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-          {greeting()}, Vastav
+          {greeting()}, Vatsa
         </h1>
         <p className="mt-1.5 text-[13px] italic leading-relaxed text-slate-500 dark:text-slate-400">
           &ldquo;{quote.line}&rdquo; <span className="not-italic text-slate-400 dark:text-slate-500">— {quote.by}</span>
@@ -432,7 +476,7 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
         </div>
       </div>
 
-      {/* ── SECTION 2: LAUNCH MONTH (DAY 1) VS CURRENT BENCHMARK ──── */}
+      {/* ── SECTION 2: LAST WEEK VS THIS WEEK COMPARISON ──── */}
       <div className="p-4 sm:p-6 rounded-3xl bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10">
@@ -444,26 +488,30 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-extrabold text-sm sm:text-lg text-white">
-                    Launch Month (May 2026) vs Today Benchmark
+                    Last Week vs This Week Comparison
                   </h3>
                   <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 shrink-0">
-                    {launchBenchmark.hasBaseline ? `${launchBenchmark.revMultiplier}x` : '—'}
+                    {weeklyBenchmark.hasBaseline ? `${weeklyBenchmark.revMultiplier}x` : '—'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300">
-                  {launchBenchmark.hasBaseline ? 'Comparing current performance against 1st working month of MIMO.' : 'Historical May 2026 baseline data not available.'}
+                  {weeklyBenchmark.hasBaseline
+                    ? 'Comparing current 7-day performance against previous 7-day baseline.'
+                    : 'Loading weekly comparative benchmark...'}
                 </p>
               </div>
             </div>
             <div className="text-left sm:text-right">
               <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                Total Revenue Expansion
+                Week-over-Week Revenue
               </span>
-              <span className="text-lg sm:text-xl font-black text-emerald-400 flex items-center sm:justify-end gap-1">
-                {launchBenchmark.hasBaseline ? (
+              <span className={`text-lg sm:text-xl font-black flex items-center sm:justify-end gap-1 ${
+                weeklyBenchmark.hasBaseline && !weeklyBenchmark.isRevUp ? 'text-rose-400' : 'text-emerald-400'
+              }`}>
+                {weeklyBenchmark.hasBaseline ? (
                   <>
-                    <ArrowUpRight size={18} />
-                    +{launchBenchmark.revGrowthPct}%
+                    {weeklyBenchmark.isRevUp ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
+                    {weeklyBenchmark.revGrowthPct >= 0 ? `+${weeklyBenchmark.revGrowthPct}%` : `${weeklyBenchmark.revGrowthPct}%`}
                   </>
                 ) : (
                   '—'
@@ -474,27 +522,47 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mt-4">
             <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">M1 Revenue</span>
-              <p className="text-lg sm:text-xl font-black text-white mt-1">{launchBenchmark.hasBaseline ? inr(launchBenchmark.lRev) : '—'}</p>
-              <span className="text-[10px] text-slate-400 mt-0.5 block">{launchBenchmark.hasBaseline ? 'Baseline in May 2026' : 'Unreconciled'}</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Last Week Revenue</span>
+              <p className="text-lg sm:text-xl font-black text-white mt-1">
+                {weeklyBenchmark.hasBaseline ? inr(weeklyBenchmark.lastRev) : '—'}
+              </p>
+              <span className="text-[10px] text-slate-400 mt-0.5 block">
+                {weeklyBenchmark.hasBaseline && weeklyBenchmarkData?.lastWeek.from
+                  ? `${fmtDateShort(weeklyBenchmarkData.lastWeek.from)} – ${fmtDateShort(weeklyBenchmarkData.lastWeek.to)}`
+                  : 'Prior 7 days'}
+              </span>
             </div>
 
             <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Revenue</span>
-              <p className="text-lg sm:text-xl font-black text-emerald-400 mt-1">{inr(totalGross)}</p>
-              <span className="text-[10px] text-emerald-300/80 font-bold mt-0.5 block">{launchBenchmark.hasBaseline ? `+${launchBenchmark.revGrowthPct}% Growth` : 'Active window'}</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">This Week Revenue</span>
+              <p className="text-lg sm:text-xl font-black text-emerald-400 mt-1">
+                {weeklyBenchmark.hasBaseline ? inr(weeklyBenchmark.thisRev) : '—'}
+              </p>
+              <span className="text-[10px] text-emerald-300/80 font-bold mt-0.5 block">
+                {weeklyBenchmark.hasBaseline
+                  ? `${weeklyBenchmark.revGrowthPct >= 0 ? '+' : ''}${weeklyBenchmark.revGrowthPct}% vs last week`
+                  : 'Active 7 days'}
+              </span>
             </div>
 
             <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Print Volume</span>
-              <p className="text-lg sm:text-xl font-black text-white mt-1">{int(cur?.pages ?? 0)} pgs</p>
-              <span className="text-[10px] text-indigo-300 font-bold mt-0.5 block">{launchBenchmark.hasBaseline ? `vs ${launchBenchmark.lPages} in M1` : 'Active window'}</span>
+              <p className="text-lg sm:text-xl font-black text-white mt-1">
+                {weeklyBenchmark.hasBaseline ? `${int(weeklyBenchmark.thisPages)} pgs` : '—'}
+              </p>
+              <span className="text-[10px] text-indigo-300 font-bold mt-0.5 block">
+                {weeklyBenchmark.hasBaseline ? `vs ${int(weeklyBenchmark.lastPages)} last week` : 'Active 7 days'}
+              </span>
             </div>
 
             <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Order Frequency</span>
-              <p className="text-lg sm:text-xl font-black text-white mt-1">{cur?.orders ?? 0} orders</p>
-              <span className="text-[10px] text-amber-300 font-bold mt-0.5 block">vs {launchBenchmark.lOrders} in M1</span>
+              <p className="text-lg sm:text-xl font-black text-white mt-1">
+                {weeklyBenchmark.hasBaseline ? `${weeklyBenchmark.thisOrders} orders` : '—'}
+              </p>
+              <span className="text-[10px] text-amber-300 font-bold mt-0.5 block">
+                {weeklyBenchmark.hasBaseline ? `vs ${weeklyBenchmark.lastOrders} last week` : 'Active 7 days'}
+              </span>
             </div>
           </div>
         </div>
@@ -510,14 +578,14 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
                 {activeChartTab === 'waterfall'
                   ? 'Revenue & Refund Trajectory'
                   : activeChartTab === 'monthly'
-                  ? 'Month-by-Month Company Growth'
+                  ? 'Week-over-Week Company Growth'
                   : 'Hourly Financial Intensity'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {activeChartTab === 'waterfall'
                   ? 'Gross collections vs refunds deducted vs net realized'
                   : activeChartTab === 'monthly'
-                  ? 'Progressive revenue scaling from Day 1 inception to present'
+                  ? 'Comparative revenue scaling between Last Week and This Week'
                   : 'Campus peak transaction velocity throughout operating hours'}
               </p>
             </div>
@@ -543,7 +611,7 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                MoM
+                WoW
               </button>
               <button
                 type="button"

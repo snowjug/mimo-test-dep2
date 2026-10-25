@@ -15,13 +15,12 @@ import { FinanceWalletPage } from './pages/FinanceWalletPage';
 import { FinanceSettlementsPage } from './pages/FinanceSettlementsPage';
 import { FinanceDashboardPage } from './pages/FinanceDashboardPage';
 import { FinanceExpensesPage } from './pages/FinanceExpensesPage';
-import { FinanceKrishnaReportPage } from './pages/FinanceKrishnaReportPage';
+import { FinanceCustomerAnalyticsPage } from './pages/FinanceCustomerAnalyticsPage';
 import { FinanceLoginPage } from '../../components/auth/FinanceLoginPage';
 import type { AdminUsersResponse } from '../../types/user.types';
 import { staffProfileService, StaffProfile } from '../../services/profile.service';
 import { ProfileModal } from '../../components/shared/ProfileModal';
 import { ProfileCompletionBanner } from '../../components/shared/ProfileCompletionBanner';
-import { ChatPanel } from '../../components/shared/ChatPanel';
 
 const TAB_PATHS: [string, FinanceTab][] = [
   ['/finance/dashboard',   'dashboard'],
@@ -32,7 +31,8 @@ const TAB_PATHS: [string, FinanceTab][] = [
   ['/finance/wallet',     'wallet'],
   ['/finance/settlement', 'settlements'],
   ['/finance/expense',    'expenses'],
-  ['/finance/krishna-report', 'krishna-report'],
+  ['/finance/customer-analytics', 'customer-analytics'],
+  ['/finance/krishna-report', 'customer-analytics'],
 ];
 const tabFromPath = (): FinanceTab => {
   const path = window.location.pathname.toLowerCase();
@@ -81,7 +81,7 @@ export const FinanceApp: React.FC = () => {
   const wantUsers = signedIn && activeTab === 'wallet';
   const users = useLiveQuery(() => (wantUsers ? api.get<AdminUsersResponse>('/admin/users').then((r) => r.data) : Promise.resolve(null)), [wantUsers], { live: false });
 
-  const wantGrowthReport = signedIn && activeTab === 'krishna-report';
+  const wantGrowthReport = signedIn && (activeTab === 'customer-analytics' || activeTab === 'krishna-report');
   const growthReport = useLiveQuery(
     () => (wantGrowthReport ? insights.userGrowthReport(current()) : Promise.resolve(null)),
     [range, wantGrowthReport],
@@ -129,7 +129,7 @@ export const FinanceApp: React.FC = () => {
       onSearchChange={setGlobalSearch}
       pendingRefundsCount={pendingRefunds}
       onOpenProfile={() => setShowProfile(true)}
-      profileName={staffProfile?.name}
+      profileName={staffProfile?.name && staffProfile.name !== 'Vishal sir' ? staffProfile.name : 'Vatsa'}
       profileAvatarUrl={staffProfile?.avatarUrl}
     >
       {activeTab === 'dashboard' && (
@@ -177,8 +177,8 @@ export const FinanceApp: React.FC = () => {
         <FinanceSettlementsPage analytics={analytics.data} transactions={transactions.data?.transactions ?? []} loading={analytics.loading} error={analytics.error} />
       )}
       {activeTab === 'expenses' && <FinanceExpensesPage />}
-      {activeTab === 'krishna-report' && (
-        <FinanceKrishnaReportPage
+      {(activeTab === 'customer-analytics' || activeTab === 'krishna-report') && (
+        <FinanceCustomerAnalyticsPage
           report={growthReport.data}
           loading={growthReport.loading}
           error={growthReport.error}
@@ -186,7 +186,6 @@ export const FinanceApp: React.FC = () => {
           onRefresh={growthReport.refresh}
         />
       )}
-      {activeTab === 'chat' && <ChatPanel basePath="/staff" selfId="finance" title="Finance Team Chat" />}
 
       {staffProfile && !showProfile && (
         <ProfileCompletionBanner profile={staffProfile} onComplete={() => setShowProfile(true)} />

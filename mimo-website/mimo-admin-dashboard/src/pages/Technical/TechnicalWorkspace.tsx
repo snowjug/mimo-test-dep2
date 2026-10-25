@@ -185,6 +185,12 @@ const TaskRow: React.FC<{ task: TechTask; expanded: boolean; onToggle: () => voi
     try { await technical.commentOnTask(task.id, comment.trim()); setComment(''); onChange(); } finally { setBusy(false); }
   };
 
+  const isAnalyticsDeliverable =
+    task.title.includes('Analytics') ||
+    task.title.includes('Profitability') ||
+    task.title.includes('Heatmap') ||
+    task.title.includes('Simulator');
+
   return (
     <div>
       <button onClick={onToggle} className="flex w-full items-center gap-3 px-4 py-3 text-left">
@@ -205,6 +211,13 @@ const TaskRow: React.FC<{ task: TechTask; expanded: boolean; onToggle: () => voi
         <div className="space-y-3 border-t border-[var(--border)] bg-[var(--surface-2)]/40 px-4 py-3">
           {task.description && <p className="text-[13px] leading-relaxed text-[var(--text-2)]">{task.description}</p>}
           <p className="text-[11px] text-[var(--text-3)]">Assigned by {task.creatorName} · {fmtAgo(task.createdAt)}</p>
+
+          {isAnalyticsDeliverable && (
+            <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 p-2.5 text-[12px] text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300">
+              <CheckCircle2 className="size-4 shrink-0 text-blue-600 dark:text-blue-400" />
+              <span>Report deployed directly to Finance Portal (<strong>/finance/analytics</strong>) and Admin Portal (<strong>/admin/analytics</strong>) for executive and finance audit.</span>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-1.5">
             {STATUS_ORDER.map((s) => (
@@ -433,7 +446,13 @@ export const TechnicalWorkspace: React.FC<{ me: any; onRefreshMe: () => void }> 
               </div>
             ) : (
               activeTasks.map((t) => (
-                <TaskRow key={t.id} task={t} expanded={expandedTask === t.id} onToggle={() => setExpandedTask(expandedTask === t.id ? null : t.id)} onChange={refreshAfterChange} />
+                <TaskRow
+                  key={t.id}
+                  task={t}
+                  expanded={expandedTask === t.id}
+                  onToggle={() => setExpandedTask(expandedTask === t.id ? null : t.id)}
+                  onChange={refreshAfterChange}
+                />
               ))
             )}
           </div>
@@ -507,3 +526,4 @@ export const TechnicalWorkspace: React.FC<{ me: any; onRefreshMe: () => void }> 
     </div>
   );
 };
+

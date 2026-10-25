@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Backspace, Check, CircleNotch } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
-import { ArchFrame, Diya, FestiveBackdrop, Mandala, OrnamentDivider, Toran, ZariBorder } from '../festive/NavaratriDecor';
+import { Diya, FestiveBackdrop, GoldenCornerWaves, Mandala, OrnamentDivider } from '../festive/NavaratriDecor';
 
 interface CodeEntryScreenProps {
   onSuccess: () => void;
@@ -25,7 +25,7 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
   hasError,
   kioskId,
 }) => {
-  const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+  const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
   const [isShaking, setIsShaking] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -68,97 +68,117 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
   }, [isActive]);
 
   if (isFestiveMode) {
-    const festiveKey =
-      'h-[84px] rounded-2xl border border-gold-600/40 bg-gradient-to-b from-white to-parchment-100 font-serif text-[42px] font-semibold leading-none text-mahogany-700 [font-variant-numeric:lining-nums] shadow-[inset_0_0_0_3px_#fffdf7,inset_0_0_0_4px_rgba(201,151,62,0.22),0_4px_12px_rgba(122,18,48,0.08)] transition-transform active:scale-95 active:from-parchment-200';
     const ready = code.length === 4;
 
     return (
       <div
-        className={`screen ${isActive ? 'visible' : ''} flex h-full overflow-hidden bg-parchment-100`}
+        className={`screen ${isActive ? 'visible' : ''} relative flex h-full select-none overflow-hidden bg-[#1A0A01]`}
         style={{ display: isActive ? 'flex' : 'none' }}
       >
         <FestiveBackdrop />
 
-        <div className="pointer-events-none absolute left-[1030px] top-[444px] z-0 -translate-x-1/2 -translate-y-1/2 opacity-[0.11]">
-          <Mandala size={600} />
+        {/* Ambient warm golden illumination in top-right */}
+        <div 
+          className="pointer-events-none absolute right-0 top-0 h-[600px] w-[600px] rounded-full blur-[120px] opacity-35"
+          style={{
+            background: 'radial-gradient(circle, rgba(212,165,89,0.35) 0%, rgba(160,80,20,0.18) 40%, transparent 70%)'
+          }}
+        />
+
+        {/* Subtle background mandala behind the cards */}
+        <div className="pointer-events-none absolute left-[1000px] top-[410px] z-0 -translate-x-1/2 -translate-y-1/2 opacity-[0.14]">
+          <Mandala size={680} />
         </div>
 
-        <Toran compact />
+        {/* Golden flowing wave curves in bottom corners */}
+        <GoldenCornerWaves />
 
+        {/* Back button */}
         <button
           onClick={onBack}
           aria-label="Go back to home"
-          className="absolute left-10 top-[104px] z-20 flex h-14 w-14 items-center justify-center rounded-full border border-gold-600/45 bg-white text-mahogany-700 shadow-[0_6px_16px_rgba(122,18,48,0.12)] transition-transform active:scale-95"
+          className="absolute left-10 top-10 z-20 flex h-14 w-14 items-center justify-center rounded-full border border-[#D4A559]/40 bg-[#1D0C04]/80 text-[#FFF8EE] shadow-[0_4px_16px_rgba(0,0,0,0.4),0_0_12px_rgba(212,165,89,0.15)] backdrop-blur-sm transition-transform hover:border-[#E5B878] hover:shadow-[0_0_18px_rgba(229,184,120,0.35)] active:scale-95"
         >
           <ArrowLeft size={24} weight="bold" />
         </button>
 
-        <div className="absolute inset-x-0 bottom-[18px] top-[96px] z-10 flex items-center justify-center gap-[88px]">
-          {/* LEFT: jharokha arch with the code slots */}
+        {/* Centered Cards Container */}
+        <div className="absolute inset-0 z-10 flex items-center justify-center gap-14">
+          {/* LEFT: Refined dark espresso glass panel with circular code indicators */}
           <motion.div
-            initial={isActive ? { opacity: 0, y: 20 } : false}
+            initial={isActive ? { opacity: 0, y: 16 } : false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            className="relative h-[560px] w-[540px]"
+            className="relative flex h-[530px] w-[530px] flex-col items-center justify-center rounded-[28px] border border-[#D4A559]/35 bg-[#180802]/80 px-10 text-center shadow-[0_24px_60px_rgba(0,0,0,0.65),0_0_30px_rgba(212,165,89,0.12),inset_0_0_30px_rgba(212,165,89,0.04)] backdrop-blur-md"
           >
-            <ArchFrame width={540} height={560} />
-            <div className="absolute inset-0 flex flex-col items-center px-12 pt-[140px] text-center">
-              <p lang="hi" className="font-deva text-[24px] leading-[1.3] text-mahogany-600">
-                अपना मिमो कोड दर्ज करें
-              </p>
-              <h2 className="mt-1 whitespace-nowrap font-serif text-[44px] font-semibold leading-[1.1] text-mahogany-800">
-                Enter your Mimo code
-              </h2>
-              <p className="mt-2 text-[17px] font-medium text-ink-warm/60">Each digit lights a diya</p>
+            <p lang="hi" className="font-deva text-[22px] font-medium leading-[1.3] text-[#DFCBB5]">
+              अपना मिमो कोड दर्ज करें
+            </p>
+            <h2 className="mt-1.5 whitespace-nowrap font-serif text-[42px] font-semibold leading-[1.15] text-[#FFF8EE] drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
+              Enter your Mimo code
+            </h2>
+            <p className="mt-2 text-[16px] font-normal text-[#A68868]">
+              Each digit lights a diya
+            </p>
 
-              <div className="mt-5">
-                <OrnamentDivider width={56} />
-              </div>
-
-              <motion.div
-                animate={isShaking ? { x: [0, -14, 14, -10, 10, -4, 4, 0] } : { x: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mt-8 flex gap-4"
-              >
-                {[0, 1, 2, 3].map((i) => {
-                  const filled = i < code.length;
-                  const active = i === code.length && !isShaking;
-                  return (
-                    <div
-                      key={i}
-                      className={`flex h-[96px] w-[84px] items-end justify-center rounded-2xl border-2 bg-white/80 pb-3 transition-colors duration-200 ${
-                        isShaking
-                          ? 'border-danger-500/70 bg-danger-500/10'
-                          : filled
-                          ? 'border-gold-500 bg-gradient-to-b from-gold-200/40 to-white shadow-[0_0_24px_rgba(251,191,36,0.35)]'
-                          : active
-                          ? 'border-mahogany-600/55'
-                          : 'border-gold-600/25'
-                      }`}
-                    >
-                      {filled ? (
-                        <Diya size={52} />
-                      ) : active ? (
-                        <span
-                          className="mb-4 h-10 w-[3px] rounded-full bg-mahogany-600"
-                          style={{ animation: 'navaratri-caret 1.1s ease-in-out infinite' }}
-                        />
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </motion.div>
+            <div className="mt-5">
+              <OrnamentDivider width={60} />
             </div>
+
+            {/* 4 Circular Code Indicators */}
+            <motion.div
+              animate={isShaking ? { x: [0, -14, 14, -10, 10, -4, 4, 0] } : { x: 0 }}
+              transition={{ duration: 0.5 }}
+              className="mt-9 flex items-center justify-center gap-5"
+            >
+              {[0, 1, 2, 3].map((i) => {
+                const filled = i < code.length;
+                const active = i === code.length && !isShaking;
+                return (
+                  <div
+                    key={i}
+                    className={`relative flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-full border transition-all duration-200 ${
+                      isShaking
+                        ? 'border-[#F35B5B]/80 bg-[#F35B5B]/15 shadow-[0_0_16px_rgba(243,91,91,0.4)]'
+                        : filled
+                        ? 'border-[#E5B878] bg-[#1E0B03]/90 shadow-[0_0_22px_rgba(229,184,120,0.45)]'
+                        : active
+                        ? 'border-[#E5B878] bg-[#1B0A03]/85 shadow-[0_0_24px_rgba(229,184,120,0.55),inset_0_0_10px_rgba(229,184,120,0.22)] ring-1 ring-[#E5B878]/60'
+                        : 'border-[#D4A559]/35 bg-[#140601]/60'
+                    }`}
+                  >
+                    {filled ? (
+                      <Diya size={44} />
+                    ) : active ? (
+                      <span
+                        className="h-8 w-[2.5px] rounded-full bg-[#E5B878] shadow-[0_0_8px_#E5B878]"
+                        style={{ animation: 'navaratri-caret 1.1s ease-in-out infinite' }}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </motion.div>
           </motion.div>
 
-          {/* RIGHT: keypad on a carved panel */}
-          <div className="relative rounded-[32px] border border-gold-600/35 bg-white/55 p-6 shadow-[0_24px_60px_rgba(122,18,48,0.10)] backdrop-blur-sm">
-            {['left-3 top-3', 'right-3 top-3', 'left-3 bottom-3', 'right-3 bottom-3'].map((pos) => (
-              <span key={pos} className={`absolute ${pos} h-2 w-2 rotate-45 bg-gold-500/70`} />
+          {/* RIGHT: Perfectly circular numeric keypad on carved glass panel */}
+          <div className="relative flex h-[530px] w-[410px] flex-col items-center justify-center rounded-[28px] border border-[#D4A559]/35 bg-[#180802]/80 p-7 shadow-[0_24px_60px_rgba(0,0,0,0.65),0_0_30px_rgba(212,165,89,0.12),inset_0_0_30px_rgba(212,165,89,0.04)] backdrop-blur-md">
+            {/* 4 Corner Diamond Rivets */}
+            {['left-3.5 top-3.5', 'right-3.5 top-3.5', 'left-3.5 bottom-3.5', 'right-3.5 bottom-3.5'].map((pos) => (
+              <span
+                key={pos}
+                className={`absolute ${pos} h-2 w-2 rotate-45 bg-[#E5B878] shadow-[0_0_6px_rgba(229,184,120,0.8)]`}
+              />
             ))}
-            <div className="grid w-[420px] grid-cols-3 gap-3.5">
+
+            <div className="grid grid-cols-3 gap-5 place-items-center">
               {KEYS.map((num) => (
-                <button key={num} id={`key-${num}`} onClick={() => handleNumClick(num)} className={festiveKey}>
+                <button
+                  key={num}
+                  id={`key-${num}`}
+                  onClick={() => handleNumClick(num)}
+                  className="relative flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-full border border-[#D4A559]/35 bg-[#220E05]/75 font-serif text-[36px] font-semibold text-[#FFF8EE] shadow-[0_4px_12px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:border-[#E5B878] hover:bg-[#2F1407] hover:shadow-[0_0_18px_rgba(229,184,120,0.4)] active:scale-95 active:bg-[#3D1A0A] active:border-[#F3C97E] active:shadow-[0_0_22px_rgba(229,184,120,0.6)] focus:outline-none"
+                >
                   {num}
                 </button>
               ))}
@@ -167,12 +187,16 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
                 id="key-del"
                 onClick={() => handleNumClick('del')}
                 aria-label="Delete last digit"
-                className={`${festiveKey} flex items-center justify-center text-mahogany-600`}
+                className="relative flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-full border border-[#D4A559]/35 bg-[#220E05]/75 text-[#FFF8EE] shadow-[0_4px_12px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:border-[#E5B878] hover:bg-[#2F1407] hover:shadow-[0_0_18px_rgba(229,184,120,0.4)] active:scale-95 active:bg-[#3D1A0A] active:border-[#F3C97E] active:shadow-[0_0_22px_rgba(229,184,120,0.6)] focus:outline-none"
               >
-                <Backspace size={30} weight="bold" />
+                <Backspace size={28} weight="bold" />
               </button>
 
-              <button id="key-0" onClick={() => handleNumClick('0')} className={festiveKey}>
+              <button
+                id="key-0"
+                onClick={() => handleNumClick('0')}
+                className="relative flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-full border border-[#D4A559]/35 bg-[#220E05]/75 font-serif text-[36px] font-semibold text-[#FFF8EE] shadow-[0_4px_12px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:border-[#E5B878] hover:bg-[#2F1407] hover:shadow-[0_0_18px_rgba(229,184,120,0.4)] active:scale-95 active:bg-[#3D1A0A] active:border-[#F3C97E] active:shadow-[0_0_22px_rgba(229,184,120,0.6)] focus:outline-none"
+              >
                 0
               </button>
 
@@ -181,10 +205,10 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
                 onClick={handleSubmit}
                 disabled={!ready || loading}
                 aria-label="Submit code"
-                className={`flex h-[84px] items-center justify-center rounded-2xl border transition-all active:scale-95 ${
+                className={`relative flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-full border transition-all duration-150 active:scale-95 focus:outline-none ${
                   ready
-                    ? 'border-gold-500 bg-gradient-to-br from-mahogany-600 to-mahogany-800 text-parchment-50 shadow-[0_10px_24px_rgba(122,18,48,0.35)] ring-1 ring-gold-400/60'
-                    : 'border-gold-600/30 bg-white/70 text-mahogany-700/35'
+                    ? 'border-[#E5B878] bg-[#220E05]/75 text-[#FFF8EE] shadow-[0_0_24px_rgba(229,184,120,0.5),inset_0_0_10px_rgba(229,184,120,0.2)] hover:shadow-[0_0_28px_rgba(229,184,120,0.6)] cursor-pointer'
+                    : 'border-[#D4A559]/25 bg-[#1B0A03]/50 text-[#FFF8EE]/30 cursor-not-allowed'
                 }`}
               >
                 <AnimatePresence mode="wait" initial={false}>
@@ -196,11 +220,11 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
                       exit={{ opacity: 0 }}
                       transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
                     >
-                      <CircleNotch size={30} weight="bold" />
+                      <CircleNotch size={28} weight="bold" />
                     </motion.span>
                   ) : (
                     <motion.span key="check" initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
-                      <Check size={30} weight="bold" />
+                      <Check size={28} weight="bold" />
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -208,8 +232,6 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
             </div>
           </div>
         </div>
-
-        <ZariBorder />
       </div>
     );
   }

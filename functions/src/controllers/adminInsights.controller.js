@@ -91,6 +91,22 @@ const getAdminAnalytics = async (req, res) => {
   }
 };
 
+// ─────────────────────────────── GET /admin/analytics/monthly-summary ───────────────────────────────
+const getAdminMonthlySummary = async (req, res) => {
+  try {
+    const months = await A.getMonthlySummary(db, Timestamp);
+    res.json({
+      launchDate: A.LAUNCH_DATE_IST,
+      timezone: "Asia/Kolkata",
+      currency: "INR",
+      months,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    fail(res, err, "monthly-summary");
+  }
+};
+
 // ─────────────────────────────── GET /admin/transactions ───────────────────────────────
 const getAdminTransactions = async (req, res) => {
   try {
@@ -290,8 +306,13 @@ const hardwareFor = (hardware, kioskId) =>
       // Some Pis already decrement paperLevel themselves on every print (stamping lastPaperDeduction each
       // time) — that value is already current. Re-subtracting the page-counter delta on top of it double
       // counts the same consumption and can drive the shown level to 0 while real paper remains. Only apply
-      // the page-counter correction when nothing is already live-decrementing paperLevel for us.
-      const selfReporting = p.lastPaperDeduction !== undefined && p.lastPaperDeduction !== null;
+      // the page-counter correction when nothing is already live-decrementing paperLevel for us. A stamp older
+      // than the last refill means that Pi stopped decrementing (the stamp is a leftover from an old Pi
+      // version), so it no longer counts — otherwise the level stays frozen at the refill value forever.
+      const lastDeductionMs = A.toMillis(p.lastPaperDeduction);
+      const refilledMs = A.toMillis(p.paperRefilledAt);
+      const deductionIsStale = Number.isFinite(lastDeductionMs) && Number.isFinite(refilledMs) && lastDeductionMs < refilledMs;
+      const selfReporting = p.lastPaperDeduction !== undefined && p.lastPaperDeduction !== null && !deductionIsStale;
       // B&W: the Pi reports the printer's own page counter, so paper left = level at refill − sheets printed since.
       const tracked = !selfReporting && type !== "color" && paperLevel !== null && Number.isFinite(p.pageCount) && Number.isFinite(p.paperRefillPageCount);
       if (tracked) paperLevel -= Math.max(0, p.pageCount - p.paperRefillPageCount);
@@ -440,15 +461,71 @@ const getAdminIncidents = async (req, res) => {
       }
     }
     let failedShown = 0;
+    const failedDocs = [];
     failedSnap.forEach((d) => {
       const j = d.data();
       if (!["failed", "refunded"].includes(String(j.status || "").toLowerCase()) || failedShown >= 200) return;
       failedShown += 1;
-      incidents.push({ id: `job-${d.id}`, type: "print_failed", severity: "high", kioskId: j.kioskId || j.printDestination || null, title: `Print failed${j.kioskId ? ` on ${j.kioskId}` : ""}`, detail: j.printerStatus || j.error || j.fileName || "Job failed", at: A.iso(A.toMillis(j.createdAt)), jobId: d.id, orderId: j.orderId || null, refundStatus: j.refundStatus || null, tab: "operations" });
+      failedDocs.push({ id: d.id, ...j });
     });
+
+    const userMap = await lookupUsers(failedDocs.map((d) => d.userId));
+
+    for (const j of failedDocs) {
+      const u = userMap.get(j.userId);
+      const kid = j.kioskId || j.printDestination || j.printOptions?.directKioskId || null;
+      const userEmail = j.userEmail || u?.email || (j.source === "whatsapp" ? j.userId : null) || (j.userId ? "Registered User" : null);
+      const userName = j.userName || j.name || u?.name || (j.source === "whatsapp" ? "WhatsApp Customer" : null);
+      const userPhone = j.userPhone || j.phoneNumber || u?.phone || (j.source === "whatsapp" ? j.userId : null);
+      const failureReason = j.printerStatus || j.error || "Job failed";
+
+      const rawColor = String(j.colorMode || j.printOptions?.colorMode || j.settings?.colorMode || (j.isColor ? "color" : "") || "").toLowerCase();
+      const isColor = rawColor === "color" || rawColor === "colour";
+      const colorMode = isColor ? "color" : "bw";
+      const pageCount = Number(j.pageCount || j.pages || j.printOptions?.pageCount || 1);
+
+      incidents.push({
+        id: `job-${j.id}`,
+        type: "print_failed",
+        severity: "high",
+        kioskId: kid,
+        title: `Print failed${kid ? ` on ${kid}` : ""}`,
+        detail: j.printerStatus || j.error || j.fileName || "Job failed",
+        at: A.iso(A.toMillis(j.createdAt)),
+        jobId: j.id,
+        orderId: j.orderId || null,
+        userId: j.userId || null,
+        userName,
+        userEmail,
+        userPhone,
+        fileName: j.fileName || null,
+        failureReason,
+        status: j.status || "failed",
+        refundStatus: j.refundStatus || null,
+        refundAmount: j.refundAmount || null,
+        amount: j.totalCost || j.amount || null,
+        pageCount,
+        copies: j.copies || j.printOptions?.copies || 1,
+        colorMode,
+        tab: "operations",
+      });
+    }
+
     refundSnap.forEach((d) => {
       const r = d.data();
-      incidents.push({ id: `refund-${d.id}`, type: "refund_request", severity: "medium", kioskId: null, title: "Refund request awaiting review", detail: `Order ${r.orderId} · ₹${A.num(r.amount)}${r.reason ? ` · ${r.reason}` : ""}`, at: A.iso(A.toMillis(r.requestedAt)), orderId: r.orderId, tab: "incidents" });
+      incidents.push({
+        id: `refund-${d.id}`,
+        type: "refund_request",
+        severity: "medium",
+        kioskId: r.kioskId || null,
+        title: "Refund request awaiting review",
+        detail: `Order ${r.orderId} · ₹${A.num(r.amount)}${r.reason ? ` · ${r.reason}` : ""}`,
+        at: A.iso(A.toMillis(r.requestedAt)),
+        orderId: r.orderId,
+        failureReason: r.reason || "Customer requested refund",
+        amount: r.amount || null,
+        tab: "incidents",
+      });
     });
 
     incidents.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || (A.toMillis(b.at) || 0) - (A.toMillis(a.at) || 0));
@@ -528,6 +605,97 @@ const getAdminIssues = async (req, res) => {
   }
 };
 
+// ─────────────────────────────── GET /admin/settlements/reconciliation ───────────────────────────────
+const getAdminSettlementsReconciliation = async (req, res) => {
+  try {
+    const [txnsSnap, settlementsSnap] = await Promise.all([
+      db.collection("payment_transactions").where("transactionStatus.status", "==", "completed").limit(1000).get().catch(() => ({ docs: [] })),
+      db.collection("cashfree_settlements").limit(1000).get().catch(() => ({ docs: [] })),
+    ]);
+
+    const txns = txnsSnap.docs.map((d) => d.data());
+    const settlements = settlementsSnap.docs.map((d) => d.data());
+
+    const totalCollectedPaise = txns.reduce((a, t) => a + Math.round((Number(t.amount) || 0) * 100), 0);
+    const totalSettledPaise = settlements.reduce((a, s) => a + Math.round((Number(s.amountSettled !== undefined ? s.amountSettled : s.settlementAmount) || 0) * 100), 0);
+    const totalFeesPaise = settlements.reduce((a, s) => a + Math.round((Number(s.serviceCharge || 0) + Number(s.serviceTax || 0)) * 100), 0);
+    const totalAdjustmentsPaise = settlements.reduce((a, s) => a + Math.round((Number(s.adjustment || 0)) * 100), 0);
+
+    const variancePaise = totalCollectedPaise - (totalSettledPaise + totalFeesPaise);
+
+    res.json({
+      status: settlements.length === 0 ? "UNRECONCILED" : Math.abs(variancePaise) < 100 ? "RECONCILED" : "DISCREPANCY_DETECTED",
+      collections: {
+        count: txns.length,
+        totalRupees: totalCollectedPaise / 100,
+      },
+      settlements: {
+        count: settlements.length,
+        totalSettledRupees: totalSettledPaise / 100,
+        totalFeesRupees: totalFeesPaise / 100,
+        totalAdjustmentsRupees: totalAdjustmentsPaise / 100,
+        records: settlements.slice(0, 50).map((s) => ({
+          settlementId: s.cfSettlementId || s.settlementId,
+          utr: s.settlementUtr || s.utr,
+          amount: s.amountSettled !== undefined ? s.amountSettled : s.settlementAmount,
+          fee: s.serviceCharge,
+          tax: s.serviceTax,
+          adjustment: s.adjustment,
+          time: s.settlementDate || s.settlementTime,
+          status: s.settlementStatus || s.reconciledStatus,
+          health: s.health || "Healthy",
+        })),
+      },
+      varianceRupees: variancePaise / 100,
+      settlementRecordsAvailable: settlements.length > 0,
+      note: settlements.length === 0
+        ? "No settlement records in Firestore. Trigger a settlement synchronization to import Cashfree bank settlements."
+        : "Reconciled with Cashfree settlement batches and bank transfer UTR records.",
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    fail(res, err, "settlement-reconciliation");
+  }
+};
+
+const cashfreeSettlementService = require("../services/cashfreeSettlement.service");
+
+// ─────────────────────────────── POST /admin/settlements/sync ───────────────────────────────
+const postAdminSyncSettlements = async (req, res) => {
+  try {
+    const dryRun = req.query.dryRun === "true" || req.body?.dryRun === true;
+    const preferApi = req.query.preferApi !== "false" && req.body?.preferApi !== false;
+    const result = await cashfreeSettlementService.syncCashfreeSettlements({
+      db,
+      dryRun,
+      preferApi,
+    });
+    res.json(result);
+  } catch (err) {
+    fail(res, err, "sync-settlements");
+  }
+};
+
+// ─────────────────────────────── GET /admin/settlements ───────────────────────────────
+const getAdminSettlements = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 500);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const status = req.query.status ? String(req.query.status).trim() : undefined;
+    const monthKey = req.query.monthKey ? String(req.query.monthKey).trim() : undefined;
+
+    const result = await cashfreeSettlementService.getSettlementsList(db, {
+      limit,
+      offset,
+      status,
+      monthKey,
+    });
+    res.json(result);
+  } catch (err) {
+    fail(res, err, "get-settlements");
+  }
+};
+
 module.exports = {
   jobTimeline,
   jobOutcome,
@@ -543,4 +711,8 @@ module.exports = {
   getAdminIssues,
   loadKiosks,
   getAdminFinanceSheetData,
+  getAdminMonthlySummary,
+  getAdminSettlementsReconciliation,
+  postAdminSyncSettlements,
+  getAdminSettlements,
 };

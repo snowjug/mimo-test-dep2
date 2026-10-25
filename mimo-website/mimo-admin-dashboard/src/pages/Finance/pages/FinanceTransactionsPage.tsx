@@ -81,19 +81,46 @@ export const FinanceTransactionsPage: React.FC<FinanceTransactionsPageProps> = (
         <FinanceMetricCard title="Collected" value={inr(ledger)} icon={<IndianRupee className="w-5 h-5" />} iconBgColor="bg-indigo-50" iconColor="text-indigo-600" loading={loading} />
       </div>
 
-      <div className="bg-white border border-[#E4E7EB] rounded-2xl p-4 shadow-xs flex flex-col lg:flex-row lg:items-center gap-3">
+      <div className="bg-white dark:bg-slate-900 border border-[#E4E7EB] dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col lg:flex-row lg:items-center gap-3">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order ID, customer, machine, gateway reference…"
-            className="w-full bg-[#F3F4F6] border border-[#E4E7EB] rounded-xl pl-10 pr-3 py-2.5 text-xs font-medium focus:outline-none focus:border-[#093765]" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search order ID, customer, machine, gateway reference…"
+            className="w-full bg-[#F3F4F6] dark:bg-slate-800 border border-[#E4E7EB] dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 rounded-xl pl-10 pr-3 py-2.5 text-xs font-medium focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
+          />
         </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="bg-[#F3F4F6] border border-[#E4E7EB] rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700">
-          {STATUS_FILTERS.map((s) => <option key={s} value={s}>{s === 'ALL' ? 'All statuses' : s.charAt(0) + s.slice(1).toLowerCase()}</option>)}
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value as typeof status)}
+          className="bg-[#F3F4F6] dark:bg-slate-800 border border-[#E4E7EB] dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none"
+        >
+          {STATUS_FILTERS.map((s) => (
+            <option key={s} value={s} className="dark:bg-slate-800 dark:text-slate-200">
+              {s === 'ALL' ? 'All statuses' : s.charAt(0) + s.slice(1).toLowerCase()}
+            </option>
+          ))}
         </select>
-        <select value={method} onChange={(e) => setMethod(e.target.value)} className="bg-[#F3F4F6] border border-[#E4E7EB] rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700">
-          {methods.map((m) => <option key={m} value={m}>{m === 'ALL' ? 'All methods' : m}</option>)}
+        <select
+          value={method}
+          onChange={(e) => setMethod(e.target.value)}
+          className="bg-[#F3F4F6] dark:bg-slate-800 border border-[#E4E7EB] dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none"
+        >
+          {methods.map((m) => (
+            <option key={m} value={m} className="dark:bg-slate-800 dark:text-slate-200">
+              {m === 'ALL' ? 'All methods' : m}
+            </option>
+          ))}
         </select>
-        <button type="button" onClick={exportCsv} disabled={rows.length === 0} className="px-4 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200/80 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-50"><Download className="w-3.5 h-3.5" /> Export CSV</button>
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={rows.length === 0}
+          className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
+        >
+          <Download className="w-3.5 h-3.5" /> Export CSV
+        </button>
       </div>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">

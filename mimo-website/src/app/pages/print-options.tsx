@@ -111,6 +111,32 @@ export function PrintOptions() {
   const [imageScaling, setImageScaling] = useState("fit");
   const [customScale, setCustomScale] = useState(100);
   const [selectedPreview, setSelectedPreview] = useState<number | null>(null);
+  const [previewSignedUrl, setPreviewSignedUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // storage.rules no longer grants public read on uploads/** (see F-01) -- a short-lived, ownership-checked
+  // signed URL has to be fetched before this preview can load the file at all. The object's own path
+  // (uploads/<userId>/...) is proof enough of ownership server-side; no jobId exists yet at this point in
+  // the flow (these are sessionStorage-held cart items from before checkout).
+  useEffect(() => {
+    if (selectedPreview === null) {
+      setPreviewSignedUrl(null);
+      return;
+    }
+    const rawUrl = files[selectedPreview]?.url;
+    if (!rawUrl) {
+      setPreviewSignedUrl(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewSignedUrl(null);
+    api.post<{ readUrl: string }>("/read-url", { fileUrl: rawUrl })
+      .then((res) => { if (!cancelled) setPreviewSignedUrl(res.data.readUrl); })
+      .catch(() => { if (!cancelled) setPreviewSignedUrl(null); })
+      .finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedPreview, files]);
   const [directKioskId, setDirectKioskId] = useState<string | null>(null);
   const [printers, setPrinters] = useState<SelectablePrinter[]>(FALLBACK_PRINTERS);
 
@@ -395,8 +421,7 @@ export function PrintOptions() {
     // Clean the Kiosk ID for the backend (SV-002-COLOR -> SV-002)
     const cleanKioskId = directKioskId?.startsWith("SV-002") ? "SV-002" : directKioskId;
 
-    // Store print options for payment page
-    sessionStorage.setItem("printOptions", JSON.stringify({
+    const optionsPayload = {
       copies: Number(copies) || 1,
       colorMode,
       doubleSided,
@@ -410,7 +435,12 @@ export function PrintOptions() {
       totalCost,
       totalPages: actualPages, // Store actual printable pages per set
       directKioskId: cleanKioskId
-    }));
+    };
+
+    // Store print options for payment page and fallback for redirects
+    sessionStorage.setItem("printOptions", JSON.stringify(optionsPayload));
+    localStorage.setItem("mimo_colorMode", colorMode);
+    localStorage.setItem("mimo_printOptions", JSON.stringify(optionsPayload));
 
     navigate("/payment");
   };
@@ -775,9 +805,13 @@ export function PrintOptions() {
             <div className="mx-4 mb-[max(16px,env(safe-area-inset-bottom))] flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[16px] bg-surface-2">
               {(() => {
                 const previewFile = files[selectedPreview];
-                const previewDataUrl = previewFile?.url;
+                const previewDataUrl = previewSignedUrl;
                 const isPdf = previewFile?.name.toLowerCase().endsWith(".pdf") || previewFile?.type === "application/pdf";
                 const isImage = previewFile?.type?.startsWith("image/");
+
+                if (previewLoading) {
+                  return <p className="p-6 text-center text-[15px] text-ink-2">Loading preview…</p>;
+                }
 
                 if (previewDataUrl) {
                   const filterStyle = colorMode === "bw" ? "grayscale(100%) contrast(1.1)" : "none";

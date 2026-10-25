@@ -10,11 +10,12 @@
  */
 
 export const FESTIVAL_CONFIG = {
-  // Sharad Navratri 2026 runs Oct 11–20; SV-002 starts early so the festive UI is live ahead of it.
-  START_DATE: '2026-10-08T00:00:00+05:30',
-  END_DATE: '2026-10-20T23:59:59+05:30',
+  // Festival start date (inclusive) — YYYY-MM-DD or full ISO 8601 string
+  START_DATE: '2026-09-01T00:00:00+05:30',
+  // Festival end date (inclusive)
+  END_DATE: '2026-09-30T23:59:59+05:30',
   // Name of the festival
-  NAME: 'Navaratri',
+  NAME: 'Ganesh Chaturthi',
 };
 
 /**

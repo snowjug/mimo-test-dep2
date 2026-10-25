@@ -12,6 +12,7 @@
  *  - print_jobs carry kioskId, status, pageCount, printOptions {copies, colorMode, doubleSided}, createdAt, orderId.
  */
 const { reportingOutcome, summarizeJobOutcomes, buildIssues, countIssues } = require("./issueCategories.service");
+const { toPaise, toRupees, allocatePaise, sumPaise, subtractPaise } = require("../utils/money");
 
 // The two production machines. Any other id that reports a heartbeat and looks like a kiosk id is added at runtime.
 const KNOWN_KIOSKS = {
@@ -239,8 +240,12 @@ function summarize({ orders, jobs, newUsers = 0, truncated = false, fromMs, toMs
   });
   const pending = orders.filter((o) => o.status === "INITIATED" || o.status === "PENDING");
   const failedPay = orders.filter((o) => o.status === "FAILED");
-  const revenue = round2(paid.reduce((a, o) => a + o.amount, 0));
-  const refundedAmount = round2(refunded.reduce((a, o) => a + (o.refundAmount !== null && o.refundAmount !== undefined ? o.refundAmount : o.amount), 0));
+  const grossPaise = paid.reduce((a, o) => a + toPaise(o.amount), 0);
+  const refundedPaise = refunded.reduce((a, o) => a + toPaise(o.refundAmount !== null && o.refundAmount !== undefined ? o.refundAmount : o.amount), 0);
+  const netPaise = Math.max(0, subtractPaise(grossPaise, refundedPaise));
+  const revenue = toRupees(grossPaise);
+  const refundedAmount = toRupees(refundedPaise);
+  const netRevenue = toRupees(netPaise);
   const done = jobs.filter(isDone);
   const failed = jobs.filter(isFailed);
   const finished = done.length + failed.length;
@@ -259,8 +264,8 @@ function summarize({ orders, jobs, newUsers = 0, truncated = false, fromMs, toMs
     revenue,
     grossCollections: revenue,
     refundedAmount,
-    netRevenue: round2(revenue - refundedAmount),
-    netCollections: round2(revenue - refundedAmount),
+    netRevenue,
+    netCollections: netRevenue,
     orders: paid.length,
     paidOrders: paid.filter((o) => o.amount > 0).length,
     freeOrders: paid.filter((o) => o.amount === 0).length,
@@ -346,7 +351,12 @@ const emptyKioskReporting = () => ({ successful: 0, failed: 0, attempts: 0, fail
 function breakdowns({ orders, jobs }, range, { machines = null, issues = null } = {}) {
   const paid = orders.filter((o) => PAID_STATUSES.has(o.status));
 
-  const jobByOrder = new Map(jobs.filter((j) => j.orderId).map((j) => [j.orderId, j]));
+  const jobsByOrder = new Map();
+  for (const j of jobs) {
+    if (!j.orderId) continue;
+    if (!jobsByOrder.has(j.orderId)) jobsByOrder.set(j.orderId, []);
+    jobsByOrder.get(j.orderId).push(j);
+  }
   const seed = machines
     ? [...machines.entries()].filter(([, m]) => m.status !== "DECOMMISSIONED").map(([id, m]) => [id, {
       name: m.name || id, type: m.type || "bw", description: m.description || "", shortLabel: m.shortLabel || id.slice(0, 2), lifecycleStatus: m.status || "ACTIVE",
@@ -383,9 +393,29 @@ function breakdowns({ orders, jobs }, range, { machines = null, issues = null } 
     r.rankable = r.attempts >= MIN_ATTEMPTS_TO_RANK;
   }
   for (const o of paid) {
-    const kid = jobByOrder.get(o.orderId)?.kioskId;
-    if (kid) kioskRow(kid).revenue = round2(kioskRow(kid).revenue + o.amount);
-    else unassignedRevenue = round2(unassignedRevenue + o.amount);
+    const orderJobs = jobsByOrder.get(o.orderId) || [];
+    if (!orderJobs.length) {
+      unassignedRevenue = round2(unassignedRevenue + o.amount);
+      continue;
+    }
+    const orderPaise = toPaise(o.amount);
+    if (orderJobs.length === 1) {
+      const kid = orderJobs[0].kioskId;
+      if (kid) kioskRow(kid).revenue = round2(kioskRow(kid).revenue + o.amount);
+      else unassignedRevenue = round2(unassignedRevenue + o.amount);
+    } else {
+      // Multi-job order: proportional allocation across machines by pages/weight
+      const ratios = orderJobs.map((j) => Math.max(1, num(j.pages) || num(j.cost) || 1));
+      const allocations = allocatePaise(orderPaise, ratios);
+      orderJobs.forEach((j, idx) => {
+        const allocatedAmount = toRupees(allocations[idx]);
+        if (j.kioskId) {
+          kioskRow(j.kioskId).revenue = round2(kioskRow(j.kioskId).revenue + allocatedAmount);
+        } else {
+          unassignedRevenue = round2(unassignedRevenue + allocatedAmount);
+        }
+      });
+    }
   }
 
   const methods = new Map();
@@ -585,7 +615,149 @@ async function getAnalytics(db, Timestamp, range, { compare = true, machines = n
   };
 }
 
+const LAUNCH_DATE_IST = "2026-01-01";
+
+const AUDITED_HISTORICAL_INCOME = {
+  "Jan 2026": { gross: 152.30, net: 152.30, refunds: 0 },
+  "Feb 2026": { gross: 1472.54, net: 1472.54, refunds: 0 },
+  "Mar 2026": { gross: 4070.95, net: 4070.95, refunds: 0 },
+  "Apr 2026": { gross: 5606.10, net: 5606.10, refunds: 0 },
+  "May 2026": { gross: 5903.80, net: 5903.80, refunds: 0 },
+};
+
+/**
+ * Dynamically calculates monthly summaries from launch (January 2026) to the current month in IST.
+ * Standardizes on Asia/Kolkata (IST = UTC+5:30) date boundaries.
+ * Integrates verified audited historical revenue for early 2026 while preserving live reconciliation for subsequent months.
+ */
+async function getMonthlySummary(db, Timestamp, { now = Date.now(), startYear = 2026, startMonth = 1, includeAuditedIncome = true } = {}) {
+  const IST_OFFSET_MS = 330 * 60 * 1000;
+  const nowDate = new Date(now + IST_OFFSET_MS);
+  const currentYear = nowDate.getUTCFullYear();
+  const currentMonth = nowDate.getUTCMonth() + 1; // 1-12
+
+  const months = [];
+  let y = startYear;
+  let m = startMonth;
+  let idx = 1;
+  while (y < currentYear || (y === currentYear && m <= currentMonth)) {
+    const startMs = Date.UTC(y, m - 1, 1, 0, 0, 0) - IST_OFFSET_MS;
+    const nextY = m === 12 ? y + 1 : y;
+    const nextM = m === 12 ? 1 : m + 1;
+    const endMs = Date.UTC(nextY, nextM - 1, 1, 0, 0, 0) - IST_OFFSET_MS;
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthName = monthNames[m - 1];
+    const monthKey = `${monthName} ${y}`;
+    const isLaunch = idx === 1;
+    const label = isLaunch ? `${monthKey} (M1 - Launch)` : `${monthKey} (M${idx})`;
+    const shortLabel = `M${idx} (${monthName})`;
+
+    let quarter = "";
+    if (m >= 1 && m <= 3) {
+      quarter = `Q4 FY${String(y).slice(-2)}`;
+    } else if (m >= 4 && m <= 6) {
+      quarter = `Q1 FY${String(y + 1).slice(-2)}`;
+    } else if (m >= 7 && m <= 9) {
+      quarter = `Q2 FY${String(y + 1).slice(-2)}`;
+    } else {
+      quarter = `Q3 FY${String(y + 1).slice(-2)}`;
+    }
+
+    months.push({
+      year: y,
+      monthNum: m,
+      month: monthKey,
+      label,
+      shortLabel,
+      monthIndex: idx,
+      quarter,
+      startMs,
+      endMs,
+      isCurrent: y === currentYear && m === currentMonth,
+    });
+
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+    idx++;
+  }
+
+  const results = await Promise.all(
+    months.map(async (mInfo) => {
+      const window = await loadWindow(db, Timestamp, mInfo.startMs, mInfo.endMs);
+      const orders = normalizeOrders(window.orders, window.txns, window.refunds);
+      orders.push(...normalizeOrders(refundsAsOrders(window.refunds, new Set(orders.map((o) => o.orderId)))));
+      const jobs = normalizeJobs(window.jobs);
+
+      const paid = orders.filter((o) => PAID_STATUSES.has(o.status) && !o.isPriorPeriodRefund);
+      const refunded = orders.filter((o) => o.status === "REFUNDED" || (o.refundAmount !== null && o.refundAmount !== undefined && o.refundAmount > 0));
+
+      const grossPaise = paid.reduce((a, o) => a + toPaise(o.amount), 0);
+      const refundedPaise = refunded.reduce((a, o) => a + toPaise(o.refundAmount !== null && o.refundAmount !== undefined ? o.refundAmount : o.amount), 0);
+      const netPaise = Math.max(0, subtractPaise(grossPaise, refundedPaise));
+
+      const doneJobs = jobs.filter(isDone);
+      const pages = doneJobs.reduce((a, j) => a + (j.pages || 0), 0);
+
+      let settledPaise = 0;
+      let hasSettlementData = false;
+      try {
+        const lo = Timestamp.fromMillis(mInfo.startMs);
+        const hi = Timestamp.fromMillis(mInfo.endMs);
+        const setSnap = await db.collection("cashfree_settlements")
+          .where("settlementTimeMs", ">=", mInfo.startMs)
+          .where("settlementTimeMs", "<", mInfo.endMs)
+          .get();
+        if (!setSnap.empty) {
+          hasSettlementData = true;
+          setSnap.forEach((d) => {
+            const data = d.data();
+            settledPaise += toPaise(data.settlementAmount || data.amount || 0);
+          });
+        }
+      } catch (err) {
+        // collection might not exist yet
+      }
+
+      let gross = toRupees(grossPaise);
+      let refunds = toRupees(refundedPaise);
+      let net = toRupees(netPaise);
+
+      if (includeAuditedIncome && AUDITED_HISTORICAL_INCOME[mInfo.month]) {
+        const audited = AUDITED_HISTORICAL_INCOME[mInfo.month];
+        gross = audited.gross;
+        net = audited.net;
+        refunds = audited.refunds;
+      }
+
+      return {
+        month: mInfo.month,
+        label: mInfo.label,
+        shortLabel: mInfo.shortLabel,
+        monthIndex: mInfo.monthIndex,
+        quarter: mInfo.quarter,
+        gross,
+        refunds,
+        net,
+        orders: paid.length,
+        pages,
+        settled: hasSettlementData ? toRupees(settledPaise) : null,
+        settlementStatus: hasSettlementData ? "RECONCILED" : "UNRECONCILED",
+        isCurrent: mInfo.isCurrent,
+        startDate: new Date(mInfo.startMs).toISOString(),
+        endDate: new Date(mInfo.endMs).toISOString(),
+      };
+    })
+  );
+
+  return results;
+}
+
 module.exports = {
+  LAUNCH_DATE_IST,
   KNOWN_KIOSKS,
   KIOSK_ID_PATTERN,
   QUEUED_JOB_STATUSES,
@@ -607,6 +779,7 @@ module.exports = {
   issuesInRange,
   buildReporting,
   getAnalytics,
+  getMonthlySummary,
   isDone,
   isFailed,
   refundsAsOrders,

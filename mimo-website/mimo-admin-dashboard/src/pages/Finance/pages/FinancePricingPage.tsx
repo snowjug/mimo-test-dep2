@@ -12,8 +12,12 @@ import {
   Sparkles,
   Calendar,
   Percent,
+  TrendingUp,
+  Users,
+  ArrowUpRight,
 } from 'lucide-react';
 import api from '../../../api';
+import { inr } from '../../../lib/format';
 import { StatusBadge } from '../components/StatusBadge';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
 
@@ -21,6 +25,16 @@ export interface FinancePricingPageProps {
   loading: boolean;
   onRefresh: () => void;
 }
+
+const formatExpiryDate = (val: any) => {
+  if (!val) return 'No Expiry';
+  if (typeof val === 'object' && ('_seconds' in val || 'seconds' in val)) {
+    const s = val.seconds ?? val._seconds;
+    return new Date(s * 1000).toLocaleDateString();
+  }
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? 'No Expiry' : d.toLocaleDateString();
+};
 
 export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
   // Pricing state
@@ -38,6 +52,8 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
   // Coupons state
   const [coupons, setCoupons] = useState<any[]>([]);
   const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [couponAnalytics, setCouponAnalytics] = useState<any[]>([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [showCreateCoupon, setShowCreateCoupon] = useState(false);
   const [showBulkGenerator, setShowBulkGenerator] = useState(false);
   const [couponCode, setCouponCode] = useState('');
@@ -83,9 +99,24 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
     }
   };
 
+  const fetchCouponAnalytics = async () => {
+    setLoadingAnalytics(true);
+    try {
+      const res = await api.get('/admin/coupons/analytics');
+      if (Array.isArray(res.data?.couponAnalytics)) {
+        setCouponAnalytics(res.data.couponAnalytics);
+      }
+    } catch (e) {
+      console.error('Failed to load coupon analytics:', e);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
     fetchCoupons();
+    fetchCouponAnalytics();
   }, []);
 
   const handleSavePricing = async () => {
@@ -181,15 +212,15 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
       )}
 
       {/* ── SECTION A: PRINT PRICING CONFIGURATION ─────────────────────────────── */}
-      <div className="bg-white border border-[#E4E7EB] rounded-2xl p-6 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="bg-white dark:bg-slate-900 border border-[#E4E7EB] dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                 <IndianRupee className="w-4 h-4" />
               </div>
-              <h2 className="text-base font-extrabold text-[#111318] tracking-tight">
-                Print Tariff & Pricing Rules
+              <h2 className="text-base font-extrabold text-[#111318] dark:text-white tracking-tight">
+                Print Tariff &amp; Pricing Rules
               </h2>
             </div>
             <p className="text-xs text-slate-400">
@@ -201,7 +232,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
             {isPricingDirty && (
               <button
                 onClick={() => setPricing({ ...originalPricing })}
-                className="px-3.5 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Reset
@@ -214,8 +245,8 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 pricingSuccess
                   ? 'bg-emerald-600 text-white'
                   : isPricingDirty
-                  ? 'bg-[#093765] hover:bg-[#062A4E] text-white shadow-purple-500/20'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  ? 'bg-[#093765] hover:bg-[#062A4E] dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white shadow-purple-500/20'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
               }`}
             >
               {pricingSuccess ? <Check className="w-4 h-4" /> : <Save className="w-3.5 h-3.5" />}
@@ -226,9 +257,9 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* Black & White Simplex */}
-          <div className="p-4 rounded-xl border border-slate-150 bg-[#F3F4F6]/50 space-y-3">
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-700/80 bg-[#F3F4F6]/50 dark:bg-slate-800/60 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800">Black & White (A4 Simplex)</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">Black &amp; White (A4 Simplex)</span>
               <StatusBadge status="ACTIVE" size="sm" />
             </div>
             <div className="flex items-center gap-2">
@@ -238,16 +269,16 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 step="0.10"
                 value={pricing.pricePerPageBW}
                 onChange={(e) => setPricing({ ...pricing, pricePerPageBW: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-black text-slate-900 dark:text-white text-base focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <span className="text-[11px] text-slate-400 block">Default standard paper rate</span>
           </div>
 
           {/* Color Simplex */}
-          <div className="p-4 rounded-xl border border-slate-150 bg-[#F3F4F6]/50 space-y-3">
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-700/80 bg-[#F3F4F6]/50 dark:bg-slate-800/60 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800">Full Color (A4 Simplex)</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">Full Color (A4 Simplex)</span>
               <StatusBadge status="ACTIVE" size="sm" />
             </div>
             <div className="flex items-center gap-2">
@@ -257,16 +288,16 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 step="0.50"
                 value={pricing.pricePerPageColor}
                 onChange={(e) => setPricing({ ...pricing, pricePerPageColor: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-black text-slate-900 dark:text-white text-base focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <span className="text-[11px] text-slate-400 block">Laser / Inkjet high resolution</span>
           </div>
 
           {/* Duplex B&W */}
-          <div className="p-4 rounded-xl border border-slate-150 bg-[#F3F4F6]/50 space-y-3">
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-700/80 bg-[#F3F4F6]/50 dark:bg-slate-800/60 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800">B&W Duplex (Double Sided)</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">B&amp;W Duplex (Double Sided)</span>
               <StatusBadge status="ACTIVE" size="sm" />
             </div>
             <div className="flex items-center gap-2">
@@ -276,16 +307,16 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 step="0.10"
                 value={pricing.pricePerPageBWDuplex}
                 onChange={(e) => setPricing({ ...pricing, pricePerPageBWDuplex: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-black text-slate-900 dark:text-white text-base focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <span className="text-[11px] text-slate-400 block">Double-sided discount rate</span>
           </div>
 
           {/* Graph Paper */}
-          <div className="p-4 rounded-xl border border-slate-150 bg-[#F3F4F6]/50 space-y-3">
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-700/80 bg-[#F3F4F6]/50 dark:bg-slate-800/60 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800">Engineering / Graph Paper</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">Engineering / Graph Paper</span>
               <StatusBadge status="ACTIVE" size="sm" />
             </div>
             <div className="flex items-center gap-2">
@@ -295,7 +326,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 step="0.10"
                 value={pricing.pricePerPageGraph}
                 onChange={(e) => setPricing({ ...pricing, pricePerPageGraph: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-black text-slate-900 text-base focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-black text-slate-900 dark:text-white text-base focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <span className="text-[11px] text-slate-400 block">Pre-printed engineering grids</span>
@@ -304,15 +335,15 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
       </div>
 
       {/* ── SECTION B: COUPONS & PROMOTIONS ────────────────────────────────────── */}
-      <div className="bg-white border border-[#E4E7EB] rounded-2xl p-6 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="bg-white dark:bg-slate-900 border border-[#E4E7EB] dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-lg bg-purple-50 text-[#093765] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-[#093765] dark:text-indigo-400 flex items-center justify-center">
                 <Tag className="w-4 h-4" />
               </div>
-              <h2 className="text-base font-extrabold text-[#111318] tracking-tight">
-                Discount Coupons & Promo Campaigns
+              <h2 className="text-base font-extrabold text-[#111318] dark:text-white tracking-tight">
+                Discount Coupons &amp; Promo Campaigns
               </h2>
             </div>
             <p className="text-xs text-slate-400">
@@ -323,14 +354,14 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowBulkGenerator(true)}
-              className="px-3.5 py-2 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 text-xs font-bold text-purple-700 dark:text-indigo-300 bg-purple-50 dark:bg-indigo-950/60 hover:bg-purple-100 dark:hover:bg-indigo-900/60 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
               Bulk Generate
             </button>
             <button
               onClick={() => setShowCreateCoupon(true)}
-              className="px-4 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] rounded-xl shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] dark:bg-indigo-600 dark:hover:bg-indigo-700 rounded-xl shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               New Coupon
@@ -342,7 +373,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-[#F3F4F6] border-b border-[#E4E7EB] text-slate-400 font-semibold text-[10px]">
+              <tr className="bg-[#F3F4F6] dark:bg-slate-800/80 border-b border-[#E4E7EB] dark:border-slate-700 text-slate-400 font-semibold text-[10px]">
                 <th className="py-3 px-4">Coupon Code</th>
                 <th className="py-3 px-4">Discount</th>
                 <th className="py-3 px-4">Type</th>
@@ -351,7 +382,7 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loadingCoupons ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-400">
@@ -366,26 +397,26 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 </tr>
               ) : (
                 coupons.map((coupon) => (
-                  <tr key={coupon.id || coupon.code} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-[#093765]">
+                  <tr key={coupon.id || coupon.code} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-[#093765] dark:text-indigo-400">
                       {coupon.code || coupon.id}
                     </td>
-                    <td className="py-3.5 px-4 font-black font-mono text-emerald-600 text-sm">
+                    <td className="py-3.5 px-4 font-black font-mono text-emerald-600 dark:text-emerald-400 text-sm">
                       {coupon.discountPercentage || 10}% OFF
                     </td>
-                    <td className="py-3.5 px-4 text-slate-600">
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
                       {coupon.isBulk ? 'Batch Voucher' : 'Campaign Code'}
                     </td>
                     <td className="py-3.5 px-4">
                       <StatusBadge status={coupon.isActive !== false ? 'ACTIVE' : 'EXPIRED'} />
                     </td>
                     <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
-                      {coupon.expiryDate ? new Date(coupon.expiryDate).toLocaleDateString() : 'No Expiry'}
+                      {formatExpiryDate(coupon.expiryDate)}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
                         onClick={() => setCouponToDelete(coupon.code || coupon.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
                         title="Delete Coupon"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -399,24 +430,144 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
         </div>
       </div>
 
+      {/* ── SECTION C: COUPON PERFORMANCE & REVENUE IMPACT ───────────────────── */}
+      <div className="bg-white dark:bg-slate-900 border border-[#E4E7EB] dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <h2 className="text-base font-extrabold text-[#111318] dark:text-white tracking-tight">
+                Coupon Performance &amp; Revenue Impact
+              </h2>
+            </div>
+            <p className="text-xs text-slate-400">
+              Real-time redemption tracking, student reach, and discount subsidization from Jan 2026.
+            </p>
+          </div>
+          <button
+            onClick={fetchCouponAnalytics}
+            disabled={loadingAnalytics}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${loadingAnalytics ? 'animate-spin' : ''}`} />
+            Refresh Analytics
+          </button>
+        </div>
+
+        {/* Analytics Summary Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+            <span className="text-[11px] font-bold text-slate-500 uppercase">Coupons Monitored</span>
+            <div className="text-xl font-mono font-black text-slate-900 dark:text-white mt-1">
+              {couponAnalytics.length}
+            </div>
+            <span className="text-[10px] text-slate-400">Across campaigns &amp; batches</span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+            <span className="text-[11px] font-bold text-slate-500 uppercase">Total Redemptions</span>
+            <div className="text-xl font-mono font-black text-indigo-600 dark:text-indigo-400 mt-1">
+              {couponAnalytics.reduce((s, c) => s + (c.redemptionCount || 0), 0)}
+            </div>
+            <span className="text-[10px] text-slate-400">Paid checkout orders</span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+            <span className="text-[11px] font-bold text-slate-500 uppercase">Discounts Subsidized</span>
+            <div className="text-xl font-mono font-black text-rose-600 dark:text-rose-400 mt-1">
+              {inr(couponAnalytics.reduce((s, c) => s + (c.totalDiscountINR || 0), 0))}
+            </div>
+            <span className="text-[10px] text-slate-400">Total discount absorbed</span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+            <span className="text-[11px] font-bold text-slate-500 uppercase">Unique Students</span>
+            <div className="text-xl font-mono font-black text-emerald-600 dark:text-emerald-400 mt-1">
+              {couponAnalytics.reduce((s, c) => s + (c.uniqueUsersCount || 0), 0)}
+            </div>
+            <span className="text-[10px] text-slate-400">Distinct student accounts</span>
+          </div>
+        </div>
+
+        {/* Analytics Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-[#F3F4F6] dark:bg-slate-800 border-b border-[#E4E7EB] dark:border-slate-700 text-slate-400 font-semibold text-[10px]">
+                <th className="py-3 px-4">Coupon Code</th>
+                <th className="py-3 px-4">Discount</th>
+                <th className="py-3 px-4">Total Redemptions</th>
+                <th className="py-3 px-4">Subsidized Volume (INR)</th>
+                <th className="py-3 px-4">Unique Students</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Last Redeemed</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {loadingAnalytics ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    Computing coupon redemptions &amp; discount analytics...
+                  </td>
+                </tr>
+              ) : couponAnalytics.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    No redemption analytics available yet.
+                  </td>
+                </tr>
+              ) : (
+                couponAnalytics.map((c) => (
+                  <tr key={c.code} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-[#093765] dark:text-indigo-400">
+                      {c.code}
+                    </td>
+                    <td className="py-3.5 px-4 font-black font-mono text-emerald-600 text-sm">
+                      {c.discountPercentage}% OFF
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800 dark:text-slate-200">
+                      {c.redemptionCount}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-rose-600 dark:text-rose-400">
+                      {inr(c.totalDiscountINR)}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">
+                      {c.uniqueUsersCount}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <StatusBadge status={c.active ? 'ACTIVE' : 'EXPIRED'} />
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px] text-right">
+                      {c.lastRedeemedAt ? new Date(c.lastRedeemedAt).toLocaleDateString() : 'Never'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* ── CREATE COUPON MODAL ────────────────────────────────────────────────── */}
       {showCreateCoupon && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <form onSubmit={handleCreateCoupon} className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-slate-900">Create New Coupon</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <form onSubmit={handleCreateCoupon} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Create New Coupon</h3>
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Code</label>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Code</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. EXAM25"
                 value={couponCode}
                 onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-mono font-bold uppercase focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Discount (%)</label>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Discount (%)</label>
               <input
                 type="number"
                 min="1"
@@ -424,29 +575,29 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 required
                 value={couponDiscount}
                 onChange={(e) => setCouponDiscount(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-mono focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Expiry Date (Optional)</label>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Expiry Date (Optional)</label>
               <input
                 type="date"
                 value={couponExpiry}
                 onChange={(e) => setCouponExpiry(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowCreateCoupon(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] rounded-xl shadow-xs"
+                className="px-4 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] dark:bg-indigo-600 dark:hover:bg-indigo-700 rounded-xl shadow-xs"
               >
                 Save Coupon
               </button>
@@ -457,22 +608,22 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
 
       {/* ── BULK GENERATOR MODAL ──────────────────────────────────────────────── */}
       {showBulkGenerator && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <form onSubmit={handleBulkGenerate} className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-slate-900">Bulk Voucher Batch Generator</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <form onSubmit={handleBulkGenerate} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Bulk Voucher Batch Generator</h3>
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Code Prefix</label>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Code Prefix</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. CAMPUS"
                 value={bulkPrefix}
                 onChange={(e) => setBulkPrefix(e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-mono font-bold uppercase focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Number of Vouchers</label>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Number of Vouchers</label>
               <input
                 type="number"
                 min="1"
@@ -480,11 +631,11 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 required
                 value={bulkCount}
                 onChange={(e) => setBulkCount(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-mono focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Discount (%)</label>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Discount (%)</label>
               <input
                 type="number"
                 min="1"
@@ -492,20 +643,20 @@ export const FinancePricingPage: React.FC<FinancePricingPageProps> = () => {
                 required
                 value={bulkDiscount}
                 onChange={(e) => setBulkDiscount(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:border-[#093765]"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-mono focus:outline-none focus:border-[#093765] dark:focus:border-indigo-500"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowBulkGenerator(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] rounded-xl shadow-xs"
+                className="px-4 py-2 text-xs font-bold text-white bg-[#093765] hover:bg-[#062A4E] dark:bg-indigo-600 dark:hover:bg-indigo-700 rounded-xl shadow-xs"
               >
                 Generate Codes
               </button>

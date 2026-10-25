@@ -13,12 +13,26 @@ const app = require("./src/server");
 // (including JWT_SECRET) to production. Real values now live only in Secret Manager, injected at runtime exactly
 // like GMAIL_APP_PASSWORD/GUARDIAN_MASTER_KEY -- src/config/env.js and admin.controller.js are unchanged, since
 // both already read these from process.env directly.
+//
+// Mission 37: FLOW_PRIVATE_KEY_PEM and FLOW_APP_SECRET (functions/src/config/env.js, read by
+// whatsappFlow.controller.js) are Secret Manager secrets too, but v2 Cloud Functions only injects a secret
+// into process.env for functions that explicitly list it here. FLOW_APP_SECRET_PREVIOUS is intentionally NOT
+// listed yet: Secret Manager deploy fails if a listed secret doesn't exist, and no rotation secret has been
+// created — add it here only once it actually exists.
 exports.api = onRequest(
   {
     cors: true,
     maxInstances: 50,
     memory: "512MiB",
-    secrets: ["GMAIL_APP_PASSWORD", "GUARDIAN_MASTER_KEY", "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD"],
+    secrets: [
+      "GMAIL_APP_PASSWORD",
+      "GUARDIAN_MASTER_KEY",
+      "JWT_SECRET",
+      "ADMIN_EMAIL",
+      "ADMIN_PASSWORD",
+      "FLOW_PRIVATE_KEY_PEM",
+      "FLOW_APP_SECRET",
+    ],
   },
   app
 );
@@ -33,3 +47,6 @@ Object.assign(
 // printTimeout.trigger also exports a plain runPrintTimeoutSweep() for direct unit testing —
 // only the wrapped Cloud Function itself should be deployed.
 exports.scheduledPrintTimeoutSweep = require("./src/triggers/printTimeout.trigger").scheduledPrintTimeoutSweep;
+
+// Mission 37: periodic worker tick for WhatsApp Flow document-processing jobs (see triggers/whatsappFlowWorker.trigger.js).
+exports.scheduledWhatsappFlowWorkerSweep = require("./src/triggers/whatsappFlowWorker.trigger").scheduledWhatsappFlowWorkerSweep;

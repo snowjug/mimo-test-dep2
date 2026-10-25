@@ -3,6 +3,7 @@
 // they pass today and must be flipped ON PURPOSE when the behaviour is fixed (see docs/contributing.md).
 const test = require("node:test");
 const assert = require("node:assert");
+const crypto = require("node:crypto");
 const { fake, http, mailbox, markPaid, seed, checkout, cashfreeCalls, pendingJob, mergedJobs, response, controller } = require("./helpers/orderHarness");
 
 test.describe("validation of the checkout request", () => {
@@ -60,7 +61,7 @@ test.describe("what a successful paid checkout does", () => {
     assert.strictEqual(job.status, "pending");
     assert.strictEqual(job.orderId, res.body.orderId);
     assert.strictEqual(job.userId, "u1");
-    assert.strictEqual(job.kioskId, "CV-001", "default kiosk when none is chosen");
+    assert.strictEqual(job.kioskId, null, "unassigned kiosk when none is chosen");
     assert.strictEqual(job.files.length, 1);
     assert.strictEqual(job.files[0].pageCount, 5);
     assert.strictEqual(job.color, false);
@@ -366,26 +367,67 @@ test.describe("abuse and edge cases", () => {
   });
 
   test("print codes of free orders are unique among active jobs too", async () => {
-    const original = Math.random;
-    let i = 0; const draws = [0.42, 0.9];
+    const original = crypto.randomInt;
+    let i = 0; const draws = [4780, 9100];
     try {
       seed({ jobs: { j1: pendingJob(), other: pendingJob({ userId: "u9", status: "paid", printCode: "4780" }) }, coupons: { ALL: { isActive: true, discountPercentage: 100 } } });
-      Math.random = () => draws[Math.min(i++, draws.length - 1)];
+      crypto.randomInt = () => draws[Math.min(i++, draws.length - 1)];
       const res = await checkout({ couponCode: "ALL" });
       assert.strictEqual(res.body.printCode, "9100", "4780 belongs to an active job, so it was redrawn");
-    } finally { Math.random = original; }
+    } finally { crypto.randomInt = original; }
   });
 
   test("print-code generation: the free path draws from 1000-9999", async () => {
-    const original = Math.random;
+    const original = crypto.randomInt;
     try {
-      for (const [r, expected] of [[0, "1000"], [0.5, "5500"], [0.9999999, "9999"]]) {
-        Math.random = () => r;
+      for (const [code, expected] of [[1000, "1000"], [5500, "5500"], [9999, "9999"]]) {
+        crypto.randomInt = () => code;
         seed({ coupons: { ALL: { isActive: true, discountPercentage: 100 } } });
         const res = await checkout({ couponCode: "ALL" });
         assert.strictEqual(res.body.printCode, expected);
       }
-    } finally { Math.random = original; }
+    } finally { crypto.randomInt = original; }
+  });
+});
+
+test.describe("re-checking out a job that is already a merge (has a files[] array)", () => {
+  // A job can already carry a files[] array if it was itself the product of an earlier merge (e.g. the
+  // customer added more documents to an existing pending job rather than starting a fresh upload). Checking
+  // that job out again must unpack every entry in files[] -- not just look at the single-file fields -- and,
+  // when merging it alongside another predecessor job, must keep the EARLIEST of their retentionStartAt
+  // values (the file's actual age for the 24h cleanup clock never resets just because it was re-merged).
+  test("unpacks every file in an existing files[] array, applies per-file page configs, and keeps the earliest retentionStartAt across predecessors", async () => {
+    const earlier = new Date("2026-01-01T00:00:00Z");
+    const later = new Date("2026-06-01T00:00:00Z");
+    seed({
+      jobs: {
+        merged: {
+          userId: "u1", status: "pending", retentionStartAt: later,
+          files: [
+            { name: "a.pdf", originalFileName: "a.pdf", url: "https://files.example/a.pdf", type: "application/pdf", size: 500, pageCount: 4 },
+            // Custom page range "1-2,4" on a 10-page file selects pages 1,2,4 -> 3 pages, not all 10.
+            { name: "b.pdf", originalFileName: "b.pdf", url: "https://files.example/b.pdf", type: "application/pdf", size: 800, pageCount: 10 },
+          ],
+        },
+        solo: { userId: "u1", status: "pending", fileName: "c.pdf", fileUrl: "https://files.example/c.pdf", mimetype: "application/pdf", size: 200, pageCount: 2, retentionStartAt: earlier },
+      },
+    });
+
+    const res = await checkout({
+      jobIds: ["merged", "solo"],
+      printOptions: { fileConfigs: { "b.pdf": { pageSelection: "custom", pageRange: "1-2,4" } } },
+    });
+
+    assert.strictEqual(res.code, 200, JSON.stringify(res.body));
+    const [job] = Object.values(fake.data("print_jobs"));
+    assert.strictEqual(job.files.length, 3, "a.pdf + b.pdf (unpacked from the existing files[]) + c.pdf (the solo job)");
+    const bEntry = job.files.find((f) => f.name === "b.pdf");
+    assert.strictEqual(bEntry.pageCount, 3, "custom range 1-2,4 on a 10-page file selects exactly 3 pages");
+    assert.strictEqual(job.pageCount, 4 + 3 + 2, "total raw pages across all three files");
+    // retentionStartAt must be the EARLIEST predecessor's, not the merged job's own (later) one, and not
+    // reset to "now" just because this is a re-checkout.
+    const retained = job.retentionStartAt.toDate ? job.retentionStartAt.toDate() : new Date(job.retentionStartAt);
+    assert.strictEqual(retained.getTime(), earlier.getTime());
   });
 });
 void response; void controller; void mergedJobs;

@@ -10,6 +10,7 @@ import { CV001Background } from './components/screens/CV001Background';
 import { Adds } from './components/screens/adds/Adds';
 import { isFestivalActive } from './config/festivalConfig';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
+import { loadActivePrint, saveActivePrint, clearActivePrint, markActivePrintCompleted, type ActivePrintJob } from './utils/activePrint';
 
 
 export type ScreenState =
@@ -27,7 +28,7 @@ function App() {
   const defaultKioskFromHost = host.includes('mimo-2-0') || host.includes('mimo-kiosk-app') ? 'SV-002' : undefined;
   const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID || defaultKioskFromHost;
   const isFestive = isFestivalActive();
-  const isFestiveForKiosk = dynamicKioskId === 'CV-001' || (dynamicKioskId === 'SV-002' && isFestive);
+  const isFestiveForKiosk = dynamicKioskId === 'CV-001' || dynamicKioskId === 'SV-002' || isFestive;
 
   useEffect(() => {
     const rootEl = document.getElementById('root');
@@ -35,22 +36,31 @@ function App() {
     document.body.classList.remove('theme-cv001', 'theme-sv002');
     rootEl?.classList.remove('theme-cv001', 'theme-sv002');
 
-    if (isFestiveForKiosk) {
-      document.body.classList.add('theme-cv001');
-      rootEl?.classList.add('theme-cv001');
-    } else if (dynamicKioskId === 'SV-002') {
+    if (dynamicKioskId === 'SV-002') {
       document.body.classList.add('theme-sv002');
       rootEl?.classList.add('theme-sv002');
+    } else if (dynamicKioskId === 'CV-001' || isFestiveForKiosk) {
+      document.body.classList.add('theme-cv001');
+      rootEl?.classList.add('theme-cv001');
     }
   }, [dynamicKioskId, isFestiveForKiosk]);
 
-  const [currentScreen, setCurrentScreen] = useState<ScreenState>('main-interface');
-  const [code, setCode] = useState('');
+  // A print this kiosk started before the page was reloaded (see utils/activePrint.ts): reopen its printing screen
+  // instead of the home screen, and let the backend job status finish the flow.
+  // A completed one reopens the summary screen it was showing.
+  const [resumedPrint] = useState(() => loadActivePrint(dynamicKioskId));
+  const resumedDone = resumedPrint?.completedAt !== undefined;
+  const [currentScreen, setCurrentScreen] = useState<ScreenState>(
+    resumedPrint ? (resumedDone ? 'summary-screen' : 'printing-screen') : 'main-interface');
+  const [code, setCode] = useState(resumedPrint?.code ?? '');
   const [toastMsg, setToastMsg] = useState('');
   const [toastError, setToastError] = useState(false);
-  const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>('idle');
+  const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>(
+    resumedPrint ? (resumedDone ? 'completed' : 'printing') : 'idle');
   const [printError, setPrintError] = useState<string | undefined>(undefined);
   const [showRefundBanner, setShowRefundBanner] = useState(false);
+  // True once /kiosk/print accepted the job (or gave no answer); false when it refused it.
+  const [canResumePrint, setCanResumePrint] = useState(!!resumedPrint);
   const [showScreensaver, setShowScreensaver] = useState(false);
   const [idleTimeout, setIdleTimeout] = useState(60);
   // True while a submitted code is being verified/triggered on the backend. The idle timer must not
@@ -58,13 +68,7 @@ function App() {
   // an in-flight print, showing the customer nothing but a jump back to home.
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
 
-  const [jobData, setJobData] = useState<{
-    userName: string;
-    fileName: string;
-    pages: number;
-    copies: number;
-    mode: string;
-  } | null>(null);
+  const [jobData, setJobData] = useState<ActivePrintJob | null>(resumedPrint?.job ?? null);
 
   const toastTimerRef = useRef<number | null>(null);
   const validationTimerRef = useRef<number | null>(null);
@@ -208,33 +212,39 @@ function App() {
 
           // 🖨️ TRIGGER PRINT VIA FIREBASE FUNCTIONS FIRST (pre-flight health check & enqueue)
           if (code !== "0000" && code !== "9999") {
+            let printRes: Response | null = null;
             try {
-              const printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
+              printRes = await fetch("https://api-upqxuj7evq-uc.a.run.app/kiosk/print", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                   printCode: code,
                   kioskId: dynamicKioskId
                 }),
               });
-
-              const printData = await printRes.json();
-              
-              if (!printRes.ok) {
-                console.warn("kiosk/print API warning:", printData.error);
-                // If printer/kiosk health check failed, display immediately without loading animations!
-                if (printData.error && (printData.error.toLowerCase().includes("not working") || printData.error.toLowerCase().includes("offline") || printData.error.toLowerCase().includes("error"))) {
-                  setPrintError(printData.error);
-                  setCurrentScreen("system-error-screen");
-                  resolve();
-                  return;
-                }
-              }
             } catch (printErr: any) {
+              // No answer at all: the job may or may not have been started. The printing screen polls the real
+              // job status and reports "could not be started" if it is still unprinted after a short grace period.
               console.warn("kiosk/print network warning:", printErr.message);
             }
+
+            // Any HTTP refusal (400 wrong machine / already redeemed, 403 restricted, 409 code collision, 429, 5xx)
+            // means this kiosk did not start the job: never show the printing screen or a success for it.
+            if (printRes && !printRes.ok) {
+              const printData = await printRes.json().catch(() => ({}));
+              console.warn("kiosk/print refused:", printRes.status, printData.error);
+              setCanResumePrint(false);
+              setPrintError(printData.error || "This print could not be started. Please try again or contact support.");
+              setCurrentScreen("system-error-screen");
+              resolve();
+              return;
+            }
+          }
+          setCanResumePrint(true);
+          if (code !== "0000" && code !== "9999" && dynamicKioskId) {
+            saveActivePrint({ code, kioskId: dynamicKioskId, job, startedAt: Date.now() });
           }
 
           setPrintStatus("printing");
@@ -262,6 +272,7 @@ function App() {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     if (validationTimerRef.current) clearTimeout(validationTimerRef.current);
 
+    clearActivePrint();
     setCode('');
     setJobData(null);
     setPrintStatus('idle');
@@ -271,9 +282,18 @@ function App() {
   }, []);
 
   // ================= RETRY =================
+  // Only a job this kiosk actually started can be resumed (re-polled). Otherwise go back to code entry: re-polling
+  // a refused or cleared code could show another kiosk's or a demo completion as this customer's success.
   const handleRetry = useCallback(() => {
-    setCurrentScreen('printing-screen');
-  }, []);
+    if (canResumePrint && code) {
+      setCurrentScreen('printing-screen');
+      return;
+    }
+    setCode('');
+    setPrintError(undefined);
+    setShowRefundBanner(false);
+    setCurrentScreen('code-entry-screen');
+  }, [canResumePrint, code]);
 
   const goToCodeEntry = useCallback(() => setCurrentScreen('code-entry-screen'), []);
   const goToSummary = useCallback(() => setCurrentScreen('summary-screen'), []);
@@ -352,10 +372,12 @@ function App() {
         colorMode={jobData?.mode?.toLowerCase().match(/color|colour/) ? 'color' : 'bw'}
         kioskId={dynamicKioskId}
         onComplete={() => {
+          markActivePrintCompleted();
           setPrintStatus('completed');
           goToSummary();
         }}
         onError={(errMsg?: string) => {
+          clearActivePrint();
           setPrintStatus('idle');
           setCode('');
           // Determine if this is a print failure that may involve a refund

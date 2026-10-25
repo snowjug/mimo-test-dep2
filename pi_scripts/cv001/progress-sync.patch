@@ -1,0 +1,110 @@
+--- a/firebase_listener.py
++++ b/firebase_listener.py
+@@ -825,6 +825,15 @@
+ # Kill switch: set SHEET_CHECK=false in the service environment to go back to "completed when CUPS finishes".
+ SHEET_CHECK_ENABLED = os.environ.get("SHEET_CHECK", "true").lower() == "true"
+ SHEET_SLOT_WAIT_SEC = 120
++# Duplex only: how long the counter must stand still at the sheet count before the job counts as done (see
++# verify_sheets_printed). Longer than one duplex sheet's turn-around, so a sides-counting printer is never cut short.
++DUPLEX_SETTLE_SEC = float(os.environ.get("DUPLEX_SETTLE_SEC", "10"))
++# The counter steps as the sheet leaves the fuser; this is the time allowed for it to clear the rollers into the
++# tray before "completed" (100% on the kiosk) is written. Not measured on the HL-L5210DN -- tune via the unit file.
++SHEET_EXIT_CLEARANCE_SEC = float(os.environ.get("SHEET_EXIT_CLEARANCE_SEC", "1.0"))
++# Kiosk progress writes go through one worker so a slow Firestore call never delays the page-counter polling,
++# and they stay in order.
++_progress_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="progress")
+ 
+ 
+ def _pjl_exchange(usb_id, query=PJL_QUERY, timeout_s=6.0):
+@@ -936,25 +945,43 @@
+     return per_copy * max(1, int(copies or 1))
+ 
+ 
+-def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=None, clock=time):
++def verify_sheets_printed(printer_name, count_before, expected_min, max_wait=None, clock=time,
++                          on_progress=None, expected_max=None, settle_sec=None):
+     """
+     After CUPS has handed the job over, poll the page counter until enough sheets came out.
+     Returns (verdict, printed): "ok" | "none" (nothing came out) | "short" (stopped early) | "unknown".
++
++    expected_max: counter steps if the counter counts printed sides rather than sheets (duplex). It is not known
++    which one the HL-L5210DN counts, so a duplex job is "ok" at expected_max steps, or at expected_min steps once
++    the counter has stopped moving for settle_sec -- never earlier, whichever way the printer counts.
++    on_progress(sheets_done) is called whenever the verified sheet count rises. It is conservative (scaled by
++    expected_min / expected_max) and capped at expected_min - 1, so only the final verdict ever means "all out".
+     """
+     if count_before is None:
+         return "unknown", None
+-    max_wait = max_wait or (45 + expected_min * 6)
++    expected_max = max(expected_min, expected_max or expected_min)
++    settle_sec = DUPLEX_SETTLE_SEC if settle_sec is None else settle_sec
++    max_wait = max_wait or (45 + expected_max * 6)
+     start = clock.time()
+-    last, last_change = None, start
++    last, last_change, reported = None, start, 0
+     while clock.time() - start < max_wait:
+         info = read_printer_status(printer_name)
+         if info:
+             count = info["pagecount"]
+             if last is None or count != last:
+                 last, last_change = count, clock.time()
+-            if count - count_before >= expected_min:
+-                return "ok", count - count_before
++            moved = count - count_before
++            if on_progress is not None and moved > 0:
++                done = min(expected_min - 1, moved * expected_min // expected_max)
++                if done > reported:
++                    reported = done
++                    try:
++                        on_progress(done)
++                    except Exception as e:
++                        print(f"⚠️ [SHEETS] Progress report failed: {e}")
+             stalled = clock.time() - last_change
++            if moved >= expected_max or (moved >= expected_min and stalled >= settle_sec):
++                return "ok", moved
+             if (count > count_before and stalled >= 25) or (count == count_before and stalled >= 60):
+                 break
+         clock.sleep(0.25)
+@@ -1121,7 +1148,13 @@
+                         verified_fields = {}
+                         if sheet_check:
+                             expected = sheet_check["expected_min"]
+-                            verdict, printed = verify_sheets_printed(printer_name, sheet_check["count_before"], expected)
++                            # The kiosk's progress bar is driven by these two fields: same unit (sheets) as the Pi.
++                            _progress_pool.submit(safe_update, doc_ref, {"totalSheets": expected, "sheetsCompleted": 0})
++                            verdict, printed = verify_sheets_printed(
++                                printer_name, sheet_check["count_before"], expected,
++                                expected_max=sheet_check.get("expected_max"),
++                                on_progress=lambda n: _progress_pool.submit(safe_update, doc_ref, {"sheetsCompleted": n}),
++                            )
+                             print(f"🔢 [SHEETS] {job_id}: {verdict} — page counter moved {printed} (needs at least {expected}).")
+                             if verdict in ("none", "short"):
+                                 info = read_printer_status(printer_name)
+@@ -1136,6 +1169,14 @@
+                                 report_print_failure(doc_ref, reason + ". You will be refunded.")
+                                 return
+                             verified_fields = {"printVerified": verdict == "ok", "sheetsVerified": printed}
++                            if verdict == "ok":
++                                verified_fields["sheetsCompleted"] = expected
++                                if SHEET_EXIT_CLEARANCE_SEC > 0:
++                                    time.sleep(SHEET_EXIT_CLEARANCE_SEC)
++                            try:  # let queued progress writes land first, so none can arrive after "completed"
++                                _progress_pool.submit(lambda: None).result(timeout=10)
++                            except Exception as e:
++                                print(f"⚠️ [SHEETS] Progress writes still pending: {e}")
+ 
+                         print(f"✅ [SYNC] CUPS job {job_id} completed physically. Marking Firestore completed.")
+                         safe_update(doc_ref, {
+@@ -1327,8 +1368,10 @@
+             # Spawn background thread to wait for physical print and update Firestore
+             sheet_check = None
+             if held_sheet_slot:
+-                sheet_check = {"count_before": count_before,
+-                               "expected_min": expected_min_sheets(page_count, copies, double_sided)}
++                expected = expected_min_sheets(page_count, copies, double_sided)
++                sheet_check = {"count_before": count_before, "expected_min": expected,
++                               # duplex: a sides-counting printer steps twice per sheet
++                               "expected_max": expected * 2 if double_sided == "double" else expected}
+             t = threading.Thread(target=wait_for_cups_job,
+                                  args=(job_id, doc_ref, cups_timeout, printer_name, page_count, copies, sheet_check),
+                                  daemon=True)

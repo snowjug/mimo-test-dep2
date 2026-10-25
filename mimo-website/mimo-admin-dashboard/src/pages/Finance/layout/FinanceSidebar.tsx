@@ -17,7 +17,6 @@ import {
   PieChart,
   Receipt,
   TrendingUp,
-  MessageCircle,
 } from 'lucide-react';
 
 export type FinanceTab =
@@ -30,8 +29,8 @@ export type FinanceTab =
   | 'wallet'
   | 'settlements'
   | 'expenses'
-  | 'krishna-report'
-  | 'chat';
+  | 'customer-analytics'
+  | 'krishna-report';
 
 export interface FinanceSidebarProps {
   activeTab: FinanceTab;
@@ -50,8 +49,7 @@ const NAV_ITEMS = [
   { id: 'wallet',      label: 'Wallet & Credits',       icon: WalletCards },
   { id: 'settlements', label: 'Settlements & Reports',  icon: FileSpreadsheet },
   { id: 'expenses',    label: 'Revenue & Expenses',     icon: Receipt },
-  { id: 'krishna-report', label: 'Special Krishna Demand Report', icon: TrendingUp },
-  { id: 'chat',         label: 'Team Chat',              icon: MessageCircle },
+  { id: 'customer-analytics', label: 'Customer Analytics', icon: TrendingUp },
 ];
 
 export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
@@ -81,7 +79,7 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
       <nav className="p-3 space-y-1.5 overflow-y-auto flex-1">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = activeTab === item.id || (item.id === 'customer-analytics' && activeTab === 'krishna-report');
           return (
             <button
               key={item.id}
@@ -139,7 +137,7 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate leading-tight">
-                Vastav Krishna Raj
+                Vatsa
               </span>
               <span className="text-[10px] text-slate-400 font-medium truncate leading-tight">
                 Finance Manager
@@ -167,14 +165,14 @@ const FleetPill: React.FC = () => {
   const ok = !!sum && sum.offline === 0;
   const dot = !sum ? 'bg-slate-300' : ok ? 'bg-emerald-500' : 'bg-amber-500';
   return (
-    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-[#E4E7EB] shadow-2xs">
+    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-[#E4E7EB] dark:border-slate-700 shadow-2xs">
       <div className="flex items-center gap-2.5">
         <span className="relative flex h-2.5 w-2.5 shrink-0">
           {ok && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
           <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${dot}`} />
         </span>
         <div className="flex flex-col">
-          <span className="text-[12px] font-bold text-slate-800 leading-none">Machines</span>
+          <span className="text-[12px] font-bold text-slate-800 dark:text-slate-100 leading-none">Machines</span>
           <span className="text-[11px] text-slate-400 font-medium mt-0.5 leading-none">
             {q.error ? 'Status unavailable' : sum ? `${sum.online} of ${sum.total} online` : 'Checking…'}
           </span>

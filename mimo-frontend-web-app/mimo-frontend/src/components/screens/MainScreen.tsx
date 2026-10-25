@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Check, CaretRight } from '@phosphor-icons/react';
-import { DiyaRow, FestiveBackdrop, Kalash, Lotus, OrnamentDivider, Toran, ZariBorder } from '../festive/NavaratriDecor';
+import { DiyaRow, FestiveBackdrop, Kalash, Lotus, OrnamentDivider, ZariBorder } from '../festive/NavaratriDecor';
 import { isFestivalActive } from '../../config/festivalConfig';
 
 interface MainScreenProps {
@@ -11,7 +11,7 @@ interface MainScreenProps {
 }
 
 export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskId }) => {
-    const isFestiveMode = kioskId === 'CV-001' || (kioskId === 'SV-002' && isFestivalActive());
+    const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
     const isSV002 = kioskId === 'SV-002';
     const [isDragging, setIsDragging] = useState(false);
     const [dragX, setDragX] = useState(0);
@@ -201,6 +201,138 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
         </footer>
     );
 
+    const isCV001 = kioskId === 'CV-001' || (!isSV002 && kioskId !== 'SV-002');
+
+    if (isSV002) {
+        return (
+            <div
+                className={`screen ${isActive ? 'visible' : ''} sv002-welcome-screen relative flex h-full w-full select-none overflow-hidden`}
+                style={{
+                    display: isActive ? 'flex' : 'none',
+                    backgroundColor: '#1A0A01',
+                    backgroundImage: 'url(/navratri-welcome-bg.png)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center right',
+                    backgroundRepeat: 'no-repeat',
+                }}
+            >
+                {/* Subtle cinematic amber illumination for atmosphere */}
+                <div 
+                    className="pointer-events-none absolute inset-0 z-0"
+                    style={{
+                        background: 'radial-gradient(circle 700px at 28% 45%, rgba(120, 50, 10, 0.28) 0%, transparent 70%)'
+                    }}
+                />
+
+                <main className="relative z-10 flex h-full w-full max-w-[700px] flex-col justify-between pl-16 pr-6 pt-16 pb-10">
+                    <motion.section
+                        initial={isActive ? { opacity: 0, y: 18 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex flex-col items-start text-left"
+                    >
+                        <p className="font-sans text-[15px] font-bold uppercase tracking-[0.55em] text-[#DFCBB5]">
+                            Welcome to
+                        </p>
+
+                        <div className="relative mt-2 flex items-baseline leading-none">
+                            <h1 className="font-sans text-[118px] font-black tracking-[-0.03em] text-[#EFE2CF] drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
+                                MIMO
+                            </h1>
+                            <span className="ml-3 font-sans text-[44px] font-extrabold text-[#E5B878] drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                                2.0
+                            </span>
+                        </div>
+
+                        <h2 className="mt-2 font-sans text-[32px] font-semibold text-white tracking-tight">
+                            Self-Service Printing Kiosk
+                        </h2>
+
+                        <div className="my-7 h-[1.5px] w-[140px] bg-gradient-to-r from-[#D4A559] via-[#A8793B] to-transparent" />
+
+                        <p className="font-serif text-[23px] font-medium italic leading-[1.4] text-[#E6C59E] max-w-[500px]">
+                            Happy Navaratri &mdash; may the divine bring joy, prosperity and good health.
+                        </p>
+                    </motion.section>
+
+                    <div className="flex flex-col items-start gap-5">
+                        <div className="w-full max-w-[460px]">
+                            {swipeTrack}
+                        </div>
+                        <footer className="text-[12px] font-medium text-[#A68868]/60">
+                            &copy; 2026 <strong className="font-semibold text-[#C4A480]/80">VisionPrintt</strong>. All rights reserved.
+                        </footer>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
+    if (isFestiveMode && isCV001) {
+        return (
+            <div
+                className={`screen ${isActive ? 'visible' : ''} cv001-welcome-screen relative flex h-full w-full select-none overflow-hidden`}
+                style={{
+                    display: isActive ? 'flex' : 'none',
+                    backgroundColor: '#1A0A01',
+                    backgroundImage: 'url(/navratri-welcome-bg.png)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center right',
+                    backgroundRepeat: 'no-repeat',
+                }}
+            >
+                {/* Subtle cinematic amber illumination for atmosphere */}
+                <div 
+                    className="pointer-events-none absolute inset-0 z-0"
+                    style={{
+                        background: 'radial-gradient(circle 700px at 28% 45%, rgba(120, 50, 10, 0.28) 0%, transparent 70%)'
+                    }}
+                />
+
+                <main className="relative z-10 flex h-full w-full max-w-[700px] flex-col justify-between pl-16 pr-6 pt-16 pb-10">
+                    <motion.section
+                        initial={isActive ? { opacity: 0, y: 18 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex flex-col items-start text-left"
+                    >
+                        <p className="font-sans text-[15px] font-bold uppercase tracking-[0.55em] text-[#DFCBB5]">
+                            Welcome to
+                        </p>
+
+                        <div className="relative mt-2 flex items-baseline leading-none">
+                            <h1 className="font-sans text-[118px] font-black tracking-[-0.03em] text-[#EFE2CF] drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
+                                MIMO
+                            </h1>
+                            <span className="ml-3 font-sans text-[44px] font-extrabold text-[#E5B878] drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                                1.0
+                            </span>
+                        </div>
+
+                        <h2 className="mt-2 font-sans text-[32px] font-semibold text-white tracking-tight">
+                            Self-Service Printing Kiosk
+                        </h2>
+
+                        <div className="my-7 h-[1.5px] w-[140px] bg-gradient-to-r from-[#D4A559] via-[#A8793B] to-transparent" />
+
+                        <p className="font-serif text-[23px] font-medium italic leading-[1.4] text-[#E6C59E] max-w-[500px]">
+                            Happy Navaratri &mdash; may the divine bring joy, prosperity and good health.
+                        </p>
+                    </motion.section>
+
+                    <div className="flex flex-col items-start gap-5">
+                        <div className="w-full max-w-[460px]">
+                            {swipeTrack}
+                        </div>
+                        <footer className="text-[12px] font-medium text-[#A68868]/60">
+                            &copy; 2026 <strong className="font-semibold text-[#C4A480]/80">VisionPrintt</strong>. All rights reserved.
+                        </footer>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
     if (isFestiveMode) {
         return (
             <div
@@ -212,9 +344,7 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
                 <Kalash className="absolute left-[86px] top-[296px] z-[1]" />
                 <Kalash className="absolute right-[86px] top-[296px] z-[1]" style={{ transform: 'scaleX(-1)' }} />
 
-                <Toran />
-
-                <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pt-[60px]">
+                <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-10 pt-0">
                     <motion.section
                         initial={isActive ? { opacity: 0, y: 22 } : false}
                         animate={{ opacity: 1, y: 0 }}

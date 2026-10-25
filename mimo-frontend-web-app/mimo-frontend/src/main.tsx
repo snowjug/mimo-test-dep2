@@ -3,30 +3,32 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
-const kioskIdParam = new URLSearchParams(window.location.search).get('kioskId');
-const host = window.location.hostname;
-const kioskId =
-  kioskIdParam ||
-  import.meta.env.VITE_KIOSK_ID ||
-  (host.includes('mimo-2-0') || host.includes('mimo-kiosk-app') ? 'SV-002' : undefined);
-
-// Both SV-002 and CV-001 screens widen the canvas to fill the viewport instead of letterboxing.
-const isFullBleed = kioskId === 'SV-002' || kioskId === 'CV-001';
-if (isFullBleed) document.documentElement.classList.add('kiosk-full-bleed');
-
 const updateScale = () => {
   const isPortrait = window.innerWidth <= 1000;
   let scale = 1;
+  let kioskWidth = 1440;
+
   if (isPortrait) {
     scale = Math.min(window.innerWidth / 810, window.innerHeight / 1440);
+    kioskWidth = 810;
   } else {
-    scale = Math.min(window.innerWidth / 1440, window.innerHeight / 810);
+    const screenAspect = window.innerWidth / window.innerHeight;
+    const baseAspect = 1440 / 810;
+
+    if (screenAspect >= baseAspect) {
+      // Screen is wider than 16:9 (e.g. 1670x900, ultrawide, etc.)
+      // Fit height to kiosk canvas (810px) and expand width dynamically so it spans 100% of the viewport width
+      scale = window.innerHeight / 810;
+      kioskWidth = Math.ceil(window.innerWidth / scale);
+    } else {
+      // Screen is narrower than 16:9
+      scale = window.innerWidth / 1440;
+      kioskWidth = 1440;
+    }
   }
+
   document.documentElement.style.setProperty('--kiosk-scale', `${scale}`);
-  if (isFullBleed) {
-    const screenWidth = isPortrait ? window.innerHeight : window.innerWidth;
-    document.documentElement.style.setProperty('--kiosk-width', `${screenWidth / scale}px`);
-  }
+  document.documentElement.style.setProperty('--kiosk-width', `${kioskWidth}px`);
 };
 window.addEventListener('resize', updateScale);
 window.addEventListener('orientationchange', updateScale);

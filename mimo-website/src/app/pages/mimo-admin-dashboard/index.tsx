@@ -4,9 +4,8 @@ import {
   Building, LogOut, Loader2, Printer, RefreshCcw, Tag,
   Home, BarChart2, Ticket, Search, User, Zap, Activity, Settings, Cpu, Droplets, Layers, Save, CheckCircle2, Clock, Menu, X, Crown, Tv, Upload
 } from 'lucide-react';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { storage, db } from '../../../lib/firebase';
+import { db } from '../../../lib/firebase';
 import api from '../../api';
 
 export default function AdminDashboard() {
@@ -49,15 +48,11 @@ export default function AdminDashboard() {
     if (!file) return;
     setIsUploadingMedia(true);
     try {
-      const storageRef = ref(storage, `screensaver/${Date.now()}_${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-      await new Promise((resolve, reject) => {
-        uploadTask.on('state_changed', null, (err) => reject(err), async () => {
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          setScreensaver((prev) => ({ ...prev, videos: [...prev.videos, downloadUrl] }));
-          resolve(downloadUrl);
-        });
-      });
+      // Signed-URL upload (F-01): the bucket no longer grants public write.
+      const { data: urlData } = await api.post('/admin/upload-url', { fileName: file.name, contentType: file.type || 'application/octet-stream', purpose: 'screensaver' }, { headers: { Authorization: `Bearer ${token}` } });
+      const putRes = await fetch(urlData.uploadUrl, { method: 'PUT', headers: { 'Content-Type': urlData.contentType }, body: file });
+      if (!putRes.ok) throw new Error(`Upload failed (HTTP ${putRes.status})`);
+      setScreensaver((prev) => ({ ...prev, videos: [...prev.videos, urlData.fileUrl] }));
     } catch (err) {
       console.error('Failed to upload screensaver media:', err);
       alert('Failed to upload file from gallery.');

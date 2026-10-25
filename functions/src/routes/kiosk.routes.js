@@ -17,6 +17,7 @@ const { createLimiters } = require("../middleware/rateLimit");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
 const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
 const { unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
+const { sessionStages } = require("../services/printStages.service");
 const { getTransporter } = require("../services/email.service");
 const { loadMachinesMap, loadMachineTemplatesMap, describeDestination } = require("../services/machineRegistry.service");
 
@@ -111,7 +112,7 @@ function createKioskRouter(dependencies) {
   } = dependencies;
 
   const router = express.Router();
-  const { codeGuessLimiter, statusLimiter } = createLimiters(db);
+  const { codeGuessLimiter, statusLimiter, reportFailureLimiter } = createLimiters(db);
 
   // ================= 1. KIOSK: POLL JOB STATUS =================
   router.get("/job-status", statusLimiter, async (req, res) => {
@@ -262,7 +263,8 @@ function createKioskRouter(dependencies) {
       }
 
       if (anyPrinting) {
-        const responsePayload = { status: "printing", isPrinted: false, sheetsCompleted, totalSheets };
+        // Additive: older kiosks ignore the two stage fields (null until the Pi has stamped every job).
+        const responsePayload = { status: "printing", isPrinted: false, sheetsCompleted, totalSheets, ...sessionStages(currentSessionDocs) };
         const contractCheck = validateKioskJobStatusResponse(responsePayload);
         if (!contractCheck.valid) {
           console.error("[SYNC CONTRACT ERROR]", contractCheck.error);
@@ -314,14 +316,30 @@ function createKioskRouter(dependencies) {
             throw new Error("TX_ABORT");
           }
 
-          // Sort in memory to get the most recent job to avoid random code collisions with stale jobs
+          // Sort in memory, most recent first (used below for the "already redeemed" fallback path).
           const sortedDocs = querySnap.docs.sort((a, b) => {
             const timeA = a.data().createdAt?.toDate ? a.data().createdAt.toDate().getTime() : 0;
             const timeB = b.data().createdAt?.toDate ? b.data().createdAt.toDate().getTime() : 0;
             return timeB - timeA;
           });
 
-          const jobDoc = sortedDocs[0];
+          // Print-code allocation is now atomic (printCode.service.js) and this should never find more than
+          // one "paid" (freshly redeemable) job for the same code -- but this used to silently pick
+          // "most recent overall" regardless of status, which is exactly backwards: a genuine collision
+          // between an OLD code's stale job (completed/failed/refunded) and a NEW customer's "paid" job
+          // would hand the NEW customer's documents to whoever redeems the OLD code's number, and vice
+          // versa. A real production incident served one customer's own, correctly-paid code with a
+          // DIFFERENT customer's print job this way. If this still ever finds >1 "paid" match (e.g. from
+          // data predating the atomic-allocation fix), fail loudly instead of guessing -- handing over the
+          // wrong customer's private documents is never an acceptable "best effort".
+          const paidDocs = sortedDocs.filter((d) => d.data().status === "paid");
+          if (paidDocs.length > 1) {
+            console.error(`[PRINT-CODE COLLISION] code ${printCode} matches ${paidDocs.length} paid jobs: ${paidDocs.map((d) => d.id).join(", ")}`);
+            transactionFailedError = { status: 409, message: "This code matched more than one order. Please contact support — do not retry." };
+            throw new Error("TX_ABORT");
+          }
+
+          const jobDoc = paidDocs[0] || sortedDocs[0];
           const jobData = jobDoc.data();
 
           // Capability-based routing validation, driven by the machine registry (looked up above, outside
@@ -340,6 +358,23 @@ function createKioskRouter(dependencies) {
             transactionFailedError = {
               status: 400,
               message: "This is a Color print job. This machine can only print black & white. Please use a colour-capable machine."
+            };
+            throw new Error("TX_ABORT");
+          }
+
+          const isExplicitlyRestricted = Boolean(
+            jobData.strictKiosk === true ||
+            jobData.directKioskRestriction === true ||
+            jobData.printOptions?.strictKiosk === true ||
+            jobData.printOptions?.directKioskRestriction === true
+          );
+          const restrictedKiosk = isExplicitlyRestricted
+            ? (jobData.printOptions?.directKioskId || jobData.directKioskId || jobData.kioskId)
+            : null;
+          if (restrictedKiosk && restrictedKiosk !== kioskId) {
+            transactionFailedError = {
+              status: 403,
+              message: `This print job is restricted to machine ${restrictedKiosk}.`
             };
             throw new Error("TX_ABORT");
           }
@@ -394,7 +429,7 @@ function createKioskRouter(dependencies) {
   });
 
   // ================= 3. KIOSK: REPORT FAILURE & AUTO-REFUND =================
-  router.post("/report-failure", async (req, res) => {
+  router.post("/report-failure", reportFailureLimiter, async (req, res) => {
     try {
       const { jobId, reason, secret } = req.body;
       if (!process.env.INTERNAL_WEBHOOK_SECRET || !secretsMatch(secret, process.env.INTERNAL_WEBHOOK_SECRET)) {
@@ -583,6 +618,66 @@ function createKioskRouter(dependencies) {
     } catch (err) {
       console.error("[REPORT-PROBLEM] Unexpected error:", err);
       return res.status(500).json({ error: "Could not record the report" });
+    }
+  });
+
+  // ================= 5. KIOSK: REPORT CLEANING STATUS =================
+  // The Pi's automated colour ink cleaning routine (scheduled at 6:00 AM) calls this after cleaning finishes
+  // to notify visionprintt@gmail.com and record the maintenance event in Firestore.
+  router.post("/report-clean", async (req, res) => {
+    try {
+      const { kioskId, printerName, secret, status, detail } = req.body || {};
+      if (!process.env.INTERNAL_WEBHOOK_SECRET || !secretsMatch(secret, process.env.INTERNAL_WEBHOOK_SECRET)) {
+        return res.status(403).json({ error: "Invalid webhook secret" });
+      }
+
+      const targetKiosk = kioskId || "SV-002";
+      const targetPrinter = printerName || "Epson_L3250";
+      const cleanStatus = status || "completed";
+
+      // 1. Record maintenance log in Firestore
+      try {
+        await db.collection("printer_maintenance").add({
+          kioskId: targetKiosk,
+          printerName: targetPrinter,
+          type: "color_ink_cleaning",
+          status: cleanStatus,
+          detail: detail || "Cleaning is done in colour printer ink",
+          cleanedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (dbErr) {
+        console.error("[REPORT-CLEAN] Failed to record in DB:", dbErr.message || dbErr);
+      }
+
+      // 2. Send notification email to visionprintt@gmail.com
+      try {
+        const transporter = getTransporter();
+        const machines = await loadMachinesMap(db);
+        const kioskName = machines.get(targetKiosk)?.name || targetKiosk;
+
+        await transporter.sendMail({
+          from: '"Mimo Printing" <visionprintt@gmail.com>',
+          to: "visionprintt@gmail.com",
+          subject: `MIMO Colour Printer Ink Cleaning Done - ${targetKiosk}`,
+          text:
+            `MIMO Colour Printer Maintenance Notification\n` +
+            `=============================================\n\n` +
+            `Kiosk: ${targetKiosk} (${kioskName})\n` +
+            `Printer: ${targetPrinter} (Colour Ink Tank)\n` +
+            `Status: Cleaning is done in colour printer ink\n` +
+            `Scheduled Time: 6:00 AM Daily\n` +
+            `Details: ${detail || "Automated head cleaning routine finished successfully without disturbing customer prints."}\n\n` +
+            `The colour printer is clean, verified, and operational for printouts.`,
+        });
+        console.log(`[EMAIL] Colour ink cleaning notification sent for ${targetKiosk}`);
+      } catch (mailErr) {
+        console.error("[REPORT-CLEAN] Email sending failed:", mailErr.message || mailErr);
+      }
+
+      return res.json({ success: true, message: "Cleaning status recorded and notification sent" });
+    } catch (err) {
+      console.error("[REPORT-CLEAN] Unexpected error:", err);
+      return res.status(500).json({ error: "Failed to process cleaning status" });
     }
   });
 

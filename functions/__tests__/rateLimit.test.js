@@ -4,7 +4,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert");
 const express = require("express");
-const { createFailureLimiter, retryAfterSeconds } = require("../src/middleware/rateLimit");
+const { createFailureLimiter, createRequestLimiter, retryAfterSeconds } = require("../src/middleware/rateLimit");
 
 function fakeDb({ failReads = false } = {}) {
   const docs = new Map();
@@ -124,5 +124,49 @@ describe("failure rate limiter", () => {
     const data = { w: [{ start: now - 10_000, count: 3 }, { start: now - 1_000, count: 5 }] };
     assert.strictEqual(retryAfterSeconds(data, LIMITS, now), Math.ceil((3_600_000 - 1_000) / 1000));
     assert.strictEqual(retryAfterSeconds(undefined, LIMITS, now), 0);
+  });
+});
+
+// createRequestLimiter counts every call, success or failure -- used for cost-bearing endpoints (uploads,
+// order creation) where a flood of entirely VALID requests is itself the DoS/cost risk, unlike the
+// failure-only limiter above which is meant for guessing attacks.
+describe("request rate limiter (counts every call, not just failures)", () => {
+  it("blocks after max requests regardless of response status, with Retry-After, per IP", async () => {
+    const db = fakeDb();
+    const limiter = createRequestLimiter(db, { scope: "write", limits: LIMITS, random: () => 1 });
+    await withApp(limiter, async (hit) => {
+      for (let i = 0; i < 3; i++) assert.strictEqual((await hit(200)).status, 200, "successful requests still count");
+      const blocked = await hit(200);
+      assert.strictEqual(blocked.status, 429);
+      assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+      assert.strictEqual((await hit(200, "2.2.2.2")).status, 200, "other IPs are unaffected");
+    });
+  });
+
+  it("unblocks when the window has passed", async () => {
+    let t = 1_000_000;
+    const limiter = createRequestLimiter(fakeDb(), { scope: "write", limits: LIMITS, now: () => t, random: () => 1 });
+    await withApp(limiter, async (hit) => {
+      for (let i = 0; i < 3; i++) await hit(200);
+      assert.strictEqual((await hit(200)).status, 429);
+      t += 61_000;
+      assert.strictEqual((await hit(200)).status, 200, "per-minute window elapsed");
+    });
+  });
+
+  it("fails open when Firestore errors", async () => {
+    const limiter = createRequestLimiter(fakeDb({ failReads: true }), { scope: "write", limits: LIMITS, random: () => 1 });
+    await withApp(limiter, async (hit) => {
+      assert.strictEqual((await hit(200)).status, 200);
+    });
+  });
+
+  it("deletes expired counter documents opportunistically", async () => {
+    let t = 1_000_000;
+    const db = fakeDb();
+    db.docs.set("rate_limits/write_old", { expireAt: new Date(t - 1) });
+    const limiter = createRequestLimiter(db, { scope: "write", limits: LIMITS, now: () => t, random: () => 0 });
+    await withApp(limiter, async (hit) => { await hit(200); });
+    assert.ok(!db.docs.has("rate_limits/write_old"), "stale doc removed");
   });
 });

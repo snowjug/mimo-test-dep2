@@ -5,6 +5,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 import time
 import subprocess
 import os
+import shutil
 import tempfile
 import zipfile
 import urllib.parse
@@ -12,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import requests
+import shlex
 
 try:
     from pillow_heif import register_heif_opener
@@ -23,14 +25,106 @@ except ImportError:
 active_jobs = set()
 
 # ================= CONFIGURATION =================
-BW_PRINTER_NAME = os.environ.get("BW_PRINTER_NAME", "Brother_HL_L2440DW_series")
-COLOR_PRINTER_NAME = os.environ.get("COLOR_PRINTER_NAME", "Epson_L3250")
-# Kiosk Routing Identity
+# Kiosk Routing Identity (Fail-closed if missing or invalid)
+VALID_KIOSK_IDS = {"CV-001", "SV-002"}
 KIOSK_ID = os.environ.get("KIOSK_ID", "KIOSK_1")
-TEMP_DIR = "/tmp/mimo_prints"
-PRE_FETCH_DIR = "/tmp/mimo_pre_fetch"
+
+DEFAULT_BW_PRINTERS = {
+    "CV-001": "Brother_HL_L5210DN_series",
+    "SV-002": "Brother_HL_L2440DW_series",
+}
+DEFAULT_COLOR_PRINTERS = {
+    "CV-001": None,
+    "SV-002": "Epson_L3250",
+}
+CROSS_KIOSK_INCOMPATIBLE = {
+    "CV-001": {"Brother_HL_L2440DW_series", "Epson_L3250", "L3250-Series"},
+    "SV-002": {"Brother_HL_L5210DN_series", "Brother_HL_L5210DN_series_USB", "Brother_IPP"},
+}
+
+
+def validate_kiosk_identity(kiosk_id):
+    """Enforces explicit, valid kiosk identity. Fails closed if missing or unknown."""
+    if not kiosk_id or kiosk_id == "KIOSK_1" or kiosk_id not in VALID_KIOSK_IDS:
+        raise ValueError(
+            f"FATAL: KIOSK_ID '{kiosk_id}' is invalid or unconfigured. "
+            f"Must be explicitly set to one of {sorted(VALID_KIOSK_IDS)}. Refusing to start."
+        )
+    return kiosk_id
+
+
+def resolve_printer_queues(kiosk_id, env_bw=None, env_color=None, is_mono_only=False):
+    """
+    Selects printer queues based on kiosk ID with fail-safe validation.
+    CV-001 defaults to Brother_HL_L5210DN_series.
+    SV-002 defaults to Brother_HL_L2440DW_series and Epson_L3250.
+    Fails clearly if KIOSK_ID or expected queue configuration is missing or invalid.
+    Preserves legitimate service configuration overrides.
+    """
+    validate_kiosk_identity(kiosk_id)
+
+    # 1. Resolve B&W queue
+    bw = env_bw if (env_bw and env_bw.strip()) else DEFAULT_BW_PRINTERS.get(kiosk_id)
+    if not bw:
+        raise ValueError(f"FATAL: Missing B&W printer queue configuration for kiosk '{kiosk_id}'. Refusing to start.")
+
+    incompatible = CROSS_KIOSK_INCOMPATIBLE.get(kiosk_id, set())
+    if bw in incompatible:
+        raise ValueError(
+            f"FATAL: Misconfigured B&W printer '{bw}' for kiosk '{kiosk_id}'. "
+            f"This queue belongs to another kiosk. Refusing to start."
+        )
+
+    # 2. Resolve Color queue
+    color = env_color if (env_color and env_color.strip()) else DEFAULT_COLOR_PRINTERS.get(kiosk_id)
+    if kiosk_id == "CV-001":
+        if color in incompatible:
+            raise ValueError(
+                f"FATAL: Misconfigured Color printer '{color}' for kiosk '{kiosk_id}'. Refusing to start."
+            )
+        if not color or is_mono_only:
+            color = bw
+    elif kiosk_id == "SV-002":
+        if not color:
+            raise ValueError("FATAL: Missing Color printer queue configuration for SV-002 (expected Epson_L3250). Refusing to start.")
+        if color in incompatible:
+            raise ValueError(
+                f"FATAL: Misconfigured Color printer '{color}' for kiosk '{kiosk_id}'. Refusing to start."
+            )
+
+    return bw, color
+
+
 # Set IS_MONOCHROME_ONLY=true in service env for printers that only support B&W (e.g. CV-001)
 IS_MONOCHROME_ONLY = os.environ.get("IS_MONOCHROME_ONLY", "false").lower() == "true"
+
+# Initial module-level printer names
+_raw_bw = os.environ.get("BW_PRINTER_NAME")
+_raw_color = os.environ.get("COLOR_PRINTER_NAME")
+if KIOSK_ID in VALID_KIOSK_IDS:
+    BW_PRINTER_NAME, COLOR_PRINTER_NAME = resolve_printer_queues(
+        KIOSK_ID, env_bw=_raw_bw, env_color=_raw_color, is_mono_only=IS_MONOCHROME_ONLY
+    )
+else:
+    BW_PRINTER_NAME = _raw_bw or "Brother_HL_L2440DW_series"
+    COLOR_PRINTER_NAME = _raw_color or "Epson_L3250"
+
+# Storage locations: default to disk-backed /var/tmp to prevent tmpfs RAM exhaustion on 1GB Pis
+TEMP_DIR = os.environ.get("TEMP_DIR", "/var/tmp/mimo_prints")
+PRE_FETCH_DIR = os.environ.get("PRE_FETCH_DIR", "/var/tmp/mimo_pre_fetch")
+
+
+def safe_sudo_run(cmd, timeout=10):
+    """Executes a command via sudo without hardcoded credentials, utilizing sudoers NOPASSWD."""
+    if os.geteuid() == 0:
+        cmd_list = cmd if isinstance(cmd, list) else shlex.split(cmd)
+        return subprocess.run(cmd_list, capture_output=True, text=True, timeout=timeout)
+    cmd_list = ["sudo", "-n"] + (cmd if isinstance(cmd, list) else shlex.split(cmd))
+    try:
+        return subprocess.run(cmd_list, capture_output=True, text=True, timeout=timeout)
+    except Exception as e:
+        print(f"⚠️ safe_sudo_run error for {cmd}: {e}")
+        return subprocess.CompletedProcess(args=cmd_list, returncode=1, stdout="", stderr=str(e))
 
 # ── Prefetch tuning (bounded pool + cache eviction) ──
 # Caps simultaneous prefetch downloads so a Firestore reconnect backlog can't spawn
@@ -64,9 +158,34 @@ PRINTER_USB_IDS = {
 # backlog document on every Firestore listener (re)connect.
 _prefetch_pool = ThreadPoolExecutor(max_workers=PREFETCH_MAX_CONCURRENT, thread_name_prefix="prefetch")
 
+# Exactly one process_job() in flight at a time per kiosk. on_snapshot() and the watchdog's stuck-job
+# fallback each used to fire a bare threading.Thread(...).start() per matching job, with no serialization --
+# if an earlier job was still mid-flight (slow download, CUPS submission, etc.) when a second, unrelated
+# job came in, both ran concurrently and could physically print out of order: a customer who thought their
+# print "didn't work" and walked away could have their job land on the tray during the NEXT customer's
+# redemption instead. Routing every submission through this single-worker pool forces strict, submission-
+# ordered one-job-at-a-time processing, matching the physical reality of one printer.
+_print_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="printjob")
+
+def _run_process_job(doc):
+    """process_job() catches its own exceptions internally, but the handful of lines before its own
+    try block (doc parsing, stamp_job) do not -- with a raw threading.Thread those still surfaced via
+    Python's default thread-exception hook (printed to stderr). A Future from pool.submit() silently
+    swallows an exception unless something calls .result(), so this wrapper re-prints it to keep that
+    same visibility instead of letting a failure vanish unlogged."""
+    try:
+        process_job(doc)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+
 def ensure_work_dirs():
-    os.makedirs(TEMP_DIR, exist_ok=True)
-    os.makedirs(PRE_FETCH_DIR, exist_ok=True)
+    for d in (TEMP_DIR, PRE_FETCH_DIR):
+        os.makedirs(d, exist_ok=True)
+        try:
+            os.chmod(d, 0o775)
+        except Exception:
+            pass
 
 # ── Ghostscript compression presets ──
 # /ebook  → downsample images to 150 DPI; great for B&W laser (small spool, fast USB transfer)
@@ -110,6 +229,9 @@ OFFICE_EXTENSIONS = (".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".txt", 
 ZIP_OFFICE_EXTENSIONS = (".docx", ".pptx", ".xlsx", ".odt", ".ods", ".odp")
 OLE_OFFICE_EXTENSIONS = (".doc", ".ppt", ".xls")
 OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+JPEG_MAGIC = b"\xff\xd8\xff"
+ZIP_MAGIC = b"PK\x03\x04"  # OOXML (.docx/.pptx/.xlsx) and other zip-based office formats
 MIN_PDF_BYTES = 100
 PDF_EOF_SCAN_BYTES = 2048
 PDFINFO_TIMEOUT_SEC = 20
@@ -121,6 +243,32 @@ PDF_DAMAGE_MARKERS = (
     "pdf file is damaged",
     "try to reconstruct",
 )
+
+def sniff_kind(path):
+    """Read the first bytes of a downloaded file and return "image" | "zip_office" | "ole_office" | None.
+
+    None means inconclusive (a real PDF, plain text, or an empty/missing file) -- callers fall back to their
+    existing extension-based handling in that case, unchanged.
+
+    WhatsApp/mobile uploads often arrive with mimetype "application/octet-stream" and no file extension
+    (confirmed root cause of "PDF is truncated (no %%EOF marker)" failures on SV-002, 2026-10-16: the
+    downloaded file was a genuine PNG, not a PDF at all -- validate_input_file's extension-based dispatch
+    defaulted it to validate_pdf_strict, which correctly found no PDF structure and misreported it as
+    truncated). Checking the actual content lets a mislabeled file still be routed correctly.
+    """
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(8)
+    except OSError:
+        return None
+    if head.startswith(PNG_MAGIC) or head.startswith(JPEG_MAGIC):
+        return "image"
+    if head.startswith(ZIP_MAGIC):
+        return "zip_office"
+    if head.startswith(OLE_MAGIC):
+        return "ole_office"
+    return None
+
 
 def validate_pdf_strict(path):
     """Strictly validate a PDF. Returns (ok, page_count, reason); page_count is None when not ok.
@@ -173,6 +321,12 @@ def validate_input_file(path):
     PDFs (and files without a known image/Office extension, which are treated as PDFs) use validate_pdf_strict.
     Images must be readable by Pillow. Office files must be complete archives/documents; their converted PDF is
     validated again after conversion.
+
+    The file's actual content (via sniff_kind) is checked before its extension/mimetype: an upload with a
+    generic or missing extension (e.g. WhatsApp's "application/octet-stream" with no filename extension) must
+    still be validated as what it actually is, not defaulted to a PDF it never was. sniff_kind returning None
+    (inconclusive -- a real PDF, plain text, or an unrecognised binary) falls through to the extension-based
+    checks below, unchanged.
     """
     try:
         if not path or not os.path.isfile(path):
@@ -180,17 +334,18 @@ def validate_input_file(path):
         size = os.path.getsize(path)
         if size == 0:
             return False, f"file is empty: {os.path.basename(path)}"
+        kind = sniff_kind(path)
         ext = os.path.splitext(path)[1].lower()
-        if ext in IMAGE_EXTENSIONS:
+        if kind == "image" or ext in IMAGE_EXTENSIONS:
             from PIL import Image
             with Image.open(path) as img:
                 img.verify()
             return True, "ok"
-        if ext in ZIP_OFFICE_EXTENSIONS:
+        if kind == "zip_office" or ext in ZIP_OFFICE_EXTENSIONS:
             if not zipfile.is_zipfile(path):
                 return False, f"Office file is incomplete or corrupt: {os.path.basename(path)}"
             return True, "ok"
-        if ext in OLE_OFFICE_EXTENSIONS:
+        if kind == "ole_office" or ext in OLE_OFFICE_EXTENSIONS:
             with open(path, "rb") as fh:
                 if fh.read(8) != OLE_MAGIC:
                     return False, f"Office file is incomplete or corrupt: {os.path.basename(path)}"
@@ -784,8 +939,8 @@ def is_printer_online(printer_name):
         if "disabled" in p_out or "stopped" in p_out or "not accepting" in p_out:
             print(f"⚠️ Printer {printer_name} is OFFLINE/DISABLED in CUPS. Attempting automatic queue healing...")
             try:
-                subprocess.run(["sudo", "-S", "cupsenable", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
-                subprocess.run(["sudo", "-S", "cupsaccept", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
+                safe_sudo_run(["/usr/sbin/cupsenable", printer_name], timeout=5)
+                safe_sudo_run(["/usr/sbin/cupsaccept", printer_name], timeout=5)
                 subprocess.run(["cupsenable", printer_name], capture_output=True, timeout=5)
                 subprocess.run(["cupsaccept", printer_name], capture_output=True, timeout=5)
                 time.sleep(1)
@@ -1037,8 +1192,8 @@ def auto_heal_cups_queue(printer_name=BW_PRINTER_NAME, job_id=None):
             subprocess.run(["cancel", job_id], capture_output=True, timeout=5)
         # Re-enable and accept jobs on the CUPS queue in case an error paused it
         try:
-            subprocess.run(["sudo", "-S", "cupsenable", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
-            subprocess.run(["sudo", "-S", "cupsaccept", printer_name], input="printpi\n", text=True, capture_output=True, timeout=5)
+            safe_sudo_run(["/usr/sbin/cupsenable", printer_name], timeout=5)
+            safe_sudo_run(["/usr/sbin/cupsaccept", printer_name], timeout=5)
             subprocess.run(["cupsenable", printer_name], capture_output=True, timeout=5)
             subprocess.run(["cupsaccept", printer_name], capture_output=True, timeout=5)
         except Exception as perm_err:
@@ -1102,11 +1257,14 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                     if job_ok:
                         try:
                             job_num = job_id.split("-")[-1]
-                            # Use -F (fixed string) to match exact literal [Job N] without regex bracket interpretation
-                            err_log_check = subprocess.run(
-                                ["sudo", "grep", "-a", "-F", f"[Job {job_num}]", "/var/log/cups/error_log"],
-                                capture_output=True, text=True, timeout=5
-                            ).stdout
+                            # Try direct read first (if in lp group or error_log readable); fallback to safe_sudo_run
+                            err_log_check = ""
+                            try:
+                                with open("/var/log/cups/error_log", "r", errors="replace") as f:
+                                    err_log_check = "".join(line for line in f if f"[Job {job_num}]" in line)
+                            except (PermissionError, FileNotFoundError):
+                                res = safe_sudo_run(["/usr/bin/grep", "-a", "-F", f"[Job {job_num}]", "/var/log/cups/error_log"], timeout=5)
+                                err_log_check = res.stdout if res.returncode == 0 else ""
                             # Check specifically for driver filter crashes only (SetupJobAttrib = escpr crash, signal 13 = SIGPIPE crash)
                             # Note: "exited with no errors" is SUCCESS — do NOT flag it
                             if "SetupJobAttrib" in err_log_check or ("signal 13" in err_log_check and "no errors" not in err_log_check):
@@ -1714,9 +1872,35 @@ def process_job(doc_snapshot):
         # Any conversion failure fails the job: an unconverted raw input is never passed on.
         any_file_sliced = False
         for f_entry, l_path in download_results:
-            f_final = l_path
             ext = os.path.splitext(l_path)[1].lower()
             entry_name = f_entry.get("name", "document")
+
+            # Content-based detection overrides a missing/generic extension (e.g. a WhatsApp upload stored
+            # as "application/octet-stream" with no filename extension) so a mislabeled image/office file
+            # is still routed to the correct conversion branch below instead of falling through to PDF
+            # handling. Images don't need a real file rename (Pillow reads by content, not extension) --
+            # only office files do, since LibreOffice picks its import filter partly from the extension on
+            # disk; make a same-directory copy with a representative extension for those (the exact
+            # docx/pptx/xlsx subtype doesn't matter -- LibreOffice's own content autodetection resolves it).
+            # The original downloaded/cached file is left untouched either way, so prefetch_cache_path()'s
+            # naming (computed independently by prefetch_job and process_job) never desyncs.
+            kind = sniff_kind(l_path)
+            if kind == "image" and ext not in IMAGE_EXTENSIONS:
+                ext = ".jpg"
+            elif kind == "zip_office" and ext not in OFFICE_EXTENSIONS:
+                office_copy = l_path + ".docx"
+                shutil.copyfile(l_path, office_copy)
+                artifact_paths.append(office_copy)
+                l_path = office_copy
+                ext = ".docx"
+            elif kind == "ole_office" and ext not in OFFICE_EXTENSIONS:
+                office_copy = l_path + ".doc"
+                shutil.copyfile(l_path, office_copy)
+                artifact_paths.append(office_copy)
+                l_path = office_copy
+                ext = ".doc"
+
+            f_final = l_path
 
             if ext in IMAGE_EXTENSIONS:
                 if image_scaling == "fill":
@@ -2056,7 +2240,7 @@ def on_snapshot(col_snapshot, changes, read_time):
                     print(f"\n🔔 New {data.get('colorMode', 'monochrome')} job detected: {doc.id}")
 
                 active_jobs.add(doc.id)
-                threading.Thread(target=process_job, args=(doc,), daemon=True).start()
+                _print_pool.submit(_run_process_job, doc)
 
 PRINTER_HEALTH_INTERVAL_SEC = 600
 
@@ -2158,11 +2342,14 @@ def reset_printer_usb(printer_name):
 
     if usb_id:
         print(f"🔌 Waking up printer {printer_name} via hardware USB reset ({usb_id})...")
-        # Run usbreset with piped password
-        res = subprocess.run(f"echo 'printpi' | sudo -S usbreset {usb_id}", shell=True, capture_output=True, text=True)
+        # Run usbreset without hardcoded password
+        res = safe_sudo_run(["usbreset", usb_id])
         print(f"USB reset output: {res.stdout.strip()} | Error: {res.stderr.strip()}")
-        # Restart CUPS to immediately re-claim USB interface and prevent usbfs detach hangs
-        subprocess.run(f"echo 'printpi' | sudo -S systemctl restart cups", shell=True, capture_output=True)
+        # Restart CUPS only if no active jobs are currently printing
+        if not active_jobs:
+            safe_sudo_run(["systemctl", "restart", "cups"])
+        else:
+            print("⚠️ CUPS restart skipped during USB reset because jobs are currently in flight.")
         return True
     else:
         print(f"⚠️ No USB ID found for printer {printer_name}")
@@ -2292,7 +2479,7 @@ def watchdog_loop():
                     status_out = status_res.stdout.lower()
                     if "disabled" in status_out:
                         print(f"⚠️ Watchdog: {printer} is disabled — re-enabling...")
-                        subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                        safe_sudo_run(["/usr/sbin/cupsenable", printer])
                         # Cancel stale spool entries for jobs already failed/refunded in Firestore
                         # before resuming to prevent ghost prints when printer comes back online
                         cancel_stale_cups_jobs_for_printer(printer)
@@ -2317,11 +2504,11 @@ def watchdog_loop():
                                 # Ensure ipp-usb is stopped and disabled so direct USB works
                                 if "Brother" in printer:
                                     print("Ensuring ipp-usb is stopped...")
-                                    subprocess.run(f"echo 'printpi' | sudo -S systemctl stop ipp-usb", shell=True, capture_output=True)
-                                    subprocess.run(f"echo 'printpi' | sudo -S systemctl disable ipp-usb", shell=True, capture_output=True)
+                                    safe_sudo_run(["systemctl", "stop", "ipp-usb"])
+                                    safe_sudo_run(["systemctl", "disable", "ipp-usb"])
                                 
                                 # Re-enable CUPS queue
-                                subprocess.run(f"echo 'printpi' | sudo -S cupsenable {printer}", shell=True, capture_output=True)
+                                safe_sudo_run(["/usr/sbin/cupsenable", printer])
                                 # Cancel stale spool entries for jobs already failed/refunded in Firestore
                                 cancel_stale_cups_jobs_for_printer(printer)
                                 stuck_cycles[printer] = 0
@@ -2352,7 +2539,7 @@ def watchdog_loop():
                     continue
                 active_jobs.add(doc.id)
                 auto_resumed_this_pass += 1
-                threading.Thread(target=process_job, args=(doc,), daemon=True).start()
+                _print_pool.submit(_run_process_job, doc)
                     
         except Exception as e:
             print(f"⚠️ Watchdog failed: {e}")
@@ -2612,32 +2799,79 @@ def finish_restart_after_boot(ref=None):
         print(f"⚠️ [RESTART] Could not close the restart command: {e}")
 
 
+def handle_clean_head_command(cmd, ref=None, clock=time):
+    """Run an admin / remote colour printhead cleaning request."""
+    if not cmd or cmd.get("status") != "pending" or cmd.get("action") != "clean_color_head":
+        return "ignored"
+    ref = ref or _command_ref()
+    command_id = cmd.get("commandId") or "clean"
+    print(f"🧹 [CLEAN] Remote request to clean colour ink head on {KIOSK_ID} (command {command_id}).")
+    safe_update(ref, {"status": "cleaning", "message": "Checking printer idle state and running head clean...",
+                      "updatedAt": firestore.SERVER_TIMESTAMP})
+    try:
+        from clean_epson import run_cleaning_job
+        ok, detail = run_cleaning_job(printer_name=COLOR_PRINTER_NAME, kiosk_id=KIOSK_ID, clock=clock)
+        status_str = "done" if ok else "failed"
+        safe_update(ref, {"status": status_str, "message": detail, "updatedAt": firestore.SERVER_TIMESTAMP,
+                          "completedAt": firestore.SERVER_TIMESTAMP})
+        return status_str
+    except Exception as e:
+        print(f"❌ [CLEAN] Cleaning command failed: {e}")
+        safe_update(ref, {"status": "failed", "message": str(e), "updatedAt": firestore.SERVER_TIMESTAMP})
+        return "failed"
+
+
 def on_command_snapshot(doc_snapshots, changes, read_time):
     for snap in doc_snapshots:
         if snap.exists:
-            threading.Thread(target=handle_restart_command, args=(snap.to_dict(),), daemon=True).start()
+            cmd = snap.to_dict() or {}
+            action = cmd.get("action")
+            if action == "clean_color_head":
+                threading.Thread(target=handle_clean_head_command, args=(cmd,), daemon=True).start()
+            else:
+                threading.Thread(target=handle_restart_command, args=(cmd,), daemon=True).start()
 
 
-def startup_purge_cups():
-    """Cancel all stale queued CUPS jobs on listener startup to prevent ghost prints when paper is refilled."""
+def color_cleaning_scheduler_loop():
+    """Background loop that schedules and executes colour ink cleaning daily at 6:00 AM IST."""
+    if KIOSK_ID != "SV-002" and not is_color_queue(COLOR_PRINTER_NAME):
+        return
     try:
-        print("🧹 [STARTUP] Clearing stale CUPS queues to prevent ghost prints...")
-        subprocess.run(["cancel", "-a", "-x"], capture_output=True, timeout=5)
+        print("⏰ [CLEAN] Starting 6:00 AM daily colour ink cleaning scheduler...")
+        from clean_epson import run_daily_scheduler
+        run_daily_scheduler(printer_name=COLOR_PRINTER_NAME, kiosk_id=KIOSK_ID, target_hour=6, target_minute=0)
     except Exception as e:
-        print(f"⚠️ [STARTUP] Failed to purge stale CUPS queues: {e}")
+        print(f"⚠️ [CLEAN] Could not start colour cleaning scheduler: {e}")
+
+
+def startup_reconcile_cups():
+    """On startup, reconcile CUPS queues against Firestore instead of blindly destroying all queued jobs.
+    Active jobs whose Firestore status is still 'printing' are preserved; only jobs that have already
+    failed, refunded, completed, or are unrecorded in Firestore are safely cancelled."""
+    try:
+        print("🔍 [STARTUP] Reconciling CUPS queue with Firestore job status...")
+        for printer in [BW_PRINTER_NAME, COLOR_PRINTER_NAME]:
+            cancel_stale_cups_jobs_for_printer(printer)
+    except Exception as e:
+        print(f"⚠️ [STARTUP] Failed to reconcile CUPS queues on startup: {e}")
 
 # Startup runs only when executed as a script (systemd: python firebase_listener.py), never on import.
 if __name__ == "__main__":
+    validate_kiosk_identity(KIOSK_ID)
+    BW_PRINTER_NAME, COLOR_PRINTER_NAME = resolve_printer_queues(
+        KIOSK_ID, env_bw=os.environ.get("BW_PRINTER_NAME"), env_color=os.environ.get("COLOR_PRINTER_NAME"), is_mono_only=IS_MONOCHROME_ONLY
+    )
     ensure_work_dirs()
     init_firebase()
 
-    startup_purge_cups()
+    startup_reconcile_cups()
 
     # Start background threads
     threading.Thread(target=heartbeat_loop, daemon=True).start()
     threading.Thread(target=watchdog_loop, daemon=True).start()
     threading.Thread(target=keep_warm_loop, daemon=True).start()
     threading.Thread(target=prefetch_cache_cleanup_loop, daemon=True).start()
+    threading.Thread(target=color_cleaning_scheduler_loop, daemon=True).start()
 
     print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
     print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")

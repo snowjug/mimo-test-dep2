@@ -11,6 +11,142 @@ const {
 // Smallest size a real uploaded document can have. Anything smaller with an unrecognised type is not a document.
 const MIN_REAL_FILE_BYTES = 256;
 
+// Largest size accepted for an unrecognised (not PDF/Office/Image) file type. The PDF and Office branches above
+// are already implicitly bounded by pdf-lib/the converter service actually being able to process the file; the
+// catch-all branch has no equivalent check, so without this an arbitrarily large file could be billed as a
+// single page. No business-set ceiling exists yet for this specific branch (document-scanner's own 10MB cap,
+// MAX_PAGE_BYTES in scanner.controller.js, is for single scanned image pages, not general documents) — 50MB is
+// a conservative ceiling for a print document pending an explicit product decision.
+const MAX_UNRECOGNISED_FILE_BYTES = 50 * 1024 * 1024;
+
+// Signed-URL upload: which prefix a given "purpose" writes under, and how long the browser has to actually
+// perform the PUT before the URL stops working. Kept short -- this is a one-shot write credential, not a
+// session token, and files that sit un-uploaded past this window just mean the customer retries /upload-url.
+const UPLOAD_URL_EXPIRY_MS = 15 * 60 * 1000;
+const UPLOAD_PURPOSES = {
+  document: (userId) => `uploads/${userId}`,
+  profile: (userId) => `profiles/${userId}`,
+};
+
+function sanitizeUploadFileName(rawName) {
+  const base = String(rawName || "file").split(/[\\/]/).pop(); // strip any path components
+  const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-150);
+  return cleaned || "file";
+}
+
+/**
+ * POST /upload-url -- mints a short-lived, write-only signed URL for ONE file under a user-owned prefix, so
+ * the browser can upload directly to Cloud Storage without that bucket needing to grant public write access
+ * (see firebase/storage.rules; this replaces the old `allow write: if true` rule once storage.rules is
+ * tightened to deny direct writes). The returned `fileUrl` is the same storage.googleapis.com-style reference
+ * the rest of the codebase (postFinalizeUpload, the Pi listener's path extractor, storageCleanup) already
+ * expects -- nothing downstream needed to change to support this.
+ */
+const postGetUploadUrl = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const { fileName, contentType, purpose } = req.body || {};
+    const prefixFor = UPLOAD_PURPOSES[purpose];
+    if (!prefixFor) {
+      return res.status(400).json({ error: `purpose must be one of: ${Object.keys(UPLOAD_PURPOSES).join(", ")}` });
+    }
+    if (typeof admin.storage !== "function") {
+      return res.status(500).json({ error: "Storage is not configured." });
+    }
+
+    const safeName = sanitizeUploadFileName(fileName);
+    const objectPath = `${prefixFor(userId)}/${Date.now()}_${safeName}`;
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(objectPath);
+
+    const [uploadUrl] = await file.getSignedUrl({
+      version: "v4",
+      action: "write",
+      expires: Date.now() + UPLOAD_URL_EXPIRY_MS,
+      contentType: contentType || "application/octet-stream",
+    });
+
+    res.json({
+      uploadUrl,
+      contentType: contentType || "application/octet-stream",
+      fileUrl: `https://storage.googleapis.com/${bucket.name}/${objectPath}`,
+      expiresInSeconds: UPLOAD_URL_EXPIRY_MS / 1000,
+    });
+  } catch (err) {
+    console.error("[UPLOAD-URL] Failed to mint signed upload URL:", err.message);
+    res.status(500).json({ error: "Could not prepare the upload. Please try again." });
+  }
+};
+
+/**
+ * POST /read-url -- mints a short-lived signed READ URL for one object this caller is allowed to see. Only
+ * two cases are supported today: a customer reading their OWN print_jobs file (ownership checked against
+ * Firestore), and an admin/finance/technical staff member reading anything (matches who could already see it
+ * through the admin dashboard's existing auth-gated APIs). Nothing else is served.
+ */
+const postGetReadUrl = async (req, res) => {
+  try {
+    const { fileUrl, jobId } = req.body || {};
+    if (!fileUrl || typeof fileUrl !== "string") {
+      return res.status(400).json({ error: "fileUrl is required." });
+    }
+    if (typeof admin.storage !== "function") {
+      return res.status(500).json({ error: "Storage is not configured." });
+    }
+    const bucket = admin.storage().bucket();
+    const objectPath = extractStoragePath(fileUrl, bucket.name, { mode: "reference" });
+    if (!objectPath) {
+      return res.status(400).json({ error: "Unrecognised file reference." });
+    }
+
+    const isStaff = !!(req.user && (req.user.isAdmin || req.user.role === "finance" || req.user.role === "technical" || req.user.role === "hr" || req.user.role === "marketing"));
+    if (!isStaff) {
+      const userId = req.user.userId || req.user.id;
+      // Primary check: every object this backend ever signs a WRITE url for is written under
+      // uploads/<userId>/... or profiles/<userId>/... (see postGetUploadUrl) -- nobody else could have
+      // gotten a signed URL to put something there, so the path itself is sufficient proof of ownership.
+      // This also covers files that aren't attached to any print_jobs doc yet (pre-checkout preview,
+      // sessionStorage-held cart items with no jobId to hand back).
+      const ownsByPath = objectPath === `uploads/${userId}` || objectPath.startsWith(`uploads/${userId}/`)
+        || objectPath === `profiles/${userId}` || objectPath.startsWith(`profiles/${userId}/`);
+      if (!ownsByPath) {
+        // Fallback: an explicit jobId whose print_jobs doc the caller owns and actually references this file
+        // (covers the merged-job case, where the path no longer carries the original uploader's userId alone).
+        if (!jobId) return res.status(403).json({ error: "Not authorized to read this file." });
+        const jobDoc = await db.collection("print_jobs").doc(jobId).get();
+        if (!jobDoc.exists || jobDoc.data().userId !== userId) {
+          return res.status(403).json({ error: "Not authorized to read this file." });
+        }
+        const jobFiles = Array.isArray(jobDoc.data().files) ? jobDoc.data().files : [jobDoc.data()];
+        const owns = jobFiles.some((f) => extractStoragePath(f.url || f.fileUrl, bucket.name, { mode: "reference" }) === objectPath);
+        if (!owns) return res.status(403).json({ error: "Not authorized to read this file." });
+      }
+    }
+
+    const [readUrl] = await bucket.file(objectPath).getSignedUrl({
+      version: "v4",
+      action: "read",
+      expires: Date.now() + 10 * 60 * 1000, // short-lived: just long enough to load one image/preview
+    });
+    res.json({ readUrl, expiresInSeconds: 600 });
+  } catch (err) {
+    console.error("[READ-URL] Failed to mint signed read URL:", err.message);
+    res.status(500).json({ error: "Could not prepare the file for viewing. Please try again." });
+  }
+};
+
+/** Admin SDK direct download -- bypasses Storage Rules entirely (same access the Pi listener already has),
+ * so this keeps working regardless of whether the bucket grants public read. Used for the server's OWN
+ * verification reads (e.g. re-parsing a PDF to get its real page count); never exposed to a browser. */
+async function downloadStorageBytes(fileUrl) {
+  if (typeof admin.storage !== "function") throw new Error("Storage is not configured.");
+  const bucket = admin.storage().bucket();
+  const objectPath = extractStoragePath(fileUrl, bucket.name, { mode: "reference" });
+  if (!objectPath) throw new Error("Unrecognised file reference.");
+  const [buf] = await bucket.file(objectPath).download();
+  return buf;
+}
+
 // Uploads are cleaned up 24 h after they were written (see docs/deployment/STORAGE_CLEANUP.md). A cart item can outlive its file
 // (open tab, stale session), so refuse to create a payable job for an object that is already gone. Only a definite "does not
 // exist" answer blocks the request; any other storage problem leaves the existing behaviour untouched.
@@ -100,8 +236,7 @@ const postFinalizeUpload = async (req, res) => {
         // in postGenerateTextPdf and the WhatsApp PDF-intake flow below).
         let pdfBuffer;
         try {
-          const pdfRes = await axios.get(f.url, { responseType: "arraybuffer" });
-          pdfBuffer = Buffer.from(pdfRes.data);
+          pdfBuffer = await downloadStorageBytes(f.url);
         } catch (downloadErr) {
           console.error(`[FINALIZE-UPLOAD ERROR] Failed to download '${f.name}' for page count verification:`, downloadErr.message);
           return failEarly(400, {
@@ -142,7 +277,7 @@ const postFinalizeUpload = async (req, res) => {
           printableMimetype = "application/pdf";
           convertedStoragePath = conv.storagePath;
           if (convertedStoragePath) generatedPaths.push(convertedStoragePath);
-          console.log(`[FINALIZE-UPLOAD] Office conversion succeeded for '${f.name}': ${resolvedPageCount} pages, printable PDF: ${printableFileUrl}`);
+          console.log(`[FINALIZE-UPLOAD] Office conversion succeeded for '${f.name}': ${resolvedPageCount} pages`);
         } catch (convErr) {
           console.error(`[FINALIZE-UPLOAD ERROR] Conversion failed for '${f.name}':`, convErr.message);
           // CRITICAL: Fail fast. Do NOT create a payable job with unverified pageCount!
@@ -158,6 +293,14 @@ const postFinalizeUpload = async (req, res) => {
         if (Number.isFinite(reportedSize) && reportedSize < MIN_REAL_FILE_BYTES) {
           return failEarly(400, {
             error: `"${f.name}" doesn't look like a real document. If you shared a link, download the actual file first and upload that.`,
+          });
+        }
+        // Unlike the PDF/Office branches, nothing here reads the file to verify its real size against the
+        // client-declared one, so this is a trust-the-client ceiling, not a verified one — same trust level
+        // this branch already has for file type. It still closes the "unlimited size, billed as 1 page" gap.
+        if (Number.isFinite(reportedSize) && reportedSize > MAX_UNRECOGNISED_FILE_BYTES) {
+          return failEarly(400, {
+            error: `"${f.name}" is too large (${Math.round(reportedSize / (1024 * 1024))}MB). Unrecognised file types are limited to ${MAX_UNRECOGNISED_FILE_BYTES / (1024 * 1024)}MB.`,
           });
         }
         // Unsupported/unrecognised format: there is no server-side way to read a real page count out of
@@ -446,4 +589,6 @@ module.exports = {
   postGenerateTextPdf,
   postCreateBlankJob,
   deleteRemoveFile,
+  postGetUploadUrl,
+  postGetReadUrl,
 };
