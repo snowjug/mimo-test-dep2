@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import api from "../api";
 import { AdBanner } from "../components/AdBanner";
 import { getTimeLeft, isCodeActive } from "../utils/print-code-expiry";
+import { describeUploadFailure, failedFilesMessage } from "../utils/upload-errors";
 
 interface UploadedFile {
   clientUploadId?: string;
@@ -682,7 +683,7 @@ export function UploadFile() {
               : f
           )
         );
-        toast.error("Upload failed for one or more files");
+        toast.error(failedFilesMessage(failedFiles.map((ff) => ff.name)));
       }
 
       // If no valid non-cancelled files, terminate sequence
@@ -783,7 +784,7 @@ export function UploadFile() {
           newFiles.some((nf) => nf.clientUploadId === f.clientUploadId) ? { ...f, status: "failed", progress: 0 } : f
         )
       );
-      toast.error("Upload failed");
+      toast.error(describeUploadFailure(err));
       setUploading(false);
     }
   };
