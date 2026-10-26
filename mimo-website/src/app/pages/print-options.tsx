@@ -516,14 +516,8 @@ export function PrintOptions() {
         trailing={
           <button
             type="button"
-            onClick={() => {
-              // Consistent with the header's "How to print" button: always restarts the full tour from
-              // step 1, which lives on the upload page -- clicking this here without navigating first
-              // would silently show nothing, since the active step wouldn't match this route.
-              navigate("/upload");
-              startTour();
-            }}
-            aria-label="Show the how-to-print tutorial"
+            onClick={startTour}
+            aria-label="Show the how-to-print guide"
             className="press flex size-10 items-center justify-center rounded-full text-ink-2 active:bg-surface-2"
           >
             <CircleHelp className="size-[22px]" strokeWidth={1.75} />
