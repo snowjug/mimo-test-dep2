@@ -526,7 +526,7 @@ export function PrintOptions() {
       />
 
       <main className="px-4">
-        <Group data-tour="print-options-printer" title="Printer">
+        <Group title="Printer">
           <div role="radiogroup" aria-label="Printer">
             {printers.map((p) => (
               <ChoiceRow key={p.id} label={p.name} detail={p.detail} selected={directKioskId === p.id} onSelect={() => selectPrinter(p.id)} />
@@ -538,7 +538,7 @@ export function PrintOptions() {
           className={`transition-opacity duration-300 ${!directKioskId ? "pointer-events-none select-none opacity-40" : ""}`}
           aria-disabled={!directKioskId}
         >
-          <Group data-tour="print-options-group" title="Options" footer={!directKioskId ? "Choose a printer first. Machines that print in colour are marked below." : undefined}>
+          <Group title="Options" footer={!directKioskId ? "Choose a printer first. Machines that print in colour are marked below." : undefined}>
             <Row
               label="Copies"
               trailing={
@@ -755,7 +755,7 @@ export function PrintOptions() {
             ))}
           </Group>
 
-          <Group data-tour="print-options-summary" title="Summary">
+          <Group title="Summary">
             <Row label="Documents" value={files.length} />
             <Row label="Pages" value={totalPages} />
             <Row label="Copies" value={Number(copies) || 1} />
