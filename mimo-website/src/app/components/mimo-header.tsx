@@ -70,11 +70,8 @@ export function MimoHeader() {
         <div className="flex min-w-0 flex-1 justify-center px-1">
           <button
             type="button"
-            onClick={() => {
-              navigate("/upload");
-              startTour();
-            }}
-            aria-label="Show the how-to-print tutorial"
+            onClick={startTour}
+            aria-label="Show the how-to-print guide"
             className="press flex min-w-0 items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-[13px] font-medium text-ink-2 active:bg-surface-3"
           >
             <CircleHelp className="size-[14px] shrink-0" strokeWidth={2} />
