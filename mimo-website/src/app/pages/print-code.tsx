@@ -287,7 +287,6 @@ export function PrintCode() {
         <p className="text-[15px] font-medium text-ink-2">{title}</p>
         <button
           type="button"
-          data-tour="print-code-display"
           onClick={handleCopyCode}
           aria-label={`Print code ${printCode.split("").join(" ")}. Tap to copy.`}
           className="press mx-auto mt-3 block rounded-[24px] px-4"
