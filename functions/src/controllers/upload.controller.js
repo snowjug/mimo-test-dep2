@@ -206,8 +206,30 @@ const postFinalizeUpload = async (req, res) => {
       return res.status(400).json({ error: `"${goneFile.name}" is no longer stored (uploads are removed after 24 hours). Please upload it again.` });
     }
 
+    // What kind of file this is. The checks are ordered: a PDF is a PDF whatever its extension, then images, then Office documents.
+    const classify = (f) => {
+      const ext = path.extname(f.name || "").toLowerCase();
+      const isPdf = ext === ".pdf" || f.type === "application/pdf";
+      const isImage = (typeof f.type === "string" && f.type.startsWith("image/")) || [".jpg", ".jpeg", ".png", ".webp", ".heic"].includes(ext);
+      return { isPdf, isImage, isOfficeDoc: !isPdf && !isImage && SUPPORTED_OFFICE_EXTENSIONS.has(ext) };
+    };
+
+    // Start every Office conversion up front, so a batch of several Word/PowerPoint files takes about as long as the
+    // slowest one instead of the sum of all of them (each can take up to ~75 s on a cold converter). Every promise
+    // resolves to { ok, conv | err } and never rejects, so an early return below cannot leave an unhandled rejection.
+    const conversions = files.map((f) =>
+      classify(f).isOfficeDoc
+        ? callOfficeConverter({ fileUrl: f.url, fileName: f.name, userId }).then((conv) => ({ ok: true, conv }), (err) => ({ ok: false, err }))
+        : null
+    );
+
     // If the batch fails after some conversions succeeded, those outputs are discarded (see failEarly).
     const failEarly = async (status, body) => {
+      // Conversions started for files the loop has not reached yet may still finish: track their output too, so it is discarded as well.
+      for (const outcome of await Promise.all(conversions.filter(Boolean))) {
+        const stored = outcome.ok && outcome.conv.storagePath;
+        if (stored && !generatedPaths.includes(stored)) generatedPaths.push(stored);
+      }
       await discardGeneratedArtifacts(generatedPaths);
       return res.status(status).json(body);
     };
@@ -217,11 +239,8 @@ const postFinalizeUpload = async (req, res) => {
     const finalizedFiles = [];
     let totalPages = 0;
 
-    for (const f of files) {
-      const ext = path.extname(f.name || "").toLowerCase();
-      const isOfficeDoc = SUPPORTED_OFFICE_EXTENSIONS.has(ext);
-      const isPdf = ext === ".pdf" || f.type === "application/pdf";
-      const isImage = (typeof f.type === "string" && f.type.startsWith("image/")) || [".jpg", ".jpeg", ".png", ".webp", ".heic"].includes(ext);
+    for (const [index, f] of files.entries()) {
+      const { isPdf, isImage, isOfficeDoc } = classify(f);
 
       let resolvedPageCount = 1;
       let printableFileUrl = f.url;
@@ -267,11 +286,9 @@ const postFinalizeUpload = async (req, res) => {
         // Invoke Cloud Run converter to render PDF and extract exact page count.
         console.log(`[FINALIZE-UPLOAD] Converting Office document '${f.name}' via converter service...`);
         try {
-          const conv = await callOfficeConverter({
-            fileUrl: f.url,
-            fileName: f.name,
-            userId: userId
-          });
+          const outcome = await conversions[index]; // started concurrently with the other Office files above
+          if (!outcome.ok) throw outcome.err;
+          const conv = outcome.conv;
           resolvedPageCount = conv.pageCount;
           printableFileUrl = conv.fileUrl; // Converted PDF becomes the printable file!
           printableMimetype = "application/pdf";
