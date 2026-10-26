@@ -84,5 +84,7 @@ test("on a deployed runtime a key file on disk is ignored and the runtime servic
 test("in local development a key file is still used", () => {
   const calls = loadFirebaseConfig({});
   assert.strictEqual(calls.cert, 1);
-  assert.deepStrictEqual(calls.initConfig.credential, { stub: "decoy@example.invalid" });
+  // Which file wins is not asserted: a developer machine may also have a real key at the repo root, which
+  // config/firebase.js checks before the working directory. All that matters is that a key file IS used locally.
+  assert.ok(calls.initConfig.credential && typeof calls.initConfig.credential.stub === "string");
 });
