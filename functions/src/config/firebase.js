@@ -2,6 +2,7 @@
 const admin = require("firebase-admin");
 const path = require("path");
 const fs = require("fs");
+const { isDeployedRuntime } = require("./credentialSource");
 
 if (!admin.apps.length) {
   let credential = null;
@@ -15,7 +16,8 @@ if (!admin.apps.length) {
       clientEmail,
       privateKey: rawKey.replace(/\\n/g, "\n"),
     });
-  } else {
+  } else if (!isDeployedRuntime()) {
+    // Local development only. A deployed function uses its runtime service account (ADC); see credentialSource.js.
     const keyPaths = [
       path.resolve(__dirname, "../../../serviceAccountKey.json"),
       path.resolve(__dirname, "../../serviceAccountKey.json"),
