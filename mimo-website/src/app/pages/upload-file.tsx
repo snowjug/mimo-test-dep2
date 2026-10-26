@@ -1030,7 +1030,6 @@ export function UploadFile() {
       {/* Upload with Scan button integrated into right corner */}
       {files.length === 0 ? (
         <div
-          data-tour="upload-dropzone"
           onClick={() => fileInputRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
@@ -1245,7 +1244,7 @@ export function UploadFile() {
         <>
           <ActionBarSpacer size={140} />
           <ActionBar>
-            <PrimaryButton data-tour="upload-continue" disabled={files.length === 0 || hasUploading} onClick={handlePrint}>
+            <PrimaryButton disabled={files.length === 0 || hasUploading} onClick={handlePrint}>
               Continue
             </PrimaryButton>
             <TextButton onClick={clearAll} className="mt-1 w-full text-ink-2">
