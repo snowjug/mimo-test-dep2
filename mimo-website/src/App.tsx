@@ -4,7 +4,7 @@ import { Toaster } from "./app/components/ui/sonner";
 import { Login } from "./app/pages/login";
 import { ScreenSkeleton } from "./app/components/mimo/screen-skeleton";
 import { TourProvider } from "./app/utils/tour-context";
-import { TourOverlay } from "./app/components/tour-overlay";
+import { HowToPrintGuide } from "./app/components/how-to-print-guide";
 
 // Every screen except the entry (login) is split into its own chunk so the first paint only
 // downloads what the login screen needs. pdf-lib, Firebase Storage and the text editor load on demand.
@@ -60,7 +60,7 @@ export default function App() {
             </Routes>
           </Suspense>
         </div>
-        <TourOverlay />
+        <HowToPrintGuide />
         <Toaster />
       </BrowserRouter>
     </TourProvider>
