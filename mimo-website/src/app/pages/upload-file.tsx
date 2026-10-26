@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import api from "../api";
 import { AdBanner } from "../components/AdBanner";
 import { getTimeLeft, isCodeActive } from "../utils/print-code-expiry";
+import { describeUploadFailure, failedFilesMessage } from "../utils/upload-errors";
 
 interface UploadedFile {
   clientUploadId?: string;
@@ -682,7 +683,7 @@ export function UploadFile() {
               : f
           )
         );
-        toast.error("Upload failed for one or more files");
+        toast.error(failedFilesMessage(failedFiles.map((ff) => ff.name)));
       }
 
       // If no valid non-cancelled files, terminate sequence
@@ -783,7 +784,7 @@ export function UploadFile() {
           newFiles.some((nf) => nf.clientUploadId === f.clientUploadId) ? { ...f, status: "failed", progress: 0 } : f
         )
       );
-      toast.error("Upload failed");
+      toast.error(describeUploadFailure(err));
       setUploading(false);
     }
   };
@@ -1029,7 +1030,6 @@ export function UploadFile() {
       {/* Upload with Scan button integrated into right corner */}
       {files.length === 0 ? (
         <div
-          data-tour="upload-dropzone"
           onClick={() => fileInputRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
@@ -1244,7 +1244,7 @@ export function UploadFile() {
         <>
           <ActionBarSpacer size={140} />
           <ActionBar>
-            <PrimaryButton data-tour="upload-continue" disabled={files.length === 0 || hasUploading} onClick={handlePrint}>
+            <PrimaryButton disabled={files.length === 0 || hasUploading} onClick={handlePrint}>
               Continue
             </PrimaryButton>
             <TextButton onClick={clearAll} className="mt-1 w-full text-ink-2">

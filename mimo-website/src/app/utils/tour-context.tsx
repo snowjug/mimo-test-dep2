@@ -1,8 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { TOUR_STEPS, type TourStep } from "./tour-steps";
+import { createContext, useCallback, useContext, useState } from "react";
+import { GUIDE_STEPS } from "./how-to-print-steps";
 
+// Open/closed and current-step state of the "How to print" guide (components/how-to-print-guide.tsx).
 const COMPLETED_KEY = "mimo_tour_completed";
-const PROGRESS_KEY = "mimo_tour_progress";
 
 export function hasTourCompleted() {
   try {
@@ -15,13 +15,10 @@ export function hasTourCompleted() {
 type TourContextValue = {
   active: boolean;
   stepIndex: number;
-  steps: TourStep[];
   start: () => void;
   next: () => void;
   prev: () => void;
-  skip: () => void;
   close: () => void;
-  goTo: (index: number) => void;
 };
 
 const TourContext = createContext<TourContextValue | null>(null);
@@ -30,65 +27,26 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
 
-  // Resume an in-progress tour across a refresh (sessionStorage: survives a reload, not a new day/tab).
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(PROGRESS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.active) {
-          setActive(true);
-          setStepIndex(parsed.stepIndex || 0);
-        }
-      }
-    } catch {
-      // sessionStorage can throw (private mode, blocked storage) -- the tour just starts fresh.
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      if (active) sessionStorage.setItem(PROGRESS_KEY, JSON.stringify({ active, stepIndex }));
-      else sessionStorage.removeItem(PROGRESS_KEY);
-    } catch {
-      // Best-effort only; losing resume state is not a functional failure.
-    }
-  }, [active, stepIndex]);
-
-  const finish = useCallback(() => {
-    setActive(false);
-    try {
-      localStorage.setItem(COMPLETED_KEY, "1");
-    } catch {
-      // If storage is unavailable the tour may re-offer itself next visit -- acceptable degradation.
-    }
-  }, []);
-
   const start = useCallback(() => {
     setStepIndex(0);
     setActive(true);
   }, []);
 
-  const next = useCallback(() => {
-    setStepIndex((i) => {
-      if (i + 1 >= TOUR_STEPS.length) {
-        finish();
-        return i;
-      }
-      return i + 1;
-    });
-  }, [finish]);
-
+  const next = useCallback(() => setStepIndex((i) => Math.min(i + 1, GUIDE_STEPS.length - 1)), []);
   const prev = useCallback(() => setStepIndex((i) => Math.max(0, i - 1)), []);
-  const skip = useCallback(() => finish(), [finish]);
-  const close = useCallback(() => finish(), [finish]);
-  const goTo = useCallback((index: number) => setStepIndex(Math.max(0, Math.min(index, TOUR_STEPS.length - 1))), []);
 
-  return (
-    <TourContext.Provider value={{ active, stepIndex, steps: TOUR_STEPS, start, next, prev, skip, close, goTo }}>
-      {children}
-    </TourContext.Provider>
-  );
+  // Closing in any way (X, Escape, tapping outside, or finishing) counts as seen, so the guide is never
+  // offered again unprompted. The header's "How to print" button always reopens it.
+  const close = useCallback(() => {
+    setActive(false);
+    try {
+      localStorage.setItem(COMPLETED_KEY, "1");
+    } catch {
+      // Storage can be unavailable (private mode); the guide may then be offered again next visit.
+    }
+  }, []);
+
+  return <TourContext.Provider value={{ active, stepIndex, start, next, prev, close }}>{children}</TourContext.Provider>;
 }
 
 export function useTour() {

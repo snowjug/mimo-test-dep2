@@ -53,7 +53,10 @@ export function PrintCode() {
         if (parsedLocal.colorMode) return parsedLocal.colorMode;
       }
     } catch {}
-    return "bw";
+    // Unknown (e.g. the page was opened without the print options in storage). Deliberately NOT assumed to be
+    // black and white: the "valid on both machines" banner below is only true for black-and-white jobs, and a
+    // colour job refused at MIMO 1.0 is a worse outcome than showing no banner.
+    return "";
   });
   const [files, setFiles] = useState<any[]>(() => {
     const storedFiles = sessionStorage.getItem("printFiles");
@@ -228,7 +231,7 @@ export function PrintCode() {
   };
 
   const isColor = colorMode === "color";
-  const isBlackAndWhite = !isColor;
+  const isBlackAndWhite = colorMode === "bw";
 
   const handleDone = () => {
     // Clear ALL session storage to ensure a completely fresh start for next job
@@ -284,7 +287,6 @@ export function PrintCode() {
         <p className="text-[15px] font-medium text-ink-2">{title}</p>
         <button
           type="button"
-          data-tour="print-code-display"
           onClick={handleCopyCode}
           aria-label={`Print code ${printCode.split("").join(" ")}. Tap to copy.`}
           className="press mx-auto mt-3 block rounded-[24px] px-4"
@@ -311,14 +313,14 @@ export function PrintCode() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-[14px] font-semibold text-ink">
-                    Valid on MIMO 1.0 & MIMO 2.0
+                    Black &amp; white printout
                   </p>
                   <span className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand-text">
-                    B&W
+                    B&amp;W
                   </span>
                 </div>
                 <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
-                  This code is valid for both machines. You can enter it on either <strong>MIMO 1.0</strong> or <strong>MIMO 2.0</strong> to get your printout.
+                  This is a black &amp; white print, so this code works at both <strong>MIMO 1.0</strong> and <strong>MIMO 2.0</strong>. Use whichever machine is closer to you.
                 </p>
               </div>
             </div>

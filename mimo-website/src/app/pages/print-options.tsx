@@ -456,6 +456,14 @@ export function PrintOptions() {
   const isSinglePageDocument = files.reduce((sum, f) => sum + (f.pageCount || 1), 0) <= 1;
   const selectedPrinter = printers.find((p) => p.id === directKioskId);
   const isDuplexSupported = (!directKioskId || selectedPrinter?.supportsDuplex !== false) && colorMode === "bw";
+  // Colour is only offered once a colour-capable machine (MIMO 2.0) is chosen. Before any machine is chosen the
+  // whole Options group is dimmed and disabled anyway, so the row stays visible there.
+  const showColourOption = !selectedPrinter || selectedPrinter.supportsColor;
+
+  // A black-and-white-only machine can never print colour: drop any colour choice carried over from before.
+  useEffect(() => {
+    if (selectedPrinter && !selectedPrinter.supportsColor && colorMode === "color") setColorMode("bw");
+  }, [selectedPrinter, colorMode]);
 
   useEffect(() => {
     if (!isDuplexSupported) {
@@ -508,14 +516,8 @@ export function PrintOptions() {
         trailing={
           <button
             type="button"
-            onClick={() => {
-              // Consistent with the header's "How to print" button: always restarts the full tour from
-              // step 1, which lives on the upload page -- clicking this here without navigating first
-              // would silently show nothing, since the active step wouldn't match this route.
-              navigate("/upload");
-              startTour();
-            }}
-            aria-label="Show the how-to-print tutorial"
+            onClick={startTour}
+            aria-label="Show the how-to-print guide"
             className="press flex size-10 items-center justify-center rounded-full text-ink-2 active:bg-surface-2"
           >
             <CircleHelp className="size-[22px]" strokeWidth={1.75} />
@@ -524,7 +526,7 @@ export function PrintOptions() {
       />
 
       <main className="px-4">
-        <Group data-tour="print-options-printer" title="Printer">
+        <Group title="Printer">
           <div role="radiogroup" aria-label="Printer">
             {printers.map((p) => (
               <ChoiceRow key={p.id} label={p.name} detail={p.detail} selected={directKioskId === p.id} onSelect={() => selectPrinter(p.id)} />
@@ -536,7 +538,7 @@ export function PrintOptions() {
           className={`transition-opacity duration-300 ${!directKioskId ? "pointer-events-none select-none opacity-40" : ""}`}
           aria-disabled={!directKioskId}
         >
-          <Group data-tour="print-options-group" title="Options" footer={!directKioskId ? "Choose a printer first. Machines that print in colour are marked below." : undefined}>
+          <Group title="Options" footer={!directKioskId ? "Choose a printer first. Machines that print in colour are marked below." : undefined}>
             <Row
               label="Copies"
               trailing={
@@ -566,18 +568,25 @@ export function PrintOptions() {
                 </Stepper>
               }
             />
-            <div className="border-t border-hairline px-4 py-3">
-              <p className="mb-2 text-[16px] text-ink">Colour</p>
-              <Segmented
-                label="Colour"
-                value={colorMode as "bw" | "color"}
-                onChange={handleColorChange}
-                options={[
-                  { value: "bw", label: "Black and white" },
-                  { value: "color", label: "Colour" },
-                ]}
-              />
-            </div>
+            {showColourOption ? (
+              <div className="border-t border-hairline px-4 py-3">
+                <p className="mb-2 text-[16px] text-ink">Colour</p>
+                <Segmented
+                  label="Colour"
+                  value={colorMode as "bw" | "color"}
+                  onChange={handleColorChange}
+                  options={[
+                    { value: "bw", label: "Black and white" },
+                    { value: "color", label: "Colour" },
+                  ]}
+                />
+              </div>
+            ) : (
+              <div className="border-t border-hairline px-4 py-3">
+                <p className="text-[16px] text-ink">Black and white</p>
+                <p className="mt-1 text-[13px] text-ink-3">{selectedPrinter?.name} prints in black and white only.</p>
+              </div>
+            )}
             <div className="border-t border-hairline px-4 py-3">
               <p className="mb-2 text-[16px] text-ink">Sides</p>
               <Segmented
@@ -746,7 +755,7 @@ export function PrintOptions() {
             ))}
           </Group>
 
-          <Group data-tour="print-options-summary" title="Summary">
+          <Group title="Summary">
             <Row label="Documents" value={files.length} />
             <Row label="Pages" value={totalPages} />
             <Row label="Copies" value={Number(copies) || 1} />

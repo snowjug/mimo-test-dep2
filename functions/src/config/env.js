@@ -53,7 +53,8 @@ const cashfreeHeaders = {
 };
 
 // ================= OFFICE CONVERTER HELPER =================
-const CONVERTER_SERVICE_URL = process.env.CONVERTER_SERVICE_URL || "https://mimo-office-converter-upqxuj7evq-uc.a.run.app";
+const DEFAULT_CONVERTER_SERVICE_URL = "https://mimo-office-converter-upqxuj7evq-uc.a.run.app";
+const CONVERTER_SERVICE_URL = process.env.CONVERTER_SERVICE_URL || DEFAULT_CONVERTER_SERVICE_URL;
 
 const INTERNAL_CONVERTER_SECRET = process.env.INTERNAL_CONVERTER_SECRET || "";
 
@@ -70,6 +71,7 @@ const FLOW_ID = process.env.FLOW_ID || ""; // the real, Meta-configured Flow ID;
 module.exports = {
   CASHFREE_BASE_URL,
   CONVERTER_SERVICE_URL,
+  DEFAULT_CONVERTER_SERVICE_URL,
   FLOW_APP_SECRET,
   FLOW_APP_SECRET_PREVIOUS,
   FLOW_ID,
