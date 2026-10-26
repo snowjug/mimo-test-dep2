@@ -1,18 +1,36 @@
 const { GoogleAuth } = require("google-auth-library");
 const axios = require("axios");
-const { CONVERTER_SERVICE_URL, INTERNAL_CONVERTER_SECRET } = require("../config/env");
+const { CONVERTER_SERVICE_URL, DEFAULT_CONVERTER_SERVICE_URL, INTERNAL_CONVERTER_SECRET } = require("../config/env");
+const { isDeployedRuntime } = require("../config/credentialSource");
 
 const SUPPORTED_OFFICE_EXTENSIONS = new Set([
   ".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls",
   ".odt", ".ods", ".odp", ".rtf", ".txt"
 ]);
 
+const LOCAL_URL_RE = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i;
+
+/**
+ * The converter URL to call. A localhost URL is a local-development setting; on a deployed function it points
+ * at the function's own container, where no converter runs, so every Word/PowerPoint/Excel upload failed (this
+ * happened in production when a local .env value was deployed). On a deployed runtime such a URL is ignored in
+ * favour of the real Cloud Run converter.
+ */
+function resolveConverterUrl(env = process.env, configured = CONVERTER_SERVICE_URL) {
+  const url = String(env.CONVERTER_SERVICE_URL || configured || DEFAULT_CONVERTER_SERVICE_URL).trim().replace(/\/+$/, "");
+  if (isDeployedRuntime(env) && LOCAL_URL_RE.test(url)) {
+    console.warn(`[CONVERTER] CONVERTER_SERVICE_URL (${url}) points at this machine, which cannot work on a deployed function. Using the Cloud Run converter instead.`);
+    return DEFAULT_CONVERTER_SERVICE_URL;
+  }
+  return url;
+}
+
 /**
  * Invokes the private LibreOffice converter service on Cloud Run via authenticated service-to-service call.
  * Returns { pageCount, fileUrl, storagePath } where fileUrl is the rendered PDF in Cloud Storage.
  */
 async function callOfficeConverter({ fileUrl, fileName, userId, jobId }) {
-  const converterUrl = (process.env.CONVERTER_SERVICE_URL || CONVERTER_SERVICE_URL).replace(/\/+$/, "");
+  const converterUrl = resolveConverterUrl();
 
   const payload = {
     fileUrl,
@@ -63,4 +81,5 @@ async function callOfficeConverter({ fileUrl, fileName, userId, jobId }) {
 module.exports = {
   SUPPORTED_OFFICE_EXTENSIONS,
   callOfficeConverter,
+  resolveConverterUrl,
 };
