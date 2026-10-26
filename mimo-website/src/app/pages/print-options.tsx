@@ -456,6 +456,14 @@ export function PrintOptions() {
   const isSinglePageDocument = files.reduce((sum, f) => sum + (f.pageCount || 1), 0) <= 1;
   const selectedPrinter = printers.find((p) => p.id === directKioskId);
   const isDuplexSupported = (!directKioskId || selectedPrinter?.supportsDuplex !== false) && colorMode === "bw";
+  // Colour is only offered once a colour-capable machine (MIMO 2.0) is chosen. Before any machine is chosen the
+  // whole Options group is dimmed and disabled anyway, so the row stays visible there.
+  const showColourOption = !selectedPrinter || selectedPrinter.supportsColor;
+
+  // A black-and-white-only machine can never print colour: drop any colour choice carried over from before.
+  useEffect(() => {
+    if (selectedPrinter && !selectedPrinter.supportsColor && colorMode === "color") setColorMode("bw");
+  }, [selectedPrinter, colorMode]);
 
   useEffect(() => {
     if (!isDuplexSupported) {
@@ -566,18 +574,25 @@ export function PrintOptions() {
                 </Stepper>
               }
             />
-            <div className="border-t border-hairline px-4 py-3">
-              <p className="mb-2 text-[16px] text-ink">Colour</p>
-              <Segmented
-                label="Colour"
-                value={colorMode as "bw" | "color"}
-                onChange={handleColorChange}
-                options={[
-                  { value: "bw", label: "Black and white" },
-                  { value: "color", label: "Colour" },
-                ]}
-              />
-            </div>
+            {showColourOption ? (
+              <div className="border-t border-hairline px-4 py-3">
+                <p className="mb-2 text-[16px] text-ink">Colour</p>
+                <Segmented
+                  label="Colour"
+                  value={colorMode as "bw" | "color"}
+                  onChange={handleColorChange}
+                  options={[
+                    { value: "bw", label: "Black and white" },
+                    { value: "color", label: "Colour" },
+                  ]}
+                />
+              </div>
+            ) : (
+              <div className="border-t border-hairline px-4 py-3">
+                <p className="text-[16px] text-ink">Black and white</p>
+                <p className="mt-1 text-[13px] text-ink-3">{selectedPrinter?.name} prints in black and white only.</p>
+              </div>
+            )}
             <div className="border-t border-hairline px-4 py-3">
               <p className="mb-2 text-[16px] text-ink">Sides</p>
               <Segmented
