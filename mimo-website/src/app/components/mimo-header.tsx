@@ -81,7 +81,7 @@ export function MimoHeader() {
         <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
-            onClick={() => navigate("/find-machine")}
+            onClick={() => navigate("/find-machine?locate=1")}
             aria-label="Find a kiosk location"
             className="press flex items-center gap-1.5 rounded-full bg-surface-2 hover:bg-surface-3 active:bg-surface-3 px-2.5 py-1.5 text-[13px] font-semibold text-ink transition-colors"
           >

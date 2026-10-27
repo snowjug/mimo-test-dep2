@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MimoHeader } from "../components/mimo-header";
 import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
-import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight, Clock } from "lucide-react";
+import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight, Clock, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { AdBanner } from "../components/AdBanner";
@@ -1215,6 +1215,37 @@ export function UploadFile() {
               Write
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Nearby Kiosk Quick Card */}
+      {files.length === 0 && (
+        <div
+          onClick={() => navigate("/find-machine?locate=1")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") navigate("/find-machine?locate=1");
+          }}
+          className="press mt-3 sm:mt-3.5 flex items-center justify-between gap-3 p-3 sm:p-3.5 rounded-[16px] bg-surface border border-hairline/70 shadow-xs cursor-pointer active:bg-surface-2 transition-all hover:border-brand/40 group"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-[12px] bg-brand-soft text-brand-text group-hover:scale-105 transition-transform">
+              <MapPin className="size-4.5 sm:size-5" strokeWidth={2.2} />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[13.5px] sm:text-[14px] font-bold text-ink leading-tight">Find Nearby Kiosk</p>
+                <span className="rounded-full bg-brand-soft px-1.5 py-0.2 text-[9.5px] font-semibold text-brand-text">Live</span>
+              </div>
+              <p className="mt-0.5 text-[12px] text-ink-2 truncate">
+                Turn on location to find the nearest kiosk & walking path
+              </p>
+            </div>
+          </div>
+          <span className="flex size-7 sm:size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink-3 group-hover:bg-brand-soft group-hover:text-brand-text transition-colors">
+            <ChevronRight className="size-4" strokeWidth={2.2} />
+          </span>
         </div>
       )}
 
