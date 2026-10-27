@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MimoHeader } from "../components/mimo-header";
 import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
-import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight, Clock } from "lucide-react";
+import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight, Clock, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { AdBanner } from "../components/AdBanner";
@@ -341,6 +341,17 @@ export function UploadFile() {
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
+
+  const [showScanComingSoon, setShowScanComingSoon] = useState(false);
+
+  useEffect(() => {
+    if (!showScanComingSoon) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowScanComingSoon(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showScanComingSoon]);
 
   // Runs once, before every other API call on this page. A returning guest or a logged-in user already
   // has a token and this is a no-op; a brand-new visitor gets a real `users` doc (same shape as a normal
@@ -1054,7 +1065,8 @@ export function UploadFile() {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate("/document-scanner");
+                  setShowScanComingSoon(true);
+                  toast.info("This feature is coming soon! ✨", { id: "scan-coming-soon" });
                 }}
                 aria-label="Scan document"
                 className="press relative z-10 flex items-center gap-1.5 rounded-full bg-white/20 hover:bg-white/25 active:bg-white/30 backdrop-blur-md px-4 py-2 text-white border border-white/25 shadow-sm"
@@ -1140,7 +1152,7 @@ export function UploadFile() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=a4");
             }}
-            className="press flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-[16px] bg-surface border border-hairline/60 shadow-xs text-center cursor-pointer active:bg-surface-2 hover:border-brand/30 transition-all group"
+            className="press flex flex-col items-center justify-center py-3 px-2 sm:py-3.5 sm:px-3 rounded-[16px] bg-surface border border-hairline/60 shadow-xs text-center cursor-pointer active:bg-surface-2 hover:border-brand/30 transition-all group min-h-[82px]"
           >
             <span className="flex size-8 items-center justify-center rounded-[10px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
               <FileIcon className="size-4" strokeWidth={1.75} />
@@ -1148,16 +1160,6 @@ export function UploadFile() {
             <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
               Blank A4 sheet
             </p>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/blank-pages?type=a4");
-              }}
-              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
-            >
-              Print
-            </button>
           </div>
 
           {/* Compartment 2: MIMO graph paper */}
@@ -1168,7 +1170,7 @@ export function UploadFile() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") navigate("/blank-pages?type=graph");
             }}
-            className="press flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-[16px] bg-surface border border-hairline/60 shadow-xs text-center cursor-pointer active:bg-surface-2 hover:border-brand/30 transition-all group"
+            className="press flex flex-col items-center justify-center py-3 px-2 sm:py-3.5 sm:px-3 rounded-[16px] bg-surface border border-hairline/60 shadow-xs text-center cursor-pointer active:bg-surface-2 hover:border-brand/30 transition-all group min-h-[82px]"
           >
             <span className="flex size-8 items-center justify-center rounded-[10px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
               <Grid3X3 className="size-4" strokeWidth={1.75} />
@@ -1176,16 +1178,6 @@ export function UploadFile() {
             <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
               MIMO graph paper
             </p>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/blank-pages?type=graph");
-              }}
-              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
-            >
-              Print
-            </button>
           </div>
 
           {/* Compartment 3: Type a document */}
@@ -1196,7 +1188,7 @@ export function UploadFile() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") navigate("/text-editor");
             }}
-            className="press flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-[16px] bg-surface border border-hairline/60 shadow-xs text-center cursor-pointer active:bg-surface-2 hover:border-brand/30 transition-all group"
+            className="press flex flex-col items-center justify-center py-3 px-2 sm:py-3.5 sm:px-3 rounded-[16px] bg-surface border border-hairline/60 shadow-xs text-center cursor-pointer active:bg-surface-2 hover:border-brand/30 transition-all group min-h-[82px]"
           >
             <span className="flex size-8 items-center justify-center rounded-[10px] bg-surface-2 text-ink mb-1.5 group-hover:scale-105 transition-transform">
               <PenLine className="size-4" strokeWidth={1.75} />
@@ -1204,16 +1196,6 @@ export function UploadFile() {
             <p className="text-[12px] font-semibold text-ink leading-tight line-clamp-1">
               Type a document
             </p>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/text-editor");
-              }}
-              className="mt-2 w-full py-1 text-[11px] font-semibold rounded-full bg-brand-soft text-brand-text group-hover:bg-brand/15 active:scale-95 transition-all text-center"
-            >
-              Write
-            </button>
           </div>
         </div>
       )}
@@ -1239,6 +1221,56 @@ export function UploadFile() {
 
       {/* Announcements / Advertisements (Shown in all states, hides cleanly with 0 skeleton if empty) */}
       <AdBanner />
+
+      {/* Scan Document - Coming Soon Modal */}
+      {showScanComingSoon && (
+        <div
+          className="fixed inset-0 z-[999] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowScanComingSoon(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="scan-coming-soon-title"
+        >
+          <div
+            className="rise-in w-full max-w-[400px] rounded-t-[28px] bg-surface px-6 pb-[max(24px,env(safe-area-inset-bottom))] pt-5 shadow-float sm:rounded-[28px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-[12px] font-bold text-brand-text">
+                <Sparkles className="size-3.5" /> Coming Soon
+              </span>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setShowScanComingSoon(false)}
+                className="press -mr-2 flex size-9 items-center justify-center rounded-full text-ink-3 active:bg-surface-2"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <div className="flex size-14 items-center justify-center rounded-2xl bg-brand-soft text-brand-text shadow-xs">
+                <Camera className="size-7" strokeWidth={1.75} aria-hidden="true" />
+              </div>
+              <h2 id="scan-coming-soon-title" className="mt-4 text-[22px] font-bold leading-tight text-ink">
+                Scan Document
+              </h2>
+              <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
+                This feature is coming soon! You'll soon be able to snap physical documents directly with your phone's camera, auto-enhance them, and print instantly.
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <PrimaryButton onClick={() => setShowScanComingSoon(false)}>
+                Got it
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
 
       {files.length > 0 && (
         <>

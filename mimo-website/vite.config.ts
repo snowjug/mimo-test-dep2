@@ -41,7 +41,8 @@ export default defineConfig({
             }
           }
 
-          const acceptsHtml = !req.headers.accept || req.headers.accept.includes('text/html') || req.headers.accept.includes('*/*');
+          const isFile = Boolean(url && (path.extname(url) || url.startsWith('/@') || url.startsWith('/src') || url.startsWith('/node_modules')));
+          const acceptsHtml = !isFile && (!req.headers.accept || req.headers.accept.includes('text/html') || req.headers['sec-fetch-dest'] === 'document' || req.headers.accept.includes('*/*'));
           
           if (acceptsHtml) {
             // Check for admin & finance routes (mimics vercel.json rewrite to /admin/index.html)

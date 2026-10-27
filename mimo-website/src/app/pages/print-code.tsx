@@ -4,7 +4,7 @@ import { Copy, Check, MessageCircle, ShieldCheck, Printer } from "lucide-react";
 import { MimoHeader } from "../components/mimo-header";
 import { Group, PrimaryButton, Row, SecondaryButton, StatusPill } from "../components/mimo/ui";
 import { toast } from "sonner";
-import { AdSenseBlock } from "../components/AdSenseBlock";
+import { AdBanner } from "../components/AdBanner";
 
 export function PrintCode() {
   const navigate = useNavigate();
@@ -413,7 +413,8 @@ export function PrintCode() {
         />
       </Group>
 
-      <AdSenseBlock className="min-h-[100px] rounded-[20px] bg-surface p-2" />
+      {/* Announcements / Advertisements (Shown in all states, hides cleanly with 0 skeleton if empty) */}
+      <AdBanner />
 
       <div className="mt-8">
         <PrimaryButton onClick={handleDone}>Print something else</PrimaryButton>

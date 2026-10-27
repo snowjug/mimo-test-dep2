@@ -243,14 +243,17 @@ export function DocumentScanner() {
     }
   }, [stopCamera]);
 
-  // Lifecycle: start camera on mount, stop on unmount
+  const isDev = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "true";
+
+  // Lifecycle: start camera on mount, stop on unmount (only in dev mode while scanner is in preview)
   useEffect(() => {
+    if (!isDev) return;
     startCamera();
     return () => {
       cameraAttemptRef.current++;
       stopCamera();
     };
-  }, [startCamera, stopCamera]);
+  }, [isDev, startCamera, stopCamera]);
 
   const openEditor = (page: ScannedPageItem) => {
     setEditingPage(page);
@@ -743,6 +746,33 @@ export function DocumentScanner() {
     "press flex size-9 items-center justify-center rounded-full text-ink-2 transition-colors active:bg-surface-3 disabled:opacity-30";
 
   const cornerKeys: (keyof DocumentCorners)[] = ["topLeft", "topRight", "bottomRight", "bottomLeft"];
+
+  if (!isDev) {
+    return (
+      <Screen className="min-h-screen">
+        <AppBar title="Scan a document" backTo="/upload" />
+        <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
+          <div className="mx-auto w-full max-w-[380px] rounded-[24px] bg-surface p-6 text-center shadow-xs border border-hairline/60">
+            <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-brand-soft text-brand-text mb-4">
+              <Camera className="size-8" strokeWidth={1.75} />
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-[12px] font-bold text-brand-text">
+              ✨ Coming Soon
+            </span>
+            <h1 className="mt-4 text-[22px] font-bold text-ink">Scan Document</h1>
+            <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
+              This feature is coming soon! You will soon be able to quickly scan physical documents with your camera and print them directly.
+            </p>
+            <div className="mt-6">
+              <PrimaryButton onClick={() => navigate("/upload")}>
+                Back to Upload
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      </Screen>
+    );
+  }
 
   return (
     <>
