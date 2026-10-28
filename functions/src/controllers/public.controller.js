@@ -41,12 +41,7 @@ const getApiScreensaver = async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("screensaver").get();
     res.json(doc.exists ? doc.data() : {
-      videos: [
-        "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
-        "/second_video.mp4",
-        "/3_video.mp4",
-        "/4_video.mp4"
-      ],
+      videos: [],
       playSound: true,
       idleTimeoutSeconds: 60
     });
