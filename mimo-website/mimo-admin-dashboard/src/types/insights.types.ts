@@ -242,6 +242,15 @@ export interface KioskRestart {
   completedAt: string | null;
 }
 
+export interface KioskCleaning {
+  status: 'pending' | 'cleaning' | 'done' | 'failed' | null;
+  message: string | null;
+  requestedAt: string | null;
+  updatedAt: string | null;
+  completedAt: string | null;
+}
+
+
 export interface JobsResponse {
   range: { from: string; to: string };
   total: number;
@@ -285,6 +294,7 @@ export interface KioskLive {
   queue: { paid: number; printing: number };
   stats: { jobs: number; completed: number; failed: number; pages: number; revenue: number };
   restart?: KioskRestart | null;
+  cleaning?: KioskCleaning | null;
 }
 
 export interface KiosksResponse {

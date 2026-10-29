@@ -59,6 +59,99 @@ async function assertWhatsAppColorRoutingEligible(db) {
 }
 
 /**
+ * Resolves the customer's email address by checking all possible sources:
+ * 1. Explicitly provided customerEmail / reqUser.email
+ * 2. Firestore `users` collection by doc ID (or query by `id`/`userId`)
+ * 3. Firestore `payment_transactions` collection for the given orderId
+ * 4. Firestore `orders` collection for the given orderId
+ * 5. Firestore `print_jobs` collection for the given orderId
+ * 6. Firebase Auth user profile (if available)
+ */
+async function resolveCustomerEmail({ db = defaultDb, userId, orderId, reqUser, explicitEmail } = {}) {
+  const isRealEmail = (e) =>
+    typeof e === "string" &&
+    e.trim().includes("@") &&
+    !e.toLowerCase().includes("user@printmimo.tech") &&
+    !e.toLowerCase().includes("placeholder");
+
+  // 1. Explicit email passed in args or reqUser
+  if (isRealEmail(explicitEmail)) return explicitEmail.trim();
+  if (isRealEmail(reqUser?.email)) return reqUser.email.trim();
+  if (isRealEmail(reqUser?.email_id)) return reqUser.email_id.trim();
+
+  // 2. Check users collection by doc ID
+  if (userId) {
+    try {
+      const userDoc = await db.collection("users").doc(userId).get();
+      if (userDoc.exists) {
+        const udata = userDoc.data() || {};
+        const candidate = udata.email || udata.userEmail || udata.customerEmail;
+        if (isRealEmail(candidate)) return candidate.trim();
+      }
+    } catch (_) {}
+
+    // Fallback: check users collection where "id" == userId or "userId" == userId
+    try {
+      const snap = await db.collection("users").where("id", "==", userId).limit(1).get();
+      if (!snap.empty) {
+        const candidate = snap.docs[0].data()?.email || snap.docs[0].data()?.userEmail;
+        if (isRealEmail(candidate)) return candidate.trim();
+      }
+    } catch (_) {}
+
+    try {
+      const snap = await db.collection("users").where("userId", "==", userId).limit(1).get();
+      if (!snap.empty) {
+        const candidate = snap.docs[0].data()?.email || snap.docs[0].data()?.userEmail;
+        if (isRealEmail(candidate)) return candidate.trim();
+      }
+    } catch (_) {}
+  }
+
+  // 3. Check payment_transactions collection by orderId
+  if (orderId) {
+    try {
+      const txnSnap = await db.collection("payment_transactions").where("orderId", "==", orderId).limit(1).get();
+      if (!txnSnap.empty) {
+        const tdata = txnSnap.docs[0].data() || {};
+        const candidate = tdata.customerEmail || tdata.userEmail || tdata.email || tdata.customer_email;
+        if (isRealEmail(candidate)) return candidate.trim();
+      }
+    } catch (_) {}
+
+    // 4. Check orders collection by orderId
+    try {
+      const ordSnap = await db.collection("orders").where("orderId", "==", orderId).limit(1).get();
+      if (!ordSnap.empty) {
+        const odata = ordSnap.docs[0].data() || {};
+        const candidate = odata.customerEmail || odata.userEmail || odata.email || odata.customer_email;
+        if (isRealEmail(candidate)) return candidate.trim();
+      }
+    } catch (_) {}
+
+    // 5. Check print_jobs by orderId
+    try {
+      const jobSnap = await db.collection("print_jobs").where("orderId", "==", orderId).limit(1).get();
+      if (!jobSnap.empty) {
+        const jdata = jobSnap.docs[0].data() || {};
+        const candidate = jdata.customerEmail || jdata.userEmail || jdata.email;
+        if (isRealEmail(candidate)) return candidate.trim();
+      }
+    } catch (_) {}
+  }
+
+  // 6. Firebase Auth fallback
+  if (userId && typeof admin?.auth === "function") {
+    try {
+      const authUser = await admin.auth().getUser(userId);
+      if (isRealEmail(authUser?.email)) return authUser.email.trim();
+    } catch (_) {}
+  }
+
+  return null;
+}
+
+/**
  * Creates (or free-fulfils) an order for `jobIds` belonging to `userId`. A faithful, behavior-preserving
  * extraction of payment.controller.js's postCreateOrder (current main, lines ~18-500) — see that function's
  * own inline comments for the reasoning behind each step; none of it is repeated or altered here beyond the
@@ -440,41 +533,37 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
       });
     }
 
+    const isRealCustEmail = typeof customerEmail === "string" && customerEmail.includes("@") && !customerEmail.toLowerCase().includes("user@printmimo.tech");
     await db.collection("orders").add({
       orderId, userId, amount: 0, totalPages: totalRawPages, totalDocs: mergedFiles.length,
       status: "PAID", orderStatus: "completed", printJobs: [newJobRef.id],
       createdAt: now, couponCode: couponCode || null, discountPercentage,
       coinsUsed: coinsApplied,
+      ...(isRealCustEmail ? { customerEmail: customerEmail.trim() } : {}),
     });
 
     try {
-      const userDoc = await db.collection("users").doc(userId).get();
-      let userEmail = (userDoc.exists ? userDoc.data().email : null) || reqUser?.email || reqUser?.email_id;
-      if (!userEmail) {
-        try {
-          const authUser = await admin.auth().getUser(userId);
-          userEmail = authUser.email;
-        } catch (e) {
-          console.log("Could not fetch user email from admin auth:", e.message);
-        }
-      }
+      const userEmail = await resolveCustomerEmail({ db, userId, orderId, reqUser, explicitEmail: customer?.email });
+      console.log(`[EMAIL-DEBUG] Preparing to send FREE OTP. Has Email: ${!!userEmail} (${userEmail || "none"}). Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
 
-      console.log(`[EMAIL-DEBUG] Preparing to send FREE OTP. Has Email: ${!!userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
+      const cleanPass = (process.env.GMAIL_APP_PASSWORD || "").trim().replace(/\s+/g, "");
 
-      if (userEmail && process.env.GMAIL_APP_PASSWORD) {
+      if (userEmail && cleanPass) {
         const mailOptions = {
           from: '"Mimo Printing" <visionprintt@gmail.com>',
           to: userEmail,
           subject: "Your Mimo Print Code is Ready!",
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px; text-align: center;">
-              <h2 style="color: #093765;">Mimo Print Receipt</h2>
-              <p style="color: #666; font-size: 16px;">Thank you for using Mimo! Your free order is ready to print.</p>
-              <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <p style="margin: 0; color: #64748b; font-size: 14px; text-transform: uppercase; font-weight: bold;">Print Code</p>
-                <p style="margin: 10px 0 0; font-size: 48px; font-weight: 900; color: #0f172a; letter-spacing: 5px;">${printCode}</p>
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #eaeaea; border-radius: 12px; text-align: center; background-color: #ffffff;">
+              <h2 style="color: #093765; margin-bottom: 8px;">Mimo Print Receipt</h2>
+              <p style="color: #64748b; font-size: 15px; margin-top: 0;">Thank you for using Mimo! Your free order is ready to print.</p>
+              <div style="background-color: #f8fafc; padding: 24px; border-radius: 10px; margin: 24px 0; border: 1px dashed #cbd5e1;">
+                <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Print Code</p>
+                <p style="margin: 12px 0 0; font-size: 52px; font-weight: 900; color: #0f172a; letter-spacing: 6px;">${printCode}</p>
               </div>
-              <p style="color: #666; font-size: 14px;">Go to the Mimo Kiosk and enter this code to retrieve your documents.</p>
+              <p style="color: #334155; font-size: 14px; line-height: 1.6;">Enter this code on the MIMO kiosk keypad to retrieve your documents.</p>
+              <hr style="border: none; border-top: 1px solid #eaeaea; margin: 24px 0;" />
+              <p style="color: #94a3b8; font-size: 12px;">This code is valid until your documents are printed.</p>
             </div>
           `,
         };
@@ -506,6 +595,7 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
     await newJobRef.update({ coinsToDeduct: coinsApplied });
   }
 
+  const isRealCustEmail = typeof customerEmail === "string" && customerEmail.includes("@") && !customerEmail.toLowerCase().includes("user@printmimo.tech");
   const paymentTxnRef = db.collection("payment_transactions").doc();
   await paymentTxnRef.set({
     orderId,
@@ -513,6 +603,7 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
     amount,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     status: "INITIATED",
+    ...(isRealCustEmail ? { customerEmail: customerEmail.trim() } : {}),
   });
 
   return { orderId, paymentSessionId: response.data.payment_session_id, amount };
@@ -529,9 +620,10 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
  * @param {string} args.userId
  * @param {string} [args.orderId]
  * @param {{email?:string}} [args.reqUser]
+ * @param {string} [args.customerEmail]
  * @returns {Promise<{printCode:string, directKioskId:string|null}>}
  */
-async function fulfillPaidOrder({ db = defaultDb, userId, orderId, reqUser } = {}) {
+async function fulfillPaidOrder({ db = defaultDb, userId, orderId, reqUser, customerEmail } = {}) {
   const now = new Date();
 
   // The whole read-check-write sequence runs inside a single Firestore transaction, keyed by orderId —
@@ -626,34 +718,32 @@ async function fulfillPaidOrder({ db = defaultDb, userId, orderId, reqUser } = {
   const { printCode, directKioskId } = outcome.body;
 
   try {
-    const userDoc = await db.collection("users").doc(userId).get();
-    let userEmail = (userDoc.exists ? userDoc.data().email : null) || reqUser?.email || reqUser?.email_id;
-    if (!userEmail) {
-      try {
-        const authUser = await admin.auth().getUser(userId);
-        userEmail = authUser.email;
-      } catch (e) {
-        console.log("Could not fetch user email from admin auth:", e.message);
-      }
-    }
+    const userEmail = await resolveCustomerEmail({ db, userId, orderId, reqUser, explicitEmail: customerEmail });
 
-    console.log(`[EMAIL-DEBUG] Preparing to send OTP. Has Email: ${!!userEmail}. Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
+    console.log(`[EMAIL-DEBUG] Preparing to send OTP. Has Email: ${!!userEmail} (${userEmail || "none"}). Has Password: ${!!process.env.GMAIL_APP_PASSWORD}`);
 
-    if (userEmail && process.env.GMAIL_APP_PASSWORD) {
+    const cleanPass = (process.env.GMAIL_APP_PASSWORD || "").trim().replace(/\s+/g, "");
+
+    if (userEmail && cleanPass) {
+      const isColor = outcome.body?.directKioskId === "SV-002";
+      const kioskGuidance = isColor
+        ? "Colour printing is available on <strong>MIMO 2.0</strong>. Please enter this code at the MIMO 2.0 kiosk."
+        : "Go to the MIMO Kiosk and enter this code to retrieve your documents.";
+
       const mailOptions = {
         from: '"Mimo Printing" <visionprintt@gmail.com>',
         to: userEmail,
         subject: "Your Mimo Print Code is Ready!",
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px; text-align: center;">
-            <h2 style="color: #093765;">Mimo Print Receipt</h2>
-            <p style="color: #666; font-size: 16px;">Thank you for using Mimo! Your document is ready to print.</p>
-            <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p style="margin: 0; color: #64748b; font-size: 14px; text-transform: uppercase; font-weight: bold;">Print Code</p>
-              <p style="margin: 10px 0 0; font-size: 48px; font-weight: 900; color: #0f172a; letter-spacing: 5px;">${printCode}</p>
+          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #eaeaea; border-radius: 12px; text-align: center; background-color: #ffffff;">
+            <h2 style="color: #093765; margin-bottom: 8px;">Mimo Print Receipt</h2>
+            <p style="color: #64748b; font-size: 15px; margin-top: 0;">Thank you for using Mimo! Your document is ready to print.</p>
+            <div style="background-color: #f8fafc; padding: 24px; border-radius: 10px; margin: 24px 0; border: 1px dashed #cbd5e1;">
+              <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Print Code</p>
+              <p style="margin: 12px 0 0; font-size: 52px; font-weight: 900; color: #0f172a; letter-spacing: 6px;">${printCode}</p>
             </div>
-            <p style="color: #666; font-size: 14px;">Go to the Mimo iPad Kiosk and scan this code to retrieve your documents.</p>
-            <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
+            <p style="color: #334155; font-size: 14px; line-height: 1.6;">${kioskGuidance}</p>
+            <hr style="border: none; border-top: 1px solid #eaeaea; margin: 24px 0;" />
             <p style="color: #94a3b8; font-size: 12px;">This code is permanently valid until it is successfully printed.</p>
           </div>
         `,
@@ -661,6 +751,15 @@ async function fulfillPaidOrder({ db = defaultDb, userId, orderId, reqUser } = {
       const transporter = getTransporter();
       await transporter.sendMail(mailOptions);
       console.log(`[EMAIL] Receipt sent to ${userEmail}`);
+
+      // If user doc has no email, attach it so future visits recognize this customer
+      if (userId) {
+        db.collection("users").doc(userId).get().then((udoc) => {
+          if (udoc.exists && !udoc.data()?.email) {
+            udoc.ref.update({ email: userEmail }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
     }
   } catch (emailErr) {
     console.error("[EMAIL ERROR] Failed to send receipt:", emailErr);

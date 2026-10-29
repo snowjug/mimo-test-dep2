@@ -9,7 +9,7 @@
       "purpose": "any maskable"
     }
   ],
-  "start_url": "/?kioskId=CV-001",
+  "start_url": "/",
   "background_color": "#1A56DB",
   "theme_color": "#1A56DB",
   "display": "fullscreen",

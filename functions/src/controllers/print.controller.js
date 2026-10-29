@@ -43,15 +43,59 @@ const postGetDocumentsByCode = async (req, res) => {
     // or the same class of collision fixed in kiosk.routes.js's /print handler after a real production
     // incident), fail loudly instead of guessing: silently picking docs[0] could expose one customer's
     // document metadata (filename, page count) in a response meant for a different customer.
-    if (snapshot.size > 1) {
-      console.error(`[PRINT-CODE COLLISION] code ${printCode} matches ${snapshot.size} paid jobs: ${snapshot.docs.map((d) => d.id).join(", ")}`);
-      return res.status(409).json({ error: "This code matched more than one order. Please contact support — do not retry." });
+    let validDocs = snapshot.docs;
+
+    if (validDocs.length > 1) {
+      // Multiple paid docs found. Determine if they belong to the SAME order/customer,
+      // or if one order is fresh (within 24h) and the other is a stale unprinted job from an earlier recycled allocation.
+      const orderIds = new Set(validDocs.map((d) => d.data().orderId).filter(Boolean));
+      const userIds = new Set(validDocs.map((d) => d.data().userId).filter(Boolean));
+      const isSameOrder = (orderIds.size === 1) || (orderIds.size === 0 && userIds.size === 1);
+
+      if (!isSameOrder) {
+        const nowMs = Date.now();
+        const VALIDITY_WINDOW_MS = 24 * 60 * 60 * 1000;
+        const getDocTime = (doc) => {
+          const d = doc.data();
+          const ts = d.codeCreatedAt || d.paymentTime || d.createdAt || d.updatedAt || d.uploadedAt;
+          if (ts && ts.toDate) return ts.toDate().getTime();
+          if (ts && ts instanceof Date) return ts.getTime();
+          if (typeof ts === "number") return ts;
+          if (typeof ts === "string") {
+            const parsed = Date.parse(ts);
+            if (!isNaN(parsed)) return parsed;
+          }
+          return 0;
+        };
+
+        const freshDocs = validDocs.filter((d) => {
+          const t = getDocTime(d);
+          return t > 0 && (nowMs - t) < VALIDITY_WINDOW_MS;
+        });
+
+        if (freshDocs.length > 0) {
+          const freshOrderIds = new Set(freshDocs.map((d) => d.data().orderId).filter(Boolean));
+          const freshUserIds = new Set(freshDocs.map((d) => d.data().userId).filter(Boolean));
+          const freshIsSameOrder = (freshOrderIds.size === 1) || (freshOrderIds.size === 0 && freshUserIds.size === 1);
+
+          if (freshIsSameOrder) {
+            validDocs = freshDocs;
+          } else {
+            console.error(`[PRINT-CODE COLLISION] code ${printCode} matches multiple distinct active orders within 24h: ${freshDocs.map((d) => d.id).join(", ")}`);
+            return res.status(409).json({ error: "This code matched more than one order. Please contact support — do not retry." });
+          }
+        } else {
+          // All matching jobs are older than 24h across multiple orders -- ambiguous collision
+          console.error(`[PRINT-CODE COLLISION] code ${printCode} matches ${validDocs.length} paid jobs across different orders: ${validDocs.map((d) => d.id).join(", ")}`);
+          return res.status(409).json({ error: "This code matched more than one order. Please contact support — do not retry." });
+        }
+      }
     }
 
     // Capability-based routing validation, driven by the machine registry: a machine must be a known, ACTIVE
     // destination, and a colour job must land on a machine whose template/override actually supports colour.
-    const firstJob = snapshot.docs[0].data();
-    const isColor = snapshot.docs.some(doc => isColorJob(doc.data()));
+    const firstJob = validDocs[0].data();
+    const isColor = validDocs.some(doc => isColorJob(doc.data()));
 
     const [machines, templates] = await Promise.all([loadMachinesMap(db), loadMachineTemplatesMap(db)]);
     const dest = describeDestination(machines, templates, kioskId);
@@ -79,7 +123,7 @@ const postGetDocumentsByCode = async (req, res) => {
       });
     }
 
-    const unprintable = unprintableFilesForKiosk(snapshot.docs.map((doc) => doc.data()), kioskId);
+    const unprintable = unprintableFilesForKiosk(validDocs.map((doc) => doc.data()), kioskId);
     if (unprintable.length) {
       return res.status(400).json({ error: unprintableFilesMessage(unprintable) });
     }
@@ -92,19 +136,19 @@ const postGetDocumentsByCode = async (req, res) => {
       if (userDoc.exists) userName = userDoc.data().username || "User";
     } catch (e) { /* ignore */ }
 
-    const documents = snapshot.docs.map(doc => {
+    const documents = validDocs.map(doc => {
       const data = doc.data();
       return {
         file: data.fileName || "Document",
         fileName: data.fileName || "Document",
         pages: data.pageCount || 1,
         copies: data.printOptions?.copies || 1,
-        colorMode: data.printOptions?.colorMode || "bw",
+        colorMode: data.colorMode || data.printOptions?.colorMode || (isColorJob(data) ? "color" : "bw"),
         jobId: doc.id,
       };
     });
 
-    res.json({ userName, name: userName, documents, printCode });
+    res.json({ userName, name: userName, documents, printCode, colorMode: isColor ? "color" : "bw" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch documents" });

@@ -3,11 +3,13 @@ const { db } = require("../config/firebase");
 
 function getTransporter() {
   const nodemailer = require("nodemailer");
+  const rawPass = process.env.GMAIL_APP_PASSWORD || "";
+  const cleanPass = rawPass.trim().replace(/\s+/g, "");
   return nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: "visionprintt@gmail.com",
-      pass: process.env.GMAIL_APP_PASSWORD || "placeholder_pass",
+      pass: cleanPass || "placeholder_pass",
     },
   });
 }

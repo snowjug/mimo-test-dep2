@@ -22,11 +22,21 @@ export type ScreenState =
   | 'maintenance-screen';
 
 function App() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const currentKioskId = urlParams.get("kioskId");
+
+  if (currentKioskId && typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('mimo_kiosk_id', currentKioskId);
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  const cachedKioskId = typeof window !== 'undefined' ? localStorage.getItem('mimo_kiosk_id') : null;
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
-  const defaultKioskFromHost = host.includes('mimo-2-0') || host.includes('mimo-kiosk-app') ? 'SV-002' : undefined;
-  const dynamicKioskId = currentKioskId || import.meta.env.VITE_KIOSK_ID || defaultKioskFromHost;
+  const defaultKioskFromHost = (host.includes('mimo-2-0') || host.includes('mimo-2') || host.includes('mimo-kiosk-app') || host.includes('sv-002')) ? 'SV-002' : undefined;
+  const dynamicKioskId = currentKioskId || defaultKioskFromHost || cachedKioskId || import.meta.env.VITE_KIOSK_ID;
   const isFestive = isFestivalActive();
   const isFestiveForKiosk = dynamicKioskId === 'CV-001' || dynamicKioskId === 'SV-002' || isFestive;
 

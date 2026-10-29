@@ -27,6 +27,9 @@ export function Register() {
 
       const { jwtToken } = response.data;
       localStorage.setItem("jwtToken", jwtToken);
+      if (email) {
+        localStorage.setItem("mimo_user_email", email);
+      }
 
       toast.success("Account created successfully!");
       navigate("/onboarding");

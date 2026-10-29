@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Printer, Wifi, WifiOff, Loader2, PackagePlus, Droplets, Power } from 'lucide-react';
+import { Printer, Wifi, WifiOff, Loader2, PackagePlus, Droplets, Power, Sparkles, Eye, EyeOff } from 'lucide-react';
 import api from '../../api';
 import { useRange } from '../../context/RangeContext';
 import { useLiveQuery, errorMessage } from '../../hooks/useLiveQuery';
@@ -10,7 +10,7 @@ import { ErrorBanner } from '../../components/insights/InsightBits';
 import { LevelBar } from '../../components/ui/shared';
 import { describeRange } from '../../lib/dateRange';
 import { inr, timeAgo } from '../../lib/format';
-import type { KioskLive, KioskRestart, PrinterInfo } from '../../types/insights.types';
+import type { KioskLive, KioskRestart, KioskCleaning, PrinterInfo } from '../../types/insights.types';
 import { clockTime } from '../../lib/format';
 
 const RESTART_LABEL: Record<string, string> = {
@@ -36,6 +36,29 @@ const RestartStatus: React.FC<{ r: KioskRestart }> = ({ r }) => {
   );
 };
 
+const CLEANING_LABEL: Record<string, string> = {
+  pending: 'Colour clean requested',
+  waiting_idle: 'Waiting for customer print to finish',
+  cleaning: 'Cleaning colour printhead…',
+  done: 'Colour printhead clean complete',
+  failed: 'Colour clean failed',
+};
+const CLEANING_RUNNING = ['pending', 'waiting_idle', 'cleaning'];
+
+const CleanStatus: React.FC<{ c: KioskCleaning }> = ({ c }) => {
+  if (!c.status) return null;
+  const tone = c.status === 'done' ? 'text-emerald-600' : c.status === 'failed' ? 'text-rose-600' : 'text-indigo-600';
+  return (
+    <p className={`mt-1 text-xs ${tone}`}>
+      {CLEANING_RUNNING.includes(c.status) && <Loader2 size={11} className="inline animate-spin mr-1 -mt-0.5" />}
+      <span className="font-bold">{CLEANING_LABEL[c.status] ?? c.status}</span>
+      {c.message && !['pending', 'waiting_idle'].includes(c.status) && <span className="text-[var(--text-2)]"> · {c.message}</span>}
+      <span className="text-[var(--text-3)]"> · {clockTime(c.completedAt || c.updatedAt || c.requestedAt)}</span>
+    </p>
+  );
+};
+
+
 /** Live machine status. Online = the Raspberry Pi sent a heartbeat in the last 5 minutes. */
 export const KiosksPage: React.FC = () => {
   const { range, setRange, current } = useRange();
@@ -45,13 +68,17 @@ export const KiosksPage: React.FC = () => {
   const [actionError, setActionError] = useState('');
   const [confirmRestart, setConfirmRestart] = useState<KioskLive | null>(null);
   const [restarting, setRestarting] = useState(false);
+  const [restartPassword, setRestartPassword] = useState('');
+  const [showRestartPassword, setShowRestartPassword] = useState(false);
 
   const requestRestart = async () => {
     if (!confirmRestart) return;
     setRestarting(true);
     setActionError('');
     try {
-      await api.post(`/admin/kiosks/${encodeURIComponent(confirmRestart.kioskId)}/restart`);
+      await api.post(`/admin/kiosks/${encodeURIComponent(confirmRestart.kioskId)}/restart`, {
+        password: restartPassword.trim(),
+      });
       setConfirmRestart(null);
       q.refresh();
     } catch (err) {
@@ -61,6 +88,27 @@ export const KiosksPage: React.FC = () => {
       setRestarting(false);
     }
   };
+
+  const [confirmClean, setConfirmClean] = useState<KioskLive | null>(null);
+  const [cleaningActive, setCleaningActive] = useState(false);
+
+
+  const requestClean = async () => {
+    if (!confirmClean) return;
+    setCleaningActive(true);
+    setActionError('');
+    try {
+      await api.post(`/admin/kiosks/${encodeURIComponent(confirmClean.kioskId)}/clean-color-head`);
+      setConfirmClean(null);
+      q.refresh();
+    } catch (err) {
+      setActionError(errorMessage(err));
+      setConfirmClean(null);
+    } finally {
+      setCleaningActive(false);
+    }
+  };
+
 
   const restock = async (printer: PrinterInfo, what: 'paper' | 'supply') => {
     const id = `${printer.key}:${what}`;
@@ -139,8 +187,9 @@ export const KiosksPage: React.FC = () => {
                 </p>
               )}
               {k.restart && <RestartStatus r={k.restart} />}
+              {k.cleaning && <CleanStatus c={k.cleaning} />}
             </div>
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmRestart(k)}
@@ -149,6 +198,16 @@ export const KiosksPage: React.FC = () => {
               >
                 <Power size={12} /> Restart Pi
               </button>
+              {(k.type === 'color' || k.printers?.some((p) => p.type === 'color') || k.kioskId === 'SV-002') && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmClean(k)}
+                  disabled={!!k.cleaning?.status && CLEANING_RUNNING.includes(k.cleaning.status)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border border-fuchsia-500/30 text-fuchsia-600 hover:bg-fuchsia-500/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Sparkles size={12} /> Clean Colour Ink
+                </button>
+              )}
             </div>
 
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -206,6 +265,32 @@ export const KiosksPage: React.FC = () => {
               <li>The kiosk is offline for about 1–2 minutes and comes back on its own.</li>
               {!confirmRestart.online && <li className="text-amber-600 font-semibold">This kiosk is offline right now. It will only restart if it reconnects within 15 minutes.</li>}
             </ul>
+            <div className="space-y-1.5 pt-1">
+              <label className="block text-xs font-bold text-[var(--text-1)]">
+                Pi Sudo Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showRestartPassword ? 'text' : 'password'}
+                  value={restartPassword}
+                  onChange={(e) => setRestartPassword(e.target.value)}
+                  placeholder="Enter Pi sudo password (e.g. printpi)"
+                  className="w-full px-3 py-2 pr-10 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-xs text-[var(--text-1)] placeholder-[var(--text-3)] focus:outline-none focus:border-rose-500 transition-colors"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowRestartPassword(!showRestartPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-3)] hover:text-[var(--text-1)] p-1 rounded-md cursor-pointer"
+                  aria-label={showRestartPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showRestartPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <p className="text-[11px] text-[var(--text-3)]">
+                Required for machines that enforce sudo authentication (e.g. MIMO 2.0). Default password is <span className="font-mono font-semibold text-[var(--text-2)]">printpi</span>.
+              </p>
+            </div>
             <div className="pt-3 flex items-center justify-end gap-2 border-t border-[var(--border)]">
               <button type="button" onClick={() => setConfirmRestart(null)}
                 className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text-2)] hover:bg-[var(--surface-2)] cursor-pointer">
@@ -214,6 +299,32 @@ export const KiosksPage: React.FC = () => {
               <button type="button" onClick={requestRestart} disabled={restarting}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold cursor-pointer disabled:opacity-50">
                 {restarting ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />} Restart Pi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmClean && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn" role="dialog" aria-modal="true">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={18} className="text-fuchsia-500" />
+              <h3 className="font-bold text-base text-[var(--text-1)]">Clean Colour Printhead on {confirmClean.name}?</h3>
+            </div>
+            <ul className="text-xs text-[var(--text-2)] space-y-1.5 list-disc pl-4">
+              <li>Verifies the printer queue is completely idle so customer prints are <strong>never interrupted or disturbed</strong>.</li>
+              <li>Sends ESC/P-R raw printhead cleaning sequence to the colour printer (Epson L3250).</li>
+              <li>Sends an automated email notification to <span className="font-mono">visionprintt@gmail.com</span> and records the maintenance event in Firestore.</li>
+              {!confirmClean.online && <li className="text-amber-600 font-semibold">This kiosk is offline right now. It will trigger once the Pi connects.</li>}
+            </ul>
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-[var(--border)]">
+              <button type="button" onClick={() => setConfirmClean(null)}
+                className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text-2)] hover:bg-[var(--surface-2)] cursor-pointer">
+                Cancel
+              </button>
+              <button type="button" onClick={requestClean} disabled={cleaningActive}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">
+                {cleaningActive ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Clean Printhead Now
               </button>
             </div>
           </div>

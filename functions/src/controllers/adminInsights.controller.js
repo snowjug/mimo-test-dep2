@@ -334,13 +334,23 @@ const hardwareFor = (hardware, kioskId) =>
     });
 
 /** Latest admin restart request for a kiosk, as the Kiosk Network page shows it. */
-const restartView = (c) => (c ? {
+const restartView = (c) => (c && (!c.action || c.action === "reboot") ? {
   status: c.status || null,
   message: c.message || null,
   requestedAt: A.iso(A.toMillis(c.requestedAt)),
   updatedAt: A.iso(A.toMillis(c.updatedAt)),
   completedAt: A.iso(A.toMillis(c.completedAt)),
 } : null);
+
+/** Latest admin colour printhead clean request for a kiosk. */
+const cleanView = (c) => (c && c.action === "clean_color_head" ? {
+  status: c.status || null,
+  message: c.message || null,
+  requestedAt: A.iso(A.toMillis(c.requestedAt)),
+  updatedAt: A.iso(A.toMillis(c.updatedAt)),
+  completedAt: A.iso(A.toMillis(c.completedAt)),
+} : null);
+
 
 async function loadKiosks(range) {
   const [statusSnap, hwDoc, queuedSnap, win, commandSnap, machines, locations] = await Promise.all([
@@ -411,6 +421,7 @@ async function loadKiosks(range) {
       queue: q,
       stats: { jobs: stats.jobs, completed: stats.completed, failed: stats.failed, pages: stats.pages, revenue: stats.revenue },
       restart: restartView(commandById.get(id)),
+      cleaning: cleanView(commandById.get(id)),
     };
   });
   return kiosks;

@@ -35,7 +35,7 @@ for _stream in (sys.stdout, sys.stderr):
 def _install_import_stubs():
     fb = types.ModuleType("firebase_admin")
     fb.credentials = types.SimpleNamespace(Certificate=mock.Mock(name="Certificate"))
-    fb.firestore = types.SimpleNamespace(client=mock.Mock(name="firestore.client"), SERVER_TIMESTAMP="SERVER_TIMESTAMP")
+    fb.firestore = types.SimpleNamespace(client=mock.Mock(name="firestore.client"), SERVER_TIMESTAMP="SERVER_TIMESTAMP", DELETE_FIELD="DELETE_FIELD")
     fb.storage = types.SimpleNamespace(bucket=mock.Mock(name="storage.bucket"))
     fb.initialize_app = mock.Mock(name="initialize_app")
     stubs = {"firebase_admin": fb}

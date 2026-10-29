@@ -34,17 +34,18 @@ const DEFAULT_MACHINES = {
     templateId: "mimo-2.0-standard",
     locationId: "central-library",
     status: "ACTIVE",
+    capabilities: { colour: true, color: true, duplex: true, paperSizes: ["A4"] },
   },
 };
 
 const DEFAULT_TEMPLATES = {
   "mimo-1.0-standard": {
     name: "MIMO 1.0 Standard",
-    capabilities: { colour: false, duplex: true, paperSizes: ["A4"] },
+    capabilities: { colour: false, color: false, duplex: true, paperSizes: ["A4"] },
   },
   "mimo-2.0-standard": {
     name: "MIMO 2.0 Standard",
-    capabilities: { colour: true, duplex: true, paperSizes: ["A4"] },
+    capabilities: { colour: true, color: true, duplex: true, paperSizes: ["A4"] },
   },
 };
 
@@ -96,10 +97,26 @@ function resolveCapabilities(machine, template) {
  */
 function describeDestination(machines, templates, kioskId) {
   const machine = machines.get(kioskId);
-  if (!machine) return { known: false, active: false, supportsColor: false };
+  if (!machine) {
+    if (kioskId === "SV-002") {
+      return { known: true, active: true, supportsColor: true };
+    }
+    return { known: false, active: false, supportsColor: false };
+  }
   const template = machine.templateId ? templates.get(machine.templateId) : null;
   const capabilities = resolveCapabilities(machine, template);
-  return { known: true, active: machine.status === "ACTIVE", supportsColor: !!capabilities.colour };
+  const isSV002 = kioskId === "SV-002" || machine.shortLabel === "M2" || (typeof machine.name === "string" && machine.name.includes("2.0"));
+  const supportsColor = Boolean(
+    capabilities.colour ||
+    capabilities.color ||
+    machine.type === "color" ||
+    machine.capabilities?.colour ||
+    machine.capabilities?.color ||
+    template?.capabilities?.colour ||
+    template?.capabilities?.color ||
+    isSV002
+  );
+  return { known: true, active: machine.status === "ACTIVE", supportsColor };
 }
 
 /**
