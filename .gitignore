@@ -33,3 +33,7 @@ coverage/
 .claude/settings.local.json
 .claude/worktrees/
 
+# Gradle build cache
+.gradle/
+**/.gradle/
+

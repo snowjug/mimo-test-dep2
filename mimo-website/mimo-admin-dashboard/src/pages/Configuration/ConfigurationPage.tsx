@@ -97,7 +97,20 @@ export const ConfigurationPage: React.FC = () => {
       return;
     }
 
-    setScreensaver((prev) => ({ ...prev, videos: [...prev.videos, trimmed] }));
+    let normalized = trimmed;
+    const gcsMatch = trimmed.match(/^https:\/\/storage\.googleapis\.com\/([^/]+)\/(.+)$/);
+    if (gcsMatch) {
+      const bucket = gcsMatch[1];
+      const objectPath = decodeURIComponent(gcsMatch[2]);
+      normalized = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media`;
+    } else {
+      const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (driveMatch) {
+        normalized = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+      }
+    }
+
+    setScreensaver((prev) => ({ ...prev, videos: [...prev.videos, normalized] }));
     setNewVideoUrl('');
   };
 
