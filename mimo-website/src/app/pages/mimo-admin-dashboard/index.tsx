@@ -944,7 +944,24 @@ export default function AdminDashboard() {
                   <div className="flex flex-col sm:flex-row gap-3">
                     <input type="text" placeholder="Paste Media URL (e.g. https://.../video.mp4 or image.jpg)" value={newVideoUrl} onChange={e => setNewVideoUrl(e.target.value)}
                       className="flex-1 px-4 py-3 rounded-lg bg-[#041E34] border border-[#1A4971] text-sm text-white outline-none focus:ring-2 focus:ring-[#6EE7B7]" />
-                    <button type="button" onClick={() => { if (newVideoUrl.trim()) { setScreensaver({ ...screensaver, videos: [...screensaver.videos, newVideoUrl.trim()] }); setNewVideoUrl(''); } }}
+                    <button type="button" onClick={() => {
+                      const trimmed = newVideoUrl.trim();
+                      if (!trimmed) return;
+                      let normalized = trimmed;
+                      const gcsMatch = trimmed.match(/^https:\/\/storage\.googleapis\.com\/([^/]+)\/(.+)$/);
+                      if (gcsMatch) {
+                        const bucket = gcsMatch[1];
+                        const objectPath = decodeURIComponent(gcsMatch[2]);
+                        normalized = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media`;
+                      } else {
+                        const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+                        if (driveMatch) {
+                          normalized = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+                        }
+                      }
+                      setScreensaver({ ...screensaver, videos: [...screensaver.videos, normalized] });
+                      setNewVideoUrl('');
+                    }}
                       className="bg-[#1E3A5F] hover:bg-[#284B7A] text-white font-semibold px-5 py-3 rounded-lg text-sm transition-colors whitespace-nowrap">
                       + Add URL
                     </button>

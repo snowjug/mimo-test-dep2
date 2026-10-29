@@ -10,6 +10,7 @@ const chat = require("./chat.controller");
 const { logFinancialAudit } = require("../utils/auditLogger");
 const { toPaise, toRupees } = require("../utils/money");
 const { cachedCollectionGet } = require("../utils/scanCache");
+const { normalizeMediaUrl } = require("../utils/mediaUrl");
 
 // Constant-time password comparison: both sides are hashed to a fixed 32-byte SHA-256 digest first, so
 // a length mismatch (almost guaranteed between a real password and an attacker's guess) can never make
@@ -138,10 +139,22 @@ const postAdminSettings = async (req, res) => {
 const getAdminScreensaver = async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("screensaver").get();
-    res.json(doc.exists ? doc.data() : {
-      videos: [],
-      playSound: true,
-      idleTimeoutSeconds: 60
+    if (!doc.exists) {
+      return res.json({
+        videos: [],
+        playSound: true,
+        idleTimeoutSeconds: 60
+      });
+    }
+    const data = doc.data() || {};
+    const videos = Array.isArray(data.videos)
+      ? data.videos.map(normalizeMediaUrl).filter(Boolean)
+      : [];
+    res.json({
+      ...data,
+      videos,
+      playSound: typeof data.playSound === "boolean" ? data.playSound : true,
+      idleTimeoutSeconds: data.idleTimeoutSeconds || 60
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -174,7 +187,7 @@ const postGetAdminUploadUrl = async (req, res) => {
     res.json({
       uploadUrl,
       contentType: contentType || "application/octet-stream",
-      fileUrl: `https://storage.googleapis.com/${bucket.name}/${objectPath}`,
+      fileUrl: `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media`,
       expiresInSeconds: 900,
     });
   } catch (err) {
@@ -187,7 +200,10 @@ const postAdminScreensaver = async (req, res) => {
   try {
     const { videos, playSound, idleTimeoutSeconds } = req.body;
     const sanitizedVideos = Array.isArray(videos)
-      ? videos.filter((v) => typeof v === 'string' && v.trim().length > 0)
+      ? videos
+          .filter((v) => typeof v === 'string' && v.trim().length > 0)
+          .map(normalizeMediaUrl)
+          .filter(Boolean)
       : [];
     const clampedTimeout = Math.min(Math.max(Number(idleTimeoutSeconds) || 60, 10), 600);
 

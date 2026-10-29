@@ -10,6 +10,33 @@ interface AddsProps {
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
 
+/**
+ * Normalizes media URLs for kiosk screensaver playback:
+ * 1. Converts Google Cloud Storage URLs (storage.googleapis.com) to Firebase Storage URLs
+ *    (firebasestorage.googleapis.com) which permit public unauthenticated reads under /screensaver/** rules.
+ * 2. Converts Google Drive preview links to direct streaming/download links.
+ */
+export function resolveScreensaverMediaUrl(rawUrl: string): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return '';
+
+  const gcsMatch = trimmed.match(/^https:\/\/storage\.googleapis\.com\/([^/]+)\/(.+)$/);
+  if (gcsMatch) {
+    const bucket = gcsMatch[1];
+    const objectPath = decodeURIComponent(gcsMatch[2]);
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media`;
+  }
+
+  const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveMatch) {
+    const fileId = driveMatch[1];
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+  }
+
+  return trimmed;
+}
+
 export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [videos, setVideos] = useState<string[]>([]);
@@ -61,7 +88,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
             docData.fields.videos.arrayValue.values
           ) {
             const videoUrls = docData.fields.videos.arrayValue.values
-              .map((v: any) => v.stringValue)
+              .map((v: any) => resolveScreensaverMediaUrl(v.stringValue))
               .filter(Boolean);
             if (videoUrls.length > 0) {
               setVideos(videoUrls);
@@ -85,7 +112,12 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
         if (res.ok) {
           const data = await res.json();
           if (data.videos && Array.isArray(data.videos) && data.videos.length > 0) {
-            setVideos(data.videos);
+            const videoUrls = data.videos
+              .map((v: string) => resolveScreensaverMediaUrl(v))
+              .filter(Boolean);
+            if (videoUrls.length > 0) {
+              setVideos(videoUrls);
+            }
           }
           if (typeof data.playSound === 'boolean') {
             setPlaySound(data.playSound);
@@ -182,26 +214,37 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
     return () => clearTimeout(timer);
   }, [isActive, currentVideoIndex, videos, handleVideoEnd]);
 
-  // Autoplay and volume control with graceful muted fallback
+  // Autoplay and volume control with robust muted start for Android WebViews & emulators
   useEffect(() => {
     const currentUrl = videos[currentVideoIndex];
     if (isActive && videoRef.current && currentUrl && !isImageUrl(currentUrl)) {
       const vid = videoRef.current;
-      vid.muted = !playSound || isMutedFallback;
+      vid.muted = true; // Always guarantee muted start for zero-touch autoplay approval
       const playPromise = vid.play();
       if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn("Autoplay attempt failed, falling back to muted play:", err);
-          vid.muted = true;
-          setIsMutedFallback(true);
-          vid.play().catch(e => {
-            console.error("Muted autoplay also failed, skipping video:", e);
-            handleMediaError(currentUrl);
+        playPromise
+          .then(() => {
+            // Once playing, attempt to enable sound if configured in settings
+            if (playSound && !isMutedFallback) {
+              try {
+                vid.muted = false;
+              } catch {
+                vid.muted = true;
+              }
+            }
+          })
+          .catch((err) => {
+            console.warn("Autoplay attempt blocked by device policy:", err);
+            vid.muted = true;
+            setIsMutedFallback(true);
+            vid.play().catch((e) => {
+              console.warn("Muted autoplay also deferred by policy:", e);
+              // Do not remove URL: autoplay restrictions are not media decode failures
+            });
           });
-        });
       }
     }
-  }, [isActive, currentVideoIndex, playSound, isMutedFallback, videos, handleMediaError]);
+  }, [isActive, currentVideoIndex, playSound, isMutedFallback, videos]);
 
   if (!isActive) return null;
 
@@ -246,9 +289,11 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
             key={`${currentVideoIndex}-${currentMediaUrl}`}
             src={currentMediaUrl}
             autoPlay 
-            muted={!playSound || isMutedFallback}
+            muted
             playsInline
+            preload="auto"
             onCanPlay={() => setIsVideoReady(true)}
+            onLoadedData={() => setIsVideoReady(true)}
             onEnded={handleVideoEnd}
             onError={() => {
               setIsVideoReady(false);

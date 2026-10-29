@@ -1,4 +1,5 @@
 const { db } = require("../config/firebase");
+const { normalizeMediaUrl } = require("../utils/mediaUrl");
 
 // ================= VALIDATE COUPON (Public) =================
 const getValidateCoupon = async (req, res) => {
@@ -40,10 +41,22 @@ const getApiSettings = async (req, res) => {
 const getApiScreensaver = async (req, res) => {
   try {
     const doc = await db.collection("mimo_settings").doc("screensaver").get();
-    res.json(doc.exists ? doc.data() : {
-      videos: [],
-      playSound: true,
-      idleTimeoutSeconds: 60
+    if (!doc.exists) {
+      return res.json({
+        videos: [],
+        playSound: true,
+        idleTimeoutSeconds: 60
+      });
+    }
+    const data = doc.data() || {};
+    const videos = Array.isArray(data.videos)
+      ? data.videos.map(normalizeMediaUrl).filter(Boolean)
+      : [];
+    res.json({
+      ...data,
+      videos,
+      playSound: typeof data.playSound === "boolean" ? data.playSound : true,
+      idleTimeoutSeconds: data.idleTimeoutSeconds || 60
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
