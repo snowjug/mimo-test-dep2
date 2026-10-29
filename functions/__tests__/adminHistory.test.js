@@ -146,3 +146,43 @@ test("refill sets the tray to 250 and remembers the page counter", async () => {
   await postAdminRefillPaper({ params: { kioskId: "SV-002" }, body: { printerKey: "CV-001" } }, bad);
   assert.strictEqual(bad.code, 400);
 });
+
+test("colour printer paper tracking follows page counter or live deductions", async () => {
+  // Computed tracking: 100 capacity, 35 pages printed since refill
+  const [computed] = hardwareFor({
+    "SV-002-COLOR": {
+      type: "color",
+      paperLevel: 100,
+      pageCount: 642,
+      paperRefillPageCount: 607,
+    },
+  }, "SV-002");
+  assert.strictEqual(computed.paperCapacity, 100);
+  assert.strictEqual(computed.paperLevel, 65);
+  assert.strictEqual(computed.paperPct, 65);
+  assert.strictEqual(computed.paperTracked, true);
+  assert.strictEqual(computed.paperSource, "computed");
+
+  // Live self-reporting from Pi:
+  const [live] = hardwareFor({
+    "SV-002-COLOR": {
+      type: "color",
+      paperLevel: 65,
+      lastPaperDeduction: new Date("2026-10-29T15:35:00Z"),
+      paperRefilledAt: new Date("2026-10-28T08:26:00Z"),
+    },
+  }, "SV-002");
+  assert.strictEqual(live.paperLevel, 65);
+  assert.strictEqual(live.paperPct, 65);
+  assert.strictEqual(live.paperTracked, true);
+  assert.strictEqual(live.paperSource, "pi-live");
+
+  // Refill sets colour tray to 100 and captures pageCount
+  fake.reset({ hardware: { printers: { "SV-002-COLOR": { type: "color", pageCount: 642, paperLevel: 65 } } } });
+  const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  await postAdminRefillPaper({ params: { kioskId: "SV-002" }, body: { printerKey: "SV-002-COLOR" } }, res);
+  assert.deepStrictEqual(res.body, { printerKey: "SV-002-COLOR", paperLevel: 100, tracked: true });
+  const saved = fake.data("hardware").printers["SV-002-COLOR"];
+  assert.strictEqual(saved.paperLevel, 100);
+  assert.strictEqual(saved.paperRefillPageCount, 642);
+});

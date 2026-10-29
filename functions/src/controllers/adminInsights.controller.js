@@ -314,7 +314,7 @@ const hardwareFor = (hardware, kioskId) =>
       const deductionIsStale = Number.isFinite(lastDeductionMs) && Number.isFinite(refilledMs) && lastDeductionMs < refilledMs;
       const selfReporting = p.lastPaperDeduction !== undefined && p.lastPaperDeduction !== null && !deductionIsStale;
       // B&W: the Pi reports the printer's own page counter, so paper left = level at refill − sheets printed since.
-      const tracked = !selfReporting && type !== "color" && paperLevel !== null && Number.isFinite(p.pageCount) && Number.isFinite(p.paperRefillPageCount);
+      const tracked = !selfReporting && paperLevel !== null && Number.isFinite(p.pageCount) && Number.isFinite(p.paperRefillPageCount);
       if (tracked) paperLevel -= Math.max(0, p.pageCount - p.paperRefillPageCount);
       if (paperLevel !== null) paperLevel = Math.max(0, Math.min(capacity, paperLevel));
       return {

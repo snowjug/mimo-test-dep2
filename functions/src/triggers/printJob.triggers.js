@@ -493,6 +493,17 @@ exports.colourPaperUsageNotification = onDocumentUpdated(
           },
           { merge: true }
         );
+
+        const hwRef = db.collection("hardware").doc("printers");
+        transaction.set(
+          hwRef,
+          {
+            [`${usageKioskId}-COLOR`]: {
+              pageCount: totalSheets,
+            },
+          },
+          { merge: true }
+        );
       });
 
       if (!milestone) {

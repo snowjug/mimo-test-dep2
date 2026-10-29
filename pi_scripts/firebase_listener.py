@@ -1180,6 +1180,39 @@ def publish_printer_health(printer_name, info):
         print(f"⚠️ [PJL] Could not publish printer health: {e}")
 
 
+def deduct_color_paper_usage(sheets_used):
+    """Decrease colour printer paper level and update page count in hardware/printers."""
+    if db is None or not sheets_used or sheets_used <= 0:
+        return
+    hw_id = "SV-002-COLOR"
+    try:
+        hw_ref = db.collection("hardware").document("printers")
+
+        @firestore.transactional
+        def _txn_deduct(txn):
+            snap = hw_ref.get(transaction=txn)
+            if not snap.exists:
+                return None
+            data = snap.to_dict() or {}
+            color_p = data.get(hw_id, {})
+            curr_lvl = color_p.get("paperLevel")
+            if curr_lvl is None:
+                curr_lvl = 100
+            new_lvl = max(0, int(curr_lvl) - int(sheets_used))
+            txn.update(hw_ref, {
+                f"{hw_id}.paperLevel": new_lvl,
+                f"{hw_id}.lastPaperDeduction": firestore.SERVER_TIMESTAMP,
+                f"{hw_id}.pageCount": firestore.Increment(int(sheets_used)),
+            })
+            return new_lvl
+
+        new_val = _txn_deduct(db.transaction())
+        if new_val is not None:
+            print(f"📄 [COLOR-PAPER] Deducted {sheets_used} sheet(s). {hw_id} paperLevel is now {new_val}.")
+    except Exception as e:
+        print(f"⚠️ [COLOR-PAPER] Could not deduct colour paper: {e}")
+
+
 def auto_heal_cups_queue(printer_name=BW_PRINTER_NAME, job_id=None):
     """
     Automatically clears stuck or errored jobs in CUPS and re-enables a paused/error print queue.
@@ -1318,6 +1351,9 @@ def wait_for_cups_job(job_id, doc_ref, timeout=1800, printer_name=BW_PRINTER_NAM
                             "printedAt": firestore.SERVER_TIMESTAMP,
                             **verified_fields,
                         })
+
+                        if is_color_printer or is_color_queue(printer_name) or (KIOSK_ID == "SV-002" and printer_name == COLOR_PRINTER_NAME):
+                            deduct_color_paper_usage(total_sheets)
                     else:
                         print(f"❌ [SYNC] CUPS job {job_id} ended in error. Reporting failure for auto-refund.")
                         auto_heal_cups_queue(printer_name, job_id)
@@ -2317,6 +2353,18 @@ def heartbeat_loop():
                 "wifiSignalDbm": wifi_dbm,
                 "wifiQualityPct": wifi_pct,
             }, merge=True)
+
+            if KIOSK_ID == "SV-002":
+                try:
+                    db.collection("hardware").document("printers").set({
+                        "SV-002-COLOR": {
+                            "status": "Online" if color_ok else "Paused/Error",
+                            "panelMessage": None if color_ok else _color_reason,
+                            "healthCheckedAt": firestore.SERVER_TIMESTAMP,
+                        }
+                    }, merge=True)
+                except Exception as hw_err:
+                    print(f"⚠️ [HEARTBEAT] Could not update colour printer status: {hw_err}")
         except Exception as e:
             print(f"⚠️ Heartbeat failed: {e}")
         try:
