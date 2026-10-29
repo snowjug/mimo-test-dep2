@@ -30,7 +30,7 @@ const postAdminKioskRestart = async (req, res) => {
 
     const commandId = crypto.randomUUID();
     const now = admin.firestore.FieldValue.serverTimestamp();
-    await db.collection("kiosk_commands").doc(kioskId).set({
+    const commandPayload = {
       kioskId,
       action: "reboot",
       status: "pending",
@@ -39,7 +39,11 @@ const postAdminKioskRestart = async (req, res) => {
       requestedBy: (req.admin && req.admin.email) || "admin",
       requestedAt: now,
       updatedAt: now,
-    });
+    };
+    if (req.body && typeof req.body.password === "string" && req.body.password.trim()) {
+      commandPayload.password = req.body.password.trim();
+    }
+    await db.collection("kiosk_commands").doc(kioskId).set(commandPayload);
     console.log(`[KIOSK-COMMAND] Reboot requested for ${kioskId} (${commandId})`);
     return res.json({ commandId, status: "pending" });
   } catch (err) {
@@ -130,4 +134,49 @@ const postAdminKioskVerify = async (req, res) => {
   }
 };
 
-module.exports = { postAdminKioskRestart, postAdminRefillPaper, postAdminKioskVerify };
+/**
+ * Admin → kiosk remote colour printhead clean request.
+ * Writes to kiosk_commands/{kioskId} with action="clean_color_head", status="pending".
+ * The Pi listener watches its kiosk document, waits for printing to finish, runs ESC/P head clean,
+ * sends confirmation email to visionprintt@gmail.com, and marks it "done".
+ */
+const CLEAN_IN_FLIGHT = ["pending", "cleaning", "waiting_idle"];
+
+const postAdminKioskCleanColorHead = async (req, res) => {
+  try {
+    const kioskId = String(req.params.kioskId || "");
+    if (!A.KIOSK_ID_PATTERN.test(kioskId)) return res.status(400).json({ error: "Unknown kiosk" });
+    const [statusDoc, cmdDoc] = await Promise.all([
+      db.collection("system_status").doc(kioskId).get(),
+      db.collection("kiosk_commands").doc(kioskId).get(),
+    ]);
+    const machineDoc = await db.collection("machines").doc(kioskId).get();
+    if (!A.KNOWN_KIOSKS[kioskId] && !statusDoc.exists && !machineDoc.exists) return res.status(404).json({ error: "Unknown kiosk" });
+
+    const current = cmdDoc.exists ? cmdDoc.data() : null;
+    if (current && CLEAN_IN_FLIGHT.includes(current.status) && Date.now() - A.toMillis(current.updatedAt || current.requestedAt) < IN_FLIGHT_MAX_MS) {
+      return res.status(409).json({ error: "A cleaning or maintenance command is already in progress for this kiosk", status: current.status });
+    }
+
+    const commandId = crypto.randomUUID();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    await db.collection("kiosk_commands").doc(kioskId).set({
+      kioskId,
+      action: "clean_color_head",
+      status: "pending",
+      commandId,
+      message: "Waiting for the Pi to start colour printhead cleaning.",
+      requestedBy: (req.admin && req.admin.email) || "admin",
+      requestedAt: now,
+      updatedAt: now,
+    });
+    console.log(`[KIOSK-COMMAND] Clean colour head requested for ${kioskId} (${commandId})`);
+    return res.json({ commandId, status: "pending", action: "clean_color_head" });
+  } catch (err) {
+    console.error("[KIOSK-COMMAND] Clean colour head request failed:", err);
+    return res.status(500).json({ error: "Could not send the clean colour head request" });
+  }
+};
+
+module.exports = { postAdminKioskRestart, postAdminRefillPaper, postAdminKioskVerify, postAdminKioskCleanColorHead };
+

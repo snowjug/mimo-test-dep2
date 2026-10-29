@@ -207,6 +207,14 @@ export function Payment() {
       if (applyCoins && coinsToUse > 0) {
         payload.coinsToUse = coinsToUse;
       }
+      const activeEmail = userEmail || localStorage.getItem("mimo_user_email");
+      const activeName = userName || localStorage.getItem("mimo_user_name");
+      if (activeEmail) {
+        payload.customerEmail = activeEmail;
+      }
+      if (activeName) {
+        payload.customerName = activeName;
+      }
 
       // 1. ALWAYS create order in backend first, regardless of amount.
       // The backend securely verifies the coupon and 100% discount status.

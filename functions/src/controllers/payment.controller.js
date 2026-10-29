@@ -43,9 +43,11 @@ const getVerifyPayment = async (req, res) => {
     const { orderId } = req.params;
 
     let cashfreeStatus = null;
+    let cashfreeCustomerEmail = null;
     try {
       const cfRes = await axios.get(`${CASHFREE_BASE_URL}/orders/${orderId}`, { headers: cashfreeHeaders, timeout: 10000 });
       cashfreeStatus = cfRes.data.order_status;
+      cashfreeCustomerEmail = cfRes.data?.customer_details?.customer_email || null;
       console.log(`[VERIFY-PAYMENT] Cashfree status for ${orderId}: ${cashfreeStatus}`);
     } catch (cfErr) {
       console.warn("[VERIFY-PAYMENT] Cashfree API failed, falling back to Firestore:", cfErr.message);
@@ -69,7 +71,11 @@ const getVerifyPayment = async (req, res) => {
       }
 
       if (cashfreeStatus === "PAID") {
-        await orderDoc.ref.update({ status: "PAID" });
+        const updateData = { status: "PAID" };
+        if (cashfreeCustomerEmail && typeof cashfreeCustomerEmail === "string" && !cashfreeCustomerEmail.toLowerCase().includes("user@printmimo.tech")) {
+          updateData.customerEmail = cashfreeCustomerEmail;
+        }
+        await orderDoc.ref.update(updateData);
       } else if (!cashfreeStatus) {
         order_status = orderDoc.data().status;
       }
@@ -81,9 +87,14 @@ const getVerifyPayment = async (req, res) => {
     if (order_status === "PAID" && userId) {
       try {
         const dummyToken = jwt.sign({ userId }, getSecretKey(), { expiresIn: "1h" });
+        const existingEmail = cashfreeCustomerEmail || (orderSnapshot.empty ? null : (orderSnapshot.docs[0].data()?.customerEmail || null));
+        const internalReqBody = { orderId };
+        if (existingEmail && typeof existingEmail === "string" && !existingEmail.toLowerCase().includes("user@printmimo.tech")) {
+          internalReqBody.customerEmail = existingEmail;
+        }
         const internalRes = await axios.post(
           `http://localhost:${process.env.PORT || 8080}/payment-success`,
-          { orderId },
+          internalReqBody,
           { headers: { Authorization: `Bearer ${dummyToken}` } }
         );
         printCode = internalRes.data.printCode;
@@ -136,6 +147,7 @@ const postCashfreeWebhook = async (req, res) => {
       const orderId = event.data.order.order_id;
       const userId = event.data.customer_details.customer_id;
       const paidAmount = event.data.order.order_amount;
+      const webhookCustomerEmail = event.data?.customer_details?.customer_email || event.data?.payment?.payment_email || null;
       const now = admin.firestore.FieldValue.serverTimestamp();
 
       // Idempotency: Cashfree retries and may deliver twice; revenue counters must only move once per order.
@@ -159,12 +171,16 @@ const postCashfreeWebhook = async (req, res) => {
       }
       const orderBatch = db.batch();
       orders.forEach((doc) => {
-        orderBatch.update(doc.ref, {
+        const updateData = {
           status: "PAID",
           orderStatus: "completed",
           "paymentDetails.paymentStatus": "completed",
           "paymentDetails.paidAt": now
-        });
+        };
+        if (webhookCustomerEmail && typeof webhookCustomerEmail === "string" && !webhookCustomerEmail.toLowerCase().includes("user@printmimo.tech")) {
+          updateData.customerEmail = webhookCustomerEmail;
+        }
+        orderBatch.update(doc.ref, updateData);
       });
       await orderBatch.commit();
 
@@ -202,9 +218,13 @@ const postCashfreeWebhook = async (req, res) => {
       if (existingCodeCheck.empty) {
         try {
           const dummyToken = jwt.sign({ userId }, getSecretKey(), { expiresIn: "1h" });
+          const webhookReqBody = { orderId };
+          if (webhookCustomerEmail && typeof webhookCustomerEmail === "string" && !webhookCustomerEmail.toLowerCase().includes("user@printmimo.tech")) {
+            webhookReqBody.customerEmail = webhookCustomerEmail;
+          }
           await axios.post(
             `http://localhost:${process.env.PORT || 8080}/payment-success`,
-            { orderId },
+            webhookReqBody,
             { headers: { Authorization: `Bearer ${dummyToken}` } }
           );
         } catch (internalErr) {
@@ -409,8 +429,8 @@ const postCheckStatus = async (req, res) => {
 const postPaymentSuccess = async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const { orderId } = req.body; // Scoped to the specific order being confirmed
-    const result = await fulfillPaidOrder({ db, userId, orderId, reqUser: req.user });
+    const { orderId, customerEmail } = req.body; // Scoped to the specific order being confirmed
+    const result = await fulfillPaidOrder({ db, userId, orderId, reqUser: req.user, customerEmail });
     if (result.alreadyIssued) {
       // Idempotent re-check: these jobs already had a code from an earlier call, nothing was written just
       // now, so the receipt e-mail/WhatsApp message (already sent the first time) is not sent again.

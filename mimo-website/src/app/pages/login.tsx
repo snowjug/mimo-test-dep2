@@ -56,6 +56,12 @@ export function Login() {
 
       toast.success("Signed in successfully!");
 
+      if (profileRes.data.email) {
+        localStorage.setItem("mimo_user_email", profileRes.data.email);
+      } else if (email) {
+        localStorage.setItem("mimo_user_email", email);
+      }
+
       if (profileRes.data.username) {
         localStorage.setItem("mimo_user_name", profileRes.data.username);
         navigate("/upload");

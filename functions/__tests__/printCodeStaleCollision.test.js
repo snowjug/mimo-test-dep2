@@ -65,3 +65,45 @@ test("a code that was refunded within the last 24h still blocks reuse with the r
   assert.strictEqual(res.code, 409);
   assert.match(res.body.error, /refunded/);
 });
+
+test("multiple paid jobs belonging to the SAME order with the same code succeed and return all documents", async () => {
+  fake.reset({
+    print_jobs: {
+      doc1: job({ status: "paid", orderId: "order_xyz", createdAt: new Date(), fileName: "doc1.pdf" }),
+      doc2: job({ status: "paid", orderId: "order_xyz", createdAt: new Date(), fileName: "doc2.pdf" }),
+    },
+  });
+  const res = await getDocuments("CV-001");
+  assert.strictEqual(res.code, 200, JSON.stringify(res.body));
+  assert.strictEqual(res.body.documents.length, 2);
+  assert.strictEqual(res.body.documents[0].file, "doc1.pdf");
+  assert.strictEqual(res.body.documents[1].file, "doc2.pdf");
+});
+
+test("a stale unprinted paid job (>24h old) does not block a fresh paid job with recycled printCode", async () => {
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  fake.reset({
+    print_jobs: {
+      stalePaid: job({ status: "paid", orderId: "order_old", userId: "u_old", createdAt: threeDaysAgo, fileName: "old.pdf" }),
+      freshPaid: job({ status: "paid", orderId: "order_new", userId: "u_new", createdAt: new Date(), fileName: "fresh.pdf" }),
+    },
+  });
+  const res = await getDocuments("CV-001");
+  assert.strictEqual(res.code, 200, JSON.stringify(res.body));
+  assert.strictEqual(res.body.documents.length, 1);
+  assert.strictEqual(res.body.documents[0].file, "fresh.pdf");
+});
+
+test("two distinct active orders within 24h with the same code still fail safely with 409", async () => {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  fake.reset({
+    print_jobs: {
+      orderA: job({ status: "paid", orderId: "order_A", userId: "u_A", createdAt: oneHourAgo, fileName: "A.pdf" }),
+      orderB: job({ status: "paid", orderId: "order_B", userId: "u_B", createdAt: new Date(), fileName: "B.pdf" }),
+    },
+  });
+  const res = await getDocuments("CV-001");
+  assert.strictEqual(res.code, 409);
+  assert.match(res.body.error, /matched more than one order/);
+});
+

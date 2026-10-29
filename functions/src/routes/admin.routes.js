@@ -47,6 +47,7 @@ router.get("/admin/transactions", financeOrAdminAuthMiddleware, insights.getAdmi
 router.get("/admin/jobs", adminAuthMiddleware, insights.getAdminJobs);
 router.get("/admin/kiosks", adminAuthMiddleware, insights.getAdminKiosks);
 router.post("/admin/kiosks/:kioskId/restart", adminAuthMiddleware, kioskCommands.postAdminKioskRestart);
+router.post("/admin/kiosks/:kioskId/clean-color-head", adminAuthMiddleware, kioskCommands.postAdminKioskCleanColorHead);
 router.post("/admin/kiosks/:kioskId/refill-paper", adminAuthMiddleware, kioskCommands.postAdminRefillPaper);
 router.post("/admin/kiosks/:kioskId/verify", adminAuthMiddleware, kioskCommands.postAdminKioskVerify);
 router.get("/admin/incidents", adminAuthMiddleware, insights.getAdminIncidents);

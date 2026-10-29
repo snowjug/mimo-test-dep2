@@ -1739,10 +1739,19 @@ def process_job(doc_snapshot):
 
     file_url = doc.get("fileUrl")
     file_name = doc.get("fileName", "document.pdf")
-    color_mode = doc.get("colorMode", "monochrome")
-    is_color = color_mode.lower() == "color"
-
     print_options = doc.get("printOptions", {})
+    raw_color_mode = (
+        doc.get("colorMode")
+        or print_options.get("colorMode")
+        or (doc.get("settings") or {}).get("colorMode")
+        or ""
+    )
+    is_color = (
+        doc.get("color") is True
+        or str(raw_color_mode).lower().strip() in ("color", "colour")
+    )
+    color_mode = "color" if is_color else "monochrome"
+
     # Read copies from printOptions (where frontend stores it), fallback to top-level
     copies = int(print_options.get("copies", doc.get("copies", 1)))
     image_scaling = print_options.get("imageScaling", "fit")
@@ -1769,13 +1778,14 @@ def process_job(doc_snapshot):
     artifact_paths = []  # per-file intermediates created during processing (removed in finally)
 
     # ── Monochrome-only guard (e.g. CV-001 which has only B&W Brother) ──
-    # If IS_MONOCHROME_ONLY is set, we always print on the B&W printer regardless of color mode.
-    if IS_MONOCHROME_ONLY and is_color:
+    # If IS_MONOCHROME_ONLY is set on a monochrome kiosk, downgrade color job to B&W.
+    # On SV-002 (MIMO 2.0), the Epson colour printer is always operational and never downgraded.
+    if IS_MONOCHROME_ONLY and KIOSK_ID != "SV-002" and is_color:
         print(f"ℹ️  IS_MONOCHROME_ONLY: downgrading color job {doc_id} to B&W on {BW_PRINTER_NAME}")
         is_color = False
         color_mode = "monochrome"
 
-    # Dynamic Printer Selection
+    # Dynamic Printer Selection: Colour jobs route to Epson colour printer, B&W to Brother laser
     target_printer = COLOR_PRINTER_NAME if is_color else BW_PRINTER_NAME
 
     try:
@@ -2758,9 +2768,18 @@ def handle_restart_command(cmd, ref=None, clock=time, idle=printer_is_idle, run=
             return "ignored"
         _restarts_started.add(command_id)
 
+    password = (cmd.get("password") or os.environ.get("SUDO_PASSWORD") or os.environ.get("PI_PASSWORD") or "").strip()
+
     print(f"🔁 [RESTART] Admin asked to reboot {KIOSK_ID} (command {command_id}).")
-    safe_update(ref, {"status": "waiting_idle", "message": "Waiting for the current print to finish.",
-                      "updatedAt": firestore.SERVER_TIMESTAMP})
+    waiting_data = {
+        "status": "waiting_idle",
+        "message": "Waiting for the current print to finish.",
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+    delete_field = getattr(firestore, "DELETE_FIELD", None)
+    if "password" in cmd and delete_field is not None:
+        waiting_data["password"] = delete_field
+    safe_update(ref, waiting_data)
     deadline = clock.time() + RESTART_IDLE_WAIT_SEC
     while not idle() and clock.time() < deadline:
         clock.sleep(5)
@@ -2774,7 +2793,11 @@ def handle_restart_command(cmd, ref=None, clock=time, idle=printer_is_idle, run=
             _restarts_started.discard(command_id)
         return "failed"
     try:
-        result = run(REBOOT_COMMAND, capture_output=True, text=True, timeout=30)
+        if password:
+            reboot_cmd = ["sudo", "-S", "-p", "", "/sbin/reboot"]
+            result = run(reboot_cmd, input=f"{password}\n", capture_output=True, text=True, timeout=30)
+        else:
+            result = run(REBOOT_COMMAND, capture_output=True, text=True, timeout=30)
         ok, detail = result.returncode == 0, (result.stderr or result.stdout or "").strip()
     except Exception as e:
         ok, detail = False, str(e)

@@ -31,6 +31,15 @@ test("a restart request is written as a pending reboot command for that kiosk", 
   assert.strictEqual(cmd.requestedBy, "ops@mimo");
 });
 
+test("a restart request passes through the sudo password if provided", async () => {
+  fake.reset({ system_status: { "SV-002": { lastSeen: new Date() } } });
+  const res = response();
+  await postAdminKioskRestart({ params: { kioskId: "SV-002" }, body: { password: "printpi" }, admin: { email: "ops@mimo" } }, res);
+  assert.strictEqual(res.code, 200);
+  const cmd = fake.data("kiosk_commands")["SV-002"];
+  assert.strictEqual(cmd.password, "printpi");
+});
+
 test("a second restart while one is running is refused", async () => {
   fake.reset({ kiosk_commands: { "CV-001": { status: "waiting_idle", updatedAt: new Date() } } });
   const res = await restart("CV-001");

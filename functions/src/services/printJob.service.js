@@ -7,8 +7,8 @@ function isColorJob(data) {
     data.printOptions?.colorMode ||
     data.settings?.colorMode ||
     ""
-  ).toString().toLowerCase();
-  return mode === "color";
+  ).toString().toLowerCase().trim();
+  return mode === "color" || mode === "colour";
 }
 
 // Export the main Express App

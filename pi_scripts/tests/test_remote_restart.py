@@ -125,6 +125,33 @@ class RemoteRestartTest(unittest.TestCase):
     def test_slightly_behind_pi_clock_counts_as_fresh(self):
         self.assertEqual(L.command_age_seconds({"requestedAt": NOW + timedelta(seconds=30)}, NOW), 0.0)
 
+    def test_reboot_with_password_uses_sudo_stdin_and_scrubs_password(self):
+        ref, calls, inputs = FakeRef(), [], []
+        def run(cmd_args, **kwargs):
+            calls.append(cmd_args)
+            inputs.append(kwargs.get("input"))
+            return ok_run()
+
+        out = L.handle_restart_command(cmd(password="custom_pi_pw"), ref=ref, clock=FakeClock(), idle=lambda: True, run=run, now=NOW)
+        self.assertEqual(out, "rebooting")
+        self.assertEqual(calls, [["sudo", "-S", "-p", "", "/sbin/reboot"]])
+        self.assertEqual(inputs, ["custom_pi_pw\n"])
+        self.assertEqual([u["status"] for u in ref.updates], ["waiting_idle", "rebooting"])
+        self.assertEqual(ref.updates[0].get("password"), "DELETE_FIELD")
+
+    def test_reboot_with_env_fallback_password(self):
+        ref, calls, inputs = FakeRef(), [], []
+        def run(cmd_args, **kwargs):
+            calls.append(cmd_args)
+            inputs.append(kwargs.get("input"))
+            return ok_run()
+
+        with mock.patch.dict(os.environ, {"SUDO_PASSWORD": "env_secret_pw"}):
+            out = L.handle_restart_command(cmd(), ref=ref, clock=FakeClock(), idle=lambda: True, run=run, now=NOW)
+            self.assertEqual(out, "rebooting")
+            self.assertEqual(calls, [["sudo", "-S", "-p", "", "/sbin/reboot"]])
+            self.assertEqual(inputs, ["env_secret_pw\n"])
+
 
 if __name__ == "__main__":
     unittest.main()

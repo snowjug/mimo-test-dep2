@@ -71,7 +71,7 @@ class Gate2SafeSudoTests(unittest.TestCase):
     @mock.patch("subprocess.run")
     def test_safe_sudo_run_uses_non_interactive_flag_when_not_root(self, mock_run):
         mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
-        with mock.patch("os.geteuid", return_value=1000):
+        with mock.patch("os.geteuid", return_value=1000, create=True):
             res = L.safe_sudo_run(["/usr/sbin/cupsenable", "Brother_HL_L2440DW_series"])
             self.assertEqual(res.returncode, 0)
             args, kwargs = mock_run.call_args

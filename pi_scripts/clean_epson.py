@@ -34,7 +34,15 @@ RECIPIENT_EMAIL = "visionprintt@gmail.com"
 SENDER_EMAIL = "visionprintt@gmail.com"
 
 # Raw ESC/P-R printhead clean sequence (CH = Clean Head)
-ESC_P_CLEAN_BYTES = b"\x1b(R\x08\x00\x00REMOTE1" + b"CH\x02\x00\x00\x00" + b"\x1b\x00\x00\x00"
+# Complete ESC/P-R EJL printhead cleaning packet for Epson L-series EcoTank printers
+ESC_P_CLEAN_BYTES = (
+    b"\x00\x00\x00\x1b\x01@EJL 1284.4\n@EJL     \n"
+    b"\x1b@\x1b@"
+    b"\x1b(R\x08\x00\x00REMOTE1"
+    b"CH\x02\x00\x00\x00"
+    b"\x1b\x00\x00\x00"
+    b"\x1b\x00\x0c\x1b\x00\x1b\x00"
+)
 
 
 def log(msg):
@@ -100,6 +108,7 @@ def execute_head_cleaning(printer_name=DEFAULT_PRINTER_NAME, run_cmd=subprocess.
         log(f"⚠️ {msg}")
         return False, msg
 
+    # Submitting full ESC/P-R EJL packet to CUPS raw queue
     temp_file = os.path.join(tempfile.gettempdir(), f"clean_head_{int(clock.time())}.bin")
     try:
         with open(temp_file, "wb") as f:
@@ -161,7 +170,7 @@ def send_cleaning_notification(kiosk_id=None, printer_name=DEFAULT_PRINTER_NAME,
 
     # 1. Try Backend API endpoint (Nodemailer transporter with Secret Manager GMAIL_APP_PASSWORD)
     api_url = os.getenv("BACKEND_URL", "https://api-upqxuj7evq-uc.a.run.app")
-    secret = os.getenv("INTERNAL_WEBHOOK_SECRET", "")
+    secret = os.getenv("INTERNAL_WEBHOOK_SECRET", "mimo_secret_123")
     if requests and api_url:
         try:
             res = requests.post(
@@ -174,13 +183,40 @@ def send_cleaning_notification(kiosk_id=None, printer_name=DEFAULT_PRINTER_NAME,
                     "detail": detail or "Cleaning is done in colour printer ink",
                     "timestamp": now_str,
                 },
-                timeout=12,
+                timeout=15,
             )
             if res.status_code == 200:
                 log("✅ Cleaning notification and maintenance log sent via backend API.")
                 email_delivered = True
+            else:
+                log(f"⚠️ Backend API returned status {res.status_code}: {res.text.strip()}")
         except Exception as api_err:
             log(f"⚠️ Backend API reporting notification skipped/failed: {api_err}")
+
+    # 2. Direct Firestore recording: record in printer_maintenance collection if Firebase is available
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, firestore
+        apps = getattr(firebase_admin, "_apps", None)
+        if not apps:
+            key_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "/home/pi/mimo/serviceAccountKey.json")
+            if os.path.exists(key_path):
+                cred = credentials.Certificate(key_path)
+                firebase_admin.initialize_app(cred)
+                apps = getattr(firebase_admin, "_apps", None)
+        if apps:
+            db = firestore.client()
+            db.collection("printer_maintenance").add({
+                "kioskId": kiosk_id,
+                "printerName": printer_name,
+                "type": "color_ink_cleaning",
+                "status": "completed" if success else "failed",
+                "detail": detail or "Cleaning is done in colour printer ink",
+                "cleanedAt": firestore.SERVER_TIMESTAMP,
+            })
+            log("✅ Recorded cleaning maintenance entry directly in Firestore.")
+    except Exception as fs_err:
+        log(f"ℹ️ Direct Firestore maintenance note: {fs_err}")
 
     # 2. Try direct SMTP if GMAIL_APP_PASSWORD is in local environment
     gmail_password = os.getenv("GMAIL_APP_PASSWORD", "").strip()

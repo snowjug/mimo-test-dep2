@@ -123,6 +123,7 @@
   "POST /admin/gang/marketing-tasks",
   "POST /admin/gang/technical-tasks",
   "POST /admin/hardware",
+  "POST /admin/kiosks/:kioskId/clean-color-head",
   "POST /admin/kiosks/:kioskId/refill-paper",
   "POST /admin/kiosks/:kioskId/restart",
   "POST /admin/kiosks/:kioskId/verify",
