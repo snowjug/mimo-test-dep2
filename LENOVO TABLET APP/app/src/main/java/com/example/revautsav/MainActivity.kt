@@ -96,6 +96,9 @@ class MainActivity : AppCompatActivity() {
         webSettings.allowFileAccess = true
         webSettings.allowContentAccess = true
 
+        // Enable video and screensaver autoplay without requiring user touch gestures
+        webSettings.mediaPlaybackRequiresUserGesture = false
+
         // Allow third party cookie and mixed content logic if applicable
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW

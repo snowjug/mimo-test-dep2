@@ -65,4 +65,28 @@ test.describe("Screensaver Configuration Endpoints", () => {
     await publicController.getApiScreensaver({}, getRes);
     assert.strictEqual(getRes.body.idleTimeoutSeconds, 600);
   });
+
+  test("POST /admin/screensaver normalizes storage.googleapis.com and Google Drive URLs", async () => {
+    seed({});
+    const req = {
+      body: {
+        videos: [
+          "https://storage.googleapis.com/test-bucket.app/screensaver/123_video.mp4",
+          "https://drive.google.com/file/d/1FmKpdxdO2_s2Zy1ERuGkYk5lnNWcjhby/view?usp=drive_link"
+        ],
+        playSound: true,
+        idleTimeoutSeconds: 60
+      }
+    };
+    const res = response();
+    await adminController.postAdminScreensaver(req, res);
+    assert.strictEqual(res.code, 200);
+
+    const getRes = response();
+    await publicController.getApiScreensaver({}, getRes);
+    assert.deepStrictEqual(getRes.body.videos, [
+      "https://firebasestorage.googleapis.com/v0/b/test-bucket.app/o/screensaver%2F123_video.mp4?alt=media",
+      "https://drive.google.com/uc?export=download&id=1FmKpdxdO2_s2Zy1ERuGkYk5lnNWcjhby"
+    ]);
+  });
 });
