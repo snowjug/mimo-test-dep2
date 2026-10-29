@@ -4,7 +4,7 @@ import { Copy, Check, MessageCircle, ShieldCheck, Printer } from "lucide-react";
 import { MimoHeader } from "../components/mimo-header";
 import { Group, PrimaryButton, Row, SecondaryButton, StatusPill } from "../components/mimo/ui";
 import { toast } from "sonner";
-import { AdSenseBlock } from "../components/AdSenseBlock";
+import { AdBanner } from "../components/AdBanner";
 
 export function PrintCode() {
   const navigate = useNavigate();
@@ -398,7 +398,10 @@ export function PrintCode() {
         </Group>
       )}
 
-      <Group className="mt-6">
+      {/* Announcements / Advertisements (Shown in all states, hides cleanly with 0 skeleton if empty) */}
+      <AdBanner />
+
+      <Group className="mt-5 sm:mt-6">
         <Row
           icon={<ShieldCheck className="size-5" strokeWidth={1.75} />}
           label="Your files stay private"
@@ -412,8 +415,6 @@ export function PrintCode() {
           onClick={() => window.open("https://wa.me/919364028349?text=Namastey%20MIMO%20%F0%9F%91%8B%0A%0AI%20need%20some%20assistance%20with%20my%20recent%20print%20order.%20Could%20you%20please%20help%20me%3F", "_blank")}
         />
       </Group>
-
-      <AdSenseBlock className="min-h-[100px] rounded-[20px] bg-surface p-2" />
 
       <div className="mt-8">
         <PrimaryButton onClick={handleDone}>Print something else</PrimaryButton>

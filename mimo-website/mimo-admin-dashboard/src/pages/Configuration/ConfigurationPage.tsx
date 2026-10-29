@@ -20,13 +20,8 @@ import { useTheme } from '../../context/ThemeContext';
 export const ConfigurationPage: React.FC = () => {
   const { isDark } = useTheme();
   const [screensaver, setScreensaver] = useState({
-    videos: [
-      "/vidssave.com Apple Education_ Ready for every learning opportunity 5 1080P.mp4",
-      "/second_video.mp4",
-      "/3_video.mp4",
-      "/4_video.mp4"
-    ],
-    playSound: true,
+    videos: [] as string[],
+    playSound: false,
     idleTimeoutSeconds: 60,
   });
   const [newVideoUrl, setNewVideoUrl] = useState('');
@@ -49,7 +44,11 @@ export const ConfigurationPage: React.FC = () => {
       try {
         const res = await api.get('/admin/screensaver');
         if (res.data) {
-          setScreensaver(res.data);
+          setScreensaver({
+            videos: Array.isArray(res.data.videos) ? res.data.videos : [],
+            playSound: Boolean(res.data.playSound),
+            idleTimeoutSeconds: Number(res.data.idleTimeoutSeconds) || 60,
+          });
         }
       } catch (err) {
         console.error('Failed to load screensaver settings:', err);
@@ -61,6 +60,13 @@ export const ConfigurationPage: React.FC = () => {
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Pi Performance Guardrail: Cap video uploads at 25MB to prevent decoder crash
+    if (file.size > 25 * 1024 * 1024) {
+      alert('Media file exceeds the 25MB limit. Please compress or resize for smooth kiosk playback on Raspberry Pi hardware.');
+      return;
+    }
+
     setIsUploadingMedia(true);
     try {
       // Signed-URL upload (F-01): the bucket no longer grants public write.
@@ -77,8 +83,21 @@ export const ConfigurationPage: React.FC = () => {
 
   const handleAddVideoUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newVideoUrl.trim()) return;
-    setScreensaver((prev) => ({ ...prev, videos: [...prev.videos, newVideoUrl.trim()] }));
+    const trimmed = newVideoUrl.trim();
+    if (!trimmed) return;
+
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        alert('Please enter a valid HTTP or HTTPS media URL');
+        return;
+      }
+    } catch {
+      alert('Invalid URL format. Please paste a valid web media URL (e.g. https://.../video.mp4)');
+      return;
+    }
+
+    setScreensaver((prev) => ({ ...prev, videos: [...prev.videos, trimmed] }));
     setNewVideoUrl('');
   };
 
@@ -190,23 +209,30 @@ export const ConfigurationPage: React.FC = () => {
                   Active Video Playlist URLs
                 </label>
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {screensaver.videos.map((vid, i) => (
-                    <div
-                      key={i}
-                      className="p-2.5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-between gap-2"
-                    >
-                      <span className="text-xs font-mono text-[var(--text-2)] truncate max-w-[280px]">
-                        {i + 1}. {vid}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveVideo(i)}
-                        className="p-1 text-[var(--text-3)] hover:text-rose-500 transition-colors cursor-pointer"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                  {screensaver.videos.length === 0 ? (
+                    <div className="p-4 rounded-xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--text-3)]">
+                      <Sparkles className="w-5 h-5 mx-auto mb-1 text-purple-400 opacity-60 animate-pulse" />
+                      <span>No custom videos added. Kiosk will display dynamic ambient motion graphics fallback automatically.</span>
                     </div>
-                  ))}
+                  ) : (
+                    screensaver.videos.map((vid, i) => (
+                      <div
+                        key={i}
+                        className="p-2.5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-between gap-2"
+                      >
+                        <span className="text-xs font-mono text-[var(--text-2)] truncate max-w-[280px]">
+                          {i + 1}. {vid}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVideo(i)}
+                          className="p-1 text-[var(--text-3)] hover:text-rose-500 transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 

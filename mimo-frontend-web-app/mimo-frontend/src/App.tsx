@@ -102,6 +102,11 @@ function App() {
     checkIntervalMs: 60000,
   });
 
+  useEffect(() => {
+    (window as any).__TRIGGER_SCREENSAVER = () => setShowScreensaver(true);
+    (window as any).__HIDE_SCREENSAVER = () => setShowScreensaver(false);
+  }, []);
+
   // ================= TOAST =================
   const showToast = useCallback((msg: string, isError: boolean = false) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
