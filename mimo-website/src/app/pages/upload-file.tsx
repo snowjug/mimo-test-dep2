@@ -374,6 +374,21 @@ export function UploadFile() {
     ensureIdentity();
   }, []);
 
+  // Preload print-options chunk and pdf-lib in background so navigating to print options is instantaneous
+  useEffect(() => {
+    const preload = () => {
+      import("./print-options").catch(() => {});
+      import("pdf-lib").catch(() => {});
+    };
+    if (typeof window !== "undefined") {
+      if ("requestIdleCallback" in window) {
+        (window as any).requestIdleCallback(preload);
+      } else {
+        setTimeout(preload, 1000);
+      }
+    }
+  }, []);
+
   const [activePrintCodes, setActivePrintCodes] = useState<ActivePrintCodeJob[]>([]);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
@@ -550,45 +565,44 @@ export function UploadFile() {
     setUploading(true);
 
     try {
-      // 1. Parse PDFs locally for page counts keyed by clientUploadId
-      const filesMeta = await Promise.all(newFiles.map(async (nf) => {
+      // Warm up / preload route chunk and pdf-lib
+      import("./print-options").catch(() => {});
+
+      // 1. Compute metadata (page counts) in parallel concurrently with the upload
+      const metaPromises = new Map<string, Promise<{ clientUploadId: string; name: string; type?: string; size: number; pageCount: number }>>();
+      newFiles.forEach((nf) => {
         const tracker = activeUploadsRef.current.get(nf.clientUploadId!)!;
         const f = tracker.file!;
-        let pageCount = 1;
-        const nameLower = f.name.toLowerCase();
-        const isDocx = nameLower.endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-        const isPptx = nameLower.endsWith(".pptx") || f.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-        const isXlsx = nameLower.endsWith(".xlsx") || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        if (f.type === "application/pdf") {
-          try {
-            const arrayBuffer = await f.arrayBuffer();
-            // Loaded on demand: pdf-lib is ~400 KB and only needed once a PDF is picked.
-            const { PDFDocument } = await import("pdf-lib");
-            const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-            pageCount = pdfDoc.getPageCount();
-          } catch (err) {
-            console.error("Failed to parse PDF on client:", err);
+        const metaPromise = (async () => {
+          let pageCount = 1;
+          const nameLower = f.name.toLowerCase();
+          const isDocx = nameLower.endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+          const isPptx = nameLower.endsWith(".pptx") || f.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+          const isXlsx = nameLower.endsWith(".xlsx") || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+          if (f.type === "application/pdf") {
+            try {
+              const arrayBuffer = await f.arrayBuffer();
+              const { PDFDocument } = await import("pdf-lib");
+              const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+              pageCount = pdfDoc.getPageCount();
+            } catch (err) {
+              console.error("Failed to parse PDF on client:", err);
+            }
+          } else if (isDocx) {
+            pageCount = await estimateDocxPages(f);
+          } else if (isPptx) {
+            pageCount = await estimatePptxSlides(f);
+          } else if (isXlsx) {
+            pageCount = await estimateXlsxSheets(f);
+          } else if (!f.type.startsWith("image/")) {
+            pageCount = 1;
           }
-        } else if (isDocx) {
-          pageCount = await estimateDocxPages(f);
-        } else if (isPptx) {
-          pageCount = await estimatePptxSlides(f);
-        } else if (isXlsx) {
-          pageCount = await estimateXlsxSheets(f);
-        } else if (!f.type.startsWith("image/")) {
-          // Fallback for legacy .doc, .ppt, .xls, .txt — 1 page estimate
-          pageCount = 1;
-        }
-        return { clientUploadId: nf.clientUploadId!, name: f.name, type: f.type, size: f.size, pageCount };
-      }));
+          return { clientUploadId: nf.clientUploadId!, name: f.name, type: f.type, size: f.size, pageCount };
+        })();
+        metaPromises.set(nf.clientUploadId!, metaPromise);
+      });
 
-      // 2. Upload via a short-lived, server-minted signed URL (POST /upload-url) rather than writing
-      // directly to Cloud Storage with the client SDK -- the bucket no longer grants public write access
-      // (see firebase/storage.rules), so the backend mints a one-shot, write-only credential scoped to
-      // this user's own uploads/ prefix for exactly this file, and the browser PUTs the bytes to that.
-      // XMLHttpRequest (not fetch) is used specifically because it's the only browser API that exposes
-      // upload progress events and a clean abort() for cancellation, matching what uploadBytesResumable
-      // gave us before.
+      // 2. Upload via a short-lived, server-minted signed URL (POST /upload-url) immediately in parallel
       const uploadPromises = newFiles.map(async (nf) => {
         const tracker = activeUploadsRef.current.get(nf.clientUploadId!)!;
         const file = tracker.file!;
@@ -637,7 +651,7 @@ export function UploadFile() {
                 resolve({ error: new Error("Network error during upload"), clientUploadId: nf.clientUploadId, name: nf.name });
               };
 
-              xhr.onload = () => {
+              xhr.onload = async () => {
                 // RACE CHECK: cancelled right as the upload finished -- discard and clean up the object.
                 if (cancelledUploadIdsRef.current.has(nf.clientUploadId!)) {
                   console.log(`[UPLOAD RACE] Upload completed after cancellation for ${nf.name}. Discarding and cleaning up.`);
@@ -651,7 +665,7 @@ export function UploadFile() {
                   return;
                 }
                 tracker.downloadURL = urlData.fileUrl;
-                const meta = filesMeta.find((m) => m.clientUploadId === nf.clientUploadId);
+                const meta = await metaPromises.get(nf.clientUploadId!);
                 resolve({
                   clientUploadId: nf.clientUploadId,
                   name: file.name,
@@ -891,17 +905,31 @@ export function UploadFile() {
 
   const handlePrint = () => {
     // Use uploadedFilesData which contains the full metadata WITH Firebase download URLs and explicit jobIds
-    let completedFiles = uploadedFilesData.filter((f) => f && f.jobId);
+    let completedFiles = uploadedFilesData.filter((f) => f && (f.jobId || f.url));
     if (completedFiles.length === 0) {
       const stored = sessionStorage.getItem("printFiles");
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          completedFiles = parsed.filter((f: any) => f && f.jobId);
+          if (Array.isArray(parsed)) {
+            completedFiles = parsed.filter((f: any) => f && (f.jobId || f.url));
+          }
         } catch (_) {}
       }
     }
-    sessionStorage.setItem("printFiles", JSON.stringify(completedFiles));
+    // Defensive fallback: if metadata array was cleared but local file states are completed
+    if (completedFiles.length === 0) {
+      completedFiles = files.filter((f) => f.status === "completed").map((f) => ({
+        clientUploadId: f.clientUploadId,
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        pageCount: f.pageCount || 1,
+      }));
+    }
+    if (completedFiles.length > 0) {
+      sessionStorage.setItem("printFiles", JSON.stringify(completedFiles));
+    }
     navigate("/print-options");
   };
 

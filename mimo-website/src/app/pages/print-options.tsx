@@ -100,7 +100,16 @@ const generatePageRange = (selectedPages: number[], maxPages: number): string =>
 export function PrintOptions() {
   const navigate = useNavigate();
   const { start: startTour } = useTour();
-  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [files, setFiles] = useState<UploadedFile[]>(() => {
+    try {
+      const storedFiles = sessionStorage.getItem("printFiles");
+      if (!storedFiles) return [];
+      const parsed = JSON.parse(storedFiles);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  });
   const [copies, setCopies] = useState(1);
   const [colorMode, setColorMode] = useState("bw");
   const [doubleSided, setDoubleSided] = useState("single");
@@ -137,7 +146,13 @@ export function PrintOptions() {
       .finally(() => { if (!cancelled) setPreviewLoading(false); });
     return () => { cancelled = true; };
   }, [selectedPreview, files]);
-  const [directKioskId, setDirectKioskId] = useState<string | null>(null);
+  const [directKioskId, setDirectKioskId] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem("directKioskId") || localStorage.getItem("mimo_directKioskId") || null;
+    } catch {
+      return null;
+    }
+  });
   const [printers, setPrinters] = useState<SelectablePrinter[]>(FALLBACK_PRINTERS);
 
   useEffect(() => {
@@ -167,7 +182,31 @@ export function PrintOptions() {
     pageSelection: "all" | "custom";
     pageRange: string;
     selectedPages: number[];
-  }>>({});
+  }>>(() => {
+    try {
+      const storedFiles = sessionStorage.getItem("printFiles");
+      if (!storedFiles) return {};
+      const parsedFiles = JSON.parse(storedFiles);
+      if (!Array.isArray(parsedFiles)) return {};
+      const initialConfigs: Record<string, {
+        pageSelection: "all" | "custom";
+        pageRange: string;
+        selectedPages: number[];
+      }> = {};
+      parsedFiles.filter(Boolean).forEach((file: any) => {
+        const pCount = file.pageCount || 1;
+        const name = file.name || "Document";
+        initialConfigs[name] = {
+          pageSelection: "all",
+          pageRange: `1-${pCount}`,
+          selectedPages: Array.from({ length: pCount }, (_, i) => i + 1)
+        };
+      });
+      return initialConfigs;
+    } catch {
+      return {};
+    }
+  });
 
   // Standard grid layouts
   const gridLayouts = [
@@ -181,32 +220,43 @@ export function PrintOptions() {
     const uploadTotalPages = sessionStorage.getItem("uploadTotalPages");
 
     if (!storedFiles) {
-      navigate("/");
+      navigate("/upload");
       return;
     }
 
-    const parsedFiles = JSON.parse(storedFiles);
-    setFiles(parsedFiles);
+    try {
+      const parsedFiles = JSON.parse(storedFiles);
+      if (!Array.isArray(parsedFiles) || parsedFiles.length === 0) {
+        navigate("/upload");
+        return;
+      }
+      setFiles(parsedFiles);
 
-    // Initialize configs
-    const initialConfigs: Record<string, {
-      pageSelection: "all" | "custom";
-      pageRange: string;
-      selectedPages: number[];
-    }> = {};
-    parsedFiles.forEach((file: any) => {
-      const pCount = file.pageCount || 1;
-      initialConfigs[file.name] = {
-        pageSelection: "all",
-        pageRange: `1-${pCount}`,
-        selectedPages: Array.from({ length: pCount }, (_, i) => i + 1)
-      };
-    });
-    setFileConfigs(initialConfigs);
+      // Initialize configs for any files not yet tracked
+      setFileConfigs((prev) => {
+        const updated = { ...prev };
+        let changed = false;
+        parsedFiles.filter(Boolean).forEach((file: any) => {
+          const fname = file.name || "Document";
+          if (!updated[fname]) {
+            changed = true;
+            const pCount = file.pageCount || 1;
+            updated[fname] = {
+              pageSelection: "all",
+              pageRange: `1-${pCount}`,
+              selectedPages: Array.from({ length: pCount }, (_, i) => i + 1)
+            };
+          }
+        });
+        return changed ? updated : prev;
+      });
+    } catch {
+      navigate("/upload");
+      return;
+    }
 
     if (uploadTotalPages) setTotalPages(Number(uploadTotalPages));
     if (uploadAmount) setBaseTotalCost(Number(uploadAmount));
-
 
     // Scroll to top when page loads
     window.scrollTo(0, 0);
@@ -220,8 +270,27 @@ export function PrintOptions() {
   }));
   const hasImages = actualImages.length > 0;
 
-  const [totalPages, setTotalPages] = useState(0);
-  const [baseTotalCost, setBaseTotalCost] = useState(0);
+  const [totalPages, setTotalPages] = useState<number>(() => {
+    try {
+      const uploadTotalPages = sessionStorage.getItem("uploadTotalPages");
+      if (uploadTotalPages) return Number(uploadTotalPages) || 0;
+      const storedFiles = sessionStorage.getItem("printFiles");
+      if (storedFiles) {
+        const parsed = JSON.parse(storedFiles);
+        if (Array.isArray(parsed)) {
+          return parsed.reduce((acc, curr) => acc + (curr?.pageCount || 1), 0);
+        }
+      }
+    } catch {}
+    return 0;
+  });
+  const [baseTotalCost, setBaseTotalCost] = useState<number>(() => {
+    try {
+      const uploadAmount = sessionStorage.getItem("uploadAmount");
+      if (uploadAmount) return Number(uploadAmount) || 0;
+    } catch {}
+    return 0;
+  });
   const [priceBW, setPriceBW] = useState(2.80);
   const [priceBWDuplex, setPriceBWDuplex] = useState(3.30);
   const [priceColor, setPriceColor] = useState(10.00);
@@ -247,16 +316,17 @@ export function PrintOptions() {
 
   // Recalculate totalPages when fileConfigs or pageSelection changes
   useEffect(() => {
-    if (files.length === 0 || Object.keys(fileConfigs).length === 0) return;
+    if (files.length === 0) return;
 
     let totalPrintedPages = 0;
     files.forEach((file) => {
+      if (!file?.name) return;
       const config = fileConfigs[file.name];
       if (config) {
         if (pageSelection === "all") {
           totalPrintedPages += (file.pageCount || 1);
         } else {
-          totalPrintedPages += config.selectedPages.length;
+          totalPrintedPages += Array.isArray(config.selectedPages) ? config.selectedPages.length : (file.pageCount || 1);
         }
       } else {
         totalPrintedPages += (file.pageCount || 1);
@@ -400,8 +470,9 @@ export function PrintOptions() {
   let hasSelectionError = false;
   if (pageSelection === "custom") {
     files.forEach((file) => {
+      if (!file?.name) return;
       const config = fileConfigs[file.name];
-      if (!config || config.selectedPages.length === 0) {
+      if (!config || !Array.isArray(config.selectedPages) || config.selectedPages.length === 0) {
         hasSelectionError = true;
       }
     });
@@ -412,8 +483,8 @@ export function PrintOptions() {
     const simplifiedConfigs: Record<string, { pageSelection: string; pageRange: string; pageCount: number }> = {};
     Object.keys(fileConfigs).forEach(fileName => {
       simplifiedConfigs[fileName] = {
-        pageSelection: fileConfigs[fileName].pageSelection,
-        pageRange: fileConfigs[fileName].pageRange,
+        pageSelection: fileConfigs[fileName]?.pageSelection || "all",
+        pageRange: fileConfigs[fileName]?.pageRange || "",
         pageCount: files.find(f => f.name === fileName)?.pageCount || 1
       };
     });
@@ -430,7 +501,7 @@ export function PrintOptions() {
       imageScaling,
       customScale,
       photoLayout,
-      pageRange: files.length > 0 ? (fileConfigs[files[0].name]?.pageRange || "") : "", // fallback
+      pageRange: files.length > 0 && files[0]?.name ? (fileConfigs[files[0].name]?.pageRange || "") : "", // fallback
       fileConfigs: simplifiedConfigs,
       totalCost,
       totalPages: actualPages, // Store actual printable pages per set
@@ -476,6 +547,10 @@ export function PrintOptions() {
 
   const selectPrinter = (id: string) => {
     setDirectKioskId(id);
+    try {
+      sessionStorage.setItem("directKioskId", id);
+      localStorage.setItem("mimo_directKioskId", id);
+    } catch {}
     const printer = printers.find((p) => p.id === id);
     if (printer && !printer.supportsColor) {
       setColorMode("bw");
@@ -624,8 +699,8 @@ export function PrintOptions() {
                     <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
                       {files.map((file, idx) => {
                         const isActive = activeFileIndex === idx;
-                        const config = fileConfigs[file.name];
-                        const selectedCount = config ? config.selectedPages.length : 0;
+                        const config = file?.name ? fileConfigs[file.name] : undefined;
+                        const selectedCount = (config && Array.isArray(config.selectedPages)) ? config.selectedPages.length : 0;
                         return (
                           <button
                             key={idx}
@@ -636,7 +711,7 @@ export function PrintOptions() {
                               isActive ? "bg-ink text-canvas" : "bg-surface-2 text-ink-2"
                             }`}
                           >
-                            <span className="max-w-[120px] truncate">{file.name}</span>
+                            <span className="max-w-[120px] truncate">{file?.name || "Document"}</span>
                             <span className="tabular-nums opacity-70">{selectedCount}</span>
                           </button>
                         );
@@ -647,30 +722,32 @@ export function PrintOptions() {
                   {(() => {
                     const activeFile = files[activeFileIndex];
                     if (!activeFile) return null;
-                    const config = fileConfigs[activeFile.name] || {
+                    const fileName = activeFile.name || "Document";
+                    const config = fileConfigs[fileName] || {
                       pageSelection: "custom",
                       pageRange: "",
                       selectedPages: []
                     };
+                    const selectedPages = Array.isArray(config.selectedPages) ? config.selectedPages : [];
                     const maxPages = activeFile.pageCount || 1;
                     const pageNumbers = Array.from({ length: maxPages }, (_, i) => i + 1);
-                    const isPdf = activeFile.name.toLowerCase().endsWith(".pdf") || activeFile.type === "application/pdf";
+                    const isPdf = (activeFile.name || "").toLowerCase().endsWith(".pdf") || activeFile.type === "application/pdf";
 
                     return (
                       <>
                         <div className="flex items-start justify-between gap-3">
                           <p className="min-w-0 text-[13px] text-ink-3">
-                            <span className="tabular-nums">{config.selectedPages.length} of {maxPages}</span> pages selected
+                            <span className="tabular-nums">{selectedPages.length} of {maxPages}</span> pages selected
                             {!isPdf && (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const val = prompt(`Enter actual total pages for ${activeFile.name}:`, String(maxPages));
+                                  const val = prompt(`Enter actual total pages for ${fileName}:`, String(maxPages));
                                   if (val) {
                                     const num = parseInt(val);
                                     if (!isNaN(num) && num > 0) {
-                                      handleUpdatePageCount(activeFile.name, num);
+                                      handleUpdatePageCount(fileName, num);
                                     }
                                   }
                                 }}
@@ -680,19 +757,19 @@ export function PrintOptions() {
                               </button>
                             )}
                           </p>
-                          {config.selectedPages.length === 0 && <StatusPill tone="danger">None selected</StatusPill>}
+                          {selectedPages.length === 0 && <StatusPill tone="danger">None selected</StatusPill>}
                         </div>
 
                         <div className="grid max-h-56 grid-cols-6 gap-2 overflow-y-auto rounded-[14px] bg-surface-2 p-2">
                           {pageNumbers.map((num) => {
-                            const isSelected = config.selectedPages.includes(num);
+                            const isSelected = selectedPages.includes(num);
                             return (
                               <button
                                 key={num}
                                 type="button"
                                 aria-pressed={isSelected}
                                 aria-label={`Page ${num}`}
-                                onClick={() => handleTogglePage(activeFile.name, num)}
+                                onClick={() => handleTogglePage(fileName, num)}
                                 className={`press flex aspect-square items-center justify-center rounded-[10px] text-[15px] font-medium tabular-nums transition-colors ${
                                   isSelected ? "bg-brand text-on-brand" : "bg-surface text-ink-2"
                                 }`}
@@ -713,7 +790,7 @@ export function PrintOptions() {
                             <button
                               key={key}
                               type="button"
-                              onClick={() => handleQuickSelect(activeFile.name, key)}
+                              onClick={() => handleQuickSelect(fileName, key)}
                               className="press h-9 rounded-full bg-surface-2 px-3.5 text-[14px] font-medium text-ink-2 active:bg-surface-3"
                             >
                               {label}
@@ -729,8 +806,8 @@ export function PrintOptions() {
                             id="page-range"
                             type="text"
                             inputMode="numeric"
-                            value={config.pageRange}
-                            onChange={(e) => handleTextRangeChange(activeFile.name, e.target.value)}
+                            value={config.pageRange || ""}
+                            onChange={(e) => handleTextRangeChange(fileName, e.target.value)}
                             className={`${inputClass} h-12 tabular-nums`}
                           />
                         </div>

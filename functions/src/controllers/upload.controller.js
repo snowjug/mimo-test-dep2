@@ -234,12 +234,9 @@ const postFinalizeUpload = async (req, res) => {
       return res.status(status).json(body);
     };
 
-    // Phase 1: Validate and convert required files BEFORE performing any database writes.
-    // If any conversion fails, return HTTP 422 immediately with 0 jobs written to Firestore.
-    const finalizedFiles = [];
-    let totalPages = 0;
-
-    for (const [index, f] of files.entries()) {
+    // Phase 1: Validate and convert required files concurrently BEFORE performing any database writes.
+    // If any conversion or verification fails, return HTTP error immediately with 0 jobs written to Firestore.
+    const fileProcessPromises = files.map(async (f, index) => {
       const { isPdf, isImage, isOfficeDoc } = classify(f);
 
       let resolvedPageCount = 1;
@@ -258,9 +255,12 @@ const postFinalizeUpload = async (req, res) => {
           pdfBuffer = await downloadStorageBytes(f.url);
         } catch (downloadErr) {
           console.error(`[FINALIZE-UPLOAD ERROR] Failed to download '${f.name}' for page count verification:`, downloadErr.message);
-          return failEarly(400, {
-            error: `Failed to read "${f.name}" for verification. Please re-upload and try again.`
-          });
+          return {
+            error: {
+              status: 400,
+              body: { error: `Failed to read "${f.name}" for verification. Please re-upload and try again.` }
+            }
+          };
         }
 
         try {
@@ -273,9 +273,12 @@ const postFinalizeUpload = async (req, res) => {
           resolvedPageCount = verifiedCount;
         } catch (pdfErr) {
           console.error(`[FINALIZE-UPLOAD ERROR] Could not read PDF '${f.name}' with pdf-lib:`, pdfErr.message);
-          return failEarly(400, {
-            error: `"${f.name}" couldn't be read. It might be corrupted, password-protected, or not a valid PDF. Please save it as a standard PDF and try again.`
-          });
+          return {
+            error: {
+              status: 400,
+              body: { error: `"${f.name}" couldn't be read. It might be corrupted, password-protected, or not a valid PDF. Please save it as a standard PDF and try again.` }
+            }
+          };
         }
         printableMimetype = "application/pdf";
       } else if (isImage) {
@@ -298,9 +301,12 @@ const postFinalizeUpload = async (req, res) => {
         } catch (convErr) {
           console.error(`[FINALIZE-UPLOAD ERROR] Conversion failed for '${f.name}':`, convErr.message);
           // CRITICAL: Fail fast. Do NOT create a payable job with unverified pageCount!
-          return failEarly(422, {
-            error: `Failed to process document '${f.name}': ${convErr.message}. Please ensure the file is valid and try again.`
-          });
+          return {
+            error: {
+              status: 422,
+              body: { error: `Failed to process document '${f.name}': ${convErr.message}. Please ensure the file is valid and try again.` }
+            }
+          };
         }
       } else {
         // Not a PDF, image or office document. The only files that reach here are unrecognised ones, and the observed
@@ -308,17 +314,23 @@ const postFinalizeUpload = async (req, res) => {
         // document is never this small, so refuse it now, before a payable job exists, instead of letting it fail at the kiosk.
         const reportedSize = Number(f.size);
         if (Number.isFinite(reportedSize) && reportedSize < MIN_REAL_FILE_BYTES) {
-          return failEarly(400, {
-            error: `"${f.name}" doesn't look like a real document. If you shared a link, download the actual file first and upload that.`,
-          });
+          return {
+            error: {
+              status: 400,
+              body: { error: `"${f.name}" doesn't look like a real document. If you shared a link, download the actual file first and upload that.` }
+            }
+          };
         }
         // Unlike the PDF/Office branches, nothing here reads the file to verify its real size against the
         // client-declared one, so this is a trust-the-client ceiling, not a verified one — same trust level
         // this branch already has for file type. It still closes the "unlimited size, billed as 1 page" gap.
         if (Number.isFinite(reportedSize) && reportedSize > MAX_UNRECOGNISED_FILE_BYTES) {
-          return failEarly(400, {
-            error: `"${f.name}" is too large (${Math.round(reportedSize / (1024 * 1024))}MB). Unrecognised file types are limited to ${MAX_UNRECOGNISED_FILE_BYTES / (1024 * 1024)}MB.`,
-          });
+          return {
+            error: {
+              status: 400,
+              body: { error: `"${f.name}" is too large (${Math.round(reportedSize / (1024 * 1024))}MB). Unrecognised file types are limited to ${MAX_UNRECOGNISED_FILE_BYTES / (1024 * 1024)}MB.` }
+            }
+          };
         }
         // Unsupported/unrecognised format: there is no server-side way to read a real page count out of
         // an arbitrary file, so — same principle as the PDF and office-doc branches above — the
@@ -328,18 +340,28 @@ const postFinalizeUpload = async (req, res) => {
         resolvedPageCount = 1;
       }
 
-      totalPages += resolvedPageCount;
-      finalizedFiles.push({
-        clientUploadId: f.clientUploadId || null,
-        name: f.name,
-        url: printableFileUrl,
-        originalUrl: originalFileUrl,
-        type: printableMimetype,
-        size: f.size,
-        pageCount: resolvedPageCount,
-        convertedStoragePath: convertedStoragePath
-      });
+      return {
+        file: {
+          clientUploadId: f.clientUploadId || null,
+          name: f.name,
+          url: printableFileUrl,
+          originalUrl: originalFileUrl,
+          type: printableMimetype,
+          size: f.size,
+          pageCount: resolvedPageCount,
+          convertedStoragePath: convertedStoragePath
+        }
+      };
+    });
+
+    const results = await Promise.all(fileProcessPromises);
+    const firstError = results.find((r) => r.error);
+    if (firstError) {
+      return failEarly(firstError.error.status, firstError.error.body);
     }
+
+    const finalizedFiles = results.map((r) => r.file);
+    const totalPages = finalizedFiles.reduce((acc, f) => acc + f.pageCount, 0);
 
     // Phase 2: Conversions succeeded for all files. Now update the database atomically.
     // Mark old pending jobs as abandoned to prevent ghost cart pricing while preserving storage ownership records
