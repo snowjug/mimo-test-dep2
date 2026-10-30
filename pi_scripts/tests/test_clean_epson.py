@@ -67,7 +67,7 @@ class CleanEpsonSafetyTests(unittest.TestCase):
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             return SimpleNamespace(returncode=0, stdout="request id is Epson_L3250-450 (1 file(s))\n", stderr="")
 
-        ok, msg = CE.execute_head_cleaning("Epson_L3250", run_cmd=mock_run, clock=clock)
+        ok, msg = CE.execute_head_cleaning("Epson_L3250", run_cmd=mock_run, clock=clock, which_cmd=lambda x: None)
         self.assertTrue(ok)
         self.assertIn("submitted successfully", msg)
         # Verify lp command was called with -d Epson_L3250 and -o raw
@@ -77,6 +77,24 @@ class CleanEpsonSafetyTests(unittest.TestCase):
         self.assertEqual(lp_call[0][2], "Epson_L3250")
         self.assertEqual(lp_call[0][3], "-o")
         self.assertEqual(lp_call[0][4], "raw")
+
+
+    def test_execute_head_cleaning_prefers_escputil_when_available(self):
+        clock = FakeClock()
+        commands_run = []
+
+        def mock_run(cmd, *a, **k):
+            commands_run.append(cmd)
+            if cmd[0] == "lpstat":
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return SimpleNamespace(returncode=0, stdout="Cleaning heads...\n", stderr="")
+
+        ok, msg = CE.execute_head_cleaning("Epson_L3250", run_cmd=mock_run, clock=clock, which_cmd=lambda x: "/usr/bin/escputil")
+        self.assertTrue(ok)
+        self.assertIn("escputil", msg)
+        escputil_call = [c for c in commands_run if c[0] == "escputil"]
+        self.assertEqual(len(escputil_call), 1)
+        self.assertEqual(escputil_call[0], ["escputil", "-c", "-u", "-q", "-P", "Epson_L3250"])
 
     def test_execute_head_cleaning_aborts_when_printer_is_busy(self):
         clock = FakeClock()

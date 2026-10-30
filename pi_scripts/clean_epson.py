@@ -18,6 +18,7 @@ import tempfile
 import smtplib
 import subprocess
 import argparse
+import shutil
 from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 
@@ -97,7 +98,7 @@ def wait_until_idle(printer_name=DEFAULT_PRINTER_NAME, max_wait_sec=300, poll_se
     return is_printer_idle(printer_name, run_cmd=run_cmd)
 
 
-def execute_head_cleaning(printer_name=DEFAULT_PRINTER_NAME, run_cmd=subprocess.run, clock=time):
+def execute_head_cleaning(printer_name=DEFAULT_PRINTER_NAME, run_cmd=subprocess.run, clock=time, which_cmd=shutil.which):
     """
     Executes raw ESC/P head-cleaning command on the Epson colour printer.
     Enforces that printer is idle before submitting.
@@ -108,7 +109,22 @@ def execute_head_cleaning(printer_name=DEFAULT_PRINTER_NAME, run_cmd=subprocess.
         log(f"⚠️ {msg}")
         return False, msg
 
-    # Submitting full ESC/P-R EJL packet to CUPS raw queue
+    # 1. Prefer escputil if installed (avoids CUPS usb backend back-channel hanging on raw jobs)
+    if which_cmd and which_cmd("escputil"):
+        log(f"Submitting printhead cleaning via escputil for {printer_name}...")
+        try:
+            res = run_cmd(["escputil", "-c", "-u", "-q", "-P", printer_name], capture_output=True, text=True, timeout=30)
+            if res.returncode == 0:
+                log(f"✅ escputil command accepted for {printer_name}")
+                clock.sleep(5)
+                return True, f"Head cleaning job submitted successfully via escputil for {printer_name}"
+            else:
+                err_msg = (res.stderr or "").strip() or "escputil returned non-zero"
+                log(f"⚠️ escputil returned error: {err_msg}. Falling back to raw CUPS submission...")
+        except Exception as e:
+            log(f"⚠️ escputil execution error: {e}. Falling back to raw CUPS submission...")
+
+    # 2. Fallback: submitting full ESC/P-R EJL packet to CUPS raw queue
     temp_file = os.path.join(tempfile.gettempdir(), f"clean_head_{int(clock.time())}.bin")
     try:
         with open(temp_file, "wb") as f:
