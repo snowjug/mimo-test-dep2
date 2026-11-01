@@ -27,7 +27,7 @@ jobs:
       converter: ${{ steps.f.outputs.converter }}
       pi: ${{ steps.f.outputs.pi }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - id: f
@@ -62,7 +62,7 @@ jobs:
     if: needs.changes.outputs.functions == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -88,7 +88,7 @@ jobs:
     if: needs.changes.outputs.website == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7
         with:
           node-version: 20
@@ -110,7 +110,7 @@ jobs:
     if: needs.changes.outputs.kiosk == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7
         with:
           node-version: 20
@@ -127,7 +127,7 @@ jobs:
     if: needs.changes.outputs.converter == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7
         with:
           node-version: 20
@@ -139,7 +139,7 @@ jobs:
     if: needs.changes.outputs.pi == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -157,7 +157,7 @@ jobs:
       contents: read
       checks: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       # Was: `bash <(curl -sSL .../rhysd/actionlint/main/scripts/download-actionlint.bash)`, which pulled an
       # install script from actionlint's mutable `main` branch on every run. Using actionlint's own published,
       # SHA-pinned action instead (the standard way projects run actionlint in CI) removes that supply-chain risk.
@@ -172,7 +172,7 @@ jobs:
     name: Secret scan (added lines only)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v7
