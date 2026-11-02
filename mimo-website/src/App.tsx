@@ -50,6 +50,16 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error("[MIMO APP ERROR]", error, errorInfo);
+    try {
+      import("./app/api").then(({ default: api }) => {
+        api.post("/api/customer-incident", {
+          type: "render_crash",
+          message: String(error?.message || "Uncaught render error").slice(0, 300),
+          route: typeof window !== "undefined" ? window.location.pathname : "unknown",
+          details: String(errorInfo?.componentStack || error?.stack || "").slice(0, 600),
+        }).catch(() => {});
+      }).catch(() => {});
+    } catch {}
   }
 
   handleReload = () => {

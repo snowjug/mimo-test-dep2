@@ -1,15 +1,11 @@
 import api from '../api';
-import type { GuardianKioskDetail, GuardianKioskSummary, GuardianSummaryResponse } from '../types/guardian.types';
+import type {
+  GuardianKioskDetail,
+  GuardianKioskSummary,
+  GuardianSummaryResponse,
+  WebsiteHealthResponse,
+} from '../types/guardian.types';
 
-/**
- * MIMO Edge Guardian — read-only admin data. Uses the SAME authenticated `api` client every other
- * admin page uses (axios instance in ../api.ts): the admin JWT is attached automatically, and a 401
- * is handled by that client's existing global interceptor exactly like every other admin endpoint —
- * nothing Guardian-specific is added to authentication.
- *
- * There is no write method here on purpose: the backend route is GET-only, and this dashboard page
- * must never issue a kiosk command, change status, or write telemetry (see GuardianPage.tsx).
- */
 export const guardian = {
   /** All kiosks that have ever reported (not every provisioned kiosk — the backend only knows
    * about kiosks present in guardian_health_latest). */
@@ -22,4 +18,20 @@ export const guardian = {
   /** One kiosk with its full last-accepted snapshot. */
   kioskDetail: (kioskId: string) =>
     api.get<GuardianKioskDetail>('/admin/guardian/health', { params: { kioskId, detail: '1' } }).then((r) => r.data),
+
+  /** Customer website real-time condition, reachability, and client incident health. */
+  websiteHealth: (skipProbe = false) =>
+    api
+      .get<WebsiteHealthResponse>('/admin/guardian/website-health', {
+        params: skipProbe ? { skipProbe: '1' } : undefined,
+      })
+      .then((r) => r.data),
+
+  /** Dispatch alert email regarding customer website condition to visionprintt@gmail.com */
+  sendWebsiteAlert: (data?: { problem?: string; location?: string; details?: string }) =>
+    api.post<{ success: boolean; recipient: string; outcome?: any }>('/admin/guardian/website-health/alert', data).then((r) => r.data),
+
+  /** Mark active website error incidents as resolved, turning the status button back to green */
+  resolveWebsiteIssues: () =>
+    api.post<{ success: boolean; message: string }>('/admin/guardian/website-health/resolve').then((r) => r.data),
 };

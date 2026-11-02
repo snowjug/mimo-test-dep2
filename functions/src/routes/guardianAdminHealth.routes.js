@@ -33,6 +33,8 @@ const { db } = require("../config/firebase");
 const { adminAuthMiddleware } = require("../middleware/auth");
 const { STATE_COLLECTION } = require("../guardian/ingest.service");
 const { computeFreshness } = require("../guardian/freshness");
+const { checkCustomerWebsiteCondition } = require("../services/websiteHealth.service");
+const { sendWebsiteAlertEmail } = require("../services/email.service");
 
 const KIOSK_RE = /^[A-Z]{2}-\d{3}$/;
 const MAX_SUMMARY_ROWS = 500; // defensive bound: one doc per kiosk, a fleet is nowhere near this
@@ -135,6 +137,65 @@ function createGuardianAdminHealthRouter({ now = Date.now } = {}) {
     } catch (err) {
       console.error("[GUARDIAN-ADMIN-HEALTH] read failed:", err && err.message);
       return res.status(503).json({ error: "Service unavailable" });
+    }
+  });
+
+  router.get("/admin/guardian/website-health", adminAuthMiddleware, async (req, res) => {
+    try {
+      const skipProbe = req.query.skipProbe === "1" || req.query.skipProbe === "true";
+      const health = await checkCustomerWebsiteCondition({ skipProbe });
+      return res.json(health);
+    } catch (err) {
+      console.error("[GUARDIAN-WEBSITE-HEALTH] read failed:", err && err.message);
+      return res.status(503).json({ error: "Service unavailable" });
+    }
+  });
+
+  router.post("/admin/guardian/website-health/alert", adminAuthMiddleware, async (req, res) => {
+    try {
+      const { problem, location, details } = req.body || {};
+      const currentHealth = await checkCustomerWebsiteCondition({ skipProbe: true, autoAlert: false });
+      const alertProblem = problem || currentHealth.problem || "Customer Website issue detected";
+      const alertLocation = location || currentHealth.location || "Customer Web Host (printmimo.tech)";
+      const alertDetails = details || currentHealth.details || "Disruption reported on customer website";
+
+      const outcome = await sendWebsiteAlertEmail({
+        problem: alertProblem,
+        location: alertLocation,
+        details: alertDetails,
+        force: true,
+      });
+
+      return res.json({ success: true, outcome, recipient: "visionprintt@gmail.com" });
+    } catch (err) {
+      console.error("[GUARDIAN-WEBSITE-ALERT] failed:", err && err.message);
+      return res.status(500).json({ error: "Failed to dispatch alert email" });
+    }
+  });
+
+  router.post("/admin/guardian/website-health/resolve", adminAuthMiddleware, async (req, res) => {
+    try {
+      const since = new Date(Date.now() - 60 * 60 * 1000);
+      const snap = await db.collection("customer_website_incidents")
+        .where("createdAt", ">=", since)
+        .limit(50)
+        .get()
+        .catch(() => null);
+
+      if (snap && !snap.empty) {
+        const batch = db.batch();
+        snap.forEach((doc) => {
+          if (doc.data().status !== "resolved") {
+            batch.update(doc.ref, { status: "resolved", resolvedAt: new Date() });
+          }
+        });
+        await batch.commit();
+      }
+
+      return res.json({ success: true, message: "Website incidents marked as resolved" });
+    } catch (err) {
+      console.error("[GUARDIAN-WEBSITE-RESOLVE] failed:", err && err.message);
+      return res.status(500).json({ error: "Failed to resolve incidents" });
     }
   });
 

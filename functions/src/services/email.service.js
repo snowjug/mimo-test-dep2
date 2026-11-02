@@ -79,7 +79,94 @@ async function sendRefundInitiatedAlert({ orderId, amount, reason = "Dispute / H
   }
 }
 
+/**
+ * Sends an email alert to the MIMO team when a customer website issue or outage occurs.
+ * Deduplicates notifications via idempotency tracking (at most one email per 15m window per problem type).
+ * Safe environment policy: Never fires live external SMTP calls in dev/test/staging environments.
+ *
+ * @param {Object} params
+ * @param {string} params.problem
+ * @param {string} params.location
+ * @param {string} [params.details]
+ * @param {string} [params.severity]
+ * @param {boolean} [params.force]
+ * @returns {Promise<{ sent: boolean, id: string, duplicate?: boolean, mock?: boolean }>}
+ */
+async function sendWebsiteAlertEmail({ problem, location, details = "", severity = "HIGH", force = false }) {
+  if (!problem) throw new Error("problem description required for website alert");
+
+  const safeProblemKey = String(problem).toLowerCase().replace(/[^a-z0-9]/g, "_").slice(0, 40);
+  const bucket = Math.floor(Date.now() / (15 * 60 * 1000));
+  const notificationId = `website_alert_${safeProblemKey}_${bucket}`;
+  const notifRef = db.collection("email_notifications").doc(notificationId);
+
+  if (!force) {
+    const existing = await notifRef.get().catch(() => null);
+    if (existing && existing.exists) {
+      console.log(`[EMAIL-ALERT] Website alert already sent recently for '${problem}', skipping duplicate.`);
+      return { sent: true, id: notificationId, duplicate: true };
+    }
+  }
+
+  const isProduction = process.env.NODE_ENV === "production" && process.env.GMAIL_APP_PASSWORD && process.env.GMAIL_APP_PASSWORD !== "placeholder_pass";
+  const nowIST = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+
+  const emailPayload = {
+    notificationId,
+    type: "WEBSITE_ISSUE_ALERT",
+    problem,
+    location,
+    details,
+    severity,
+    recipient: "visionprintt@gmail.com",
+    subject: `[MIMO Website Alert] Issue Detected: ${problem}`,
+    body:
+      `MIMO CUSTOMER WEBSITE INCIDENT ALERT\n` +
+      `====================================\n\n` +
+      `Severity: ${severity}\n` +
+      `Time Detected: ${nowIST} IST\n\n` +
+      `WHAT IS THE PROBLEM:\n` +
+      `${problem}\n\n` +
+      `WHERE THE PROBLEM OCCURS:\n` +
+      `${location}\n\n` +
+      `TECHNICAL DETAILS & EVIDENCE:\n` +
+      `${details || "No additional technical traces provided."}\n\n` +
+      `CUSTOMER IMPACT:\n` +
+      `Customers visiting https://printmimo.tech may face difficulty accessing the site,\n` +
+      `uploading documents, or proceeding to payment.\n\n` +
+      `EDGE GUARDIAN DASHBOARD:\n` +
+      `https://printmimo.tech/admin/guardian\n\n` +
+      `Please investigate and resolve promptly.`,
+    status: isProduction ? "SENDING" : "MOCKED_SAFE_ENV",
+    createdAt: new Date().toISOString(),
+    timestampMs: Date.now(),
+  };
+
+  if (!isProduction) {
+    console.log(`[EMAIL-ALERT] [SAFE MODE] Website alert recorded in DB for '${problem}' (no live email sent).`);
+    await notifRef.set({ ...emailPayload, status: "MOCKED_SAFE_ENV" }).catch(() => {});
+    return { sent: true, id: notificationId, mock: true };
+  }
+
+  try {
+    const transporter = getTransporter();
+    await transporter.sendMail({
+      from: '"MIMO Edge Guardian" <visionprintt@gmail.com>',
+      to: "visionprintt@gmail.com",
+      subject: emailPayload.subject,
+      text: emailPayload.body,
+    });
+    await notifRef.set({ ...emailPayload, status: "DELIVERED" });
+    return { sent: true, id: notificationId };
+  } catch (err) {
+    console.error(`[EMAIL-ALERT] Failed to deliver website email alert:`, err.message);
+    await notifRef.set({ ...emailPayload, status: "FAILED", error: err.message }).catch(() => {});
+    return { sent: false, id: notificationId, error: err.message };
+  }
+}
+
 module.exports = {
   getTransporter,
   sendRefundInitiatedAlert,
+  sendWebsiteAlertEmail,
 };

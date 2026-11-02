@@ -804,6 +804,14 @@ export function UploadFile() {
 
     } catch (err) {
       console.error(err);
+      try {
+        api.post("/api/customer-incident", {
+          type: "upload_failed",
+          message: describeUploadFailure(err),
+          route: "/upload",
+          details: String((err as any)?.message || err).slice(0, 500),
+        }).catch(() => {});
+      } catch {}
       setFiles((prev) =>
         prev.map((f) =>
           newFiles.some((nf) => nf.clientUploadId === f.clientUploadId) ? { ...f, status: "failed", progress: 0 } : f

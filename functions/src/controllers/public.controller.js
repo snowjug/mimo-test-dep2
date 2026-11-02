@@ -103,9 +103,45 @@ const getApiStats = async (req, res) => {
   }
 };
 
+// ================= CUSTOMER WEBSITE INCIDENT REPORTING =================
+const postCustomerIncident = async (req, res) => {
+  try {
+    const { type, message, route, details, clientUploadId } = req.body || {};
+    if (!message && !type) {
+      return res.status(400).json({ error: "message or type required" });
+    }
+    const incidentData = {
+      type: type || "client_error",
+      message: String(message || "Customer reported a website issue").slice(0, 500),
+      route: String(route || "/").slice(0, 100),
+      details: String(details || "").slice(0, 1000),
+      clientUploadId: clientUploadId || null,
+      status: "unresolved",
+      createdAt: new Date(),
+    };
+    const docRef = await db.collection("customer_website_incidents").add(incidentData);
+
+    // Auto trigger alert email in the background
+    try {
+      const { sendWebsiteAlertEmail } = require("../services/email.service");
+      await sendWebsiteAlertEmail({
+        problem: incidentData.message,
+        location: `Customer Frontend (${incidentData.route})`,
+        details: incidentData.details || `Error occurred on customer website route '${incidentData.route}'`,
+      });
+    } catch (_) {}
+
+    return res.status(201).json({ success: true, incidentId: docRef.id });
+  } catch (err) {
+    console.error("[CUSTOMER-INCIDENT] Failed to record:", err.message);
+    return res.status(500).json({ error: "Failed to record incident" });
+  }
+};
+
 module.exports = {
   getValidateCoupon,
   getApiSettings,
   getApiScreensaver,
   getApiStats,
+  postCustomerIncident,
 };

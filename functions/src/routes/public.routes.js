@@ -12,5 +12,7 @@ router.get("/api/stats", public.getApiStats);
 router.get("/api/machines", getPublicMachines);
 router.get("/api/machines/:machineId", getPublicMachine);
 router.get("/api/ads", getPublicAds);
+router.post("/api/customer-incident", public.postCustomerIncident);
+router.post("/public/customer-incident", public.postCustomerIncident);
 
 module.exports = router;

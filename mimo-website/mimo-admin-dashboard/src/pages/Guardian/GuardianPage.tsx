@@ -7,6 +7,8 @@ import { ErrorBanner } from '../../components/insights/InsightBits';
 import { GuardianSummaryCards } from './components/GuardianSummaryCards';
 import { GuardianKioskTable } from './components/GuardianKioskTable';
 import { GuardianKioskDetailModal } from './components/GuardianKioskDetail';
+import { CustomerWebsiteStatusButton } from './components/CustomerWebsiteStatusButton';
+import { CustomerWebsiteDiagnosticModal } from './components/CustomerWebsiteDiagnosticModal';
 import { KiosksPage } from '../Kiosks/KiosksPage';
 import { ConfigurationPage } from '../Configuration/ConfigurationPage';
 
@@ -36,7 +38,9 @@ const SUB_TABS: { id: GuardianSubTab; label: string; icon: React.ElementType }[]
 export const GuardianPage: React.FC = () => {
   const [subTab, setSubTab] = useState<GuardianSubTab>('health');
   const q = useLiveQuery(() => guardian.summary(), [], { intervalMs: 45000, live: subTab === 'health' });
+  const webQ = useLiveQuery(() => guardian.websiteHealth(), [], { intervalMs: 30000, live: true });
   const [detailKioskId, setDetailKioskId] = useState<string | null>(null);
+  const [showWebsiteModal, setShowWebsiteModal] = useState(false);
 
   return (
     <div className="space-y-6 animate-fadeIn font-sans select-none">
@@ -45,7 +49,14 @@ export const GuardianPage: React.FC = () => {
           <h1 className="hidden lg:block text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-1)]">Edge Guardian</h1>
           <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">Kiosk health, network and configuration.</p>
         </div>
-        {subTab === 'health' && <LiveIndicator updatedAt={q.updatedAt} live fetching={q.fetching} onRefresh={q.refresh} />}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <CustomerWebsiteStatusButton
+            health={webQ.data ?? null}
+            loading={webQ.loading}
+            onClick={() => setShowWebsiteModal(true)}
+          />
+          {subTab === 'health' && <LiveIndicator updatedAt={q.updatedAt} live fetching={q.fetching} onRefresh={q.refresh} />}
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5 border-b border-[var(--border)]">
@@ -54,11 +65,10 @@ export const GuardianPage: React.FC = () => {
             key={id}
             type="button"
             onClick={() => setSubTab(id)}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold border-b-2 -mb-px cursor-pointer transition-colors ${
-              subTab === id
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold border-b-2 -mb-px cursor-pointer transition-colors ${subTab === id
                 ? 'border-[var(--primary)] text-[var(--primary)]'
                 : 'border-transparent text-[var(--text-3)] hover:text-[var(--text-1)]'
-            }`}
+              }`}
           >
             <Icon size={14} /> {label}
           </button>
@@ -92,6 +102,14 @@ export const GuardianPage: React.FC = () => {
             <GuardianKioskDetailModal kioskId={detailKioskId} onClose={() => setDetailKioskId(null)} />
           )}
         </>
+      )}
+
+      {showWebsiteModal && (
+        <CustomerWebsiteDiagnosticModal
+          health={webQ.data ?? null}
+          onClose={() => setShowWebsiteModal(false)}
+          onRefresh={webQ.refresh}
+        />
       )}
 
       {subTab === 'network' && <KiosksPage />}

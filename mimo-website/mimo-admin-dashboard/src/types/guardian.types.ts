@@ -96,3 +96,38 @@ export interface GuardianKioskDetail extends GuardianKioskSummary {
 export interface GuardianSummaryResponse {
   kiosks: GuardianKioskSummary[];
 }
+
+export interface WebsiteHealthCheckItem {
+  ok: boolean;
+  message: string;
+  status?: number;
+  activeIncidents?: number;
+  latestIncident?: {
+    id: string;
+    type: string;
+    message: string;
+    route?: string;
+    details?: string;
+    createdAt?: any;
+  } | null;
+}
+
+export interface WebsiteHealthResponse {
+  isGood: boolean;
+  status: 'good' | 'failing';
+  problem: string | null;
+  location: string | null;
+  details: string;
+  checkedAt: string;
+  checks?: {
+    frontend?: WebsiteHealthCheckItem;
+    database?: WebsiteHealthCheckItem;
+    storage?: WebsiteHealthCheckItem;
+    clientTelemetry?: WebsiteHealthCheckItem;
+  };
+  detectedIssues?: Array<{
+    problem: string;
+    location: string;
+    details: string;
+  }>;
+}
