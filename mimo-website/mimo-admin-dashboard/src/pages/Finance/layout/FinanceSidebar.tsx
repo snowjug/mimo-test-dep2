@@ -160,7 +160,7 @@ export const FinanceSidebar: React.FC<FinanceSidebarProps> = ({
 
 /** "2/2 machines online" from /admin/kiosks (replaces the old fixed "All Systems Operational"). */
 const FleetPill: React.FC = () => {
-  const q = useLiveQuery(() => insights.kiosks(defaultRange()), [], { intervalMs: 30000 });
+  const q = useLiveQuery(() => insights.kiosks(defaultRange()), []);
   const sum = q.data?.summary;
   const ok = !!sum && sum.offline === 0;
   const dot = !sum ? 'bg-slate-300' : ok ? 'bg-emerald-500' : 'bg-amber-500';

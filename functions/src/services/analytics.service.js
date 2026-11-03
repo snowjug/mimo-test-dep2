@@ -13,6 +13,7 @@
  */
 const { reportingOutcome, summarizeJobOutcomes, buildIssues, countIssues } = require("./issueCategories.service");
 const { toPaise, toRupees, allocatePaise, sumPaise, subtractPaise } = require("../utils/money");
+const { cachedValue } = require("../utils/scanCache");
 
 // The two production machines. Any other id that reports a heartbeat and looks like a kiosk id is added at runtime.
 const KNOWN_KIOSKS = {
@@ -465,8 +466,16 @@ function breakdowns({ orders, jobs }, range, { machines = null, issues = null } 
 
 // ─────────────────────────────── Firestore loading ───────────────────────────────
 
+// Analytics, transactions, kiosks and the monthly summary all load the same windows; a dashboard load reads
+// thousands of documents per window, so identical windows within this TTL share one Firestore read.
+const WINDOW_CACHE_MS = 2 * 60 * 1000;
+
 /** Loads every document created inside [fromMs, toMs). `db` and `Timestamp` are injected. */
-async function loadWindow(db, Timestamp, fromMs, toMs) {
+function loadWindow(db, Timestamp, fromMs, toMs) {
+  return cachedValue(`window:${fromMs}:${toMs}`, () => loadWindowUncached(db, Timestamp, fromMs, toMs), WINDOW_CACHE_MS);
+}
+
+async function loadWindowUncached(db, Timestamp, fromMs, toMs) {
   const lo = Timestamp.fromMillis(fromMs);
   const hi = Timestamp.fromMillis(toMs);
   const q = (collection, field) =>

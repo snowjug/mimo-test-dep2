@@ -74,8 +74,8 @@ function extractNameFallback(i: Incident): string | null {
 
 export const IncidentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNavigate }) => {
   const { range, setRange, current } = useRange();
-  const inc = useLiveQuery(() => insights.incidents(current()), [range], { live: true, intervalMs: 20000 });
-  const refunds = useLiveQuery(() => api.get<{ requests: RefundRequest[] }>('/admin/refund-requests').then((r) => r.data.requests), [], { live: true, intervalMs: 30000 });
+  const inc = useLiveQuery(() => insights.incidents(current()), [range], { live: true });
+  const refunds = useLiveQuery(() => api.get<{ requests: RefundRequest[] }>('/admin/refund-requests').then((r) => r.data.requests), [], { live: true });
   const [confirm, setConfirm] = useState<RefundRequest | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -556,7 +556,7 @@ const HISTORY_PAGE = 25;
  */
 const IssueHistory: React.FC<{ onSelectIncident?: (incident: Incident) => void }> = ({ onSelectIncident }) => {
   const { range, current, live } = useRange();
-  const q = useLiveQuery(() => insights.issues(current(), { limit: HISTORY_LIMIT, current: 0 }), [range], { live, intervalMs: 60000 });
+  const q = useLiveQuery(() => insights.issues(current(), { limit: HISTORY_LIMIT, current: 0 }), [range], { live });
   const [category, setCategory] = useState<string>('ALL');
   const [machine, setMachine] = useState<string>('ALL');
   const [shown, setShown] = useState(HISTORY_PAGE);

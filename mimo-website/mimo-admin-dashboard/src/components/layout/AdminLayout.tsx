@@ -122,8 +122,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
 
   // Live fleet + incidents for the tab badge, the fleet line and the alerts sheet (always "today").
-  const kiosksQ = useLiveQuery(() => insights.kiosks(defaultRange()), [], { intervalMs: 30000 });
-  const incidentsQ = useLiveQuery(() => insights.incidents(defaultRange()), [], { intervalMs: 30000 });
+  const kiosksQ = useLiveQuery(() => insights.kiosks(defaultRange()), []);
+  const incidentsQ = useLiveQuery(() => insights.incidents(defaultRange()), []);
   const fleet = kiosksQ.data ? { online: kiosksQ.data.summary.online, total: kiosksQ.data.summary.total } : null;
   const incidentCount = incidentsQ.data?.counts.open ?? 0;
   const alerts = incidentsQ.data?.incidents ?? [];

@@ -63,7 +63,7 @@ const CleanStatus: React.FC<{ c: KioskCleaning }> = ({ c }) => {
 export const KiosksPage: React.FC = () => {
   const { range, setRange, current } = useRange();
   // Machine health is always live, whatever range is selected for the activity numbers.
-  const q = useLiveQuery(() => insights.kiosks(current()), [range], { live: true, intervalMs: 20000 });
+  const q = useLiveQuery(() => insights.kiosks(current()), [range], { live: true });
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
   const [confirmRestart, setConfirmRestart] = useState<KioskLive | null>(null);

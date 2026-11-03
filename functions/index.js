@@ -22,7 +22,9 @@ const app = require("./src/server");
 exports.api = onRequest(
   {
     cors: true,
-    maxInstances: 50,
+    // 10 instances x 80 concurrent requests is far above MIMO's traffic, and caps what a runaway client loop
+    // (or an open dashboard tab) can bill in CPU time.
+    maxInstances: 10,
     memory: "512MiB",
     // /finalize-upload converts every Office file of a batch through the LibreOffice converter (up to ~75 s each
     // on a cold start). The 60 s default could cut a multi-file upload off half-way, so allow a few minutes.

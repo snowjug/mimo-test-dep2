@@ -389,7 +389,7 @@ export const TechnicalWorkspace: React.FC<{ me: any; onRefreshMe: () => void }> 
   const overdueCount = activeTasks.filter((t) => t.dueAtMs && t.dueAtMs < Date.now()).length;
 
   // REAL machine telemetry — technical-scoped endpoint (health/status only, no revenue).
-  const kiosks = useLiveQuery(() => technical.machines(), [], { live: true, intervalMs: 30000 });
+  const kiosks = useLiveQuery(() => technical.machines(), [], { live: true });
   const machines: TechMachine[] = kiosks.data?.kiosks ?? [];
 
   const postAnnouncement = async () => {

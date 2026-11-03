@@ -164,18 +164,34 @@ const getAdminJobs = async (req, res) => {
     const wantStatus = req.query.status ? String(req.query.status).toLowerCase() : null;
     const wantKiosk = req.query.kioskId ? String(req.query.kioskId) : null;
 
-    const snap = await db.collection("print_jobs")
+    const inRange = db.collection("print_jobs")
       .where("createdAt", ">=", Timestamp.fromMillis(range.from))
-      .where("createdAt", "<", Timestamp.fromMillis(range.to))
-      .orderBy("createdAt", "desc")
-      .limit(A.MAX_DOCS_PER_COLLECTION)
-      .get();
+      .where("createdAt", "<", Timestamp.fromMillis(range.to));
+    const filtered = !!(wantStatus || wantKiosk);
 
-    let docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    if (wantStatus) docs = docs.filter((d) => String(d.status || "").toLowerCase() === wantStatus);
-    if (wantKiosk) docs = docs.filter((d) => (d.kioskId || d.printDestination) === wantKiosk);
-    const total = docs.length;
-    docs = docs.slice(0, limit);
+    // Unfiltered (the dashboards' default): read only the `limit` newest jobs and count the rest, instead of
+    // reading every job in the range (up to 5,000 billed reads) to show a handful. Filters match fields a plain
+    // query can't express (legacy printDestination, mixed-case status), so they still filter in memory.
+    let docs;
+    let total;
+    let scanned;
+    if (filtered) {
+      const snap = await inRange.orderBy("createdAt", "desc").limit(A.MAX_DOCS_PER_COLLECTION).get();
+      scanned = snap.size;
+      docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (wantStatus) docs = docs.filter((d) => String(d.status || "").toLowerCase() === wantStatus);
+      if (wantKiosk) docs = docs.filter((d) => (d.kioskId || d.printDestination) === wantKiosk);
+      total = docs.length;
+      docs = docs.slice(0, limit);
+    } else {
+      const [snap, countSnap] = await Promise.all([
+        inRange.orderBy("createdAt", "desc").limit(limit).get(),
+        inRange.count().get(),
+      ]);
+      docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      total = countSnap.data().count;
+      scanned = Math.min(total, A.MAX_DOCS_PER_COLLECTION);
+    }
 
     const normalized = new Map(docs.map((d) => [d.id, A.normalizeJobs([d])[0]]));
     const [users, refunds, orders, machines] = await Promise.all([
@@ -239,7 +255,7 @@ const getAdminJobs = async (req, res) => {
         } : null,
       };
     });
-    res.json({ range: { from: A.iso(range.from), to: A.iso(range.to) }, total, truncated: total > limit || snap.size >= A.MAX_DOCS_PER_COLLECTION, jobs, updatedAt: new Date().toISOString() });
+    res.json({ range: { from: A.iso(range.from), to: A.iso(range.to) }, total, truncated: total > limit || scanned >= A.MAX_DOCS_PER_COLLECTION, jobs, updatedAt: new Date().toISOString() });
   } catch (err) {
     fail(res, err, "jobs");
   }

@@ -8,26 +8,31 @@ const TTL_MS = Number(process.env.ADMIN_SCAN_CACHE_TTL_MS ?? 5 * 60 * 1000);
 // Off under `node --test` (NODE_TEST_CONTEXT) so cached snapshots can't leak between test cases.
 const disabled = () => TTL_MS <= 0 || process.env.NODE_ENV === "test" || !!process.env.NODE_TEST_CONTEXT;
 
-const entries = new Map(); // collection name -> { expires, promise }
+const entries = new Map(); // cache key -> { expires, promise }
 
-function cachedCollectionGet(db, collectionName) {
-  if (disabled()) return db.collection(collectionName).get();
+/** Returns loader()'s promise, shared by every caller with the same key until it expires (ttlMs, default TTL_MS). */
+function cachedValue(key, loader, ttlMs = TTL_MS) {
+  if (disabled() || ttlMs <= 0) return loader();
 
   const now = Date.now();
-  const hit = entries.get(collectionName);
+  const hit = entries.get(key);
   if (hit && hit.expires > now) return hit.promise;
 
-  const promise = db.collection(collectionName).get();
-  entries.set(collectionName, { expires: now + TTL_MS, promise });
+  const promise = loader();
+  entries.set(key, { expires: now + ttlMs, promise });
   // A failed read must not be served again for the whole TTL.
   promise.catch(() => {
-    if (entries.get(collectionName)?.promise === promise) entries.delete(collectionName);
+    if (entries.get(key)?.promise === promise) entries.delete(key);
   });
   return promise;
+}
+
+function cachedCollectionGet(db, collectionName) {
+  return cachedValue(`collection:${collectionName}`, () => db.collection(collectionName).get());
 }
 
 function clearScanCache() {
   entries.clear();
 }
 
-module.exports = { cachedCollectionGet, clearScanCache };
+module.exports = { cachedValue, cachedCollectionGet, clearScanCache };

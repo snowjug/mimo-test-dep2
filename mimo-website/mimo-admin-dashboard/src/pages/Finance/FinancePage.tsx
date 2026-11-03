@@ -53,7 +53,7 @@ import { insights } from '../../services/insights.service';
 import { DateRangePicker } from '../../components/ui/DateRangePicker';
 import { ErrorBanner } from '../../components/insights/InsightBits';
 import { bucketLabel, describeRange, presetRange, toDateKey } from '../../lib/dateRange';
-import { errorMessage } from '../../hooks/useLiveQuery';
+import { AUTO_REFRESH_MS, errorMessage } from '../../hooks/useLiveQuery';
 
 const fmtDateShort = (key?: string) => {
   if (!key) return '';
@@ -197,7 +197,7 @@ export const FinancePage: React.FC = () => {
   useEffect(() => {
     loadFinanceData();
     if (!live) return;
-    const id = window.setInterval(() => { if (document.visibilityState === 'visible') loadFinanceData(); }, 30000);
+    const id = window.setInterval(() => { if (document.visibilityState === 'visible') loadFinanceData(); }, AUTO_REFRESH_MS);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range]);

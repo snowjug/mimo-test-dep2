@@ -70,3 +70,36 @@ test("getAdminJobs includes destinationShortLabel from the registry's shortLabel
   assert.strictEqual(byId.j1.destinationShortLabel, "M1");
   assert.strictEqual(byId.j2.destinationShortLabel, "ZZ", "an id with no registry entry falls back to its own first two letters");
 });
+
+// Read cost: unfiltered calls (the dashboards' default) must read only `limit` jobs and count the rest, not
+// every job in the range. Five jobs today, newest first: j5 (now) ... j1 (4 min ago).
+const fiveJobsToday = () => Object.fromEntries([1, 2, 3, 4, 5].map((i) => [`j${i}`, {
+  kioskId: "CV-001", userId: "u1", status: i === 2 ? "failed" : "completed",
+  createdAt: new Date(Date.now() - (5 - i) * 60000), fileName: `${i}.pdf`, pageCount: 1,
+}]));
+
+test("getAdminJobs without filters returns only the newest `limit` jobs and the full count as total", async () => {
+  fake.reset({ print_jobs: fiveJobsToday() });
+  const res = await jobs({ limit: "2" });
+  assert.strictEqual(res.code, 200);
+  assert.deepStrictEqual(res.body.jobs.map((j) => j.id), ["j5", "j4"]);
+  assert.strictEqual(res.body.total, 5);
+  assert.strictEqual(res.body.truncated, true);
+});
+
+test("getAdminJobs with a status filter still filters the whole range and reports the filtered total", async () => {
+  fake.reset({ print_jobs: fiveJobsToday() });
+  const res = await jobs({ status: "failed" });
+  assert.strictEqual(res.code, 200);
+  assert.deepStrictEqual(res.body.jobs.map((j) => j.id), ["j2"]);
+  assert.strictEqual(res.body.total, 1);
+  assert.strictEqual(res.body.truncated, false);
+});
+
+test("getAdminJobs without filters and a limit above the range size returns every job, untruncated", async () => {
+  fake.reset({ print_jobs: fiveJobsToday() });
+  const res = await jobs();
+  assert.deepStrictEqual(res.body.jobs.map((j) => j.id), ["j5", "j4", "j3", "j2", "j1"]);
+  assert.strictEqual(res.body.total, 5);
+  assert.strictEqual(res.body.truncated, false);
+});

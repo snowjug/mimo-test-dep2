@@ -75,7 +75,7 @@ export const FinanceApp: React.FC = () => {
   const refunds = useLiveQuery(
     () => (signedIn ? api.get<{ requests: any[] }>('/admin/refund-requests', { params: toApiRange(current()) }).then((r) => r.data.requests) : Promise.resolve(null)),
     [range, signedIn],
-    { live: live && signedIn, intervalMs: 30000 }
+    { live: live && signedIn }
   );
   // Heavy (scans users, orders and jobs), so only while the Wallet page is open and refreshed manually.
   const wantUsers = signedIn && activeTab === 'wallet';

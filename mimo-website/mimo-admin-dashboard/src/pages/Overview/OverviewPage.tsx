@@ -99,8 +99,9 @@ export const OverviewPage: React.FC = () => {
   const { isDark } = useTheme();
   const { range, setRange, current, live } = useRange();
   const analytics = useLiveQuery(() => insights.analytics(current(), false), [range], { live });
-  const kiosks = useLiveQuery(() => insights.kiosks(current()), [range], { live: true, intervalMs: 20000 });
-  const jobs = useLiveQuery(() => insights.jobs(current(), { limit: 1000 }), [range], { live });
+  const kiosks = useLiveQuery(() => insights.kiosks(current()), [range], { live: true });
+  // Only the newest RECENT_PRINTS are shown here, so fetch only those (the backend then reads just that many).
+  const jobs = useLiveQuery(() => insights.jobs(current(), { limit: RECENT_PRINTS }), [range], { live });
   const [actionError, setActionError] = useState('');
 
   const cur = analytics.data?.current;

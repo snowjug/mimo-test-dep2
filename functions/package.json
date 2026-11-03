@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "node dev.js",
+    "dev:emulator": "firebase emulators:exec --config __tests__/emulator/firebase.emulator.json --only firestore --project demo-mimo-dev \"node dev.js\"",
     "test": "node --test __tests__/*.test.js",
     "test:sync": "node --test __tests__/kioskSyncContract.test.js",
     "predeploy:check": "npm test",

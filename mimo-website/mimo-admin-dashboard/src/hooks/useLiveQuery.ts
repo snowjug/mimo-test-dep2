@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+/**
+ * Every dashboard query re-runs Firestore reads on the backend, and Firestore bills per document read: 20-30 s
+ * polling on a few open tabs ran to millions of reads a day. So data refreshes on its own at most every 20 min;
+ * anything fresher comes from the page's Refresh button (`refresh()`).
+ */
+export const AUTO_REFRESH_MS = 20 * 60 * 1000;
+
 export interface LiveQueryOptions {
-  /** Poll interval in ms while the tab is visible. Ignored when `live` is false. Default 30s. */
-  intervalMs?: number;
-  /** Poll only when true (e.g. the selected range includes today). Default true. */
+  /** Auto-refresh (every AUTO_REFRESH_MS while the tab is visible) only when true, e.g. the range includes today. Default true. */
   live?: boolean;
 }
 
@@ -29,13 +34,13 @@ export const errorMessage = (err: unknown): string => {
 };
 
 /**
- * Fetches `fetcher` whenever `deps` change and keeps it fresh by polling. Stale responses are discarded,
- * polling pauses while the tab is hidden, and errors are surfaced instead of being swallowed as empty data.
+ * Fetches `fetcher` whenever `deps` change and refreshes it every AUTO_REFRESH_MS. Stale responses are discarded,
+ * auto-refresh pauses while the tab is hidden, and errors are surfaced instead of being swallowed as empty data.
  */
 export function useLiveQuery<T>(
   fetcher: () => Promise<T>,
   deps: React.DependencyList,
-  { intervalMs = 30000, live = true }: LiveQueryOptions = {}
+  { live = true }: LiveQueryOptions = {}
 ): LiveQuery<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,11 +48,13 @@ export function useLiveQuery<T>(
   const [fetching, setFetching] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const seq = useRef(0);
+  const lastRunAt = useRef(0);
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
 
   const run = useCallback(async (isFirst: boolean) => {
     const mine = ++seq.current;
+    lastRunAt.current = Date.now();
     setFetching(true);
     if (isFirst) setLoading(true);
     try {
@@ -75,16 +82,19 @@ export function useLiveQuery<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  // Poll while visible.
+  // Auto-refresh while visible, once the data is AUTO_REFRESH_MS old. The once-a-minute check sends nothing
+  // until then, and returning to the tab refetches only stale data, so switching tabs costs nothing.
   useEffect(() => {
     if (!live) return;
-    const tick = () => { if (document.visibilityState === 'visible') run(false); };
-    const id = window.setInterval(tick, intervalMs);
-    const onVisible = () => { if (document.visibilityState === 'visible') run(false); };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
+    const refreshIfStale = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - lastRunAt.current < AUTO_REFRESH_MS) return;
+      run(false);
+    };
+    const id = window.setInterval(refreshIfStale, 60 * 1000);
+    document.addEventListener('visibilitychange', refreshIfStale);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', refreshIfStale); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live, intervalMs, ...deps]);
+  }, [live, ...deps]);
 
   return { data, error, loading, fetching, updatedAt, refresh: () => run(false) };
 }

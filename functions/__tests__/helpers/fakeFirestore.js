@@ -8,7 +8,7 @@
 //   fake.data("orders")   // -> { o1: {...} } plain snapshot of a collection
 //   fake.log              // { writes: [...], reads: number } every write in order, for assertions
 //
-// Supported: collection().doc(id?) / add / where(==,!=,<,<=,>,>=,in,not-in,array-contains) / orderBy / limit / get,
+// Supported: collection().doc(id?) / add / where(==,!=,<,<=,>,>=,in,not-in,array-contains) / orderBy / limit / get / count,
 // doc get/set(merge)/update(dotted paths)/create(ALREADY_EXISTS -> code 6)/delete, batch, runTransaction,
 // FieldValue.serverTimestamp / increment / delete, Timestamp.fromDate / now.
 
@@ -135,6 +135,14 @@ function createFakeFirestore(seed = {}, { strictTransactions = false } = {}) {
         docs = docs.slice(0, max).map(([id]) => snapDoc(colName, id));
         return { empty: docs.length === 0, size: docs.length, docs, forEach: (fn) => docs.forEach(fn) };
       },
+      // aggregation: count of matching docs (honours limit, as the real SDK does)
+      count: () => ({
+        get: async () => {
+          state.log.reads += 1;
+          const n = [...col(colName).values()].filter((d) => filters.every((f) => applyOps(f.op, getPath(d, f.field), f.value))).length;
+          return { data: () => ({ count: Math.min(n, max) }) };
+        },
+      }),
     };
     return q;
   }

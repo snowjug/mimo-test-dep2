@@ -37,8 +37,8 @@ const SUB_TABS: { id: GuardianSubTab; label: string; icon: React.ElementType }[]
  */
 export const GuardianPage: React.FC = () => {
   const [subTab, setSubTab] = useState<GuardianSubTab>('health');
-  const q = useLiveQuery(() => guardian.summary(), [], { intervalMs: 45000, live: subTab === 'health' });
-  const webQ = useLiveQuery(() => guardian.websiteHealth(), [], { intervalMs: 30000, live: true });
+  const q = useLiveQuery(() => guardian.summary(), [], { live: subTab === 'health' });
+  const webQ = useLiveQuery(() => guardian.websiteHealth(), [], { live: true });
   const [detailKioskId, setDetailKioskId] = useState<string | null>(null);
   const [showWebsiteModal, setShowWebsiteModal] = useState(false);
 

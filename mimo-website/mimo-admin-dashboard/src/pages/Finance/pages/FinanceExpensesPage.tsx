@@ -53,6 +53,7 @@ import {
 import { inr } from '../../../lib/format';
 import api from '../../../api';
 import { insights } from '../../../services/insights.service';
+import { AUTO_REFRESH_MS } from '../../../hooks/useLiveQuery';
 import type { FinanceSheetResponse, FinanceExpenseItem } from '../../../types/insights.types';
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
@@ -475,13 +476,12 @@ export const FinanceExpensesPage: React.FC = () => {
     }
   }, [loadPersistedExpenses]);
 
-  // Initial load & automatic 5-minute background refresh
+  // Initial load (syncSpreadsheetData also loads the persisted expenses) & 20-minute background refresh
   useEffect(() => {
     syncSpreadsheetData(false);
-    loadPersistedExpenses();
     const interval = setInterval(() => {
       syncSpreadsheetData(false);
-    }, 5 * 60 * 1000);
+    }, AUTO_REFRESH_MS);
 
     return () => clearInterval(interval);
   }, [syncSpreadsheetData, loadPersistedExpenses]);

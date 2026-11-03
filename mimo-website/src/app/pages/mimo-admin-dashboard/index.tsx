@@ -65,7 +65,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (token) {
       fetchData();
-      const interval = setInterval(fetchData, 30000);
+      // Every poll re-reads Firestore on the backend (billed per document), so refresh on its own only every
+      // 20 minutes; the Refresh button fetches immediately.
+      const interval = setInterval(fetchData, 20 * 60 * 1000);
       return () => clearInterval(interval);
     }
   }, [token]);
@@ -441,6 +443,13 @@ export default function AdminDashboard() {
               <Search className="w-4 h-4 text-[#8AA1B9] flex-shrink-0" />
               <input type="text" placeholder="Search..." className="bg-transparent border-none outline-none text-sm text-[#6EE7B7] placeholder-[#8AA1B9] w-full" />
             </div>
+            <button
+              onClick={fetchData}
+              title="Refresh now"
+              className="p-2.5 bg-[#112F4B] border border-[#1A4971] hover:bg-[#163C5D] text-[#6EE7B7] rounded-xl transition-colors"
+            >
+              <RefreshCcw className="w-4 h-4" />
+            </button>
             <button
               onClick={handleResetMetrics}
               disabled={isResetting}
