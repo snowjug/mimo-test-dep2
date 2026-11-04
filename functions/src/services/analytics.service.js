@@ -470,9 +470,46 @@ function breakdowns({ orders, jobs }, range, { machines = null, issues = null } 
 // thousands of documents per window, so identical windows within this TTL share one Firestore read.
 const WINDOW_CACHE_MS = 5 * 60 * 1000;
 
+// One dashboard load asks for many different date windows (today, a week, a month, the previous period, ...), and
+// each used to be its own read of up to 4 x MAX_DOCS_PER_COLLECTION documents: tens of thousands of reads per page
+// open. Instead the last BASE_WINDOW_DAYS days are read ONCE (shared by every caller for WINDOW_CACHE_MS) and each
+// requested window is cut out of that in memory. Anything that does not fit inside the base window, or a base read
+// that hit the per-collection cap (so it may be missing documents), falls back to the exact per-window read above,
+// so a figure can never silently change.
+const BASE_WINDOW_DAYS = 45;
+const BASE_FIELDS = { orders: "createdAt", txns: "createdAt", jobs: "createdAt", refunds: "initiatedAt" };
+
+/** Milliseconds of a Firestore Timestamp / Date, else null (a Firestore range query would not match anything else either). */
+function fieldMs(value) {
+  if (value && typeof value.toMillis === "function") return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  return null;
+}
+
+/** The documents of an already-loaded base window that lie inside [fromMs, toMs): same rule as the range query. */
+function sliceWindow(base, fromMs, toMs) {
+  const inside = (docs, field) => docs.filter((d) => {
+    const ms = fieldMs(d[field]);
+    return ms !== null && ms >= fromMs && ms < toMs;
+  });
+  return {
+    orders: inside(base.orders, BASE_FIELDS.orders),
+    txns: inside(base.txns, BASE_FIELDS.txns),
+    jobs: inside(base.jobs, BASE_FIELDS.jobs),
+    refunds: inside(base.refunds, BASE_FIELDS.refunds),
+    truncated: false,
+  };
+}
+
 /** Loads every document created inside [fromMs, toMs). `db` and `Timestamp` are injected. */
-function loadWindow(db, Timestamp, fromMs, toMs) {
-  return cachedValue(`window:${fromMs}:${toMs}`, () => loadWindowUncached(db, Timestamp, fromMs, toMs), WINDOW_CACHE_MS);
+function loadWindow(db, Timestamp, fromMs, toMs, now = Date.now()) {
+  const direct = () => cachedValue(`window:${fromMs}:${toMs}`, () => loadWindowUncached(db, Timestamp, fromMs, toMs), WINDOW_CACHE_MS);
+  const dayStart = Math.floor(now / DAY_MS) * DAY_MS;
+  const baseFrom = dayStart - BASE_WINDOW_DAYS * DAY_MS;
+  const baseTo = dayStart + 2 * DAY_MS;
+  if (fromMs < baseFrom || toMs > baseTo) return direct();
+  return cachedValue(`window:base:${baseFrom}`, () => loadWindowUncached(db, Timestamp, baseFrom, baseTo), WINDOW_CACHE_MS)
+    .then((base) => (base.truncated ? direct() : sliceWindow(base, fromMs, toMs)));
 }
 
 async function loadWindowUncached(db, Timestamp, fromMs, toMs) {
@@ -784,6 +821,8 @@ module.exports = {
   buildSeries,
   breakdowns,
   loadWindow,
+  loadWindowUncached, // exported for tests: the exact per-window read the shared base window must match
+  BASE_WINDOW_DAYS,
   loadRefundRequests,
   issuesInRange,
   buildReporting,

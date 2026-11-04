@@ -35,11 +35,22 @@ const RECENT_REFERENCE_WINDOW_MS = 10 * 60 * 1000;
 const CHECKOUT_PROTECTION_MS = 6 * 60 * 60 * 1000;
 
 const num = (v, d) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
+
+// The hourly job sweep only looks at recent jobs (config.fullScan === false). Once a day, at this hour in IST, it runs
+// the original whole-collection scan instead, so a job older than the lookback that still has files is never missed.
+const FULL_SCAN_HOUR_IST = 3;
+const isFullScanHour = (date = new Date()) =>
+  Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", hour12: false }).format(date)) % 24 === FULL_SCAN_HOUR_IST;
 const defaults = (env = process.env) => ({
   retentionMs: num(env.STORAGE_RETENTION_MS, RETENTION_MS),
   jobPageSize: num(env.RETENTION_PAGE_SIZE, 300),
   jobMaxScanned: num(env.RETENTION_MAX_DOCS_PER_RUN, 1500),
   jobMaxCleaned: num(env.RETENTION_MAX_JOBS_PER_RUN, 150),
+  // fullScan=false makes runJobRetentionPass look only at jobs created in the last jobLookbackMs (the retention
+  // window is 24 h, so 2 days leaves a full day of margin). It stops the hourly run re-reading every old, already
+  // cleaned job; the trigger still runs one full scan a day as the safety net. Default true = original behaviour.
+  jobLookbackMs: num(env.RETENTION_LOOKBACK_MS, 2 * 24 * 3600 * 1000),
+  fullScan: true,
   orphanPageSize: num(env.ORPHAN_PAGE_SIZE, 250),
   orphanMaxScanned: num(env.ORPHAN_MAX_OBJECTS_PER_RUN, 1000),
   deleteConcurrency: num(env.STORAGE_DELETE_CONCURRENCY, 4),
@@ -180,7 +191,10 @@ async function runJobRetentionPass({ db, admin, bucket, nowMs = Date.now(), log 
   const lease = await acquireLease(db, JOBS_STATE_DOC, { nowMs, runId });
   if (!lease.acquired) { counters.aborted = "lease_held"; log.log(`[RETENTION] skipped: another run holds the lease`); return counters; }
   const startMs = clock();
-  let cursor = lease.state.jobCursor || null;
+  const recentOnly = config.fullScan === false;
+  // A recent-only run neither reads nor moves the full sweep's saved cursor.
+  let cursor = recentOnly ? null : (lease.state.jobCursor || null);
+  let lastSnap = null;
   try {
     const index = await loadActiveReferenceIndex(db, bucket.name);
     if (!index.complete) { counters.aborted = "reference_index_incomplete"; log.error("[RETENTION] reference index incomplete; deleting nothing this run"); return counters; }
@@ -188,10 +202,17 @@ async function runJobRetentionPass({ db, admin, bucket, nowMs = Date.now(), log 
 
     outer:
     for (;;) {
-      let q = db.collection("print_jobs").orderBy("__name__").limit(config.jobPageSize);
-      if (cursor) q = q.startAfter(cursor);
+      let q;
+      if (recentOnly) {
+        // Oldest first, so the jobs closest to (or past) their retention deadline are always handled first.
+        q = db.collection("print_jobs").where("createdAt", ">=", new Date(nowMs - config.jobLookbackMs)).orderBy("createdAt").limit(config.jobPageSize);
+        if (lastSnap) q = q.startAfter(lastSnap);
+      } else {
+        q = db.collection("print_jobs").orderBy("__name__").limit(config.jobPageSize);
+        if (cursor) q = q.startAfter(cursor);
+      }
       const snap = await q.get();
-      if (snap.empty) { counters.wrapped = true; cursor = null; break; }
+      if (snap.empty) { if (!recentOnly) { counters.wrapped = true; cursor = null; } break; }
       // jobs created while this run was scanning must be visible to the reference check
       await addRecentReferences(db, bucket.name, index, indexLoadedMs - RECENT_REFERENCE_WINDOW_MS);
 
@@ -227,11 +248,12 @@ async function runJobRetentionPass({ db, admin, bucket, nowMs = Date.now(), log 
         if (result.complete) bump(counters, "cleaned"); else if (result.objects.some((o) => o.outcome === "failed")) bump(counters, "failed"); else bump(counters, "partial");
         cursor = doc.id;
       }
-      await saveState(db, JOBS_STATE_DOC, { jobCursor: cursor, jobCursorUpdatedMs: clock() });
-      if (snap.docs.length < config.jobPageSize) { counters.wrapped = true; cursor = null; break; }
+      if (!recentOnly) await saveState(db, JOBS_STATE_DOC, { jobCursor: cursor, jobCursorUpdatedMs: clock() });
+      lastSnap = snap.docs[snap.docs.length - 1];
+      if (snap.docs.length < config.jobPageSize) { if (!recentOnly) { counters.wrapped = true; cursor = null; } break; }
     }
   } finally {
-    await releaseLease(db, JOBS_STATE_DOC, runId, { jobCursor: cursor, lastRunMs: nowMs, lastCounters: JSON.parse(JSON.stringify(counters)),
+    await releaseLease(db, JOBS_STATE_DOC, runId, { jobCursor: recentOnly ? (lease.state.jobCursor || null) : cursor, lastRunMs: nowMs, lastCounters: JSON.parse(JSON.stringify(counters)),
       ...(counters.wrapped ? { lastSweepCompletedMs: nowMs } : {}) }).catch((e) => log.error(`[RETENTION] could not release lease: ${e.message}`));
   }
   log.log(`[RETENTION] scanned=${counters.scanned} cleaned=${counters.cleaned} partial=${counters.partial} failed=${counters.failed} skipped=${JSON.stringify(counters.skipped)} objects=${JSON.stringify(counters.objects)} wrapped=${counters.wrapped}`);
@@ -324,6 +346,7 @@ async function runOrphanStoragePass({ db, admin, bucket, nowMs = Date.now(), log
 
 module.exports = {
   defaults,
+  isFullScanHour,
   classifyJob,
   claimJobForCleanup,
   cleanJobDocument,

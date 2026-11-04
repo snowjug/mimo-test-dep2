@@ -462,20 +462,33 @@ const getAdminKiosks = async (req, res) => {
 
 // ─────────────────────────────── GET /admin/incidents ───────────────────────────────
 const SEVERITY_ORDER = { high: 0, medium: 1, low: 2 };
+
+/**
+ * The jobs of the range, newest first, as something with forEach(doc => doc.id / doc.data()).
+ * Normally cut out of the shared analytics window (already read for this dashboard load, so it costs nothing extra).
+ * The shared window is read oldest-first, so when it hit the document cap the NEWEST jobs could be missing: then the
+ * original newest-first query is used instead. Range filter only: an `in` filter on status would need a composite index.
+ */
+async function incidentJobs(range) {
+  const win = await A.loadWindow(db, Timestamp, range.from, range.to);
+  if (win.truncated) {
+    return cachedValue(`incidents:jobs:${range.from}:${range.to}`, () => db.collection("print_jobs")
+      .where("createdAt", ">=", Timestamp.fromMillis(range.from))
+      .where("createdAt", "<", Timestamp.fromMillis(range.to))
+      .orderBy("createdAt", "desc")
+      .limit(A.MAX_DOCS_PER_COLLECTION)
+      .get(), 5 * 60 * 1000);
+  }
+  const newestFirst = [...win.jobs].sort((a, b) => (A.toMillis(b.createdAt) || 0) - (A.toMillis(a.createdAt) || 0));
+  return { forEach: (fn) => newestFirst.forEach(({ id, ...data }) => fn({ id, data: () => data })) };
+}
+
 const getAdminIncidents = async (req, res) => {
   try {
     const range = A.parseRange(req.query);
     const [kiosks, failedSnap, refundSnap] = await Promise.all([
       loadKiosks(range),
-      // Range filter only: adding an `in` filter on status would need a composite index (which needs console access).
-      // Up to MAX_DOCS_PER_COLLECTION reads per call and the dashboard re-asks on every load, so share one read per
-      // range between callers/instances' repeat loads (same short TTL as the analytics window; off under tests).
-      cachedValue(`incidents:jobs:${range.from}:${range.to}`, () => db.collection("print_jobs")
-        .where("createdAt", ">=", Timestamp.fromMillis(range.from))
-        .where("createdAt", "<", Timestamp.fromMillis(range.to))
-        .orderBy("createdAt", "desc")
-        .limit(A.MAX_DOCS_PER_COLLECTION)
-        .get(), 5 * 60 * 1000),
+      incidentJobs(range),
       db.collection("refund_requests").where("status", "==", "pending").limit(100).get(),
     ]);
 
