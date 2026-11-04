@@ -5,7 +5,7 @@
 // in every other configuration, including every existing test, which never sets LOCAL_TARGET.
 //
 // Login routes are allowlisted because they only compare credentials against local env vars
-// (see admin.controller.js/hr.controller.js/marketing.controller.js/technical.controller.js) and
+// (see admin.controller.js/marketing.controller.js) and
 // never write anything.
 //
 // POST /kiosk/guardian/health is allowlisted too, but for a different reason: unlike every other
@@ -18,7 +18,7 @@
 // intentional: this switch exists to stop an accidental local click from mutating real data, not
 // to stop a real kiosk's own telemetry from reaching real Firestore.
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const LOGIN_PATHS = new Set(["/admin/login", "/hr/login", "/marketing/login", "/technical/login"]);
+const LOGIN_PATHS = new Set(["/admin/login", "/marketing/login"]);
 const ALWAYS_ALLOWED_PATHS = new Set(["/kiosk/guardian/health"]);
 
 const blockProductionWrites = (req, res, next) => {

@@ -3,7 +3,7 @@ import { Loader2, AlertCircle, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
 export interface StaffLoginProps {
-  variant: 'admin' | 'finance' | 'technical' | 'hr' | 'marketing';
+  variant: 'admin' | 'finance' | 'marketing';
   onLogin: (email: string, pass: string) => Promise<void>;
   loading: boolean;
   error: string;
@@ -14,7 +14,7 @@ const COPY = {
     portal: 'Admin',
     title: 'Sign in to Admin',
     subtitle: 'Kiosks, print operations and fleet management.',
-    placeholder: 'mimo.admin',
+    placeholder: 'Admin ID',
     switchLabel: 'Need Finance Portal?',
     switchText: 'Go to Finance',
     switchHref: '/finance',
@@ -23,25 +23,7 @@ const COPY = {
     portal: 'Finance',
     title: 'Sign in to Finance',
     subtitle: 'Payments, refunds, pricing, settlements and P&L.',
-    placeholder: 'mimo.finance',
-    switchLabel: 'Need Admin Portal?',
-    switchText: 'Go to Admin',
-    switchHref: '/admin',
-  },
-  technical: {
-    portal: 'Technical',
-    title: 'Sign in to Technical',
-    subtitle: 'Tasks, machines, work sessions and team updates.',
-    placeholder: 'you@mimo.internal',
-    switchLabel: 'Need Admin Portal?',
-    switchText: 'Go to Admin',
-    switchHref: '/admin',
-  },
-  hr: {
-    portal: 'HR',
-    title: 'Sign in to HR',
-    subtitle: 'Employees, attendance, leave and onboarding.',
-    placeholder: 'you@mimo.internal',
+    placeholder: 'Finance ID',
     switchLabel: 'Need Admin Portal?',
     switchText: 'Go to Admin',
     switchHref: '/admin',

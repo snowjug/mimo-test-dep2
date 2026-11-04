@@ -11,7 +11,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Activity,
-  Building2,
   Megaphone,
   ShieldCheck,
 } from 'lucide-react';
@@ -41,10 +40,6 @@ const NAV_CORE: NavItemDef[] = [
   { id: 'overview',   label: 'Executive Overview',   icon: LayoutDashboard },
   { id: 'operations', label: 'Print Operations',     icon: Printer, badge: 'LIVE', badgeType: 'live' },
   { id: 'incidents',  label: 'Incident Management',  icon: AlertTriangle, badgeType: 'alert' },
-];
-
-const NAV_COMPANY: NavItemDef[] = [
-  { id: 'company',    label: 'Company Overview',     icon: Building2 },
 ];
 
 // Kiosk Network and System Configuration live inside Edge Guardian as sub-tabs (GuardianPage),
@@ -221,7 +216,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* ── SECTION 2: NAVIGATION GROUPS ──────────────────────────── */}
       <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4 ${isCollapsedView ? 'px-2' : 'px-3'}`}>
         <Section label="Core" items={NAV_CORE} />
-        <Section label="Company" items={NAV_COMPANY} />
         <Section label="Infrastructure" items={NAV_INFRA} />
         <Section label="Analytics" items={NAV_ANALYTICS} />
         <Section label="Finance" items={NAV_FINANCE} />

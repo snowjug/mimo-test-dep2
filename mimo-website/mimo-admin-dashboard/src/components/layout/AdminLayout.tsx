@@ -14,7 +14,6 @@ import {
   RefreshCcw,
   ChevronRight,
   X,
-  Building2,
   User,
   MessageCircle,
   Megaphone,
@@ -62,7 +61,6 @@ const TITLES: Record<string, string> = {
   users: 'Customers',
   coupons: 'Coupon Codes',
   finance: 'Finance',
-  company: 'Company Overview',
   chat: 'Team Chat',
   advertisements: 'Advertisements',
   guardian: 'Edge Guardian',
@@ -82,7 +80,6 @@ const MORE = [
   { id: 'users',           label: 'Customers',          icon: Users },
   { id: 'coupons',         label: 'Coupon Codes',       icon: Ticket },
   { id: 'finance',         label: 'Finance',            icon: IndianRupee },
-  { id: 'company',         label: 'Company Overview',   icon: Building2 },
   { id: 'chat',            label: 'Team Chat',          icon: MessageCircle },
   { id: 'advertisements',  label: 'Advertisements',     icon: Megaphone },
 ];

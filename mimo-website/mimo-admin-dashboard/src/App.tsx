@@ -13,10 +13,7 @@ const UsersPage = lazy(() => import('./pages/Users/UsersPage').then((m) => ({ de
 const CouponsPage = lazy(() => import('./pages/Coupons/CouponsPage').then((m) => ({ default: m.CouponsPage })));
 const FinancePage = lazy(() => import('./pages/Finance/FinancePage').then((m) => ({ default: m.FinancePage })));
 const FinanceApp = lazy(() => import('./pages/Finance/FinanceApp').then((m) => ({ default: m.FinanceApp })));
-const TechnicalApp = lazy(() => import('./pages/Technical/TechnicalApp').then((m) => ({ default: m.TechnicalApp })));
-const HrApp = lazy(() => import('./pages/Hr/HrApp').then((m) => ({ default: m.HrApp })));
 const MarketingApp = lazy(() => import('./pages/Marketing/MarketingApp').then((m) => ({ default: m.MarketingApp })));
-const AdminCompanyPage = lazy(() => import('./pages/Company/AdminCompanyPage').then((m) => ({ default: m.AdminCompanyPage })));
 const AdminChatPage = lazy(() => import('./pages/Chat/AdminChatPage').then((m) => ({ default: m.AdminChatPage })));
 const AdvertisementsPage = lazy(() => import('./pages/Advertisements/AdvertisementsPage').then((m) => ({ default: m.AdvertisementsPage })));
 const GuardianPage = lazy(() => import('./pages/Guardian/GuardianPage').then((m) => ({ default: m.GuardianPage })));
@@ -48,7 +45,6 @@ function DashboardApp() {
     if (path.includes('finance')) return 'finance';
     // Kiosk Network and System Configuration now live inside Edge Guardian as sub-tabs.
     if (path.includes('kiosk') || path.includes('config') || path.includes('setting')) return 'guardian';
-    if (path.includes('company')) return 'company';
     if (path.includes('chat')) return 'chat';
     if (path.includes('advertisements') || path.includes('ads')) return 'advertisements';
     if (path.includes('guardian')) return 'guardian';
@@ -131,7 +127,6 @@ function DashboardApp() {
       {activeTab === 'users' && <UsersPage />}
       {activeTab === 'coupons' && <CouponsPage />}
       {activeTab === 'finance' && <FinancePage />}
-      {activeTab === 'company' && <AdminCompanyPage />}
       {activeTab === 'chat' && <AdminChatPage />}
       {activeTab === 'advertisements' && <AdvertisementsPage />}
       {activeTab === 'guardian' && <GuardianPage />}
@@ -145,12 +140,6 @@ export default function RootApp() {
   const [isFinanceRoute, setIsFinanceRoute] = useState(() => {
     return window.location.pathname.toLowerCase().startsWith('/finance');
   });
-  const [isTechnicalRoute, setIsTechnicalRoute] = useState(() => {
-    return window.location.pathname.toLowerCase().startsWith('/technical');
-  });
-  const [isHrRoute, setIsHrRoute] = useState(() => {
-    return window.location.pathname.toLowerCase().startsWith('/hr');
-  });
   const [isMarketingRoute, setIsMarketingRoute] = useState(() => {
     return window.location.pathname.toLowerCase().startsWith('/marketing');
   });
@@ -158,8 +147,6 @@ export default function RootApp() {
   useEffect(() => {
     const handlePopState = () => {
       setIsFinanceRoute(window.location.pathname.toLowerCase().startsWith('/finance'));
-      setIsTechnicalRoute(window.location.pathname.toLowerCase().startsWith('/technical'));
-      setIsHrRoute(window.location.pathname.toLowerCase().startsWith('/hr'));
       setIsMarketingRoute(window.location.pathname.toLowerCase().startsWith('/marketing'));
     };
     window.addEventListener('popstate', handlePopState);
@@ -172,30 +159,6 @@ export default function RootApp() {
         <RangeProvider>
           <Suspense fallback={null}>
             <FinanceApp />
-          </Suspense>
-        </RangeProvider>
-      </ThemeProvider>
-    );
-  }
-
-  if (isTechnicalRoute) {
-    return (
-      <ThemeProvider>
-        <RangeProvider>
-          <Suspense fallback={null}>
-            <TechnicalApp />
-          </Suspense>
-        </RangeProvider>
-      </ThemeProvider>
-    );
-  }
-
-  if (isHrRoute) {
-    return (
-      <ThemeProvider>
-        <RangeProvider>
-          <Suspense fallback={null}>
-            <HrApp />
           </Suspense>
         </RangeProvider>
       </ThemeProvider>
