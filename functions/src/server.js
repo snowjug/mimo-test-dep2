@@ -5,6 +5,7 @@ const { CASHFREE_BASE_URL, cashfreeHeaders } = require("./config/env");
 const { admin, db } = require("./config/firebase");
 const { isColorJob } = require("./services/printJob.service");
 const { blockProductionWrites } = require("./middleware/blockProductionWrites");
+const { adminOriginGuard } = require("./middleware/adminOriginGuard");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -34,9 +35,10 @@ app.use(require("./routes/upload.routes"));
 app.use(require("./routes/payment.routes"));
 app.use(require("./routes/print.routes"));
 app.use(require("./routes/public.routes"));
+// Admin + finance API: reject browsers calling from any site other than the official dashboard (see
+// middleware/adminOriginGuard.js). Must come before the admin routes.
+app.use("/admin", adminOriginGuard);
 app.use(require("./routes/admin.routes"));
-app.use(require("./routes/technical.routes"));
-app.use(require("./routes/hr.routes"));
 app.use(require("./routes/marketing.routes"));
 app.use(require("./routes/whatsapp.routes"));
 app.use(require("./routes/whatsappFlowEndpoint.routes")); // Mission 37: real Meta Flow Data Exchange endpoint, additive

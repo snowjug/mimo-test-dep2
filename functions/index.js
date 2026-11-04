@@ -36,6 +36,8 @@ exports.api = onRequest(
       "JWT_SECRET",
       "ADMIN_EMAIL",
       "ADMIN_PASSWORD",
+      "FINANCE_EMAIL",
+      "FINANCE_PASSWORD",
       "FLOW_PRIVATE_KEY_PEM",
       "FLOW_APP_SECRET",
     ],

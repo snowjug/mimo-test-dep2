@@ -69,7 +69,11 @@ const RECOMMENDED = [
 // functions/src/config/env.js's getSecretKey()) after a plain functions/.env value for these was found live
 // in production -- Firebase bundles a plain `.env` into every deploy, which is how that happened. Secret
 // Manager is now the only place a real value for these three is ever written.
-const SECRET_MANAGED = ["GMAIL_APP_PASSWORD", "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD"];
+const SECRET_MANAGED = ["GMAIL_APP_PASSWORD", "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD", "FINANCE_EMAIL", "FINANCE_PASSWORD"];
+// Moving from a plain value to Secret Manager: functions/index.js binds these, but the live function may still
+// carry them as plain env for one more deploy. They must not be written to .env in that deploy either (Google
+// rejects a name that is both plain and secret). The secrets MUST exist in Secret Manager before that deploy.
+const MIGRATING_TO_SECRET = ["FINANCE_EMAIL", "FINANCE_PASSWORD"];
 
 const PUBLIC_JWT_FALLBACK = "fallback_secret_key_change_me_in_prod";
 const WEAK_PASSWORDS = new Set(["admin", "password", "123456", "12345678", "admin123", "administrator", "root", "changeme", "printpi", "mimo", "mimo123"]);
@@ -175,7 +179,7 @@ function main() {
   const liveSecretRefs = parseLiveSecretRefs(liveJson);
   const secretEnv = parseDotenv(process.env.FUNCTIONS_ENV_FILE || "");
   const { merged, dropped } = mergeSources({ live, secretEnv });
-  const boundSecrets = SECRET_MANAGED.filter((n) => liveSecretRefs.includes(n));
+  const boundSecrets = SECRET_MANAGED.filter((n) => liveSecretRefs.includes(n) || MIGRATING_TO_SECRET.includes(n));
   boundSecrets.forEach((n) => delete merged[n]);
   const validation = validate(merged);
   const missing = validation.missing.filter((n) => !boundSecrets.includes(n));

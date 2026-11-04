@@ -159,12 +159,17 @@ test("without a live secret reference JWT_SECRET is still required", () => {
 // WhatsApp Flow feature, found while integrating it). These tests prove the fix without ever asserting on,
 // or printing, a real value. (Mission 49 moved MIMO_SA_* from REQUIRED to RECOMMENDED — see the dedicated
 // tests below — but they must still round-trip into .env when supplied, which this test still covers.)
-test("CLI: FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* survive filtering and are written, never printed", () => {
+// FINANCE_EMAIL/FINANCE_PASSWORD moved to Secret Manager (functions/index.js binds them): they must NEVER be
+// written to the plain .env any more, so nobody with console or CI-log access can read them.
+test("CLI: MIMO_SA_* still round-trip into .env, FINANCE_EMAIL/FINANCE_PASSWORD are left to Secret Manager, nothing is printed", () => {
   const r = run(GOOD);
   assert.strictEqual(r.status, 0, r.stderr);
   const writtenEnv = parseDotenv(fs.readFileSync(r.out, "utf8"));
-  for (const k of ["FINANCE_EMAIL", "FINANCE_PASSWORD", "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY"]) {
+  for (const k of ["MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY"]) {
     assert.strictEqual(writtenEnv[k], GOOD[k], `${k} did not round-trip into .env`);
+  }
+  for (const k of ["FINANCE_EMAIL", "FINANCE_PASSWORD"]) {
+    assert.ok(!(k in writtenEnv), `${k} must come from Secret Manager, not the plain .env`);
   }
   const shown = r.stdout.replace(/::add-mask::.*/g, "");
   for (const k of ["FINANCE_EMAIL", "FINANCE_PASSWORD", "MIMO_SA_PROJECT_ID", "MIMO_SA_CLIENT_EMAIL", "MIMO_SA_PRIVATE_KEY"]) {
@@ -172,14 +177,13 @@ test("CLI: FINANCE_EMAIL/FINANCE_PASSWORD/MIMO_SA_* survive filtering and are wr
   }
 });
 
-test("CLI: missing FINANCE_EMAIL/FINANCE_PASSWORD fails closed (exit 1), naming the keys but not any value", () => {
+test("CLI: a missing FINANCE_EMAIL/FINANCE_PASSWORD in CI config does not block a deploy (they are Secret Manager secrets)", () => {
   const { FINANCE_EMAIL, FINANCE_PASSWORD, ...rest } = GOOD;
   const r = run(rest);
-  assert.strictEqual(r.status, 1);
-  for (const k of ["FINANCE_EMAIL", "FINANCE_PASSWORD"]) {
-    assert.ok(r.stderr.includes(k), `${k} should be named as missing`);
-  }
-  assert.ok(!r.written);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.ok(r.stdout.includes("FINANCE_EMAIL") && r.stdout.includes("FINANCE_PASSWORD"), "the Secret Manager notice should name them");
+  const writtenEnv = parseDotenv(fs.readFileSync(r.out, "utf8"));
+  assert.ok(!("FINANCE_PASSWORD" in writtenEnv));
 });
 
 // Mission 49: config/firebase.js falls back to Application Default Credentials (the Cloud Run service's

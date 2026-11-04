@@ -22,6 +22,7 @@ const passwordsMatch = (a, b) => {
 };
 
 // ================= ADMIN AUTH =================
+const STAFF_TOKEN_TTL = "12h";
 const postAdminLogin = (req, res) => {
   const { email, username, password } = req.body;
 
@@ -34,19 +35,16 @@ const postAdminLogin = (req, res) => {
   const reqIdentifier = (email || username || "").trim();
   const reqPassword   = (password || "").trim();
 
-  // Admin credentials
-  const isAdminMatch =
-    (envAdminEmail && reqIdentifier.toLowerCase() === envAdminEmail.toLowerCase()) ||
-    reqIdentifier.toLowerCase() === "mimo.admin" ||
-    reqIdentifier.toLowerCase() === "admin@printmimo.tech";
-
-  const isAdminPassMatch =
-    (envAdminPassword && passwordsMatch(reqPassword, envAdminPassword)) ||
-    passwordsMatch(reqPassword, "admin123") ||
-    passwordsMatch(reqPassword, "admin");
+  // Admin credentials. ONLY the values from Secret Manager (ADMIN_EMAIL / ADMIN_PASSWORD) are accepted: this
+  // repository is public, so no built-in identity or password may exist in source (there used to be a
+  // "mimo.admin" / "admin123" fallback that let anyone who read the code log in to production as admin).
+  // Both checks always run so the response time does not reveal which half was wrong.
+  const isAdminMatch = Boolean(envAdminEmail) && reqIdentifier.toLowerCase() === envAdminEmail.toLowerCase();
+  const isAdminPassMatch = Boolean(envAdminPassword) && passwordsMatch(reqPassword, envAdminPassword);
 
   if (isAdminMatch && isAdminPassMatch) {
-    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, getSecretKey(), { expiresIn: "30d" });
+    // 12 h, not 30 d: a stolen or shared token stops working the same day.
+    const token = jwt.sign({ isAdmin: true, role: "admin", email: reqIdentifier }, getSecretKey(), { expiresIn: STAFF_TOKEN_TTL });
     return res.json({ token, role: "admin", message: "Admin Login Successful" });
   }
 
@@ -57,7 +55,7 @@ const postAdminLogin = (req, res) => {
     reqIdentifier.toLowerCase() === envFinanceEmail.toLowerCase() &&
     passwordsMatch(reqPassword, envFinancePassword)
   ) {
-    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, getSecretKey(), { expiresIn: "30d" });
+    const token = jwt.sign({ isAdmin: false, role: "finance", email: reqIdentifier }, getSecretKey(), { expiresIn: STAFF_TOKEN_TTL });
     return res.json({ token, role: "finance", message: "Finance Login Successful" });
   }
 
