@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Printer, Wifi, WifiOff, Loader2, PackagePlus, Droplets, Power, Sparkles, Eye, EyeOff } from 'lucide-react';
+import { Printer, Wifi, WifiOff, Loader2, PackagePlus, Droplets, Power, Sparkles, Eye, EyeOff, Tv } from 'lucide-react';
 import api from '../../api';
 import { useRange } from '../../context/RangeContext';
 import { useLiveQuery, errorMessage } from '../../hooks/useLiveQuery';
@@ -190,6 +190,13 @@ export const KiosksPage: React.FC = () => {
               {k.cleaning && <CleanStatus c={k.cleaning} />}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
+              <a
+                href={`/admin/configuration?kioskId=${k.kioskId}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border border-purple-500/30 text-purple-600 hover:bg-purple-500/10 cursor-pointer transition-colors"
+                title={`Configure screensaver playlist for ${k.kioskId}`}
+              >
+                <Tv size={12} /> Screensaver
+              </a>
               <button
                 type="button"
                 onClick={() => setConfirmRestart(k)}

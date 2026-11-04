@@ -40,12 +40,39 @@ const getApiSettings = async (req, res) => {
 
 const getApiScreensaver = async (req, res) => {
   try {
+    const { kioskId } = req.query || {};
+
+    if (kioskId) {
+      const cleanKioskId = String(kioskId).trim().toUpperCase();
+      const kioskDoc = await db.collection("kiosk_screensavers").doc(cleanKioskId).get();
+      if (kioskDoc.exists) {
+        const kData = kioskDoc.data() || {};
+        const kVideos = Array.isArray(kData.videos)
+          ? kData.videos.map(normalizeMediaUrl).filter(Boolean)
+          : [];
+
+        // If custom videos exist and fallback is not explicitly forced, serve kiosk-specific config
+        if (!kData.useGlobalFallback && kVideos.length > 0) {
+          return res.json({
+            kioskId: cleanKioskId,
+            videos: kVideos,
+            playSound: typeof kData.playSound === "boolean" ? kData.playSound : false,
+            idleTimeoutSeconds: kData.idleTimeoutSeconds || 60,
+            isCustom: true
+          });
+        }
+      }
+    }
+
+    // Fallback: Global screensaver
     const doc = await db.collection("mimo_settings").doc("screensaver").get();
     if (!doc.exists) {
       return res.json({
+        kioskId: kioskId ? String(kioskId).trim().toUpperCase() : null,
         videos: [],
         playSound: true,
-        idleTimeoutSeconds: 60
+        idleTimeoutSeconds: 60,
+        isFallback: true
       });
     }
     const data = doc.data() || {};
@@ -54,9 +81,11 @@ const getApiScreensaver = async (req, res) => {
       : [];
     res.json({
       ...data,
+      kioskId: kioskId ? String(kioskId).trim().toUpperCase() : null,
       videos,
       playSound: typeof data.playSound === "boolean" ? data.playSound : true,
-      idleTimeoutSeconds: data.idleTimeoutSeconds || 60
+      idleTimeoutSeconds: data.idleTimeoutSeconds || 60,
+      isFallback: !!kioskId
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

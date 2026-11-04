@@ -344,6 +344,7 @@ function App() {
       {/* ================= SCREENSAVER ================= */}
       <Adds 
         isActive={showScreensaver} 
+        kioskId={dynamicKioskId} 
         onTap={() => setShowScreensaver(false)} 
         onTimeoutChange={(sec) => setIdleTimeout(sec)} 
       />

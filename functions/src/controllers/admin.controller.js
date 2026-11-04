@@ -136,11 +136,73 @@ const postAdminSettings = async (req, res) => {
 
 const getAdminScreensaver = async (req, res) => {
   try {
+    const { kioskId } = req.query || {};
+
+    if (kioskId && kioskId !== "global" && kioskId !== "all") {
+      const cleanKioskId = String(kioskId).trim().toUpperCase();
+      const doc = await db.collection("kiosk_screensavers").doc(cleanKioskId).get();
+      if (doc.exists) {
+        const data = doc.data() || {};
+        const videos = Array.isArray(data.videos)
+          ? data.videos.map(normalizeMediaUrl).filter(Boolean)
+          : [];
+        return res.json({
+          kioskId: cleanKioskId,
+          videos,
+          playSound: typeof data.playSound === "boolean" ? data.playSound : false,
+          idleTimeoutSeconds: data.idleTimeoutSeconds || 60,
+          useGlobalFallback: Boolean(data.useGlobalFallback),
+          isCustom: true,
+          updatedAt: data.updatedAt || null,
+        });
+      }
+
+      // Kiosk not yet customized: provide safe template with fallback enabled
+      return res.json({
+        kioskId: cleanKioskId,
+        videos: [],
+        playSound: false,
+        idleTimeoutSeconds: 60,
+        useGlobalFallback: true,
+        isCustom: false,
+      });
+    }
+
+    if (kioskId === "all") {
+      const [globalDoc, kiosksSnap] = await Promise.all([
+        db.collection("mimo_settings").doc("screensaver").get(),
+        db.collection("kiosk_screensavers").get(),
+      ]);
+
+      const globalData = globalDoc.exists ? globalDoc.data() : { videos: [], playSound: false, idleTimeoutSeconds: 60 };
+      const kiosks = {};
+      kiosksSnap.forEach((doc) => {
+        const d = doc.data() || {};
+        kiosks[doc.id] = {
+          kioskId: doc.id,
+          videos: Array.isArray(d.videos) ? d.videos.map(normalizeMediaUrl).filter(Boolean) : [],
+          playSound: typeof d.playSound === "boolean" ? d.playSound : false,
+          idleTimeoutSeconds: d.idleTimeoutSeconds || 60,
+          useGlobalFallback: Boolean(d.useGlobalFallback),
+          updatedAt: d.updatedAt || null,
+        };
+      });
+
+      return res.json({
+        global: {
+          videos: Array.isArray(globalData.videos) ? globalData.videos.map(normalizeMediaUrl).filter(Boolean) : [],
+          playSound: typeof globalData.playSound === "boolean" ? globalData.playSound : false,
+          idleTimeoutSeconds: globalData.idleTimeoutSeconds || 60,
+        },
+        kiosks,
+      });
+    }
+
     const doc = await db.collection("mimo_settings").doc("screensaver").get();
     if (!doc.exists) {
       return res.json({
         videos: [],
-        playSound: true,
+        playSound: false,
         idleTimeoutSeconds: 60
       });
     }
@@ -151,7 +213,7 @@ const getAdminScreensaver = async (req, res) => {
     res.json({
       ...data,
       videos,
-      playSound: typeof data.playSound === "boolean" ? data.playSound : true,
+      playSound: typeof data.playSound === "boolean" ? data.playSound : false,
       idleTimeoutSeconds: data.idleTimeoutSeconds || 60
     });
   } catch (err) {
@@ -165,7 +227,7 @@ const getAdminScreensaver = async (req, res) => {
 const ADMIN_UPLOAD_PREFIXES = { screensaver: "screensaver", ads: "ads" };
 const postGetAdminUploadUrl = async (req, res) => {
   try {
-    const { fileName, contentType, purpose } = req.body || {};
+    const { fileName, contentType, purpose, kioskId } = req.body || {};
     const prefix = ADMIN_UPLOAD_PREFIXES[purpose];
     if (!prefix) {
       return res.status(400).json({ error: `purpose must be one of: ${Object.keys(ADMIN_UPLOAD_PREFIXES).join(", ")}` });
@@ -174,7 +236,10 @@ const postGetAdminUploadUrl = async (req, res) => {
       return res.status(500).json({ error: "Storage is not configured." });
     }
     const safeName = String(fileName || "file").split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]/g, "_").slice(-150) || "file";
-    const objectPath = `${prefix}/${Date.now()}_${safeName}`;
+    const subFolder = (purpose === "screensaver" && kioskId && kioskId !== "global")
+      ? `${prefix}/${String(kioskId).trim().toUpperCase()}`
+      : prefix;
+    const objectPath = `${subFolder}/${Date.now()}_${safeName}`;
     const bucket = admin.storage().bucket();
     const [uploadUrl] = await bucket.file(objectPath).getSignedUrl({
       version: "v4",
@@ -196,7 +261,7 @@ const postGetAdminUploadUrl = async (req, res) => {
 
 const postAdminScreensaver = async (req, res) => {
   try {
-    const { videos, playSound, idleTimeoutSeconds } = req.body;
+    const { kioskId, videos, playSound, idleTimeoutSeconds, useGlobalFallback } = req.body;
     const sanitizedVideos = Array.isArray(videos)
       ? videos
           .filter((v) => typeof v === 'string' && v.trim().length > 0)
@@ -204,6 +269,19 @@ const postAdminScreensaver = async (req, res) => {
           .filter(Boolean)
       : [];
     const clampedTimeout = Math.min(Math.max(Number(idleTimeoutSeconds) || 60, 10), 600);
+
+    if (kioskId && kioskId !== "global") {
+      const cleanKioskId = String(kioskId).trim().toUpperCase();
+      await db.collection("kiosk_screensavers").doc(cleanKioskId).set({
+        kioskId: cleanKioskId,
+        videos: sanitizedVideos,
+        playSound: Boolean(playSound),
+        idleTimeoutSeconds: clampedTimeout,
+        useGlobalFallback: Boolean(useGlobalFallback),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      return res.json({ success: true, kioskId: cleanKioskId });
+    }
 
     await db.collection("mimo_settings").doc("screensaver").set({
       videos: sanitizedVideos,

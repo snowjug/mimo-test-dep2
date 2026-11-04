@@ -6,6 +6,7 @@ interface AddsProps {
   isActive: boolean;
   onTap: () => void;
   onTimeoutChange?: (seconds: number) => void;
+  kioskId?: string | null;
 }
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
@@ -37,11 +38,11 @@ export function resolveScreensaverMediaUrl(rawUrl: string): string {
   return trimmed;
 }
 
-export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
+export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [videos, setVideos] = useState<string[]>([]);
   const [playSound, setPlaySound] = useState(false);
-  const [isMutedFallback, setIsMutedFallback] = useState(true);
+  const [isMutedFallback, setIsMutedFallback] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [currentTimeStr, setCurrentTimeStr] = useState('');
   const [currentDateStr, setCurrentDateStr] = useState('');
@@ -75,6 +76,43 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
   // Fetch dynamic screen saver configuration directly from Firestore or admin backend
   useEffect(() => {
     const fetchScreenSaverConfig = async () => {
+      const cleanKioskId = kioskId ? kioskId.trim().toUpperCase() : null;
+
+      // 1. Try Firestore REST: per-kiosk document first if kioskId is present
+      if (cleanKioskId) {
+        try {
+          const fsKioskRes = await fetch(
+            `https://firestore.googleapis.com/v1/projects/mimo-v2-11868/databases/(default)/documents/kiosk_screensavers/${encodeURIComponent(cleanKioskId)}`
+          );
+          if (fsKioskRes.ok) {
+            const docData = await fsKioskRes.json();
+            const fields = docData.fields || {};
+            const isFallback = fields.useGlobalFallback?.booleanValue;
+            const values = fields.videos?.arrayValue?.values;
+
+            if (!isFallback && values && Array.isArray(values) && values.length > 0) {
+              const videoUrls = values
+                .map((v: any) => resolveScreensaverMediaUrl(v.stringValue))
+                .filter(Boolean);
+              if (videoUrls.length > 0) {
+                setVideos(videoUrls);
+                if (fields.playSound && typeof fields.playSound.booleanValue === 'boolean') {
+                  setPlaySound(fields.playSound.booleanValue);
+                }
+                if (fields.idleTimeoutSeconds && onTimeoutChange) {
+                  const sec = parseInt(fields.idleTimeoutSeconds.integerValue || '60', 10);
+                  if (sec > 0) onTimeoutChange(sec);
+                }
+                return;
+              }
+            }
+          }
+        } catch (fsKioskErr) {
+          console.warn(`Firestore REST per-kiosk fetch error for ${cleanKioskId}:`, fsKioskErr);
+        }
+      }
+
+      // 2. Try Firestore REST for Global Default screensaver
       try {
         const fsRes = await fetch(
           "https://firestore.googleapis.com/v1/projects/mimo-v2-11868/databases/(default)/documents/mimo_settings/screensaver"
@@ -104,11 +142,15 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
           return;
         }
       } catch (fsErr) {
-        console.warn("Firestore REST fetch error, falling back to backend API:", fsErr);
+        console.warn("Firestore REST global fetch error, falling back to backend API:", fsErr);
       }
 
+      // 3. Fallback to Backend API (which also handles per-kiosk resolution and fallback)
       try {
-        const res = await fetch(`${BACKEND_URL}/api/screensaver`);
+        const targetUrl = cleanKioskId
+          ? `${BACKEND_URL}/api/screensaver?kioskId=${encodeURIComponent(cleanKioskId)}`
+          : `${BACKEND_URL}/api/screensaver`;
+        const res = await fetch(targetUrl);
         if (res.ok) {
           const data = await res.json();
           if (data.videos && Array.isArray(data.videos) && data.videos.length > 0) {
@@ -134,7 +176,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
     fetchScreenSaverConfig();
     const interval = setInterval(fetchScreenSaverConfig, 30000); // Re-check config every 30 seconds
     return () => clearInterval(interval);
-  }, [onTimeoutChange]);
+  }, [kioskId, onTimeoutChange]);
 
   // Teardown video element and frame buffers cleanly to prevent Pi memory leak
   const purgeVideoBuffers = useCallback(() => {
@@ -165,6 +207,7 @@ export function Adds({ isActive, onTap, onTimeoutChange }: AddsProps) {
     if (isActive) {
       setCurrentVideoIndex(0);
       setIsVideoReady(false);
+      setIsMutedFallback(false);
     } else {
       purgeVideoBuffers();
     }
