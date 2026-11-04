@@ -8,6 +8,7 @@ const A = require("../services/analytics.service");
 const { resolveRefunds, cashfreeRefundFetcher } = require("../services/refundSync.service");
 const R = require("../services/machineRegistry.service");
 const C = require("../services/issueCategories.service");
+const { cachedValue } = require("../utils/scanCache");
 
 // Cashfree refund lookups for the history (manual refunds made in the Cashfree app). Tests swap this out.
 let fetchCashfreeRefunds = (orderId) => {
@@ -467,12 +468,14 @@ const getAdminIncidents = async (req, res) => {
     const [kiosks, failedSnap, refundSnap] = await Promise.all([
       loadKiosks(range),
       // Range filter only: adding an `in` filter on status would need a composite index (which needs console access).
-      db.collection("print_jobs")
+      // Up to MAX_DOCS_PER_COLLECTION reads per call and the dashboard re-asks on every load, so share one read per
+      // range between callers/instances' repeat loads (same short TTL as the analytics window; off under tests).
+      cachedValue(`incidents:jobs:${range.from}:${range.to}`, () => db.collection("print_jobs")
         .where("createdAt", ">=", Timestamp.fromMillis(range.from))
         .where("createdAt", "<", Timestamp.fromMillis(range.to))
         .orderBy("createdAt", "desc")
         .limit(A.MAX_DOCS_PER_COLLECTION)
-        .get(),
+        .get(), 5 * 60 * 1000),
       db.collection("refund_requests").where("status", "==", "pending").limit(100).get(),
     ]);
 

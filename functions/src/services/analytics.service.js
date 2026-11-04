@@ -468,7 +468,7 @@ function breakdowns({ orders, jobs }, range, { machines = null, issues = null } 
 
 // Analytics, transactions, kiosks and the monthly summary all load the same windows; a dashboard load reads
 // thousands of documents per window, so identical windows within this TTL share one Firestore read.
-const WINDOW_CACHE_MS = 2 * 60 * 1000;
+const WINDOW_CACHE_MS = 5 * 60 * 1000;
 
 /** Loads every document created inside [fromMs, toMs). `db` and `Timestamp` are injected. */
 function loadWindow(db, Timestamp, fromMs, toMs) {

@@ -65,3 +65,23 @@ test("cachedValue is a pass-through while running under node --test", async () =
   await cachedValue("k", c.load);
   assert.strictEqual(c.calls, 2);
 });
+
+// Cost guard: a dashboard re-open within the dashboards' 20-minute refresh cycle must not re-read whole
+// collections. Pins the default TTL so a well-meaning "make it fresher" change fails loudly in CI.
+test("default scan cache TTL keeps entries alive for at least 10 minutes", withCacheEnabled(async () => {
+  const real = Date.now;
+  const c = counter();
+  try {
+    let now = real.call(Date);
+    Date.now = () => now;
+    await cachedValue("collection:orders", c.load);
+    now += 10 * 60 * 1000;
+    await cachedValue("collection:orders", c.load);
+    assert.strictEqual(c.calls, 1, "a read 10 minutes later should still be served from the cache");
+    now += 6 * 60 * 1000; // 16 min total: past the 15 min default
+    await cachedValue("collection:orders", c.load);
+    assert.strictEqual(c.calls, 2, "after the TTL the data must be reloaded");
+  } finally {
+    Date.now = real;
+  }
+}));

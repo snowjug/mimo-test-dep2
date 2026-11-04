@@ -3,7 +3,9 @@
 // read, so a few open dashboard tabs auto-refreshing cost millions of reads a day. Entries expire on a
 // TTL, and concurrent callers share one in-flight read. Never use this for anything on the print,
 // payment or kiosk paths — those must always see live data.
-const TTL_MS = Number(process.env.ADMIN_SCAN_CACHE_TTL_MS ?? 5 * 60 * 1000);
+// 15 min: the dashboards auto-refresh every 20 min, and a cold Cloud Run instance re-reads whole collections, so a
+// short TTL turned every dashboard open into tens of thousands of reads (see the Nov 2026 read-burst investigation).
+const TTL_MS = Number(process.env.ADMIN_SCAN_CACHE_TTL_MS ?? 15 * 60 * 1000);
 
 // Off under `node --test` (NODE_TEST_CONTEXT) so cached snapshots can't leak between test cases.
 const disabled = () => TTL_MS <= 0 || process.env.NODE_ENV === "test" || !!process.env.NODE_TEST_CONTEXT;
