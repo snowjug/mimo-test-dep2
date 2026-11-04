@@ -1,14 +1,14 @@
 {
   ".claude/settings.json": {
-    "mtime": 1792257790.2220879,
-    "seen": 1793682792.230905,
-    "ast_hash": "3b541b9935fcf0831355da956f897645",
-    "semantic_hash": "3b541b9935fcf0831355da956f897645"
+    "mtime": 1793814958.6081707,
+    "seen": 1793815279.161249,
+    "ast_hash": "2a6ca537afe1955d2a6c3a12006fd471",
+    "semantic_hash": ""
   },
   ".github/scripts/__tests__/functions-env.test.js": {
-    "mtime": 1792999906.659838,
-    "seen": 1793682792.230907,
-    "ast_hash": "bf71b02077cdb9c2bf949eccb0d6f5f4",
+    "mtime": 1793814931.5162916,
+    "seen": 1793815279.161251,
+    "ast_hash": "5d9a7444f7dbd900c95a367be24d2e52",
     "semantic_hash": ""
   },
   ".github/scripts/__tests__/secret-scan.test.js": {
@@ -18,9 +18,9 @@
     "semantic_hash": "78ac0cb4abadbca01605c6661c2b281b"
   },
   ".github/scripts/functions-env.js": {
-    "mtime": 1792999906.6602397,
-    "seen": 1793682792.23091,
-    "ast_hash": "20d461bbbe9dc6e4a83cc2e5683781e2",
+    "mtime": 1793814712.783045,
+    "seen": 1793815279.161254,
+    "ast_hash": "2e6fa5d7ef134b8afb73988fee8684ac",
     "semantic_hash": ""
   },
   ".github/scripts/secret-scan.js": {
@@ -126,8 +126,8 @@
     "semantic_hash": "d56d83fdc358c86ba0ac6e5ccf633503"
   },
   "functions/__tests__/adminKiosksAndJobs.test.js": {
-    "mtime": 1793682643.6442018,
-    "seen": 1793682792.230929,
+    "mtime": 1793691171.7052157,
+    "seen": 1793813731.810792,
     "ast_hash": "0ecf69902eb71ebea447891397866af3",
     "semantic_hash": ""
   },
@@ -204,9 +204,9 @@
     "semantic_hash": "64965803c6e265ae83ee9256531a0068"
   },
   "functions/__tests__/fixtures/route-table.json": {
-    "mtime": 1793681992.9369738,
-    "seen": 1793682792.230945,
-    "ast_hash": "55cdf2666afff7bc2539f4d4c9d890ad",
+    "mtime": 1793814781.789037,
+    "seen": 1793815279.161288,
+    "ast_hash": "e983a728254102dd15fa1a1ea25ff51c",
     "semantic_hash": ""
   },
   "functions/__tests__/googleSheets.test.js": {
@@ -228,8 +228,8 @@
     "semantic_hash": "53ebfe60e6ce8e5e5c94fddf3052d242"
   },
   "functions/__tests__/helpers/fakeFirestore.js": {
-    "mtime": 1793682378.5432982,
-    "seen": 1793682792.230953,
+    "mtime": 1793691171.7056215,
+    "seen": 1793813731.810817,
     "ast_hash": "8d5bfdfbf8bc9161220eab99723146c2",
     "semantic_hash": ""
   },
@@ -474,20 +474,20 @@
     "semantic_hash": "ec21bd2d7eb589499ab13a18cd3f7656"
   },
   "functions/dev.js": {
-    "mtime": 1793682466.927214,
-    "seen": 1793682792.231005,
+    "mtime": 1793691171.7062392,
+    "seen": 1793813731.810869,
     "ast_hash": "b380162441a8feb5c0cabfc631356ef7",
     "semantic_hash": ""
   },
   "functions/index.js": {
-    "mtime": 1793682626.2642806,
-    "seen": 1793682792.231006,
-    "ast_hash": "dd146ecf4f0d3d12f8634ac0768fe9c2",
+    "mtime": 1793814708.3077006,
+    "seen": 1793815279.1613472,
+    "ast_hash": "9eba66218f3482b737b660e50d5bf4c4",
     "semantic_hash": ""
   },
   "functions/package.json": {
-    "mtime": 1793682478.2313304,
-    "seen": 1793682792.231006,
+    "mtime": 1793691171.7070298,
+    "seen": 1793813731.8108711,
     "ast_hash": "dcab4f3aacdacd59b51c26dbe07bc319",
     "semantic_hash": ""
   },
@@ -504,27 +504,15 @@
     "semantic_hash": ""
   },
   "functions/src/controllers/admin.controller.js": {
-    "mtime": 1793681992.9385695,
-    "seen": 1793682792.2310112,
-    "ast_hash": "3d66d6a4492d77fb66c8bb6dd40c5d0c",
+    "mtime": 1793814540.3318496,
+    "seen": 1793815279.161352,
+    "ast_hash": "07feb7b7dcd5c8970ea0bf825873ccc2",
     "semantic_hash": ""
   },
-  "functions/src/controllers/adminGang.controller.js": {
-    "mtime": 1791652609.1831877,
-    "seen": 1792255376.8530009,
-    "ast_hash": "2e9ef4a52bc8ff3bb0291fa19e7c3ef5",
-    "semantic_hash": "2e9ef4a52bc8ff3bb0291fa19e7c3ef5"
-  },
-  "functions/src/controllers/adminHr.controller.js": {
-    "mtime": 1791616200.657706,
-    "seen": 1792255376.8530009,
-    "ast_hash": "98b87c23b2b47c75de5a0f0896e5e429",
-    "semantic_hash": "98b87c23b2b47c75de5a0f0896e5e429"
-  },
   "functions/src/controllers/adminInsights.controller.js": {
-    "mtime": 1793682451.3842294,
-    "seen": 1793682792.2310138,
-    "ast_hash": "c9cacb7f04eb5775eefd0f6eef462b68",
+    "mtime": 1793813748.1835415,
+    "seen": 1793815279.1613529,
+    "ast_hash": "8190827cab711c7f61af506c1f736707",
     "semantic_hash": ""
   },
   "functions/src/controllers/adminReports.controller.js": {
@@ -550,12 +538,6 @@
     "seen": 1792255376.8530052,
     "ast_hash": "d4110951c6d1f8df41107bbd0873ebfb",
     "semantic_hash": "d4110951c6d1f8df41107bbd0873ebfb"
-  },
-  "functions/src/controllers/hr.controller.js": {
-    "mtime": 1792999906.671268,
-    "seen": 1793682792.231018,
-    "ast_hash": "c288aa65327ae51195dc1dc5c149faac",
-    "semantic_hash": ""
   },
   "functions/src/controllers/kioskCommands.controller.js": {
     "mtime": 1793681992.9391842,
@@ -598,12 +580,6 @@
     "seen": 1792255376.85301,
     "ast_hash": "fc90a3a86f6c9b804a3455fd70727870",
     "semantic_hash": "fc90a3a86f6c9b804a3455fd70727870"
-  },
-  "functions/src/controllers/technical.controller.js": {
-    "mtime": 1792999906.6720319,
-    "seen": 1793682792.231025,
-    "ast_hash": "f065deac6e1d66e056fed23c48ce5984",
-    "semantic_hash": ""
   },
   "functions/src/controllers/technicalTools.controller.js": {
     "mtime": 1792257790.237395,
@@ -648,9 +624,9 @@
     "semantic_hash": "4977518796b42af8dab69a6b20d56b81"
   },
   "functions/src/middleware/auth.js": {
-    "mtime": 1792999906.673229,
-    "seen": 1793682792.2310379,
-    "ast_hash": "f9cef11f5fedaf52357cd16dcc9a483a",
+    "mtime": 1793814769.474928,
+    "seen": 1793815279.161376,
+    "ast_hash": "88eaceab862b3988b7f6b88e27775e7d",
     "semantic_hash": ""
   },
   "functions/src/middleware/rateLimit.js": {
@@ -660,21 +636,15 @@
     "semantic_hash": ""
   },
   "functions/src/routes/admin.routes.js": {
-    "mtime": 1793681992.9412649,
-    "seen": 1793682792.23104,
-    "ast_hash": "f86d84f15b513643e386707742121ff8",
+    "mtime": 1793814744.2449627,
+    "seen": 1793815279.1613781,
+    "ast_hash": "ac99621a9e3482a34f462c291d0a9ecc",
     "semantic_hash": ""
   },
   "functions/src/routes/auth.routes.js": {
     "mtime": 1792274513.4716349,
     "seen": 1793682792.231041,
     "ast_hash": "6a3e681c2a3009657f3634fb1d99a476",
-    "semantic_hash": ""
-  },
-  "functions/src/routes/hr.routes.js": {
-    "mtime": 1792274513.4723215,
-    "seen": 1793682792.231043,
-    "ast_hash": "7c0c38aaabc531b4e4ace59d21fedcfe",
     "semantic_hash": ""
   },
   "functions/src/routes/kiosk.routes.js": {
@@ -707,12 +677,6 @@
     "ast_hash": "18b6e4b06438e31056c8ec6d27c19a23",
     "semantic_hash": ""
   },
-  "functions/src/routes/technical.routes.js": {
-    "mtime": 1792274513.473517,
-    "seen": 1793682792.231049,
-    "ast_hash": "25a00130d9be2f0738354272334696c3",
-    "semantic_hash": ""
-  },
   "functions/src/routes/upload.routes.js": {
     "mtime": 1792299606.7062252,
     "seen": 1793682792.23105,
@@ -732,15 +696,15 @@
     "semantic_hash": "004df2a4a3a3b45d9a84b218b0c0f34c"
   },
   "functions/src/server.js": {
-    "mtime": 1792999906.6742585,
-    "seen": 1793682792.231053,
-    "ast_hash": "b418c22b7acfdaca396a2aa4824ed0f2",
+    "mtime": 1793814723.26281,
+    "seen": 1793815279.161389,
+    "ast_hash": "c78ecfc46750a1c9e82f2a7348793bbe",
     "semantic_hash": ""
   },
   "functions/src/services/analytics.service.js": {
-    "mtime": 1793682427.6060388,
-    "seen": 1793682792.231054,
-    "ast_hash": "6f083649cffdeaffbe4efd6665fddc7a",
+    "mtime": 1793813748.1838062,
+    "seen": 1793815279.16139,
+    "ast_hash": "a13aeb2593d3f548c8a07d019acdbe5b",
     "semantic_hash": ""
   },
   "functions/src/services/cashfreeSettlement.service.js": {
@@ -1074,9 +1038,9 @@
     "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/App.tsx": {
-    "mtime": 1792999906.718367,
-    "seen": 1793682792.231126,
-    "ast_hash": "6506299911877a0f77ef5c9238131e0f",
+    "mtime": 1793814811.2807271,
+    "seen": 1793815279.161459,
+    "ast_hash": "2edeadb5d8adc8595ac5d764a26d2edb",
     "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/api.ts": {
@@ -1097,12 +1061,6 @@
     "ast_hash": "21cb466c2ecd635e73e66ccc9a18d925",
     "semantic_hash": "21cb466c2ecd635e73e66ccc9a18d925"
   },
-  "mimo-website/mimo-admin-dashboard/src/components/auth/HrLoginPage.tsx": {
-    "mtime": 1791616601.9064732,
-    "seen": 1792255376.853083,
-    "ast_hash": "97d84225cd799e487d7b7855ef3a1c5b",
-    "semantic_hash": "97d84225cd799e487d7b7855ef3a1c5b"
-  },
   "mimo-website/mimo-admin-dashboard/src/components/auth/MarketingLoginPage.tsx": {
     "mtime": 1791616610.317433,
     "seen": 1792255376.8530838,
@@ -1110,22 +1068,10 @@
     "semantic_hash": "66cf08c11b2981ad74783d8ce41b6261"
   },
   "mimo-website/mimo-admin-dashboard/src/components/auth/StaffLogin.tsx": {
-    "mtime": 1791616516.283563,
-    "seen": 1792255376.853085,
-    "ast_hash": "831a26af55044ddb78d8d85ed097de3a",
-    "semantic_hash": "831a26af55044ddb78d8d85ed097de3a"
-  },
-  "mimo-website/mimo-admin-dashboard/src/components/auth/TechnicalLoginPage.tsx": {
-    "mtime": 1791610701.2262108,
-    "seen": 1792255376.853086,
-    "ast_hash": "e2535dc0748976887ccf7d12a9be3220",
-    "semantic_hash": "e2535dc0748976887ccf7d12a9be3220"
-  },
-  "mimo-website/mimo-admin-dashboard/src/components/gang/ContributionGraph.tsx": {
-    "mtime": 1791791773.3470106,
-    "seen": 1792255376.853086,
-    "ast_hash": "a23844c502e820011833ada907e80516",
-    "semantic_hash": "a23844c502e820011833ada907e80516"
+    "mtime": 1793814829.5239627,
+    "seen": 1793815279.161463,
+    "ast_hash": "a7aa9410c8a35f14a049f10180783210",
+    "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/components/history/PrintHistory.tsx": {
     "mtime": 1791893631.1825461,
@@ -1146,9 +1092,9 @@
     "semantic_hash": "8128681c36018a617406a30b2124f418"
   },
   "mimo-website/mimo-admin-dashboard/src/components/layout/AdminLayout.tsx": {
-    "mtime": 1793682717.364428,
-    "seen": 1793682792.231137,
-    "ast_hash": "059ed538f05c10825a6b920fd2489428",
+    "mtime": 1793814850.3947077,
+    "seen": 1793815279.1614668,
+    "ast_hash": "c9cd1516dfab037be69503197699ef63",
     "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/components/layout/AppShell.tsx": {
@@ -1164,9 +1110,9 @@
     "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/components/layout/Sidebar.tsx": {
-    "mtime": 1792999906.7224708,
-    "seen": 1793682792.2311392,
-    "ast_hash": "c4e32a8e4e1cf7409738fa7741c74322",
+    "mtime": 1793814841.6626523,
+    "seen": 1793815279.161469,
+    "ast_hash": "92a37ec573fd616662f612aa5ba81bbb",
     "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/components/shared/ChatPanel.tsx": {
@@ -1230,8 +1176,8 @@
     "semantic_hash": "493e3efe23f5d36efa3e47bdb00661d4"
   },
   "mimo-website/mimo-admin-dashboard/src/hooks/useLiveQuery.ts": {
-    "mtime": 1793682717.364603,
-    "seen": 1793682792.231149,
+    "mtime": 1793691171.7181797,
+    "seen": 1793813731.811007,
     "ast_hash": "848f5ba09de4125a868aee3091772a4d",
     "semantic_hash": ""
   },
@@ -1283,12 +1229,6 @@
     "ast_hash": "5115fb626d73d4d19d82b3f65f1bfe7f",
     "semantic_hash": "5115fb626d73d4d19d82b3f65f1bfe7f"
   },
-  "mimo-website/mimo-admin-dashboard/src/pages/Company/AdminCompanyPage.tsx": {
-    "mtime": 1791796066.7350535,
-    "seen": 1792255376.853106,
-    "ast_hash": "4d782c96c6f5c833664f48dfd6acf006",
-    "semantic_hash": "4d782c96c6f5c833664f48dfd6acf006"
-  },
   "mimo-website/mimo-admin-dashboard/src/pages/Configuration/ConfigurationPage.tsx": {
     "mtime": 1793681992.9475906,
     "seen": 1793682792.231158,
@@ -1302,14 +1242,14 @@
     "semantic_hash": "2d8c015d4b310e1cae9908603d971d3a"
   },
   "mimo-website/mimo-admin-dashboard/src/pages/Finance/FinanceApp.tsx": {
-    "mtime": 1793682717.3648088,
-    "seen": 1793682792.2311602,
+    "mtime": 1793691171.718961,
+    "seen": 1793813731.811017,
     "ast_hash": "32cb820f92da7e42ec08aeb905fb7c21",
     "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/pages/Finance/FinancePage.tsx": {
-    "mtime": 1793682717.3650439,
-    "seen": 1793682792.231161,
+    "mtime": 1793691171.7204087,
+    "seen": 1793813731.811017,
     "ast_hash": "304f3036146eba7a7fe3c52c847ff8bb",
     "semantic_hash": ""
   },
@@ -1350,8 +1290,8 @@
     "semantic_hash": "fd04caf404b6e8217759c80c6229291b"
   },
   "mimo-website/mimo-admin-dashboard/src/pages/Finance/layout/FinanceSidebar.tsx": {
-    "mtime": 1793682717.365241,
-    "seen": 1793682792.231167,
+    "mtime": 1793691171.7208962,
+    "seen": 1793813731.811023,
     "ast_hash": "cd99a8425a4c55923bb76e3798608fc9",
     "semantic_hash": ""
   },
@@ -1380,8 +1320,8 @@
     "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/pages/Finance/pages/FinanceExpensesPage.tsx": {
-    "mtime": 1793682717.365508,
-    "seen": 1793682792.2311711,
+    "mtime": 1793691171.7220287,
+    "seen": 1793813731.811028,
     "ast_hash": "4d53c4f921ba5ac2b09be82d5d5ad00c",
     "semantic_hash": ""
   },
@@ -1433,42 +1373,6 @@
     "ast_hash": "aa56b0a4e8ab400d72b81927ed5e7926",
     "semantic_hash": "aa56b0a4e8ab400d72b81927ed5e7926"
   },
-  "mimo-website/mimo-admin-dashboard/src/pages/Gang/MimoGangPage.tsx": {
-    "mtime": 1792257790.4289312,
-    "seen": 1793682792.231179,
-    "ast_hash": "717589926e42d2b2b1c8160c0e6566cb",
-    "semantic_hash": "717589926e42d2b2b1c8160c0e6566cb"
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Hr/HrApp.tsx": {
-    "mtime": 1792257790.4293633,
-    "seen": 1793682792.231186,
-    "ast_hash": "78ee6b4f13975f39994f67975e2520cc",
-    "semantic_hash": "78ee6b4f13975f39994f67975e2520cc"
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Hr/HrAttendance.tsx": {
-    "mtime": 1791616824.353934,
-    "seen": 1792255376.853127,
-    "ast_hash": "5ed62aaf205ec7f5c7549a1a31290d3a",
-    "semantic_hash": "5ed62aaf205ec7f5c7549a1a31290d3a"
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Hr/HrEmployees.tsx": {
-    "mtime": 1791616784.9347484,
-    "seen": 1792255376.853127,
-    "ast_hash": "83df6e2685c32c0d17734c3798f9537f",
-    "semantic_hash": "83df6e2685c32c0d17734c3798f9537f"
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Hr/HrLeave.tsx": {
-    "mtime": 1791616881.7375798,
-    "seen": 1792255376.853128,
-    "ast_hash": "5d22c527dfe6f1980c0f2898c227d6be",
-    "semantic_hash": "5d22c527dfe6f1980c0f2898c227d6be"
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Hr/HrOverview.tsx": {
-    "mtime": 1791796288.8484194,
-    "seen": 1792255376.853129,
-    "ast_hash": "05386ee4f944e7de8a5e4c07908bfe41",
-    "semantic_hash": "05386ee4f944e7de8a5e4c07908bfe41"
-  },
   "mimo-website/mimo-admin-dashboard/src/pages/Incidents/IncidentDetailsModal.tsx": {
     "mtime": 1792006672.7929623,
     "seen": 1792255376.85313,
@@ -1476,14 +1380,14 @@
     "semantic_hash": "1680d492e981021e5bc18d50d794be35"
   },
   "mimo-website/mimo-admin-dashboard/src/pages/Incidents/IncidentsPage.tsx": {
-    "mtime": 1793682717.3658633,
-    "seen": 1793682792.231192,
+    "mtime": 1793691171.7229848,
+    "seen": 1793813731.811051,
     "ast_hash": "cdbea3502e3bf0978f4971523ec32484",
     "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/pages/Kiosks/KiosksPage.tsx": {
-    "mtime": 1793682717.3660645,
-    "seen": 1793682792.231193,
+    "mtime": 1793691171.7232673,
+    "seen": 1793813731.811052,
     "ast_hash": "eb8d7c33b08802d14c06788d5b455377",
     "semantic_hash": ""
   },
@@ -1506,40 +1410,10 @@
     "semantic_hash": "3fbd7e0927cfd0d3574ac00728cdc95c"
   },
   "mimo-website/mimo-admin-dashboard/src/pages/Overview/OverviewPage.tsx": {
-    "mtime": 1793682717.366261,
-    "seen": 1793682792.2311969,
+    "mtime": 1793691171.7237349,
+    "seen": 1793813731.8110552,
     "ast_hash": "80a1a00125881bf0bebdba9e791388c8",
     "semantic_hash": ""
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Technical/TechnicalApp.tsx": {
-    "mtime": 1792257790.4304256,
-    "seen": 1793682792.2311978,
-    "ast_hash": "2f8119566d363da5c65860fed4b8f603",
-    "semantic_hash": "2f8119566d363da5c65860fed4b8f603"
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Technical/TechnicalTeamPage.tsx": {
-    "mtime": 1792257790.4308372,
-    "seen": 1793682792.2311978,
-    "ast_hash": "be9a4d7db783fe50f87d5d51cd85cd73",
-    "semantic_hash": "be9a4d7db783fe50f87d5d51cd85cd73"
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Technical/TechnicalToolModal.tsx": {
-    "mtime": 1792257790.4317687,
-    "seen": 1793682792.231199,
-    "ast_hash": "67eed017290de8079beb8c8d7903d990",
-    "semantic_hash": "67eed017290de8079beb8c8d7903d990"
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Technical/TechnicalWorkspace.tsx": {
-    "mtime": 1793682717.3664365,
-    "seen": 1793682792.2312,
-    "ast_hash": "5d3e9df2e36c52e53fb384f3fae29291",
-    "semantic_hash": ""
-  },
-  "mimo-website/mimo-admin-dashboard/src/pages/Technical/quotes.ts": {
-    "mtime": 1791611408.423588,
-    "seen": 1792255376.8531399,
-    "ast_hash": "3b2725e26400e8cd31eb904733a7fd5e",
-    "semantic_hash": "3b2725e26400e8cd31eb904733a7fd5e"
   },
   "mimo-website/mimo-admin-dashboard/src/pages/Users/UsersPage.tsx": {
     "mtime": 1791791820.65259,
@@ -1547,29 +1421,11 @@
     "ast_hash": "89876f95b4368f205bf8d4d08a4f31da",
     "semantic_hash": "89876f95b4368f205bf8d4d08a4f31da"
   },
-  "mimo-website/mimo-admin-dashboard/src/services/adminCompany.service.ts": {
-    "mtime": 1791617043.147466,
-    "seen": 1792255376.853141,
-    "ast_hash": "3be34eb8e5b716ec3eeb065d7e6a8648",
-    "semantic_hash": "3be34eb8e5b716ec3eeb065d7e6a8648"
-  },
-  "mimo-website/mimo-admin-dashboard/src/services/adminGang.service.ts": {
-    "mtime": 1791652737.5444214,
-    "seen": 1792255376.853142,
-    "ast_hash": "1b06542bfb380ee76f738443784b0cf8",
-    "semantic_hash": "1b06542bfb380ee76f738443784b0cf8"
-  },
   "mimo-website/mimo-admin-dashboard/src/services/chat.service.ts": {
     "mtime": 1791793379.447234,
     "seen": 1792255376.853143,
     "ast_hash": "22d7ccf95f27affc0efae4fc37d50e10",
     "semantic_hash": "22d7ccf95f27affc0efae4fc37d50e10"
-  },
-  "mimo-website/mimo-admin-dashboard/src/services/hr.service.ts": {
-    "mtime": 1791796254.4769778,
-    "seen": 1792255376.8531442,
-    "ast_hash": "5b3f891c5a2f4fb86e97d02ebef2e375",
-    "semantic_hash": "5b3f891c5a2f4fb86e97d02ebef2e375"
   },
   "mimo-website/mimo-admin-dashboard/src/services/insights.service.ts": {
     "mtime": 1791893631.1894329,
@@ -1588,12 +1444,6 @@
     "seen": 1793682792.231209,
     "ast_hash": "94adeb263bc626d91b73cd03af5f6b16",
     "semantic_hash": ""
-  },
-  "mimo-website/mimo-admin-dashboard/src/services/technical.service.ts": {
-    "mtime": 1792257790.4325914,
-    "seen": 1793682792.23121,
-    "ast_hash": "98d691931aa2c2af23ee3aab00d4d60e",
-    "semantic_hash": "98d691931aa2c2af23ee3aab00d4d60e"
   },
   "mimo-website/mimo-admin-dashboard/src/services/users.service.ts": {
     "mtime": 1790492507.2451465,
@@ -1770,8 +1620,8 @@
     "semantic_hash": ""
   },
   "mimo-website/src/app/pages/mimo-admin-dashboard/index.tsx": {
-    "mtime": 1793682601.9245322,
-    "seen": 1793682792.2312372,
+    "mtime": 1793691171.7247643,
+    "seen": 1793813731.8111,
     "ast_hash": "7a604bfd3e07329ba5babf45e2380743",
     "semantic_hash": ""
   },
@@ -2214,9 +2064,9 @@
     "semantic_hash": ""
   },
   "functions/__tests__/scanCache.test.js": {
-    "mtime": 1793682678.405482,
-    "seen": 1793682792.230983,
-    "ast_hash": "11bdd44f3b78259d52c45320200990df",
+    "mtime": 1793813748.1830232,
+    "seen": 1793815279.161325,
+    "ast_hash": "518712c229a5d08efe1b7001c06d090f",
     "semantic_hash": ""
   },
   "functions/__tests__/screensaver.test.js": {
@@ -2340,9 +2190,9 @@
     "semantic_hash": ""
   },
   "functions/src/middleware/blockProductionWrites.js": {
-    "mtime": 1792999906.6734,
-    "seen": 1793682792.231039,
-    "ast_hash": "c31d5af99280ca57e5dd59cf458a4ea9",
+    "mtime": 1793814952.9824274,
+    "seen": 1793815279.161376,
+    "ast_hash": "1c3b175e35461f06453beebfafa60cb0",
     "semantic_hash": ""
   },
   "functions/src/routes/guardianAdminHealth.routes.js": {
@@ -2406,9 +2256,9 @@
     "semantic_hash": ""
   },
   "functions/src/utils/scanCache.js": {
-    "mtime": 1793682397.8538754,
-    "seen": 1793682792.231082,
-    "ast_hash": "e333d93e95b7ddc3d0e4d6a550b14430",
+    "mtime": 1793813748.1840346,
+    "seen": 1793815279.1614149,
+    "ast_hash": "e1cdb902000f094a8dd42258ff4862d4",
     "semantic_hash": ""
   },
   "functions/src/whatsapp-flow/cdn.js": {
@@ -2532,8 +2382,8 @@
     "semantic_hash": ""
   },
   "mimo-website/mimo-admin-dashboard/src/pages/Guardian/GuardianPage.tsx": {
-    "mtime": 1793682717.3656707,
-    "seen": 1793682792.23118,
+    "mtime": 1793691171.7225578,
+    "seen": 1793813731.8110368,
     "ast_hash": "d82d13c4ea41505a40a693300d7ef416",
     "semantic_hash": ""
   },
@@ -3423,6 +3273,18 @@
     "mtime": 1790157418.7737134,
     "seen": 1793682792.2313752,
     "ast_hash": "fc3c2a6b73fb9def438112237c5e7f7b",
+    "semantic_hash": ""
+  },
+  "functions/__tests__/adminLoginAndOrigin.test.js": {
+    "mtime": 1793814898.346097,
+    "seen": 1793815279.161273,
+    "ast_hash": "4063266a5a39e86f247c79bd5e7c6899",
+    "semantic_hash": ""
+  },
+  "functions/src/middleware/adminOriginGuard.js": {
+    "mtime": 1793814569.367695,
+    "seen": 1793815279.161375,
+    "ast_hash": "0b0097968c8cab275e28b1bffc7c352f",
     "semantic_hash": ""
   }
 }

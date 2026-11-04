@@ -1,37 +1,37 @@
-# Graph Report - mimo-test-dep2  (2026-11-03)
+# Graph Report - mimo-test-dep2  (2026-11-04)
 
 ## Corpus Check
-- 520 files · ~510,545 words
+- 497 files · ~486,076 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 53 file(s) not represented in the graph (top: .xml 14, (none) 10, .css 6)
 
 ## Summary
-- 5397 nodes · 11740 edges · 228 communities (193 shown, 35 thin omitted)
-- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 757 edges (avg confidence: 0.87)
+- 5165 nodes · 11160 edges · 252 communities (207 shown, 45 thin omitted)
+- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 702 edges (avg confidence: 0.87)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d0f75499`
+- Built from commit: `91c56b00`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - ref_lucide_react
-- ErrorBanner
-- base_scenario
+- src/api.ts
+- use
 - whatsapp.controller.js
 - opencv-4.9.0.js
 - storageCleanup.service.js
 - dependencies
 - scheduler.py
-- firebase.js
+- admin.routes.js
 - storageUploadLifecycle.test.js
 - insights.types.ts
 - admin.controller.js
 - mimo-website/package.json
 - print-options.tsx
 - Observation
-- helpers.py
+- build
 - MainActivity.kt
 - kioskUnprintableFiles.test.js
 - refund.characterization.test.js
@@ -44,7 +44,7 @@
 - kioskPreFetchIsolation.test.js
 - MIMO Edge Guardian — Architecture & Inspection Plan v0.1
 - whatsappFlow.controller.js
-- test_classifier.py
+- service.py
 - mimo-admin-dashboard/src/App.tsx
 - dateRange.ts
 - VerifySheets
@@ -53,17 +53,17 @@
 - readLatin1String
 - test_listener_inputs.py
 - analyticsReporting.test.js
-- technical.controller.js
+- KiosksPage.tsx
 - ref_node_assert
 - mimo-website/src/App.tsx
 - job
-- hr.controller.js
+- helpers.py
 - scanner.controller.js
 - analytics.service.js
 - Verify
 - converter/index.js
 - converter.service.js
-- fakeFirestore.js
+- MIMO — Design
 - MIMO Edge Guardian — Phase 2A Contract (Proposed)
 - adminInsights.controller.js
 - guardianAdminHealth.routes.js
@@ -74,14 +74,14 @@
 - googleSheets.test.js
 - _strftime
 - technicalTools.controller.js
-- CV001BellsDecor.tsx
+- adminLoginAndOrigin.test.js
 - ui.tsx
 - Publisher
-- snapshot.py
+- scheduler.py
 - Firebase Firestore Schema Design for MIMO Kiosk System
 - pi_scripts/firebase_listener.py
 - user.controller.js
-- kioskCommands.controller.js
+- kioskRestart.test.js
 - whatsappFlowEndpoint.test.js
 - Gate2SafeSudoTests
 - FakeRef
@@ -92,7 +92,7 @@
 - flowHandler.js
 - print_file
 - .write
-- functions/package.json
+- firebase.js
 - ref_express
 - FinanceExpensesPage.tsx
 - flowFixtures.js
@@ -100,11 +100,11 @@
 - test_print_serialization.py
 - cashfreeWebhook.test.js
 - compilerOptions
-- adminGang.controller.js
+- metaFlowAdapter.js
 - test_auto_update.cjs
 - src/api.ts
 - MIMO — Architecture
-- uploadFinalizeGuard.test.js
+- postFinalizeUpload
 - mimo-frontend/package.json
 - compilerOptions
 - guardianRegistry.test.js
@@ -136,14 +136,14 @@
 - scanner.service.test.js
 - devDependencies
 - createOrderOperation.js
-- metaFlowAdapter.js
-- storage.service.js
+- order.service.js
+- createFakeFirestore
 - adminIssues.test.js
-- publicMachines.controller.js
+- ads.controller.js
 - createWasm
 - guardianIngest.concurrency.test.js
-- guardianAdminHealth.test.js
-- ads.controller.js
+- OverviewPage.tsx
+- whatsappFlowOrphanJob.test.js
 - whatsappWebhookSecurity.test.js
 - index.tsx
 - AdvertisementsPage.tsx
@@ -154,17 +154,17 @@
 - test_pi_ops.py
 - MIMO — Self-Service Cloud Printing
 - test_static_safety.py
-- scripts
+- functions/package.json
 - whatsappPaymentLink.test.js
 - crypto.js
-- pdfExport.ts
+- marketing.controller.js
 - get
-- storageBlockersRegression.test.js
-- read_printer_status
+- clean_epson.py
+- server.js
 - test_download_retry.py
 - AutoResumeEligibilityTests
 - test_watch_self_healing.py
-- refund.characterization.test.js
+- guardianAdminHealth.test.js
 - test_active_print.mts
 - storageCleanup.emulator.js
 - secret-scan.test.js
@@ -177,7 +177,7 @@
 - whatsappPaymentTransactions.test.js
 - handle_clean_head_command
 - ListenerTestCase
-- printer_status.py
+- base_scenario
 - mimoStats.test.js
 - refundSync.service.js
 - ref_path
@@ -188,21 +188,21 @@
 - ToastContext.tsx
 - callRuntimeCallbacks
 - makeClassHandle
-- is_read_only
+- SubprocessRunner
 - MIMO Backend (`functions/`)
 - fix_sv002_bw_queue.sh
 - scanner.routes.test.js
-- whatsappFlowWorker.trigger.js
+- orphanStorage.trigger.js
 - adminRefundRequests.test.js
 - is_printer_online
 - PrefetchCacheCleanupTests
 - scanner.routes.js
 - issueCategories.test.js
-- printCodeStaleCollision.test.js
+- context
 - dependencies
-- orderCreationRace.test.js
+- expand
 - mimo-website/src/main.tsx
-- uploadPdfPageCount.test.js
+- pdfExport.ts
 - MIMO Admin Dashboard & Finance Portal (`mimo-website/mimo-admin-dashboard/`)
 - PrintJobDispatchGoesThroughSingleWorkerPoolTests
 - Office → PDF converter (`converter/`)
@@ -231,23 +231,49 @@
 - public/README.md
 - Android kiosk shell (`LENOVO TABLET APP/`)
 - cv001/README.md
+- financeRemediation.test.js
 - set_manual_copies.sh
+- whatsapp.controller.js
 - tsconfig.json
+- kioskReportProblem.test.js
+- storageSuccessCleanup.test.js
+- ServiceTest
 - kiosk_unlock.sh
+- `pi-guardian/`: MIMO Edge Guardian, Phase 1 (local core)
+- kioskReportClean.test.js
+- kioskCleanColorHead.test.js
+- apiSurface.test.js
+- credentialSource.test.js
+- packagingBoundary.test.js
+- Collection Architecture
+- loadPricing
+- public.controller.js
+- test_snapshot.py
+- ParseAndClassify
+- SlotAndKillSwitch
+- publisher_from_env
+- kioskVerify.test.js
+- LpstatTimeoutTest
+- NoHardcodedCredentialsTests
+- CleanEpsonScheduleTests
+- Gate3StorageAndPermissionsTests
+- HealthPublish
 
 ## God Nodes (most connected - your core abstractions)
 1. `base_scenario()` - 70 edges
-2. `ErrorBanner()` - 62 edges
-3. `createFakeFirestore()` - 54 edges
-4. `db` - 51 edges
-5. `Observation` - 51 edges
-6. `use()` - 47 edges
-7. `inr()` - 45 edges
-8. `errorMessage()` - 41 edges
-9. `admin` - 35 edges
-10. `useRange()` - 33 edges
+2. `createFakeFirestore()` - 55 edges
+3. `Observation` - 51 edges
+4. `use()` - 47 edges
+5. `db` - 45 edges
+6. `inr()` - 45 edges
+7. `ErrorBanner()` - 38 edges
+8. `useRange()` - 33 edges
+9. `admin` - 32 edges
+10. `createKioskRouter()` - 32 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `5. `orders` Collection` --references--> `orders()`  [INFERRED]
+  docs/architecture/FIREBASE_SCHEMA_DESIGN.md → functions/__tests__/refund.characterization.test.js
 - `Phase 1: Current System (Weeks 1-2)` --references--> `orders()`  [INFERRED]
   docs/architecture/FIREBASE_SCHEMA_DESIGN.md → functions/__tests__/refund.characterization.test.js
 - `Real-Time Operations` --references--> `orders()`  [INFERRED]
@@ -256,37 +282,35 @@
   pi-guardian/deploy/README.md → functions/src/guardian/registry.js
 - `6.1 Isolation from the existing kiosk router` --references--> `createKioskRouter()`  [INFERRED]
   docs/architecture/MIMO_EDGE_GUARDIAN_PHASE_2A_CONTRACT.md → functions/src/routes/kiosk.routes.js
-- `5.4 Transactional safety` --references--> `claimRefund()`  [INFERRED]
-  docs/architecture/MIMO_EDGE_GUARDIAN_PHASE_2A_CONTRACT.md → functions/src/services/refund.service.js
 
 ## Import Cycles
 - None detected.
 
-## Communities (228 total, 35 thin omitted)
+## Communities (252 total, 45 thin omitted)
 
 ### Community 0 - "ref_lucide_react"
-Cohesion: 0.05
-Nodes (84): ExecutiveReportsHub(), Delta(), MetricKey, METRICS, PeriodComparison(), Row, rowsFor(), T (+76 more)
+Cohesion: 0.06
+Nodes (87): Adding a page or a metric, ExecutiveReportsHub(), Delta(), ErrorBanner(), MetricKey, METRICS, PeriodComparison(), Row (+79 more)
 
-### Community 1 - "ErrorBanner"
-Cohesion: 0.03
-Nodes (112): Adding a page or a metric, ContributionGraph(), ErrorBanner(), ProofImageModal(), ProofModalData, AUTO_REFRESH_MS, errorMessage(), LiveQuery (+104 more)
+### Community 1 - "src/api.ts"
+Cohesion: 0.11
+Nodes (21): LOGIN_URLS, ROUTE_PREFIX_TOKEN, TOKEN_KEYS, AUTO_REFRESH_MS, errorMessage(), LiveQuery, LiveQueryOptions, CouponItem (+13 more)
 
-### Community 2 - "base_scenario"
-Cohesion: 0.05
-Nodes (25): Checks, Configuration, Limits of Phase 1, `pi-guardian/`: MIMO Edge Guardian, Phase 1 (local core), Run it, Run the tests (no kiosk, no network, no credentials), Semantics, Snapshot (+17 more)
+### Community 2 - "use"
+Cohesion: 0.15
+Nodes (5): use(), LinkIpRouteGatewayTest, ResourceTest, run_one(), ToolFailureSemanticsTest
 
 ### Community 3 - "whatsapp.controller.js"
-Cohesion: 0.04
-Nodes (81): cashfreeHeaders, fetchCashfreeRefunds(), { admin, db }, axios, { CASHFREE_BASE_URL, getSecretKey, cashfreeHeaders }, crypto, isValidCashfreeSignature(), jwt (+73 more)
+Cohesion: 0.09
+Nodes (27): getWaPaySuccess(), ACTIVE_STATUSES, crypto, generateUniquePrintCode(), randomCode(), tryClaim(), { admin, db }, { AsyncLocalStorage } (+19 more)
 
 ### Community 4 - "opencv-4.9.0.js"
 Cohesion: 0.03
 Nodes (23): alignUp(), Circle(), _clock_gettime(), demangleAll(), doCallback(), done(), _emscripten_get_environ(), _emscripten_get_heap_size() (+15 more)
 
 ### Community 5 - "storageCleanup.service.js"
-Cohesion: 0.17
-Nodes (22): addRecentReferences(), buildCleanupUpdate(), toMillis(), acquireLease(), bump(), claimJobForCleanup(), classifyJob(), cleanJobDocument() (+14 more)
+Cohesion: 0.18
+Nodes (20): addRecentReferences(), buildCleanupUpdate(), CUSTOMER_PREFIXES, getRetentionStartTime(), toMillis(), acquireLease(), bump(), claimJobForCleanup() (+12 more)
 
 ### Community 6 - "dependencies"
 Cohesion: 0.03
@@ -294,23 +318,23 @@ Nodes (68): dependencies, axios, @capacitor/android, @capacitor/cli, @capacitor/
 
 ### Community 7 - "scheduler.py"
 Cohesion: 0.07
-Nodes (17): main(), main(), _classify_oserror(), HostReader, HttpsClient, NetworkProbe, ProbeResult, SocketHttpsClient (+9 more)
+Nodes (11): _classify_oserror(), NetworkProbe, ProbeResult, CommandResult, CommandRunner, FakeClock, Scenario, ScenarioHost (+3 more)
 
-### Community 8 - "firebase.js"
-Cohesion: 0.03
-Nodes (95): getSecretKey(), googleClient, admin, db, fs, { isDeployedRuntime }, path, { db } (+87 more)
+### Community 8 - "admin.routes.js"
+Cohesion: 0.06
+Nodes (38): getSecretKey(), googleClient, { admin, db }, bcrypt, generateGuestName(), { getSecretKey, googleClient }, GUEST_ADJECTIVES, GUEST_NOUNS (+30 more)
 
 ### Community 9 - "storageUploadLifecycle.test.js"
 Cohesion: 0.07
-Nodes (25): ago(), { createFakeBucket }, { createFakeFirestore }, createHarness(), NOW, createFakeBucket(), assert, { createHarness, NOW, HOUR } (+17 more)
+Nodes (25): ago(), { createFakeBucket }, { createFakeFirestore }, createHarness(), NOW, createFakeBucket(), assert, C (+17 more)
 
 ### Community 10 - "insights.types.ts"
-Cohesion: 0.05
-Nodes (82): displayName(), isToday(), JobDetails(), MachineBadge(), ms(), OUTCOME, printDuration(), PrintHistoryList() (+74 more)
+Cohesion: 0.07
+Nodes (37): HeaderProps, extractNameFallback(), IncidentDetailsModal(), IncidentDetailsModalProps, TYPE_CONFIG, BASIS_LABEL, extractNameFallback(), ICONS (+29 more)
 
 ### Community 11 - "admin.controller.js"
 Cohesion: 0.04
-Nodes (44): { admin, db }, ADMIN_UPLOAD_PREFIXES, axios, { cachedCollectionGet }, { CASHFREE_BASE_URL, getSecretKey, cashfreeHeaders }, chat, { claimRefund, releaseRefund, refundIdFor, REFUND_BLOCKED_MESSAGES }, crypto (+36 more)
+Nodes (42): 5.1 Definitions, 5.2 Per-kiosk accepted state (what the backend remembers), 5.3 Decision table, 5.4 Transactional safety, 5. Timestamp, stream ID, boot ID, sequence and replay semantics (PROPOSED), { admin, db }, ADMIN_UPLOAD_PREFIXES, axios (+34 more)
 
 ### Community 12 - "mimo-website/package.json"
 Cohesion: 0.03
@@ -324,9 +348,9 @@ Nodes (24): ScreenSkeleton(), ActionBar(), ActionBarSpacer(), AppBar(), ChoiceRo
 Cohesion: 0.13
 Nodes (29): _carrier(), collect_all(), collect_cups(), collect_disk(), collect_dns(), collect_endpoints(), collect_gateway(), collect_ipv4() (+21 more)
 
-### Community 15 - "helpers.py"
-Cohesion: 0.08
-Nodes (11): CommandResult, FakeClock, Scenario, ScenarioHost, ScenarioRunner, build(), make_config(), BlockingRunner (+3 more)
+### Community 15 - "build"
+Cohesion: 0.16
+Nodes (4): build(), RecordingEvent, RunForeverTest, SchedulerTest
 
 ### Community 16 - "MainActivity.kt"
 Cohesion: 0.06
@@ -334,59 +358,59 @@ Nodes (5): KioskDeviceAdminReceiver, MainActivity, WebChromeClient, WebViewClien
 
 ### Community 17 - "kioskUnprintableFiles.test.js"
 Cohesion: 0.05
-Nodes (50): { db }, { isColorJob, unprintableFilesForKiosk, unprintableFilesMessage }, { loadMachinesMap, loadMachineTemplatesMap, describeDestination }, extensionOf(), getNgrokUrl(), isColorJob(), triggerPiPrint(), unprintableFilesForKiosk() (+42 more)
+Nodes (43): { db }, { isColorJob, unprintableFilesForKiosk, unprintableFilesMessage }, { loadMachinesMap, loadMachineTemplatesMap, describeDestination }, postGetDocumentsByCode(), postMarkPrinted(), extensionOf(), getNgrokUrl(), triggerPiPrint() (+35 more)
 
 ### Community 18 - "refund.characterization.test.js"
-Cohesion: 0.06
-Nodes (31): getVerifyPayment(), postPaymentSuccess(), installAxiosStub(), assert, { createFakeFirestore }, fake, { getVerifyPayment, postPaymentSuccess }, http (+23 more)
+Cohesion: 0.05
+Nodes (36): getVerifyPayment(), postPaymentSuccess(), installAxiosStub(), assert, { createFakeFirestore }, fake, { getVerifyPayment, postPaymentSuccess }, http (+28 more)
 
 ### Community 19 - "pi_config.py"
-Cohesion: 0.05
-Nodes (33): check_epson_options(), check_epson(), check_printpi(), check_processes(), configure_brother(), deploy_cv001(), deploy_sv002(), run_ssh() (+25 more)
+Cohesion: 0.06
+Nodes (28): check_epson_options(), check_epson(), check_printpi(), check_processes(), configure_brother(), deploy_cv001(), deploy_sv002(), run_ssh() (+20 more)
 
 ### Community 20 - "mimo-frontend/src/App.tsx"
 Cohesion: 0.17
 Nodes (21): App(), FestiveBackdrop(), GoldenCornerWaves(), Lotus(), OrnamentDivider(), ZariBorder(), CodeEntryScreen(), CodeEntryScreenProps (+13 more)
 
 ### Community 21 - "kiosk.routes.js"
-Cohesion: 0.05
-Nodes (52): { claimRefund, refundIdFor }, { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE }, createKioskRouter(), { createLimiters }, crypto, customerHistory(), express, { getTransporter } (+44 more)
+Cohesion: 0.07
+Nodes (42): { claimRefund, refundIdFor }, { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE }, createKioskRouter(), { createLimiters }, crypto, customerHistory(), defaultSendIssueEmail(), express (+34 more)
 
 ### Community 22 - "routes.ts"
 Cohesion: 0.33
 Nodes (5): App(), DashboardLayout(), Toaster(), router, react-router
 
 ### Community 23 - "ref_react"
-Cohesion: 0.05
-Nodes (58): AdminLoginPageProps, FinanceLoginPage(), FinanceLoginPageProps, HrLoginPage(), HrLoginPageProps, MarketingLoginPage(), MarketingLoginPageProps, COPY (+50 more)
+Cohesion: 0.09
+Nodes (37): api, MarketingLoginPage(), MarketingLoginPageProps, AdminLayout(), AdminLayoutProps, emailFromToken(), MORE, Sheet() (+29 more)
 
 ### Community 24 - "document-scanner.tsx"
 Cohesion: 0.09
 Nodes (32): AspectRatioMode, DocumentScanner(), loadImageElement(), readFileAsDataUrl(), ScannedPageItem, AutoCaptureAnalysis, AutoCaptureConfig, AutoCaptureStatus (+24 more)
 
 ### Community 25 - "kioskPreFetchIsolation.test.js"
-Cohesion: 0.04
-Nodes (66): submitJob(), FIXED_NOW, cashfreeCalls(), checkout(), controller, { createFakeFirestore }, emailServicePath, fake (+58 more)
+Cohesion: 0.07
+Nodes (44): cashfreeCalls(), checkout(), controller, { createFakeFirestore }, emailServicePath, fake, http, { installAxiosStub } (+36 more)
 
 ### Community 26 - "MIMO Edge Guardian — Architecture & Inspection Plan v0.1"
 Cohesion: 0.05
 Nodes (44): 10. What must be understood in depth, 11. Proposed code boundaries, 12. Guardian health contract v1, 13. Definition of Done for v1, 14. First implementation milestone, 15. Immediate next task, 1. Mission, 2. Production baseline (+36 more)
 
 ### Community 27 - "whatsappFlow.controller.js"
-Cohesion: 0.10
-Nodes (16): { admin, db }, buildHandle(), configSignature(), { createCdnFetcher }, { createMetaFlowAdapter }, FLOW_MEDIA_CDN_HOST_SUFFIXES, { FLOW_PRIVATE_KEY_PEM, FLOW_APP_SECRET, FLOW_APP_SECRET_PREVIOUS }, getHandle() (+8 more)
-
-### Community 28 - "test_classifier.py"
 Cohesion: 0.08
-Nodes (24): 1.1 Top-level shape, 1.2 Each `checks[]` entry, 1.3 Diagnosis block, 1.5 Sequence-number behavior (existing, in-process only), 1.6 Scheduler/callback behavior, 1.7 Command allowlist and static safety (existing, unchanged by this design), 1. Frozen Phase 1 snapshot contract (existing, verified against source), Cascade (+16 more)
+Nodes (23): { admin, db }, buildHandle(), configSignature(), { createCdnFetcher }, { createMetaFlowAdapter }, FLOW_MEDIA_CDN_HOST_SUFFIXES, { FLOW_PRIVATE_KEY_PEM, FLOW_APP_SECRET, FLOW_APP_SECRET_PREVIOUS }, getHandle() (+15 more)
+
+### Community 28 - "service.py"
+Cohesion: 0.12
+Nodes (10): main(), load_config(), main(), HostReader, SocketProbe, _discover_boot_id(), Scheduler, main() (+2 more)
 
 ### Community 29 - "mimo-admin-dashboard/src/App.tsx"
-Cohesion: 0.11
-Nodes (28): AdminChatPage, AdminCompanyPage, AdvertisementsPage, AnalyticsPage, CouponsPage, DashboardApp(), FinanceApp, FinancePage (+20 more)
+Cohesion: 0.06
+Nodes (37): CV001BellsDecor(), SingleGoldenBell(), AdminChatPage, AdvertisementsPage, AnalyticsPage, CouponsPage, DashboardApp(), FinanceApp (+29 more)
 
 ### Community 30 - "dateRange.ts"
-Cohesion: 0.09
-Nodes (45): DateRangePicker(), Props, TONES, Ctx, RangeCtx, RangeProvider(), addDaysKey(), ApiRange (+37 more)
+Cohesion: 0.08
+Nodes (46): DateRangePicker(), Props, TONES, Ctx, RangeCtx, RangeProvider(), addDaysKey(), ApiRange (+38 more)
 
 ### Community 31 - "VerifySheets"
 Cohesion: 0.07
@@ -397,40 +421,40 @@ Cohesion: 0.11
 Nodes (5): FakeBlob, FakeBucket, FakeDB, FakeDocRef, FakeSubprocess
 
 ### Community 33 - "printJob.triggers.js"
-Cohesion: 0.07
-Nodes (32): 4.3 Job status lifecycle, 6. Backend design, 6. Triggers: regions, runtime and how to deploy them (updated 2026-09-27), defaultSendIssueEmail(), getTransporter(), sendRefundInitiatedAlert(), claimRefund(), { admin, db } (+24 more)
+Cohesion: 0.11
+Nodes (25): 4.1 From upload to print code, 4.2 At the kiosk, 4.3 Job status lifecycle, 4.4 WhatsApp ordering, 4.5 Payment and Cashfree webhook flow, 4. Key flows, 6. Backend design, 6. Triggers: regions, runtime and how to deploy them (updated 2026-09-27) (+17 more)
 
 ### Community 34 - "readLatin1String"
 Cohesion: 0.11
 Nodes (37): craftInvokerFunction(), createNamedFunction(), __embind_finalize_value_array(), __embind_finalize_value_object(), __embind_register_class(), __embind_register_class_class_function(), unboundTypesHandler(), __embind_register_class_constructor() (+29 more)
 
 ### Community 35 - "test_listener_inputs.py"
-Cohesion: 0.04
-Nodes (26): execute_head_cleaning(), is_printer_idle(), log(), main(), run_cleaning_job(), run_daily_scheduler(), seconds_until_target_time(), send_cleaning_notification() (+18 more)
+Cohesion: 0.09
+Nodes (9): CleanEpsonNotificationTests, _load(), fake_page_count(), fake_pdfinfo_result(), ImportSafetyTests, _install_import_stubs(), _load_listener(), OnSnapshotUpdatesLastSeenTests (+1 more)
 
 ### Community 36 - "analyticsReporting.test.js"
 Cohesion: 0.17
 Nodes (11): DEFAULT_MACHINES, A, assert, at(), data, { DEFAULT_MACHINES }, { describe, it }, ist() (+3 more)
 
-### Community 37 - "technical.controller.js"
-Cohesion: 0.08
-Nodes (26): A, { admin, db }, bcrypt, chat, getDailyReports(), getOpenSession(), { getSecretKey }, getTechnicalActivity() (+18 more)
+### Community 37 - "KiosksPage.tsx"
+Cohesion: 0.07
+Nodes (25): BtnProps, CardProps, ConfirmDialog(), ConfirmDialogProps, EmptyStateProps, ErrorStateProps, LevelBar(), LevelBarProps (+17 more)
 
 ### Community 38 - "ref_node_assert"
-Cohesion: 0.06
-Nodes (26): A, assert, { describe, it }, A, assert, { describe, it }, Timestamp, assert (+18 more)
+Cohesion: 0.07
+Nodes (21): A, assert, { describe, it }, A, assert, { describe, it }, Timestamp, assert (+13 more)
 
 ### Community 39 - "mimo-website/src/App.tsx"
 Cohesion: 0.10
 Nodes (27): AdminDashboard, AppErrorBoundary, BlankPages, HowToPrintGuide(), DirectSuccess, DocumentScanner, ErrorBoundaryProps, ErrorBoundaryState (+19 more)
 
 ### Community 40 - "job"
-Cohesion: 0.28
+Cohesion: 0.27
 Nodes (3): entry(), job(), ProcessJobInputTests
 
-### Community 41 - "hr.controller.js"
-Cohesion: 0.08
-Nodes (23): { admin, db }, bcrypt, chat, DEFAULT_LEAVE_BALANCE, DEFAULT_ONBOARDING_CHECKLIST, DEPARTMENTS, EMPLOYEE_STATUSES, getEmployees() (+15 more)
+### Community 41 - "helpers.py"
+Cohesion: 0.19
+Nodes (6): cascaded(), check(), drop(), roots(), run_cycle(), ScenarioTest
 
 ### Community 42 - "scanner.controller.js"
 Cohesion: 0.27
@@ -446,54 +470,54 @@ Nodes (10): ALLOWED_MIME_TYPES, Busboy, {
 
 ### Community 43 - "analytics.service.js"
 Cohesion: 0.11
-Nodes (38): AUDITED_HISTORICAL_INCOME, breakdowns(), bucketKey(), buildSeries(), { cachedValue }, countNewUsers(), DONE_JOB_STATUSES, emptyKioskReporting() (+30 more)
+Nodes (37): AUDITED_HISTORICAL_INCOME, breakdowns(), bucketKey(), buildSeries(), { cachedValue }, countNewUsers(), DONE_JOB_STATUSES, emptyKioskReporting() (+29 more)
 
 ### Community 44 - "Verify"
 Cohesion: 0.08
 Nodes (6): counter(), FakeClock, FakeDoc, SheetCheckShape, Tracking, Verify
 
 ### Community 45 - "converter/index.js"
-Cohesion: 0.09
-Nodes (23): admin, app, CONVERSION_TIMEOUT_MS, { execFile }, express, fs, getLibreOfficeBinary(), os (+15 more)
+Cohesion: 0.10
+Nodes (22): admin, app, CONVERSION_TIMEOUT_MS, { execFile }, express, fs, getLibreOfficeBinary(), os (+14 more)
 
 ### Community 46 - "converter.service.js"
 Cohesion: 0.13
 Nodes (14): isDeployedRuntime(), axios, callOfficeConverter(), { CONVERTER_SERVICE_URL, DEFAULT_CONVERTER_SERVICE_URL, INTERNAL_CONVERTER_SECRET }, { GoogleAuth }, { isDeployedRuntime }, resolveConverterUrl(), SUPPORTED_OFFICE_EXTENSIONS (+6 more)
 
-### Community 47 - "fakeFirestore.js"
-Cohesion: 0.06
-Nodes (36): applyOps(), clone(), createFakeFirestore(), query(), getPath(), isPlainObject(), resolve(), setPath() (+28 more)
+### Community 47 - "MIMO — Design"
+Cohesion: 0.12
+Nodes (18): 10. Guidelines for future development, 11. Known deviations from these principles, 1. Design principles, 2. Application responsibilities, 3. Frontend design, 4. Backend module organization, 6. API conventions, 7. Authentication and authorization (+10 more)
 
 ### Community 48 - "MIMO Edge Guardian — Phase 2A Contract (Proposed)"
-Cohesion: 0.06
-Nodes (35): 0. Scope and hard boundaries (unchanged from `CLAUDE.md`), 10. Retry backoff and jitter (Pi side, PROPOSED), 11. Isolated latest-state Firestore document (PROPOSED), 12. Server-receipt-time freshness calculation (PROPOSED), 13.1 Shared inputs, 13.2 Vector A — empty-checks `UNKNOWN` snapshot, `seq = 1`, 13.3 Vector B — `FAILING` snapshot with one check, `seq = 2`, same stream, 13.4 Negative vector — tamper detection (+27 more)
+Cohesion: 0.08
+Nodes (26): 0. Scope and hard boundaries (unchanged from `CLAUDE.md`), 10. Retry backoff and jitter (Pi side, PROPOSED), 11. Isolated latest-state Firestore document (PROPOSED), 12. Server-receipt-time freshness calculation (PROPOSED), 13.1 Shared inputs, 13.2 Vector A — empty-checks `UNKNOWN` snapshot, `seq = 1`, 13.3 Vector B — `FAILING` snapshot with one check, `seq = 2`, same stream, 13.4 Negative vector — tamper detection (+18 more)
 
 ### Community 49 - "adminInsights.controller.js"
 Cohesion: 0.11
-Nodes (30): A, { admin, db }, C, cashfreeSettlementService, cleanView(), fail(), getAdminAnalytics(), getAdminFinanceSheetData() (+22 more)
+Nodes (30): A, { admin, db }, C, { cachedValue }, cashfreeSettlementService, cleanView(), fail(), getAdminAnalytics() (+22 more)
 
 ### Community 50 - "guardianAdminHealth.routes.js"
-Cohesion: 0.09
-Nodes (27): postCustomerIncident(), computeFreshness(), { adminAuthMiddleware }, { checkCustomerWebsiteCondition }, { computeFreshness }, createGuardianAdminHealthRouter(), { db }, express (+19 more)
+Cohesion: 0.08
+Nodes (29): postCustomerIncident(), computeFreshness(), { adminAuthMiddleware }, { checkCustomerWebsiteCondition }, { computeFreshness }, createGuardianAdminHealthRouter(), { db }, express (+21 more)
 
 ### Community 51 - "diagnose"
-Cohesion: 0.12
-Nodes (8): cascades(), CascadeTest, codes(), diagnose(), HealthyTest, RootCauseTest, StaleAndPersistenceTest, UnknownVersusFailTest
+Cohesion: 0.09
+Nodes (16): Cascade, classify(), cascade_if_blocked(), state(), expected_checks(), make_config(), cascades(), CascadeTest (+8 more)
 
 ### Community 52 - "functions-env.test.js"
-Cohesion: 0.11
-Nodes (25): ALLOWED, ALLOWED_PATTERNS, fs, isAllowed(), main(), mergeSources(), parseDotenv(), parseLiveEnv() (+17 more)
+Cohesion: 0.10
+Nodes (26): ALLOWED, ALLOWED_PATTERNS, fs, isAllowed(), main(), mergeSources(), MIGRATING_TO_SECRET, parseDotenv() (+18 more)
 
 ### Community 53 - "scanner-document-scorer.ts"
 Cohesion: 0.15
 Nodes (26): DocumentCorners, angleAtDegrees(), angleScore(), areaScore(), aspectRatioScore(), boundingBoxArea(), CandidateInput, centerScore() (+18 more)
 
 ### Community 54 - "profile.controller.js"
-Cohesion: 0.12
-Nodes (23): postAdminAdImage(), { db, admin }, { parseMultipartForm, uploadBufferToStorage }, postChatMessage(), bcrypt, { db }, DOCUMENT_TYPES, extractFields() (+15 more)
+Cohesion: 0.08
+Nodes (32): { admin, db }, fetchAllAds(), getAdminAds(), getPublicAds(), { parseMultipartForm, uploadBufferToStorage }, patchAdminAd(), postAdminAd(), postAdminAdImage() (+24 more)
 
 ### Community 55 - "googleSheets.test.js"
-Cohesion: 0.12
+Cohesion: 0.13
 Nodes (24): axios, fetchFinanceSheetData(), GIDS, isPendingStatus(), isRevenueEligible(), isSettledStatus(), MONTH_MAP, parseDayNumber() (+16 more)
 
 ### Community 56 - "_strftime"
@@ -504,21 +528,25 @@ Nodes (24): url(), __addDays(), __arraySum(), ccall(), convertReturnValue(), dem
 Cohesion: 0.08
 Nodes (12): A, { admin, db }, CATEGORY_LABEL, { classifyFailureText, ISSUE_CATEGORIES }, COST_BENCHMARKS, DAYS_OF_WEEK, getFailureAnalytics(), INITIAL_TICKETS (+4 more)
 
+### Community 58 - "adminLoginAndOrigin.test.js"
+Cohesion: 0.14
+Nodes (15): passwordsMatch(), postAdminLogin(), adminOriginGuard(), allowedOrigins(), DEFAULT_ORIGINS, { adminOriginGuard, allowedOrigins }, assert, { createFakeFirestore } (+7 more)
+
 ### Community 59 - "ui.tsx"
 Cohesion: 0.16
 Nodes (31): api, AuthFooter(), MimoCoinsDisplay(), initialsOf(), MimoHeader(), ProfileButton(), ButtonProps, EmptyState() (+23 more)
 
 ### Community 60 - "Publisher"
-Cohesion: 0.10
-Nodes (8): sanitize_text(), Publisher, PublishResult, publisher_from_env(), main(), make_snapshot(), SanitizeTest, PublisherFromEnvTest
+Cohesion: 0.12
+Nodes (8): sanitize_text(), HttpsClient, SocketHttpsClient, Publisher, PublishResult, main(), make_snapshot(), SanitizeTest
 
-### Community 61 - "snapshot.py"
-Cohesion: 0.14
-Nodes (17): 1.4 Size and validation, 6.1 Isolation from the existing kiosk router, 6.2 Request, 6.3 Response codes (PROPOSED), 6. `POST /kiosk/guardian/health` (PROPOSED), is_valid_check_id(), iso_utc(), plane_of() (+9 more)
+### Community 61 - "scheduler.py"
+Cohesion: 0.10
+Nodes (23): 1.4 Size and validation, 6.1 Isolation from the existing kiosk router, 6.2 Request, 6.3 Response codes (PROPOSED), 6. `POST /kiosk/guardian/health` (PROPOSED), add_root(), Diagnosis, _evidence() (+15 more)
 
 ### Community 62 - "Firebase Firestore Schema Design for MIMO Kiosk System"
-Cohesion: 0.07
-Nodes (29): 1. `users` Collection, 2. `kiosk_machines` Collection, 3. `print_jobs` Collection, 4. `payment_transactions` Collection, 6. `printers` Collection (Optional but Recommended), 7. `kiosk_health_logs` Collection (Time Series), Answer to Your Question, BigQuery Access Control (+21 more)
+Cohesion: 0.09
+Nodes (22): Answer to Your Question, BigQuery Access Control, BigQuery Cost Management, BigQuery Export Configuration, Enable Firestore BigQuery Export, Firebase Firestore Schema Design for MIMO Kiosk System, Firestore Security Rules, Implementation Roadmap (+14 more)
 
 ### Community 63 - "pi_scripts/firebase_listener.py"
 Cohesion: 0.09
@@ -526,15 +554,15 @@ Nodes (7): cleanup_prefetch_cache(), _is_prefetch_candidate_fresh(), on_prefetch
 
 ### Community 64 - "user.controller.js"
 Cohesion: 0.08
-Nodes (18): postAdminCouponsBulk(), postMarkPrinted(), { admin, db }, Busboy, { normalizeOrders }, parsePhotoUpload(), postUploadProfilePhoto(), { v4: uuidv4 } (+10 more)
+Nodes (17): postAdminCouponsBulk(), { admin, db }, Busboy, { normalizeOrders }, parsePhotoUpload(), postUploadProfilePhoto(), { v4: uuidv4 }, { authMiddleware } (+9 more)
 
-### Community 65 - "kioskCommands.controller.js"
-Cohesion: 0.07
-Nodes (32): 4.2 Backend access (least privilege), A, { admin, db }, CLEAN_IN_FLIGHT, crypto, IN_FLIGHT, postAdminKioskCleanColorHead(), postAdminKioskRestart() (+24 more)
+### Community 65 - "kioskRestart.test.js"
+Cohesion: 0.15
+Nodes (14): 4.1 Secret identity, 4.2 Backend access (least privilege), 4.3 The Pi side — master key never present, 4.4 Rotation and revocation, 4. Secret Manager target architecture and provisioning boundaries (PROPOSED — target, not deployed), postAdminKioskRestart(), assert, { createFakeFirestore } (+6 more)
 
 ### Community 66 - "whatsappFlowEndpoint.test.js"
-Cohesion: 0.10
-Nodes (22): crypto, generateFlowToken(), markBindingFailed(), markBindingSent(), prepareFlowTokenBinding(), ref(), resolveFlowTokenWaId(), revokeFlowTokenBinding() (+14 more)
+Cohesion: 0.08
+Nodes (25): crypto, generateFlowToken(), markBindingFailed(), markBindingSent(), prepareFlowTokenBinding(), ref(), resolveFlowTokenWaId(), revokeFlowTokenBinding() (+17 more)
 
 ### Community 68 - "FakeRef"
 Cohesion: 0.17
@@ -542,14 +570,14 @@ Nodes (7): cmd(), FakeClock, FakeRef, ok_run(), RemoteRestartTest, run(), run()
 
 ### Community 69 - "config.py"
 Cohesion: 0.15
-Nodes (13): _bool(), ConfigError, Endpoint, GuardianConfig, _int(), _is_ip(), load_config(), _num() (+5 more)
+Nodes (12): _bool(), ConfigError, Endpoint, GuardianConfig, _int(), _is_ip(), _num(), parse_config() (+4 more)
 
 ### Community 70 - "upload.controller.js"
 Cohesion: 0.10
-Nodes (22): { admin, db }, axios, downloadStorageBytes(), {
+Nodes (35): { admin, db }, axios, deleteRemoveFile(), discardGeneratedArtifacts(), downloadStorageBytes(), {
   extractStoragePath, validateCustomerPath, loadActiveReferenceIndex, isReferencedByOther,
   deleteObject, cleanupJobObjects, buildCleanupUpdate,
-}, findMissingUploadedFile(), { getPDFDocument }, path, postFinalizeUpload() (+14 more)
+}, findMissingUploadedFile(), { getPDFDocument } (+27 more)
 
 ### Community 71 - "issueCategories.service.js"
 Cohesion: 0.11
@@ -560,32 +588,32 @@ Cohesion: 0.14
 Nodes (23): Ad, AdBanner(), AdSlide(), normalizeUrl(), useAds(), wrap(), TextButton(), ActivePrintCodeJob (+15 more)
 
 ### Community 73 - "flowHandler.js"
-Cohesion: 0.12
-Nodes (21): COLOR_MODES, SCREENS, { COLOR_NOTICE, SCREENS, COLOR_MODES, MAX_COPIES }, createFlowHandler(), checkStatus(), dispatch(), submitOptions(), { createInMemorySessionStore } (+13 more)
+Cohesion: 0.13
+Nodes (19): { COLOR_NOTICE, SCREENS, COLOR_MODES, MAX_COPIES }, createFlowHandler(), checkStatus(), dispatch(), submitOptions(), { createInMemorySessionStore }, crypto, { pricingContext } (+11 more)
 
 ### Community 74 - "print_file"
-Cohesion: 0.09
-Nodes (12): auto_heal_cups_queue(), color_cleaning_scheduler_loop(), deduct_color_paper_usage(), end_sheet_check(), expected_min_sheets(), get_pdf_page_count(), is_color_queue(), pre_rasterize_pdf_for_color() (+4 more)
+Cohesion: 0.07
+Nodes (17): begin_sheet_check(), check_printer_health_when_idle(), classify_supply(), color_cleaning_scheduler_loop(), deduct_color_paper_usage(), end_sheet_check(), expected_min_sheets(), is_color_queue() (+9 more)
 
 ### Community 75 - ".write"
 Cohesion: 0.17
 Nodes (3): _make_png_bytes(), _make_zip_bytes(), StrictValidatorTests
 
-### Community 76 - "functions/package.json"
-Cohesion: 0.09
-Nodes (21): author, description, devDependencies, c8, engines, node, axios, express (+13 more)
+### Community 76 - "firebase.js"
+Cohesion: 0.07
+Nodes (26): admin, db, fs, { isDeployedRuntime }, path, A, { admin, db }, { cachedCollectionGet } (+18 more)
 
 ### Community 77 - "ref_express"
-Cohesion: 0.04
-Nodes (65): 10. Guidelines for future development, 11. Known deviations from these principles, 1. Design principles, 2. Application responsibilities, 3. Frontend design, 4. Backend module organization, 6. API conventions, 7. Authentication and authorization (+57 more)
+Cohesion: 0.05
+Nodes (44): 8. Authentication, authorization and rate-limiting behavior (PROPOSED), authMiddleware(), createFailureLimiter(), createLimiters(), createRequestLimiter(), crypto, hashIp(), retryAfterSeconds() (+36 more)
 
 ### Community 78 - "FinanceExpensesPage.tsx"
-Cohesion: 0.12
-Nodes (22): CATEGORY_COLORS, categoryConfig(), CHART_PALETTE, EntryStatus, EXPENSE_CATEGORIES, ExpenseReport, FinanceExpensesPage(), formatIsoDate() (+14 more)
+Cohesion: 0.13
+Nodes (21): CATEGORY_COLORS, categoryConfig(), CHART_PALETTE, EntryStatus, EXPENSE_CATEGORIES, ExpenseReport, FinanceExpensesPage(), formatIsoDate() (+13 more)
 
 ### Community 79 - "flowFixtures.js"
-Cohesion: 0.09
-Nodes (15): addDocument(), crc32(), { createRequire }, crypto, encryptMedia(), functionsRequire, http, makePng() (+7 more)
+Cohesion: 0.10
+Nodes (12): makePng(), addDocument(), crc32(), { createRequire }, crypto, encryptMedia(), functionsRequire, http (+4 more)
 
 ### Community 80 - "abort"
 Cohesion: 0.11
@@ -596,32 +624,32 @@ Cohesion: 0.23
 Nodes (4): _FakeChange, _FakeChangeType, FakeSnapshot, PrefetchConcurrencyTests
 
 ### Community 82 - "cashfreeWebhook.test.js"
-Cohesion: 0.05
-Nodes (37): app, app, { onRequest }, ALWAYS_ALLOWED_PATHS, blockProductionWrites(), LOGIN_PATHS, WRITE_METHODS, { admin, db } (+29 more)
+Cohesion: 0.09
+Nodes (18): admin, assert, crypto, db, fake, firebasePath, http, jobDoc (+10 more)
 
 ### Community 83 - "compilerOptions"
 Cohesion: 0.09
 Nodes (21): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, jsx, lib, module, moduleDetection, moduleResolution (+13 more)
 
-### Community 84 - "adminGang.controller.js"
-Cohesion: 0.16
-Nodes (18): { admin, db }, adminActor(), DEFAULT_LEAVE_BALANCE, EMPLOYEE_STATUSES, getAdminMarketingTasks(), getAdminTechnicalTasks(), logActivity(), MARKETING_PRIORITIES (+10 more)
+### Community 84 - "metaFlowAdapter.js"
+Cohesion: 0.20
+Nodes (15): b64(), crypto, decryptRequest(), encryptResponse(), FlowDecryptionError, verifySignature(), AdapterConfigError, createFirestoreWaIdResolver() (+7 more)
 
 ### Community 85 - "test_auto_update.cjs"
 Cohesion: 0.11
 Nodes (11): assert, { createRoot }, mockDoc, MockNode, React, runTests(), AutoUpdateHarnessComponent(), createHookTester() (+3 more)
 
 ### Community 86 - "src/api.ts"
-Cohesion: 0.04
-Nodes (75): api, LOGIN_URLS, ROUTE_PREFIX_TOKEN, TOKEN_KEYS, BtnProps, CardProps, ConfirmDialogProps, EmptyState() (+67 more)
+Cohesion: 0.06
+Nodes (60): EmptyState(), LoadingSkeleton(), SearchInput(), ConfigurationPage(), CustomerWebsiteDiagnosticModal(), Props, CustomerWebsiteStatusButton(), Props (+52 more)
 
 ### Community 87 - "MIMO — Architecture"
-Cohesion: 0.09
-Nodes (23): 10. Deployment topology, 12. Design decisions, 13. Known limitations, 14. Feature status and unverified behaviour, 1. Overview, 2. System context, 3. Components, 4.1 From upload to print code (+15 more)
+Cohesion: 0.18
+Nodes (11): 10. Deployment topology, 12. Design decisions, 13. Known limitations, 14. Feature status and unverified behaviour, 1. Overview, 2. System context, 3. Components, 5. Firestore data model (+3 more)
 
-### Community 88 - "uploadFinalizeGuard.test.js"
-Cohesion: 0.25
-Nodes (8): assert, { createFakeFirestore }, fake, finalize(), garbage, { postFinalizeUpload }, response(), test
+### Community 88 - "postFinalizeUpload"
+Cohesion: 0.14
+Nodes (16): postFinalizeUpload(), assert, { createFakeFirestore }, fake, finalize(), garbage, { postFinalizeUpload }, response() (+8 more)
 
 ### Community 89 - "mimo-frontend/package.json"
 Cohesion: 0.11
@@ -640,14 +668,14 @@ Cohesion: 0.09
 Nodes (17): { KIOSK_REGISTRY_COLLECTION, STATUS, isKeyVersionPermitted }, STATUS, assert, { createFakeFirestore }, { createGuardianHealthRouter }, DERIVED_KEY_HEX, { deriveKioskKey }, { describe, it, before, after, beforeEach } (+9 more)
 
 ### Community 93 - "worker.js"
-Cohesion: 0.13
-Nodes (17): claimJob(), completeJob(), errorMessage(), failJob(), getJob(), ref(), TERMINAL_STATES, getSessionStatus() (+9 more)
+Cohesion: 0.09
+Nodes (25): claimJob(), completeJob(), errorMessage(), failJob(), getJob(), ref(), TERMINAL_STATES, getSessionStatus() (+17 more)
 
 ### Community 94 - "flowOrchestrator.js"
-Cohesion: 0.14
-Nodes (20): claimFlowOrderNotification(), completeFlowOrderNotification(), fingerprintOf(), {
+Cohesion: 0.12
+Nodes (22): claimFlowOrderNotification(), completeFlowOrderNotification(), COLOR_MODES, SCREENS, fingerprintOf(), {
   createOrderFromFlowJob, claimFlowOrderNotification, completeFlowOrderNotification, FlowOrderError, OrderServiceError,
-}, finishReview(), pollProcessing(), { pricingContext }, processing() (+12 more)
+}, finishReview(), pollProcessing() (+14 more)
 
 ### Community 95 - "e2e_print_progress.mjs"
 Cohesion: 0.15
@@ -670,8 +698,8 @@ Cohesion: 0.12
 Nodes (14): assert, { autoRefundJob }, { CASHFREE_BASE_URL, cashfreeHeaders }, { createFakeFirestore }, { createKioskRouter }, fake, http, { installAxiosStub } (+6 more)
 
 ### Community 102 - "process_job"
-Cohesion: 0.15
-Nodes (8): convert_image_to_pdf_fit(), convert_to_pdf(), impose_nup(), new_temp_pdf_path(), process_image_custom(), process_image_fill(), process_job(), sniff_kind()
+Cohesion: 0.11
+Nodes (11): convert_image_to_pdf_fit(), convert_to_pdf(), get_pdf_page_count(), impose_nup(), new_temp_pdf_path(), pre_rasterize_pdf_for_color(), process_image_custom(), process_image_fill() (+3 more)
 
 ### Community 103 - "prefetch_one_file"
 Cohesion: 0.15
@@ -702,8 +730,8 @@ Cohesion: 0.12
 Nodes (10): postAdminRefillPaper(), assert, { createFakeFirestore }, fake, { jobOutcome, hardwareFor }, NOW, { postAdminRefillPaper }, quietLog (+2 more)
 
 ### Community 110 - "cashfreeSettlement.service.js"
-Cohesion: 0.15
-Nodes (22): axios, calculateSettlementHealth(), classifySettlementStatus(), fetchSettlementsFromCashfree(), fetchSettlementsFromGoogleSheet(), normalizeSettlementItem(), parseDateAndTimestamp(), round2() (+14 more)
+Cohesion: 0.24
+Nodes (14): axios, calculateSettlementHealth(), classifySettlementStatus(), fetchSettlementsFromCashfree(), fetchSettlementsFromGoogleSheet(), normalizeSettlementItem(), parseDateAndTimestamp(), round2() (+6 more)
 
 ### Community 111 - "pipeline.js"
 Cohesion: 0.18
@@ -718,8 +746,8 @@ Cohesion: 0.16
 Nodes (15): __emval_addMethodCaller(), __emval_as(), __emval_call_void_method(), __emval_get_method_caller(), __emval_get_property(), __emval_lookupTypes(), __emval_new_array(), __emval_new_cstring() (+7 more)
 
 ### Community 114 - "safe_sudo_run"
-Cohesion: 0.16
-Nodes (8): cancel_stale_cups_jobs_for_printer(), is_eligible_for_auto_resume(), on_snapshot(), reset_printer_usb(), _run_process_job(), safe_sudo_run(), startup_reconcile_cups(), watchdog_loop()
+Cohesion: 0.14
+Nodes (9): auto_heal_cups_queue(), cancel_stale_cups_jobs_for_printer(), is_eligible_for_auto_resume(), on_snapshot(), reset_printer_usb(), _run_process_job(), safe_sudo_run(), startup_reconcile_cups() (+1 more)
 
 ### Community 115 - "README.md"
 Cohesion: 0.24
@@ -754,24 +782,24 @@ Cohesion: 0.13
 Nodes (15): devDependencies, eslint, @eslint/js, eslint-plugin-react-hooks, eslint-plugin-react-refresh, globals, tailwindcss, @tailwindcss/vite (+7 more)
 
 ### Community 119 - "createOrderOperation.js"
-Cohesion: 0.17
-Nodes (14): resolveWhatsAppUser(), buildPendingPrintJobDoc(), { createOrderForUser, OrderServiceError }, createOrderFromFlowJob(), FlowOrderError, { getJob }, NOTIFY_STATES, { resolveWhatsAppUser } (+6 more)
+Cohesion: 0.12
+Nodes (19): resolveWhatsAppUser(), buildPendingPrintJobDoc(), { createOrderForUser, OrderServiceError }, createOrderFromFlowJob(), FlowOrderError, { getJob }, NOTIFY_STATES, { resolveWhatsAppUser } (+11 more)
 
-### Community 120 - "metaFlowAdapter.js"
-Cohesion: 0.20
-Nodes (15): b64(), crypto, decryptRequest(), encryptResponse(), FlowDecryptionError, verifySignature(), AdapterConfigError, createFirestoreWaIdResolver() (+7 more)
+### Community 120 - "order.service.js"
+Cohesion: 0.09
+Nodes (27): cashfreeHeaders, fetchCashfreeRefunds(), { admin, db }, axios, { CASHFREE_BASE_URL, getSecretKey, cashfreeHeaders }, crypto, isValidCashfreeSignature(), jwt (+19 more)
 
-### Community 121 - "storage.service.js"
-Cohesion: 0.25
-Nodes (16): deleteRemoveFile(), discardGeneratedArtifacts(), ACTIVE_REFERENCE_STATUSES, cleanupJobObjects(), collectRawReferences(), CUSTOMER_PREFIXES, deleteObject(), discoverStoragePaths() (+8 more)
+### Community 121 - "createFakeFirestore"
+Cohesion: 0.08
+Nodes (26): applyOps(), clone(), createFakeFirestore(), query(), getPath(), isPlainObject(), resolve(), setPath() (+18 more)
 
 ### Community 122 - "adminIssues.test.js"
 Cohesion: 0.16
 Nodes (12): getAdminIssues(), assert, { createFakeFirestore }, fake, FROM, { getAdminIssues }, issues(), RANGE (+4 more)
 
-### Community 123 - "publicMachines.controller.js"
-Cohesion: 0.22
-Nodes (12): buildMachineView(), { db }, getPublicMachine(), getPublicMachines(), loadMachineContext(), R, toMillis(), express (+4 more)
+### Community 123 - "ads.controller.js"
+Cohesion: 0.14
+Nodes (17): buildMachineView(), { db }, getPublicMachine(), getPublicMachines(), loadMachineContext(), R, toMillis(), express (+9 more)
 
 ### Community 124 - "createWasm"
 Cohesion: 0.20
@@ -781,17 +809,17 @@ Nodes (14): addRunDependency(), createWasm(), instantiateArrayBuffer(), instanti
 Cohesion: 0.14
 Nodes (15): canonicalString(), assert, BOOT_ID, { createFakeFirestore }, { createGuardianHealthRouter }, { deriveKioskKey, canonicalString, sha256Hex, hmacSha256Hex }, { describe, it, before, after, beforeEach }, express (+7 more)
 
-### Community 126 - "guardianAdminHealth.test.js"
+### Community 126 - "OverviewPage.tsx"
 Cohesion: 0.13
-Nodes (13): ADMIN_TOKEN, assert, { createFakeFirestore }, { createGuardianAdminHealthRouter }, { describe, it, before, after, beforeEach }, express, fake, FINANCE_TOKEN (+5 more)
+Nodes (28): displayName(), isToday(), JobDetails(), MachineBadge(), ms(), OUTCOME, printDuration(), PrintHistoryList() (+20 more)
 
-### Community 127 - "ads.controller.js"
-Cohesion: 0.24
-Nodes (10): { admin, db }, fetchAllAds(), getAdminAds(), getPublicAds(), { parseMultipartForm, uploadBufferToStorage }, patchAdminAd(), postAdminAd(), sanitize() (+2 more)
+### Community 127 - "whatsappFlowOrphanJob.test.js"
+Cohesion: 0.09
+Nodes (22): submitJob(), FIXED_NOW, assert, { classifyJob, claimJobForCleanup, CHECKOUT_PROTECTION_MS }, { createFakeFirestore, FIXED_NOW }, { fake, http, seed }, { finishReview, DEFAULT_JOB_COLLECTION, DEFAULT_ORDER_LINK_COLLECTION }, { SCREENS } (+14 more)
 
 ### Community 128 - "whatsappWebhookSecurity.test.js"
-Cohesion: 0.13
-Nodes (12): crypto, admin, assert, benignBody, crypto, db, firebasePath, { postWhatsappWebhook } (+4 more)
+Cohesion: 0.17
+Nodes (11): admin, assert, benignBody, crypto, db, firebasePath, { postWhatsappWebhook }, request() (+3 more)
 
 ### Community 129 - "index.tsx"
 Cohesion: 0.18
@@ -806,52 +834,52 @@ Cohesion: 0.21
 Nodes (11): A4_PORTRAIT, a4Layout(), buildPdf(), encode(), FIT_STEPS, fitPagesToPdfLimit(), FittedPdf, loadImage() (+3 more)
 
 ### Community 132 - "storageUploadLifecycle.test.js"
-Cohesion: 0.15
-Nodes (12): assert, convPath, { createHarness, NOW, HOUR }, finalize(), h, orphans(), { postFinalizeUpload, deleteRemoveFile }, removeFile() (+4 more)
+Cohesion: 0.18
+Nodes (10): assert, convPath, { createHarness, NOW, HOUR }, finalize(), h, { postFinalizeUpload, deleteRemoveFile }, removeFile(), response() (+2 more)
 
 ### Community 134 - "FakeClock"
-Cohesion: 0.19
-Nodes (3): CleanEpsonSafetyTests, mock_run(), FakeClock
+Cohesion: 0.13
+Nodes (4): CleanEpsonSafetyTests, mock_run(), FakeClock, FirebaseListenerCleanCommandTests
 
 ### Community 136 - "MIMO — Self-Service Cloud Printing"
 Cohesion: 0.13
 Nodes (15): Credentials (private), Deployment, Documentation map, Environment variables, Features and status, Local development, MIMO — Self-Service Cloud Printing, New intern onboarding (+7 more)
 
 ### Community 137 - "test_static_safety.py"
-Cohesion: 0.24
-Nodes (3): imports(), sources(), StaticSafetyTest
+Cohesion: 0.13
+Nodes (5): imports(), sources(), StaticSafetyTest, brother_pid(), query()
 
-### Community 138 - "scripts"
-Cohesion: 0.14
-Nodes (14): scripts, dev, dev:emulator, predeploy:check, test, test:coverage, test:coverage:core, test:coverage:money (+6 more)
+### Community 138 - "functions/package.json"
+Cohesion: 0.06
+Nodes (35): author, description, devDependencies, c8, engines, node, axios, express (+27 more)
 
 ### Community 139 - "whatsappPaymentLink.test.js"
-Cohesion: 0.17
-Nodes (9): getWaPay(), admin, assert, axiosPath, calls, db, firebasePath, { getWaPay } (+1 more)
+Cohesion: 0.12
+Nodes (12): getWaPay(), express, router, whatsapp, admin, assert, axiosPath, calls (+4 more)
 
 ### Community 140 - "crypto.js"
 Cohesion: 0.19
 Nodes (12): RFC-5869, crypto, deriveKioskKey(), hexEqualConstantTime(), HKDF_INFO, hkdfSha256(), infoForKeyVersion(), assert (+4 more)
 
-### Community 141 - "pdfExport.ts"
-Cohesion: 0.32
-Nodes (7): exportUsersPdf(), FinanceWalletPageProps, UsersPage(), usersService, AdminUserItem, AdminUserMetrics, AdminUsersResponse
+### Community 141 - "marketing.controller.js"
+Cohesion: 0.10
+Nodes (16): { admin, db }, bcrypt, chat, getMarketingTasks(), { getSecretKey }, jwt, logActivity(), patchMarketingTask() (+8 more)
 
 ### Community 142 - "get"
 Cohesion: 0.35
 Nodes (12): createFirestoreSessionStore(), del(), get(), peek(), serialisedPerToken(), start(), createInMemorySessionStore(), get() (+4 more)
 
-### Community 143 - "storageBlockersRegression.test.js"
+### Community 143 - "clean_epson.py"
 Cohesion: 0.14
-Nodes (7): assert, C, { createHarness, BUCKET, NOW, HOUR, ago }, h, S, test, uploadController
+Nodes (10): execute_head_cleaning(), is_printer_idle(), log(), main(), run_cleaning_job(), run_daily_scheduler(), seconds_until_target_time(), send_cleaning_notification() (+2 more)
 
-### Community 144 - "read_printer_status"
-Cohesion: 0.12
-Nodes (9): begin_sheet_check(), check_printer_health_when_idle(), classify_supply(), parse_pjl_status(), _pjl_exchange(), publish_printer_health(), read_printer_status(), sheet_check_lock() (+1 more)
+### Community 144 - "server.js"
+Cohesion: 0.11
+Nodes (17): app, ALWAYS_ALLOWED_PATHS, blockProductionWrites(), LOGIN_PATHS, WRITE_METHODS, { admin, db }, { adminOriginGuard }, app (+9 more)
 
-### Community 148 - "refund.characterization.test.js"
-Cohesion: 0.15
-Nodes (10): assert, { autoRefundJob }, { createFakeFirestore }, event(), failing(), fake, http, { installAxiosStub } (+2 more)
+### Community 148 - "guardianAdminHealth.test.js"
+Cohesion: 0.13
+Nodes (13): ADMIN_TOKEN, assert, { createFakeFirestore }, { createGuardianAdminHealthRouter }, { describe, it, before, after, beforeEach }, express, fake, FINANCE_TOKEN (+5 more)
 
 ### Community 149 - "test_active_print.mts"
 Cohesion: 0.22
@@ -866,7 +894,7 @@ Cohesion: 0.12
 Nodes (15): 1. Deployment inventory, 2. Pipeline, 3. Backend configuration and the security gate, 4. Security review of the pipeline, 5. What cannot be verified from here, 7. Findings from the read-only checks of 2026-09-26/27, CI/CD — how a push becomes a deployment, { execFileSync } (+7 more)
 
 ### Community 152 - "mimo-frontend/src/App.tsx"
-Cohesion: 0.17
+Cohesion: 0.18
 Nodes (8): ScreenState, Adds(), AddsProps, resolveScreensaverMediaUrl(), CV001Background(), MaintenanceScreen(), MaintenanceScreenProps, @phosphor-icons/react
 
 ### Community 153 - "uploadFinalizeConcurrency.test.js"
@@ -906,12 +934,8 @@ Cohesion: 0.28
 Nodes (8): getMimoStats(), assert, { createFakeFirestore }, fake, { getMimoStats }, getStats(), response(), test
 
 ### Community 163 - "refundSync.service.js"
-Cohesion: 0.61
-Nodes (7): iso(), loadByOrderId(), refundFromCashfree(), refundFromFirestore(), resolveRefunds(), toMillis(), up()
-
-### Community 164 - "ref_path"
-Cohesion: 0.07
-Nodes (22): app, assert, { createFakeFirestore }, fs, path, SNAPSHOT, test, assert (+14 more)
+Cohesion: 0.50
+Nodes (8): cashfreeRefundFetcher(), iso(), loadByOrderId(), refundFromCashfree(), refundFromFirestore(), resolveRefunds(), toMillis(), up()
 
 ### Community 165 - "manifest.json"
 Cohesion: 0.22
@@ -941,9 +965,13 @@ Nodes (9): addOnPostRun(), addOnPreRun(), callRuntimeCallbacks(), initRuntime(),
 Cohesion: 0.33
 Nodes (7): downcastPointer(), getBasestPointer(), getInheritedInstance(), makeClassHandle(), RegisteredPointer_fromWireType(), makeDefaultHandle(), throwInternalError()
 
+### Community 172 - "SubprocessRunner"
+Cohesion: 0.12
+Nodes (12): 1.1 Top-level shape, 1.2 Each `checks[]` entry, 1.3 Diagnosis block, 1.5 Sequence-number behavior (existing, in-process only), 1.6 Scheduler/callback behavior, 1.7 Command allowlist and static safety (existing, unchanged by this design), 1. Frozen Phase 1 snapshot contract (existing, verified against source), is_read_only() (+4 more)
+
 ### Community 173 - "MIMO Backend (`functions/`)"
-Cohesion: 0.20
-Nodes (10): 10. Status, known issues and links, 1. Folder structure, 2. Run it locally, 3. API overview, 5. Environment variables, 6. Print-code protection (rate limiting), 7. Testing, 8. Deploying (+2 more)
+Cohesion: 0.11
+Nodes (16): 8.1 Admin and Finance workflows, 8. Admin & finance analytics, 5. Database design principles, `firebase/` — Firebase security rules and indexes, 10. Status, known issues and links, 1. Folder structure, 2. Run it locally, 3. API overview (+8 more)
 
 ### Community 174 - "fix_sv002_bw_queue.sh"
 Cohesion: 0.47
@@ -961,12 +989,9 @@ Nodes (8): patchPage(), updateScannerPage(), assert, { authMiddleware }, { creat
   postFinalizeSession,
 }, router, test
 
-### Community 176 - "whatsappFlowWorker.trigger.js"
-Cohesion: 0.22
-Nodes (8): { admin, db }, { createCdnFetcher }, FLOW_MEDIA_CDN_HOST_SUFFIXES, { onSchedule }, {
-  runOrchestratedWorkerTick,
-  DEFAULT_JOB_COLLECTION,
-}, runWhatsappFlowWorkerSweep(), runOrchestratedWorkerTick(), createDocumentProcessingTask()
+### Community 176 - "orphanStorage.trigger.js"
+Cohesion: 0.15
+Nodes (12): app, { onRequest }, defaults(), num(), { admin, db }, { onSchedule }, { runOrphanStoragePass, defaults }, scheduledOrphanStorageCleanup() (+4 more)
 
 ### Community 177 - "adminRefundRequests.test.js"
 Cohesion: 0.28
@@ -989,28 +1014,24 @@ Nodes (8): deletePage(), postReorderPages(), { authMiddleware }, express, {
 }, router, deleteScannerPage(), reorderScannerPages()
 
 ### Community 181 - "issueCategories.test.js"
-Cohesion: 0.22
-Nodes (6): assert, C, KNOWN_REASONS, machines, { PRINT_TIMEOUT_MESSAGE }, test
-
-### Community 182 - "printCodeStaleCollision.test.js"
-Cohesion: 0.25
-Nodes (7): assert, { createFakeFirestore }, fake, getDocuments(), { postGetDocumentsByCode }, response(), test
+Cohesion: 0.10
+Nodes (18): isColorJob(), computePrintTimeoutMs(), { admin, db }, { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE }, { isColorJob }, { onSchedule }, runPrintTimeoutSweep(), assert (+10 more)
 
 ### Community 183 - "dependencies"
 Cohesion: 0.29
 Nodes (7): dependencies, @google/model-viewer, lucide-react, motion, @phosphor-icons/react, react, react-dom
 
-### Community 184 - "orderCreationRace.test.js"
-Cohesion: 0.29
-Nodes (7): assert, checkout(), controller, { createFakeFirestore }, fake, response(), test
+### Community 184 - "expand"
+Cohesion: 0.24
+Nodes (4): expand(), PiClient, clean_env(), ExpandTests
 
 ### Community 185 - "mimo-website/src/main.tsx"
 Cohesion: 0.33
 Nodes (3): ThemeProvider(), next-themes, @react-oauth/google
 
-### Community 186 - "uploadPdfPageCount.test.js"
-Cohesion: 0.29
-Nodes (7): assert, { createFakeFirestore }, fake, finalize(), { postFinalizeUpload }, response(), test
+### Community 186 - "pdfExport.ts"
+Cohesion: 0.32
+Nodes (7): exportUsersPdf(), FinanceWalletPageProps, UsersPage(), usersService, AdminUserItem, AdminUserMetrics, AdminUsersResponse
 
 ### Community 187 - "MIMO Admin Dashboard & Finance Portal (`mimo-website/mimo-admin-dashboard/`)"
 Cohesion: 0.25
@@ -1033,7 +1054,7 @@ Cohesion: 0.29
 Nodes (7): Build & deploy, MIMO Customer Website (`mimo-website/`), Notes, Run locally, Status, dependencies and troubleshooting, The customer journey (what the pages do), What is in here
 
 ### Community 195 - "UniqueDownloadPathTests"
-Cohesion: 0.33
+Cohesion: 0.29
 Nodes (3): UniqueDownloadPathTests, slow_writer(), url_for()
 
 ### Community 196 - "BigQuery Analytics"
@@ -1084,25 +1105,81 @@ Nodes (4): buildCommand, devCommand, outputDirectory, rewrites
 Cohesion: 0.12
 Nodes (12): ExampleUnitTest, Android kiosk shell (`LENOVO TABLET APP/`), Build and install (*unverified in the documentation audit*), Common problems, Dependencies and configuration, How it talks to the rest of the system, Testing, What is in here (+4 more)
 
+### Community 218 - "financeRemediation.test.js"
+Cohesion: 0.29
+Nodes (9): allocatePaise(), formatINR(), multiplyPaise(), sumPaise(), toRupees(), A, assert, test (+1 more)
+
+### Community 220 - "whatsapp.controller.js"
+Cohesion: 0.10
+Nodes (26): { admin, db }, { _askForCoupon, _finalizePayment, sendWhatsAppButtons, sendWhatsAppList, sendWhatsAppMessage, sendWhatsAppOrderCard, waContext }, axios, { CASHFREE_BASE_URL, WA_ACCESS_TOKEN, WA_APP_SECRET, WA_VERIFY_TOKEN, cashfreeHeaders }, crypto, { generateUniquePrintCode }, { getPDFDocument }, isValidWhatsAppSignature() (+18 more)
+
+### Community 222 - "kioskReportProblem.test.js"
+Cohesion: 0.17
+Nodes (11): judgeReport(), assert, { createFakeFirestore }, { createKioskRouter, judgeReport }, emails, fake, { isColorJob }, post() (+3 more)
+
+### Community 223 - "storageSuccessCleanup.test.js"
+Cohesion: 0.18
+Nodes (7): assert, { autoCleanupStorageJob }, { createHarness, NOW, HOUR }, h, { runJobRetentionPass }, sweep(), test
+
+### Community 226 - "`pi-guardian/`: MIMO Edge Guardian, Phase 1 (local core)"
+Cohesion: 0.18
+Nodes (9): Checks, Configuration, Limits of Phase 1, `pi-guardian/`: MIMO Edge Guardian, Phase 1 (local core), Run it, Run the tests (no kiosk, no network, no credentials), Semantics, Snapshot (+1 more)
+
+### Community 227 - "kioskReportClean.test.js"
+Cohesion: 0.22
+Nodes (9): assert, { createFakeFirestore }, { createKioskRouter }, fake, { isColorJob }, post(), response(), router (+1 more)
+
+### Community 228 - "kioskCleanColorHead.test.js"
+Cohesion: 0.28
+Nodes (8): postAdminKioskCleanColorHead(), assert, clean(), { createFakeFirestore }, fake, { postAdminKioskCleanColorHead }, response(), test
+
+### Community 229 - "apiSurface.test.js"
+Cohesion: 0.22
+Nodes (7): app, assert, { createFakeFirestore }, fs, path, SNAPSHOT, test
+
+### Community 230 - "credentialSource.test.js"
+Cohesion: 0.22
+Nodes (7): assert, fs, { isDeployedRuntime }, Module, os, path, test
+
+### Community 231 - "packagingBoundary.test.js"
+Cohesion: 0.25
+Nodes (7): assert, findOutOfBoundsRequires(), fs, FUNCTIONS_ROOT, listJsFiles(), path, test
+
+### Community 232 - "Collection Architecture"
+Cohesion: 0.25
+Nodes (8): 1. `users` Collection, 2. `kiosk_machines` Collection, 3. `print_jobs` Collection, 4. `payment_transactions` Collection, 5. `orders` Collection, 6. `printers` Collection (Optional but Recommended), 7. `kiosk_health_logs` Collection (Time Series), Collection Architecture
+
+### Community 233 - "loadPricing"
+Cohesion: 0.43
+Nodes (5): DEFAULT_RATES, loadPricing(), sanitizeRates(), { loadPricing }, pricingContext()
+
+### Community 239 - "public.controller.js"
+Cohesion: 0.22
+Nodes (6): getAdminScreensaver(), postAdminScreensaver(), { db }, getApiScreensaver(), { normalizeMediaUrl }, normalizeMediaUrl()
+
+### Community 244 - "kioskVerify.test.js"
+Cohesion: 0.28
+Nodes (8): postAdminKioskVerify(), assert, { createFakeFirestore }, fake, { postAdminKioskVerify }, response(), test, verify()
+
 ## Knowledge Gaps
 - **102 isolated node(s):** `express`, `firebase-admin`, `pdf-lib`, `axios`, `cashfree-pg` (+97 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 2532 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **35 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 2433 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **45 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `6.3 Response codes (PROPOSED)` connect `snapshot.py` to `Publisher`, `ref_express`?**
-  _High betweenness centrality (0.212) - this node is a cross-community bridge._
+- **Why does `6.3 Response codes (PROPOSED)` connect `scheduler.py` to `Publisher`, `ref_express`, `MIMO — Design`?**
+  _High betweenness centrality (0.233) - this node is a cross-community bridge._
 - **What connects `express`, `firebase-admin`, `pdf-lib` to the rest of the system?**
   _102 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `ref_lucide_react` be split into smaller, more focused modules?**
-  _Cohesion score 0.05470608222901801 - nodes in this community are weakly interconnected._
-- **Why does `validate_snapshot()` connect `snapshot.py` to `MIMO Edge Guardian — Phase 2A Contract (Proposed)`, `base_scenario`, `test_classifier.py`, `helpers.py`?**
-  _High betweenness centrality (0.195) - this node is a cross-community bridge._
-- **Should `ErrorBanner` be split into smaller, more focused modules?**
-  _Cohesion score 0.0349294471431876 - nodes in this community are weakly interconnected._
-- **Why does `authMiddleware()` connect `ref_express` to `user.controller.js`, `firebase.js`, `scanner.routes.test.js`, `scanner.routes.js`, `snapshot.py`?**
-  _High betweenness centrality (0.137) - this node is a cross-community bridge._
-- **Should `base_scenario` be split into smaller, more focused modules?**
-  _Cohesion score 0.05321100917431193 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06386292834890965 - nodes in this community are weakly interconnected._
+- **Why does `validate_snapshot()` connect `scheduler.py` to ``pi-guardian/`: MIMO Edge Guardian, Phase 1 (local core)`, `scheduler.py`, `SubprocessRunner`, `build`, `MIMO Edge Guardian — Phase 2A Contract (Proposed)`, `test_snapshot.py`?**
+  _High betweenness centrality (0.210) - this node is a cross-community bridge._
+- **Should `src/api.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._
+- **Why does `authMiddleware()` connect `ref_express` to `user.controller.js`, `admin.routes.js`, `MIMO — Design`, `scanner.routes.test.js`, `scanner.routes.js`, `scheduler.py`?**
+  _High betweenness centrality (0.153) - this node is a cross-community bridge._
+- **Should `use` be split into smaller, more focused modules?**
+  _Cohesion score 0.1471264367816092 - nodes in this community are weakly interconnected._
