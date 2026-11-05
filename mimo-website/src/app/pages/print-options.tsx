@@ -6,6 +6,7 @@ import { CircleHelp, FileText, X } from "lucide-react";
 import api from "../api";
 import { useTour } from "../utils/tour-context";
 import { KioskOutageAlert } from "../components/mimo/KioskOutageAlert";
+import { useKioskOutage } from "../utils/useKioskOutage";
 
 interface UploadedFile {
   name: string;
@@ -525,6 +526,58 @@ export function PrintOptions() {
     if (copies > 1) setCopies(copies - 1);
   };
 
+  const { outages } = useKioskOutage();
+  const isMimo1Down = Boolean(outages.allDown || outages.mimo1Down);
+  const isMimo2ColorDown = Boolean(outages.allDown || outages.mimo2ColorDown);
+  const isMimo2BwDown = Boolean(outages.allDown || outages.mimo2BwDown);
+  const isMimo2Down = Boolean(outages.allDown || (outages.mimo2BwDown && outages.mimo2ColorDown));
+  const isAllPrintersDown = Boolean(outages.allDown || (isMimo1Down && isMimo2Down));
+
+  // Automatically shift customers away from problematic machines if selected
+  useEffect(() => {
+    if (directKioskId === "CV-001" && isMimo1Down) {
+      if (!isMimo2Down) {
+        toast.info("MIMO 1.0 is currently under maintenance. Switched to MIMO 2.0.");
+        setDirectKioskId("SV-002");
+        try {
+          sessionStorage.setItem("directKioskId", "SV-002");
+          localStorage.setItem("mimo_directKioskId", "SV-002");
+        } catch {}
+      } else {
+        setDirectKioskId(null);
+      }
+    } else if (directKioskId === "SV-002" && isMimo2Down) {
+      if (!isMimo1Down) {
+        toast.info("MIMO 2.0 is currently under maintenance. Switched to MIMO 1.0.");
+        setDirectKioskId("CV-001");
+        try {
+          sessionStorage.setItem("directKioskId", "CV-001");
+          localStorage.setItem("mimo_directKioskId", "CV-001");
+        } catch {}
+      } else {
+        setDirectKioskId(null);
+      }
+    }
+  }, [directKioskId, isMimo1Down, isMimo2Down]);
+
+  // If Colour printer on MIMO 2.0 is down and user is on color, auto-revert to bw
+  useEffect(() => {
+    if (directKioskId === "SV-002" && isMimo2ColorDown && colorMode === "color") {
+      toast.warning("MIMO 2.0 Colour printer is currently unavailable. Switched to Black & White.");
+      setColorMode("bw");
+    }
+  }, [directKioskId, isMimo2ColorDown, colorMode]);
+
+  // If B&W on MIMO 2.0 is down and user is on bw, auto-switch to color if available
+  useEffect(() => {
+    if (directKioskId === "SV-002" && isMimo2BwDown && colorMode === "bw") {
+      if (!isMimo2ColorDown) {
+        toast.warning("MIMO 2.0 Black & White printer is currently unavailable. Switched to Colour.");
+        setColorMode("color");
+      }
+    }
+  }, [directKioskId, isMimo2BwDown, isMimo2ColorDown, colorMode]);
+
   const isSinglePageDocument = files.reduce((sum, f) => sum + (f.pageCount || 1), 0) <= 1;
   const selectedPrinter = printers.find((p) => p.id === directKioskId);
   const isDuplexSupported = (!directKioskId || selectedPrinter?.supportsDuplex !== false) && colorMode === "bw";
@@ -547,6 +600,14 @@ export function PrintOptions() {
   }, [isSinglePageDocument, isDuplexSupported, doubleSided, pageSelection]);
 
   const selectPrinter = (id: string) => {
+    if (id === "CV-001" && isMimo1Down) {
+      toast.error("MIMO 1.0 is currently unavailable for maintenance.");
+      return;
+    }
+    if (id === "SV-002" && isMimo2Down) {
+      toast.error("MIMO 2.0 is currently unavailable for maintenance.");
+      return;
+    }
     setDirectKioskId(id);
     try {
       sessionStorage.setItem("directKioskId", id);
@@ -561,25 +622,42 @@ export function PrintOptions() {
   };
 
   const handleColorChange = (mode: "bw" | "color") => {
-    if (mode === "bw") {
-      setColorMode("bw");
-      return;
-    }
-    const current = printers.find((p) => p.id === directKioskId);
-    if (current && !current.supportsColor) {
-      const colorPrinter = printers.find((p) => p.supportsColor);
-      if (colorPrinter) {
-        toast.info(`Switched to ${colorPrinter.name} for Color printing`);
-        setDirectKioskId(colorPrinter.id);
+    if (mode === "color") {
+      if (isMimo2ColorDown) {
+        toast.error("MIMO 2.0 Colour printer is currently unavailable due to maintenance.");
+        return;
       }
+      const current = printers.find((p) => p.id === directKioskId);
+      if (current && !current.supportsColor) {
+        const colorPrinter = printers.find((p) => p.supportsColor);
+        if (colorPrinter) {
+          toast.info(`Switched to ${colorPrinter.name} for Color printing`);
+          setDirectKioskId(colorPrinter.id);
+        }
+      }
+      setColorMode("color");
+      setDoubleSided("single");
+    } else {
+      if (directKioskId === "SV-002" && isMimo2BwDown) {
+        if (!isMimo1Down) {
+          toast.info("MIMO 2.0 B&W printer is unavailable. Switched to MIMO 1.0 for B&W printing.");
+          setDirectKioskId("CV-001");
+          setColorMode("bw");
+          return;
+        } else {
+          toast.error("Black & white printing is currently unavailable on MIMO 2.0.");
+          return;
+        }
+      }
+      setColorMode("bw");
     }
-    setColorMode("color");
-    setDoubleSided("single");
   };
 
   const sheetsTotal = actualPages * (Number(copies) || 1);
-  const blockingMessage = !directKioskId
-    ? "Choose a printer to continue."
+  const blockingMessage = isAllPrintersDown
+    ? "All printers are currently offline for maintenance. Please subscribe above to receive an email notification when available."
+    : !directKioskId
+    ? "Choose an available printer to continue."
     : hasSelectionError
     ? "Select at least one page in each file."
     : null;
@@ -605,9 +683,49 @@ export function PrintOptions() {
         <KioskOutageAlert className="mb-3" />
         <Group title="Printer">
           <div role="radiogroup" aria-label="Printer">
-            {printers.map((p) => (
-              <ChoiceRow key={p.id} label={p.name} detail={p.detail} selected={directKioskId === p.id} onSelect={() => selectPrinter(p.id)} />
-            ))}
+            {printers.map((p) => {
+              const isCv001 = p.id === "CV-001";
+              const isSv002 = p.id === "SV-002";
+              const isPrinterDisabled = isCv001 ? isMimo1Down : isSv002 ? isMimo2Down : false;
+
+              let statusDetail = p.detail;
+              let statusBadge: React.ReactNode = null;
+
+              if (isPrinterDisabled) {
+                statusDetail = "Temporarily unavailable for maintenance";
+                statusBadge = (
+                  <span className="inline-flex items-center rounded-full bg-rose-100 dark:bg-rose-950/60 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:text-rose-300">
+                    Offline
+                  </span>
+                );
+              } else if (isSv002 && isMimo2ColorDown) {
+                statusDetail = "Black & white only (Colour printer under maintenance)";
+                statusBadge = (
+                  <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                    Colour Offline
+                  </span>
+                );
+              } else if (isSv002 && isMimo2BwDown) {
+                statusDetail = "Colour only (Black & white printer under maintenance)";
+                statusBadge = (
+                  <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                    B&W Offline
+                  </span>
+                );
+              }
+
+              return (
+                <ChoiceRow
+                  key={p.id}
+                  label={p.name}
+                  detail={statusDetail}
+                  badge={statusBadge}
+                  disabled={isPrinterDisabled}
+                  selected={directKioskId === p.id}
+                  onSelect={() => selectPrinter(p.id)}
+                />
+              );
+            })}
           </div>
         </Group>
 
@@ -653,8 +771,16 @@ export function PrintOptions() {
                   value={colorMode as "bw" | "color"}
                   onChange={handleColorChange}
                   options={[
-                    { value: "bw", label: "Black and white" },
-                    { value: "color", label: "Colour" },
+                    {
+                      value: "bw",
+                      label: isMimo2BwDown ? "Black and white (Offline)" : "Black and white",
+                      disabled: Boolean(directKioskId === "SV-002" && isMimo2BwDown),
+                    },
+                    {
+                      value: "color",
+                      label: isMimo2ColorDown ? "Colour (Offline)" : "Colour",
+                      disabled: isMimo2ColorDown,
+                    },
                   ]}
                 />
               </div>
@@ -857,8 +983,8 @@ export function PrintOptions() {
               ₹{totalCost.toFixed(2)}
             </p>
           </div>
-          <PrimaryButton onClick={handleContinue} disabled={files.length === 0 || hasSelectionError || !directKioskId}>
-            Continue to pay
+          <PrimaryButton onClick={handleContinue} disabled={files.length === 0 || hasSelectionError || !directKioskId || isAllPrintersDown}>
+            {isAllPrintersDown ? "Printers Offline" : "Continue to pay"}
           </PrimaryButton>
         </div>
       </ActionBar>

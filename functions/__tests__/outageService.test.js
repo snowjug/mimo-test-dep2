@@ -25,4 +25,21 @@ test("outageService - unit tests", async (t) => {
       /Email is required/
     );
   });
+
+  await t.test("sendPrinterRestoredNotificationEmail rejects invalid email", async () => {
+    const { sendPrinterRestoredNotificationEmail } = require("../src/services/email.service");
+    await assert.rejects(
+      () => sendPrinterRestoredNotificationEmail({ recipient: "bad-email" }),
+      /Valid recipient email required/
+    );
+    const mockRes = await sendPrinterRestoredNotificationEmail({ recipient: "customer@example.com", printerName: "MIMO 2.0" });
+    assert.equal(mockRes.sent, true);
+    assert.equal(mockRes.mock, true);
+  });
+
+  await t.test("updateOutageStatus handles testEmailRecipient parameter", async () => {
+    const res = await outageService.updateOutageStatus({ testEmailRecipient: "testadmin@example.com" });
+    assert.ok(res.testEmailResult);
+    assert.equal(res.testEmailResult.sent, true);
+  });
 });

@@ -25,6 +25,39 @@ export const GuardianOutageControl: React.FC<Props> = ({ onStatusChange }) => {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [showTestEmail, setShowTestEmail] = useState(false);
+  const [testEmail, setTestEmail] = useState('visionprintt@gmail.com');
+  const [sendingTest, setSendingTest] = useState(false);
+
+  const handleSendTestEmail = async () => {
+    if (!testEmail || !testEmail.includes('@')) {
+      setFeedback({ message: 'Please enter a valid email address for testing', type: 'error' });
+      return;
+    }
+    setSendingTest(true);
+    setFeedback(null);
+    try {
+      const res = await guardian.updateOutages({
+        testEmailRecipient: testEmail.trim(),
+        testPrinterName: 'MIMO 2.0 Colour Printer',
+      });
+      if (res.testEmailResult?.sent) {
+        setFeedback({
+          message: `✓ Test restoration email sent to ${testEmail}!`,
+          type: 'success',
+        });
+      } else {
+        setFeedback({
+          message: `Test email status: ${res.testEmailResult?.error || 'Recorded/Sent'}`,
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
+      setFeedback({ message: err.message || 'Failed to send test email', type: 'error' });
+    } finally {
+      setSendingTest(false);
+    }
+  };
 
   const loadStatus = async () => {
     try {
@@ -61,9 +94,9 @@ export const GuardianOutageControl: React.FC<Props> = ({ onStatusChange }) => {
           type: 'success',
         });
       } else {
-        const sentMsg = updated.pendingSubscribers !== undefined ? '' : '';
+        const sentCount = updated.emailsSent ?? 0;
         setFeedback({
-          message: `${label} marked operational! Waiting customers will receive an email notification.`,
+          message: `${label} marked operational! ${sentCount > 0 ? `Sent restoration notification email to ${sentCount} waiting customer(s).` : 'Waiting customers will receive an email notification.'}`,
           type: 'success',
         });
       }
@@ -252,10 +285,41 @@ export const GuardianOutageControl: React.FC<Props> = ({ onStatusChange }) => {
             <strong>{data?.pendingSubscribers ?? 0} customer(s)</strong> have requested an email notification when machines are back online.
           </span>
         </div>
-        <span className="text-[11px] text-[var(--text-3)]">
-          Last updated: {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString() : 'Never'}
-        </span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowTestEmail(!showTestEmail)}
+            className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+          >
+            {showTestEmail ? 'Hide Test' : '✉ Test Email Delivery'}
+          </button>
+          <span className="text-[11px] text-[var(--text-3)]">
+            Last updated: {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString() : 'Never'}
+          </span>
+        </div>
       </div>
+
+      {showTestEmail && (
+        <div className="p-3 rounded-xl border border-indigo-200 bg-indigo-50/50 dark:border-indigo-900/40 dark:bg-indigo-950/20 text-xs flex flex-col sm:flex-row items-center gap-2 animate-fadeIn">
+          <span className="text-indigo-900 dark:text-indigo-300 font-medium shrink-0">Send test restoration email to:</span>
+          <input
+            type="email"
+            value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+            placeholder="visionprintt@gmail.com"
+            className="flex-1 px-2.5 py-1 text-xs rounded-lg border border-indigo-300 dark:border-indigo-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+          <button
+            type="button"
+            disabled={sendingTest || !testEmail}
+            onClick={handleSendTestEmail}
+            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-lg text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
+          >
+            {sendingTest ? <Loader2 className="size-3 animate-spin" /> : <Mail className="size-3" />}
+            <span>Send Test Email</span>
+          </button>
+        </div>
+      )}
 
       {/* Live Preview Box */}
       {showPreview && (

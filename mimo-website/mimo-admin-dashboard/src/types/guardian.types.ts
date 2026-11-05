@@ -143,6 +143,8 @@ export interface KioskOutageStatus {
   hasActiveOutage: boolean;
   activeNotices: string[];
   pendingSubscribers?: number;
+  emailsSent?: number;
+  testEmailResult?: any;
 }
 
 export interface KioskOutageUpdate {
@@ -151,4 +153,6 @@ export interface KioskOutageUpdate {
   mimo2BwDown?: boolean;
   mimo2ColorDown?: boolean;
   customNotice?: string;
+  testEmailRecipient?: string;
+  testPrinterName?: string;
 }

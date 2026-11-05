@@ -1,6 +1,18 @@
 // Lazy-loaded Nodemailer Transporter helper
 const { db } = require("../config/firebase");
 
+function isLiveEmailEnvironment() {
+  const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.NODE_TEST_CONTEXT);
+  if (isTest) return false;
+
+  const isCloudRuntime = Boolean(process.env.K_SERVICE || process.env.FUNCTION_TARGET || process.env.NODE_ENV === "production");
+  const rawPass = process.env.GMAIL_APP_PASSWORD || "";
+  const cleanPass = rawPass.trim().replace(/\s+/g, "");
+  const hasAppPassword = Boolean(cleanPass && cleanPass !== "placeholder_pass");
+
+  return isCloudRuntime && hasAppPassword;
+}
+
 function getTransporter() {
   const nodemailer = require("nodemailer");
   const rawPass = process.env.GMAIL_APP_PASSWORD || "";
@@ -39,7 +51,7 @@ async function sendRefundInitiatedAlert({ orderId, amount, reason = "Dispute / H
     return { sent: true, id: notificationId, duplicate: true };
   }
 
-  const isProduction = process.env.NODE_ENV === "production" && process.env.GMAIL_APP_PASSWORD && process.env.GMAIL_APP_PASSWORD !== "placeholder_pass";
+  const isProduction = isLiveEmailEnvironment();
 
   const emailPayload = {
     notificationId,
@@ -108,7 +120,7 @@ async function sendWebsiteAlertEmail({ problem, location, details = "", severity
     }
   }
 
-  const isProduction = process.env.NODE_ENV === "production" && process.env.GMAIL_APP_PASSWORD && process.env.GMAIL_APP_PASSWORD !== "placeholder_pass";
+  const isProduction = isLiveEmailEnvironment();
   const nowIST = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
 
   const emailPayload = {
@@ -181,10 +193,7 @@ async function sendPrinterRestoredNotificationEmail({ recipient, printerName = "
   const notificationId = `restored_${recipient.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}`;
   const notifRef = db.collection("email_notifications").doc(notificationId);
 
-  const isProduction =
-    process.env.NODE_ENV === "production" &&
-    process.env.GMAIL_APP_PASSWORD &&
-    process.env.GMAIL_APP_PASSWORD !== "placeholder_pass";
+  const isProduction = isLiveEmailEnvironment();
 
   const emailPayload = {
     notificationId,
@@ -195,10 +204,29 @@ async function sendPrinterRestoredNotificationEmail({ recipient, printerName = "
     body:
       `Hello!\n\n` +
       `Great news — ${printerName} is back online and in full working condition!\n\n` +
-      `You can now upload your documents and print smoothly at https://printmimo.tech\n\n` +
+      `You can now upload your documents and print smoothly at https://printmimo.tech/upload\n\n` +
       `Thank you for your patience while we completed maintenance!\n\n` +
       `Warm regards,\n` +
       `The MIMO Team`,
+    html:
+      `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">` +
+      `<div style="text-align: center; margin-bottom: 20px;">` +
+      `<h2 style="color: #4f46e5; margin: 0 0 4px 0; font-size: 22px; font-weight: 800;">MIMO Print Ready!</h2>` +
+      `<p style="color: #64748b; font-size: 13px; margin: 0;">Service Restoration Alert</p>` +
+      `</div>` +
+      `<div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">` +
+      `<p style="margin: 0 0 6px 0; font-size: 15px; font-weight: 700; color: #166534;">🎉 ${printerName} is back online!</p>` +
+      `<p style="margin: 0; font-size: 13.5px; color: #14532d; line-height: 1.5;">Maintenance has concluded and the printer is fully operational. You can now send your documents to print right away.</p>` +
+      `</div>` +
+      `<div style="text-align: center; margin: 24px 0;">` +
+      `<a href="https://printmimo.tech/upload" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">Upload & Print Now</a>` +
+      `</div>` +
+      `<hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />` +
+      `<p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.4;">` +
+      `You received this email because you requested a notification on printmimo.tech when this printer was restored.<br>` +
+      `The MIMO Team &bull; visionprintt@gmail.com` +
+      `</p>` +
+      `</div>`,
     status: isProduction ? "SENDING" : "MOCKED_SAFE_ENV",
     createdAt: new Date().toISOString(),
     timestampMs: Date.now(),

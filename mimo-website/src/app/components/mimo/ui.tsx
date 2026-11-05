@@ -166,31 +166,44 @@ export function ChoiceRow({
   detail,
   selected,
   onSelect,
+  disabled,
+  badge,
 }: {
   label: React.ReactNode;
   detail?: React.ReactNode;
   selected: boolean;
   onSelect: () => void;
+  disabled?: boolean;
+  badge?: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       role="radio"
       aria-checked={selected}
-      onClick={onSelect}
-      className="flex min-h-[60px] w-full items-center gap-3 border-t border-hairline px-4 py-3 text-left transition-colors first:border-t-0 active:bg-surface-2"
+      aria-disabled={disabled}
+      disabled={disabled}
+      onClick={disabled ? undefined : onSelect}
+      className={cn(
+        "flex min-h-[60px] w-full items-center gap-3 border-t border-hairline px-4 py-3 text-left transition-colors first:border-t-0",
+        disabled ? "opacity-55 cursor-not-allowed bg-surface-2/40 select-none" : "active:bg-surface-2",
+      )}
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-[16px] font-medium text-ink">{label}</span>
+        <span className="flex items-center gap-2 text-[16px] font-medium text-ink">
+          <span>{label}</span>
+          {badge}
+        </span>
         {detail && <span className="mt-0.5 block text-[13px] text-ink-3">{detail}</span>}
       </span>
       <span
         className={cn(
           "flex size-6 shrink-0 items-center justify-center rounded-full transition-colors",
-          selected ? "bg-brand text-on-brand" : "border-[1.5px] border-hairline-strong",
+          selected && !disabled ? "bg-brand text-on-brand" : "border-[1.5px] border-hairline-strong",
+          disabled && "opacity-40 border-hairline",
         )}
       >
-        {selected && <Check className="size-3.5" strokeWidth={3} />}
+        {selected && !disabled && <Check className="size-3.5" strokeWidth={3} />}
       </span>
     </button>
   );

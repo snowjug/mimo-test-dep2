@@ -119,6 +119,12 @@ async function notifySubscribersOnRestoration(restoredScopes) {
   if (!restoredScopes || !restoredScopes.length) return { sentCount: 0 };
 
   try {
+    // Reset any mock-sent subscribers so they can receive real email in production
+    const snapMock = await SUBSCRIBERS_COLL.where("mock", "==", true).get().catch(() => ({ docs: [] }));
+    for (const d of snapMock.docs) {
+      await d.ref.update({ notified: false, mock: false }).catch(() => {});
+    }
+
     const snap = await SUBSCRIBERS_COLL.where("notified", "==", false).get();
     if (snap.empty) {
       console.log("[OUTAGE-SERVICE] No pending subscribers to notify.");
@@ -148,16 +154,19 @@ async function notifySubscribersOnRestoration(restoredScopes) {
         }
 
         try {
-          await sendPrinterRestoredNotificationEmail({
+          const sendResult = await sendPrinterRestoredNotificationEmail({
             recipient: sub.email,
             printerName: printerLabel,
           });
-          await doc.ref.update({
-            notified: true,
-            notifiedAt: new Date().toISOString(),
-            restoredScopes,
-          });
-          sentCount++;
+          if (sendResult.sent) {
+            await doc.ref.update({
+              notified: true,
+              notifiedAt: new Date().toISOString(),
+              restoredScopes,
+              mock: Boolean(sendResult.mock),
+            });
+            sentCount++;
+          }
         } catch (mailErr) {
           console.error(`[OUTAGE-SERVICE] Failed to notify ${sub.email}:`, mailErr.message);
         }
@@ -176,6 +185,14 @@ async function notifySubscribersOnRestoration(restoredScopes) {
  * Updates outage overrides and dispatches restoration emails if any outage was resolved.
  */
 async function updateOutageStatus(updates, updatedBy = "admin") {
+  if (updates.testEmailRecipient) {
+    const testResult = await sendPrinterRestoredNotificationEmail({
+      recipient: updates.testEmailRecipient,
+      printerName: updates.testPrinterName || "MIMO 2.0 Colour Printer",
+    });
+    const current = await getOutageStatus();
+    return { ...current, testEmailResult: testResult };
+  }
   const current = await getOutageStatus();
 
   const newMimo1 = updates.mimo1Down !== undefined ? Boolean(updates.mimo1Down) : current.mimo1Down;
