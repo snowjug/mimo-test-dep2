@@ -350,14 +350,27 @@ test.describe("abuse and edge cases", () => {
     assert.deepStrictEqual(fake.data("orders").existing, { orderId: "order_taken", userId: "u9", amount: 50, status: "PAID" }, "the other customer's order is untouched");
   });
 
-  test("checking out the same jobs twice: the second attempt fails because the first replaced them", async () => {
+  test("checking out the same jobs twice: the second attempt returns the active session rather than failing with not found", async () => {
     seed({});
     const first = await checkout({});
     assert.strictEqual(first.code, 200);
     const second = await checkout({});
-    assert.strictEqual(second.code, 400);
-    assert.match(second.body.error, /Print job not found: j1/);
+    assert.strictEqual(second.code, 200);
+    assert.strictEqual(second.body.orderId, first.body.orderId);
+    assert.strictEqual(second.body.paymentSessionId, first.body.paymentSessionId);
     assert.strictEqual(cashfreeCalls().length, 1, "only one payment session was created");
+  });
+
+  test("checking out a job after payment is confirmed returns the issued printCode immediately", async () => {
+    seed({});
+    const first = await checkout({});
+    assert.strictEqual(first.code, 200);
+    await markPaid(first.body.orderId);
+    const second = await checkout({});
+    assert.strictEqual(second.code, 200);
+    assert.strictEqual(second.body.orderId, first.body.orderId);
+    assert.ok(second.body.printCode, "returns print code directly");
+    assert.strictEqual(second.body.free, true);
   });
 
   test("two customers cannot check out each other's jobs", async () => {

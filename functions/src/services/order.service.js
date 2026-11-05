@@ -207,7 +207,7 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
       const jobId = ref.id;
       const doc = await ref.get();
       if (!doc.exists) {
-        throw Object.assign(new Error(`Print job not found: ${jobId}`), { httpStatus: 400 });
+        return null;
       }
       const data = doc.data();
       if (data.userId !== userId) {
@@ -227,6 +227,136 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
   } catch (claimErr) {
     if (claimErr && claimErr.httpStatus) throw new OrderServiceError(claimErr.httpStatus, claimErr.message);
     throw claimErr;
+  }
+
+  // Graceful recovery: if a jobId was already claimed/merged into an active order by this user (e.g. browser
+  // back-navigation, double-submit, returning from mobile UPI app, or payment gateway retry), seamlessly
+  // resume the active checkout or return the already-paid print code rather than rejecting with "Print job not found".
+  const missingJobIndex = targetJobs.findIndex((j) => !j);
+  if (missingJobIndex !== -1) {
+    const missingJobId = jobRefs[missingJobIndex].id;
+
+    let candidateJob = null;
+    let candidateOrderId = null;
+
+    // 1. Direct correlation via sourceJobIds array
+    try {
+      const sourceSnap = await db.collection("print_jobs")
+        .where("userId", "==", userId)
+        .where("sourceJobIds", "array-contains", missingJobId)
+        .limit(1)
+        .get();
+
+      if (!sourceSnap.empty) {
+        candidateJob = sourceSnap.docs[0];
+        candidateOrderId = candidateJob.data().orderId || null;
+      }
+    } catch (_) {}
+
+    // 2. Correlation fallback: user's most recent active job with an orderId
+    if (!candidateJob) {
+      try {
+        const recentJobsSnap = await db.collection("print_jobs")
+          .where("userId", "==", userId)
+          .where("status", "in", ["pending", "paid"])
+          .get();
+
+        for (const d of recentJobsSnap.docs) {
+          const dData = d.data();
+          if (dData.orderId) {
+            candidateJob = d;
+            candidateOrderId = dData.orderId;
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (candidateJob && candidateOrderId) {
+      const cData = candidateJob.data();
+
+      // Case A: Print code was already issued!
+      if (cData.printCode) {
+        return {
+          orderId: candidateOrderId,
+          paymentSessionId: null,
+          amount: cData.pricing?.jobCost || cData.totalCost || 0,
+          printCode: cData.printCode,
+          free: true,
+          alreadyIssued: true,
+        };
+      }
+
+      // Case B: Payment is confirmed (in orders or payment_transactions)
+      let isPaid = cData.status === "paid";
+      if (!isPaid) {
+        for (const col of ["orders", "payment_transactions"]) {
+          try {
+            const ordCheck = await db.collection(col).where("orderId", "==", candidateOrderId).where("userId", "==", userId).limit(1).get();
+            if (!ordCheck.empty && ordCheck.docs[0].data().status === "PAID") {
+              isPaid = true;
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // Case C: Check Cashfree directly if not yet synced to DB
+      if (!isPaid && CASHFREE_BASE_URL) {
+        try {
+          const cfRes = await axios.get(`${CASHFREE_BASE_URL}/orders/${candidateOrderId}`, { headers: cashfreeHeaders, timeout: 5000 });
+          if (cfRes.data?.order_status === "PAID") {
+            isPaid = true;
+          }
+        } catch (_) {}
+      }
+
+      if (isPaid) {
+        const fulfillment = await fulfillPaidOrder({
+          db,
+          userId,
+          orderId: candidateOrderId,
+          reqUser,
+          customerEmail: customer?.email,
+        });
+        return {
+          orderId: candidateOrderId,
+          paymentSessionId: null,
+          amount: cData.pricing?.jobCost || cData.totalCost || 0,
+          printCode: fulfillment.printCode,
+          free: true,
+        };
+      }
+
+      // Case D: Payment is still pending (allow user to continue with active session)
+      let sessionId = null;
+      let orderAmount = cData.pricing?.jobCost || cData.totalCost || 0;
+      try {
+        const txnSnap = await db.collection("payment_transactions").where("orderId", "==", candidateOrderId).where("userId", "==", userId).limit(1).get();
+        if (!txnSnap.empty) {
+          const txnData = txnSnap.docs[0].data();
+          sessionId = txnData.paymentSessionId || null;
+          if (txnData.amount !== undefined) orderAmount = txnData.amount;
+        }
+      } catch (_) {}
+
+      if (!sessionId && CASHFREE_BASE_URL) {
+        try {
+          const cfRes = await axios.get(`${CASHFREE_BASE_URL}/orders/${candidateOrderId}`, { headers: cashfreeHeaders, timeout: 5000 });
+          sessionId = cfRes.data?.payment_session_id || null;
+        } catch (_) {}
+      }
+
+      if (sessionId) {
+        return {
+          orderId: candidateOrderId,
+          paymentSessionId: sessionId,
+          amount: orderAmount,
+        };
+      }
+    }
+
+    throw new OrderServiceError(400, `Print job not found: ${missingJobId}`);
   }
 
   let discountPercentage = 0;
@@ -393,8 +523,10 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
   totalAmount += jobCost;
 
   const newJobRef = db.collection("print_jobs").doc();
+  const sourceJobIds = targetJobs.map((j) => j.ref.id);
   const newJobData = {
     userId,
+    sourceJobIds,
     fileName: mergedFiles.length > 1 ? `Multiple Files (${mergedFiles.length})` : mergedFiles[0].name,
     fileUrl: mergedFiles[0].url,
     originalFileUrl: mergedFiles[0].originalFileUrl || null,
@@ -601,6 +733,8 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
     orderId,
     userId,
     amount,
+    sourceJobIds,
+    paymentSessionId: response ? response.data.payment_session_id : null,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     status: "INITIATED",
     ...(isRealCustEmail ? { customerEmail: customerEmail.trim() } : {}),

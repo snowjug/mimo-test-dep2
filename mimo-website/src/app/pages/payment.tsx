@@ -6,6 +6,7 @@ import { ActionBar, ActionBarSpacer, AppBar, Group, PrimaryButton, Row, inputCla
 import { ScreenSkeleton } from "../components/mimo/screen-skeleton";
 import { toast } from "sonner";
 import api from "../api";
+import { isCodeActive } from "../utils/print-code-expiry";
 
 export function Payment() {
   const navigate = useNavigate();
@@ -60,6 +61,54 @@ export function Payment() {
       }
     };
     fetchData();
+
+    // Check if an order was already paid or if code was generated (e.g. returning from mobile UPI app)
+    const checkActiveOrderOrCode = async () => {
+      try {
+        const historyRes = await api.get("/print-history");
+        if (Array.isArray(historyRes.data)) {
+          const now = Date.now();
+          const active = historyRes.data.find((j: any) => isCodeActive(j, now));
+          if (active && active.printCode) {
+            sessionStorage.setItem("printCode", active.printCode);
+            localStorage.setItem("mimo_printCode", active.printCode);
+            if (active.kioskId) {
+              sessionStorage.setItem("directKioskId", active.kioskId);
+              localStorage.setItem("mimo_directKioskId", active.kioskId);
+            }
+            toast.success("Print code ready!");
+            navigate("/print-code");
+            return;
+          }
+        }
+      } catch (_) {}
+
+      const pendingOrderId = sessionStorage.getItem("currentOrderId") || localStorage.getItem("mimo_currentOrderId");
+      if (pendingOrderId) {
+        try {
+          const verifyRes = await api.get(`/verify-payment/${pendingOrderId}`);
+          if (verifyRes.data?.order_status === "PAID" && verifyRes.data?.printCode) {
+            sessionStorage.setItem("printCode", verifyRes.data.printCode);
+            localStorage.setItem("mimo_printCode", verifyRes.data.printCode);
+            if (verifyRes.data.directKioskId) {
+              sessionStorage.setItem("directKioskId", verifyRes.data.directKioskId);
+              localStorage.setItem("mimo_directKioskId", verifyRes.data.directKioskId);
+            }
+            toast.success("Payment confirmed! Your print code is ready.");
+            navigate("/print-code");
+          }
+        } catch (_) {}
+      }
+    };
+    checkActiveOrderOrCode();
+
+    const onWindowFocus = () => { checkActiveOrderOrCode(); };
+    window.addEventListener("focus", onWindowFocus);
+    document.addEventListener("visibilitychange", onWindowFocus);
+    return () => {
+      window.removeEventListener("focus", onWindowFocus);
+      document.removeEventListener("visibilitychange", onWindowFocus);
+    };
   }, [navigate]);
 
 
@@ -221,18 +270,39 @@ export function Payment() {
       const orderResponse = await api.post("/create-order", payload);
       const { orderId, paymentSessionId, free, printCode } = orderResponse.data;
 
-      // 2. If backend determines it's totally free, skip Cashfree
-      if (free && printCode) {
+      if (orderId) {
+        sessionStorage.setItem("currentOrderId", orderId);
+        localStorage.setItem("mimo_currentOrderId", orderId);
+      }
+
+      // 2. If backend determines it's free or already paid with a code ready, skip Cashfree
+      if (printCode) {
         sessionStorage.setItem("printCode", printCode);
+        localStorage.setItem("mimo_printCode", printCode);
         localStorage.setItem("mimo_colorMode", printOptions.colorMode || "bw");
-        toast.success("Free Order Confirmed!");
+        if (printOptions.directKioskId) {
+          sessionStorage.setItem("directKioskId", printOptions.directKioskId);
+          localStorage.setItem("mimo_directKioskId", printOptions.directKioskId);
+        }
+        toast.success("Order Confirmed!");
         navigate("/print-code");
         return;
       }
 
       // 3. Trigger Cashfree SDK for paid orders
       const cashfreeMode = import.meta.env.VITE_CASHFREE_MODE || "production";
-      const cashfree = (window as any).Cashfree({
+      let cashfreeConstructor = (window as any).Cashfree;
+      if (typeof cashfreeConstructor !== "function") {
+        // Short grace period in case the deferred SDK script is still evaluating
+        await new Promise((r) => setTimeout(r, 400));
+        cashfreeConstructor = (window as any).Cashfree;
+      }
+
+      if (typeof cashfreeConstructor !== "function") {
+        throw new Error("Payment gateway is loading. Please tap Pay again.");
+      }
+
+      const cashfree = cashfreeConstructor({
         mode: cashfreeMode,
       });
 
@@ -244,10 +314,33 @@ export function Payment() {
       await cashfree.checkout(checkoutOptions);
       
     } catch (err: any) {
-      console.error("Cashfree Error:", err);
+      console.error("Checkout Error:", err);
       const errorMsg = typeof err.response?.data === 'string' 
         ? err.response.data 
         : err.response?.data?.error || err.message || "Payment initiation failed";
+
+      // If job was not found or already claimed, check if a print code was generated in the background
+      if (typeof errorMsg === "string" && (errorMsg.includes("not found") || errorMsg.includes("no longer available"))) {
+        try {
+          const historyRes = await api.get("/print-history");
+          if (Array.isArray(historyRes.data)) {
+            const now = Date.now();
+            const active = historyRes.data.find((j: any) => isCodeActive(j, now));
+            if (active && active.printCode) {
+              sessionStorage.setItem("printCode", active.printCode);
+              localStorage.setItem("mimo_printCode", active.printCode);
+              if (active.kioskId) {
+                sessionStorage.setItem("directKioskId", active.kioskId);
+                localStorage.setItem("mimo_directKioskId", active.kioskId);
+              }
+              toast.success("Print code retrieved!");
+              navigate("/print-code");
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+
       toast.error(errorMsg);
     } finally {
       setIsProcessing(false);
