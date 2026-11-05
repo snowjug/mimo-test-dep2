@@ -8,6 +8,7 @@ const kioskCommands = require("../controllers/kioskCommands.controller");
 const adminReports = require("../controllers/adminReports.controller");
 const ads = require("../controllers/ads.controller");
 const tools = require("../controllers/technicalTools.controller");
+const outage = require("../controllers/outage.controller");
 
 const router = express.Router();
 const { loginLimiter } = createLimiters(db);
@@ -81,5 +82,9 @@ router.patch("/staff/profile", staffAuthMiddleware, admin.patchStaffProfile);
 router.post("/staff/profile/document/:docType", staffAuthMiddleware, admin.postStaffProfileDocument);
 router.get("/staff/chat", staffAuthMiddleware, admin.getStaffChatMessages);
 router.post("/staff/chat", staffAuthMiddleware, admin.postStaffChatMessage);
+
+// ── CUSTOMER WEBSITE OUTAGE & MAINTENANCE POPUPS ─────────────────────────────
+router.get("/admin/kiosk-outages", adminAuthMiddleware, outage.getAdminOutages);
+router.post("/admin/kiosk-outages", adminAuthMiddleware, outage.postAdminOutages);
 
 module.exports = router;

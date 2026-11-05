@@ -165,8 +165,71 @@ async function sendWebsiteAlertEmail({ problem, location, details = "", severity
   }
 }
 
+/**
+ * Sends a notification email to a customer when a machine or printer is restored to operational status.
+ *
+ * @param {Object} params
+ * @param {string} params.recipient - Customer's email address
+ * @param {string} params.printerName - Display name of the restored machine / printer
+ * @returns {Promise<{ sent: boolean, id: string, mock?: boolean }>}
+ */
+async function sendPrinterRestoredNotificationEmail({ recipient, printerName = "MIMO Printers" }) {
+  if (!recipient || typeof recipient !== "string" || !recipient.includes("@")) {
+    throw new Error("Valid recipient email required");
+  }
+
+  const notificationId = `restored_${recipient.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}`;
+  const notifRef = db.collection("email_notifications").doc(notificationId);
+
+  const isProduction =
+    process.env.NODE_ENV === "production" &&
+    process.env.GMAIL_APP_PASSWORD &&
+    process.env.GMAIL_APP_PASSWORD !== "placeholder_pass";
+
+  const emailPayload = {
+    notificationId,
+    type: "PRINTER_RESTORED_NOTIFICATION",
+    recipient,
+    printerName,
+    subject: `[MIMO] ${printerName} is Back Online & Ready to Print!`,
+    body:
+      `Hello!\n\n` +
+      `Great news — ${printerName} is back online and in full working condition!\n\n` +
+      `You can now upload your documents and print smoothly at https://printmimo.tech\n\n` +
+      `Thank you for your patience while we completed maintenance!\n\n` +
+      `Warm regards,\n` +
+      `The MIMO Team`,
+    status: isProduction ? "SENDING" : "MOCKED_SAFE_ENV",
+    createdAt: new Date().toISOString(),
+    timestampMs: Date.now(),
+  };
+
+  if (!isProduction) {
+    console.log(`[EMAIL-ALERT] [SAFE MODE] Printer restored email notification recorded in DB for ${recipient} (${printerName}).`);
+    await notifRef.set({ ...emailPayload, status: "MOCKED_SAFE_ENV" }).catch(() => {});
+    return { sent: true, id: notificationId, mock: true };
+  }
+
+  try {
+    const transporter = getTransporter();
+    await transporter.sendMail({
+      from: '"MIMO Printing Support" <visionprintt@gmail.com>',
+      to: recipient,
+      subject: emailPayload.subject,
+      text: emailPayload.body,
+    });
+    await notifRef.set({ ...emailPayload, status: "DELIVERED" });
+    return { sent: true, id: notificationId };
+  } catch (err) {
+    console.error(`[EMAIL-ALERT] Failed to send restored notification to ${recipient}:`, err.message);
+    await notifRef.set({ ...emailPayload, status: "FAILED", error: err.message }).catch(() => {});
+    return { sent: false, id: notificationId, error: err.message };
+  }
+}
+
 module.exports = {
   getTransporter,
   sendRefundInitiatedAlert,
   sendWebsiteAlertEmail,
+  sendPrinterRestoredNotificationEmail,
 };

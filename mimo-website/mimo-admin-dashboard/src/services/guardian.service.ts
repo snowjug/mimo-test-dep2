@@ -4,6 +4,8 @@ import type {
   GuardianKioskSummary,
   GuardianSummaryResponse,
   WebsiteHealthResponse,
+  KioskOutageStatus,
+  KioskOutageUpdate,
 } from '../types/guardian.types';
 
 export const guardian = {
@@ -34,4 +36,11 @@ export const guardian = {
   /** Mark active website error incidents as resolved, turning the status button back to green */
   resolveWebsiteIssues: () =>
     api.post<{ success: boolean; message: string }>('/admin/guardian/website-health/resolve').then((r) => r.data),
+
+  /** Get current customer website outage and maintenance popup overrides */
+  getOutages: () => api.get<KioskOutageStatus>('/admin/kiosk-outages').then((r) => r.data),
+
+  /** Update outage overrides and notify waiting customers when restored */
+  updateOutages: (data: KioskOutageUpdate) =>
+    api.post<KioskOutageStatus>('/admin/kiosk-outages', data).then((r) => r.data),
 };

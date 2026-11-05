@@ -9,8 +9,11 @@ import { GuardianKioskTable } from './components/GuardianKioskTable';
 import { GuardianKioskDetailModal } from './components/GuardianKioskDetail';
 import { CustomerWebsiteStatusButton } from './components/CustomerWebsiteStatusButton';
 import { CustomerWebsiteDiagnosticModal } from './components/CustomerWebsiteDiagnosticModal';
+import { GuardianOutageControl } from './components/GuardianOutageControl';
+import { KioskOutageStatusButton } from './components/KioskOutageStatusButton';
 import { KiosksPage } from '../Kiosks/KiosksPage';
 import { ConfigurationPage } from '../Configuration/ConfigurationPage';
+import type { KioskOutageStatus } from '../../types/guardian.types';
 
 type GuardianSubTab = 'health' | 'network' | 'configuration';
 
@@ -22,18 +25,6 @@ const SUB_TABS: { id: GuardianSubTab; label: string; icon: React.ElementType }[]
 
 /**
  * MIMO Edge Guardian — kiosk health, network and configuration, grouped under one nav entry.
- *
- * Only the Health sub-tab is Guardian's own surface, and it stays strictly observational: it calls
- * GET /admin/guardian/health only (via services/guardian.service.ts, the shared authenticated `api`
- * client every admin page uses), issues no kiosk command, no restart, no paper refill, no
- * provisioning or revocation call, and writes nothing anywhere. A failed Guardian fetch only
- * affects this sub-tab: it cannot touch printing.
- *
- * The Network and Configuration sub-tabs are the pre-existing KiosksPage/ConfigurationPage
- * components, unchanged, nested here only for navigation. They keep calling their own existing
- * write-capable admin routes (kiosk restart, paper/toner restock, screensaver + threshold saves) —
- * that control-plane logic is NOT part of Guardian's own read-only code path, which stays the way
- * CLAUDE.md requires it: observe-only, no automatic repair or control actions.
  */
 export const GuardianPage: React.FC = () => {
   const [subTab, setSubTab] = useState<GuardianSubTab>('health');
@@ -41,15 +32,20 @@ export const GuardianPage: React.FC = () => {
   const webQ = useLiveQuery(() => guardian.websiteHealth(), [], { live: true });
   const [detailKioskId, setDetailKioskId] = useState<string | null>(null);
   const [showWebsiteModal, setShowWebsiteModal] = useState(false);
+  const [outages, setOutages] = useState<KioskOutageStatus | null>(null);
 
   return (
     <div className="space-y-6 animate-fadeIn font-sans select-none">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
           <h1 className="hidden lg:block text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-1)]">Edge Guardian</h1>
-          <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">Kiosk health, network and configuration.</p>
+          <p className="text-xs sm:text-sm text-[var(--text-2)] mt-1">Kiosk health, network, outage alerts and configuration.</p>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
+          <KioskOutageStatusButton
+            outages={outages}
+            onClick={() => setSubTab('health')}
+          />
           <CustomerWebsiteStatusButton
             health={webQ.data ?? null}
             loading={webQ.loading}
@@ -78,6 +74,9 @@ export const GuardianPage: React.FC = () => {
       {subTab === 'health' && (
         <>
           {q.error && <ErrorBanner message={q.error} onRetry={q.refresh} />}
+
+          {/* Outage and Maintenance Popups Control Panel */}
+          <GuardianOutageControl onStatusChange={setOutages} />
 
           <GuardianSummaryCards kiosks={q.data?.kiosks ?? []} loading={q.loading} />
 

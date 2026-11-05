@@ -131,3 +131,24 @@ export interface WebsiteHealthResponse {
     details: string;
   }>;
 }
+
+export interface KioskOutageStatus {
+  allDown: boolean;
+  mimo1Down: boolean;
+  mimo2BwDown: boolean;
+  mimo2ColorDown: boolean;
+  customNotice: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  hasActiveOutage: boolean;
+  activeNotices: string[];
+  pendingSubscribers?: number;
+}
+
+export interface KioskOutageUpdate {
+  allDown?: boolean;
+  mimo1Down?: boolean;
+  mimo2BwDown?: boolean;
+  mimo2ColorDown?: boolean;
+  customNotice?: string;
+}

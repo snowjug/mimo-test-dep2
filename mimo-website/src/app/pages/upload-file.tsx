@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MimoHeader } from "../components/mimo-header";
+import { KioskOutageAlert } from "../components/mimo/KioskOutageAlert";
 import { ActionBar, ActionBarSpacer, Group, PrimaryButton, Row, StatusPill, TextButton } from "../components/mimo/ui";
 import { FileText, X, ImageIcon, File as FileIcon, Grid3X3, Copy, Plus, PenLine, Camera, Loader2, ChevronRight, Clock, MapPin, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -970,6 +971,7 @@ export function UploadFile() {
   return (
     <div className="px-4 pb-8 max-w-lg mx-auto">
       <MimoHeader />
+      <KioskOutageAlert />
       <input
         ref={fileInputRef}
         type="file"

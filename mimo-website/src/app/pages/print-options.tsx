@@ -5,6 +5,7 @@ import { ActionBar, ActionBarSpacer, AppBar, ChoiceRow, Group, PrimaryButton, Ro
 import { CircleHelp, FileText, X } from "lucide-react";
 import api from "../api";
 import { useTour } from "../utils/tour-context";
+import { KioskOutageAlert } from "../components/mimo/KioskOutageAlert";
 
 interface UploadedFile {
   name: string;
@@ -601,6 +602,7 @@ export function PrintOptions() {
       />
 
       <main className="px-4">
+        <KioskOutageAlert className="mb-3" />
         <Group title="Printer">
           <div role="radiogroup" aria-label="Printer">
             {printers.map((p) => (
