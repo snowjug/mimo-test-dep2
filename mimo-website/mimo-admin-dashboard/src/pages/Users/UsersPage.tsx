@@ -22,6 +22,7 @@ import {
   Download,
 } from 'lucide-react';
 import { usersService } from '../../services/users.service';
+import { statFontSize } from '../../lib/format';
 import { AdminUserItem, AdminUserMetrics } from '../../types/user.types';
 import { useTheme } from '../../context/ThemeContext';
 import { exportUsersPdf } from '../../lib/pdfExport';
@@ -140,15 +141,15 @@ export const UsersPage: React.FC = () => {
       {/* ── Metrics Grid ───────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Users */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-[var(--text-2)]">Total Registered</span>
             <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
               <Users size={16} />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)]">
-            {loading ? '...' : metrics?.totalUsers || 0}
+          <p className={`font-black text-[var(--text-1)] truncate tabular-nums ${statFontSize(loading ? "..." : metrics?.totalUsers || 0)}`}>
+            {loading ? "..." : metrics?.totalUsers || 0}
           </p>
           <p className="text-[11px] text-[var(--text-3)] font-medium mt-1">
             {loading ? 'Accounts registered on campus' : (
@@ -162,15 +163,15 @@ export const UsersPage: React.FC = () => {
         </div>
 
         {/* Active Paying Customers */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-[var(--text-2)]">Paying Customers</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
               <UserCheck size={16} />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)]">
-            {loading ? '...' : metrics?.activeCustomers || 0}
+          <p className={`font-black text-[var(--text-1)] truncate tabular-nums ${statFontSize(loading ? "..." : metrics?.activeCustomers || 0)}`}>
+            {loading ? "..." : metrics?.activeCustomers || 0}
           </p>
           <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
             {metrics?.totalUsers ? `${((metrics.activeCustomers / metrics.totalUsers) * 100).toFixed(0)}% of total userbase` : '0%'}
@@ -178,15 +179,15 @@ export const UsersPage: React.FC = () => {
         </div>
 
         {/* Conversion Rate */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-[var(--text-2)]">Conversion Rate</span>
             <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
               <Percent size={16} />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)]">
-            {loading ? '...' : `${metrics?.conversionRate || 0}%`}
+          <p className={`font-black text-[var(--text-1)] truncate tabular-nums ${statFontSize(loading ? "..." : `${metrics?.conversionRate || 0}%`)}`}>
+            {loading ? "..." : `${metrics?.conversionRate || 0}%`}
           </p>
           <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mt-2 overflow-hidden">
             <div
@@ -197,15 +198,15 @@ export const UsersPage: React.FC = () => {
         </div>
 
         {/* ARPU */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs transition-all min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-[var(--text-2)]">Avg Revenue / User</span>
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
               <IndianRupee size={16} />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)]">
-            {loading ? '...' : `₹${metrics?.avgRevenuePerUser || 0}`}
+          <p className={`font-black text-[var(--text-1)] truncate tabular-nums ${statFontSize(loading ? "..." : `₹${metrics?.avgRevenuePerUser || 0}`)}`}>
+            {loading ? "..." : `₹${metrics?.avgRevenuePerUser || 0}`}
           </p>
           <p className="text-[11px] text-[var(--text-3)] font-medium mt-1">
             Total Revenue: ₹{metrics?.totalRevenue?.toLocaleString('en-IN') || 0}

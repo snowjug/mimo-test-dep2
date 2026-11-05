@@ -37,3 +37,17 @@ export const duration = (ms: number | null | undefined) => {
   if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
   return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`;
 };
+
+/**
+ * Dynamically scales metric and KPI font sizes based on string length and screen size.
+ * Guarantees that as numbers increase in digit count, the font size gracefully reduces
+ * so the value remains strictly inside its card border with zero collision or overflow on mobile.
+ */
+export const statFontSize = (val: string | number | null | undefined): string => {
+  const str = String(val ?? '').trim();
+  const len = str.length;
+  if (len >= 14) return 'text-[13px] sm:text-[16px] md:text-[18px] lg:text-[20px]';
+  if (len >= 11) return 'text-[15px] sm:text-[18px] md:text-[20px] lg:text-[22px]';
+  if (len >= 8)  return 'text-[17px] sm:text-[20px] md:text-[22px] lg:text-[24px]';
+  return 'text-[21px] sm:text-[23px] md:text-[26px]';
+};

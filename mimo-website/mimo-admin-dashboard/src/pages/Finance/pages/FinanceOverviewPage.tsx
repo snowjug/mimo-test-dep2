@@ -378,13 +378,13 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
       {/* ── SECTION 1: EXECUTIVE FINANCIAL MATRIX (6 Cards) ────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
         {/* Gross Collections */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] sm:text-[11px] font-bold uppercase">Gross Collections</span>
             <IndianRupee className="w-4 h-4 text-indigo-500" />
           </div>
-          <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white truncate">
-            {cur ? inr(totalGross) : '—'}
+          <p className={`font-black text-slate-900 dark:text-white truncate tabular-nums ${statFontSize(cur ? inr(totalGross) : "—")}`}>
+            {cur ? inr(totalGross) : "—"}
           </p>
           <span className="text-[10px] text-slate-500 mt-1 block truncate">
             {cur ? `${cur.orders} paid orders` : 'Loading...'}
@@ -392,13 +392,13 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
         </div>
 
         {/* Completed Refunds */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] sm:text-[11px] font-bold uppercase">Completed Refunds</span>
             <RotateCcw className="w-4 h-4 text-rose-500" />
           </div>
-          <p className="text-lg sm:text-2xl font-black text-rose-600 dark:text-rose-400 truncate">
-            {cur ? inr(totalRefunded) : '—'}
+          <p className={`font-black text-rose-600 dark:text-rose-400 truncate tabular-nums ${statFontSize(cur ? inr(totalRefunded) : "—")}`}>
+            {cur ? inr(totalRefunded) : "—"}
           </p>
           <span className="text-[10px] text-rose-500/80 font-semibold mt-1 block truncate">
             {totalGross > 0 ? `${((totalRefunded / totalGross) * 100).toFixed(1)}% of gross` : '0%'}
@@ -406,13 +406,13 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
         </div>
 
         {/* Net Customer Collections */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs ring-1 ring-emerald-500/20">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs ring-1 ring-emerald-500/20 min-w-0 overflow-hidden">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] sm:text-[11px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Net Collections</span>
             <TrendingUp className="w-4 h-4 text-emerald-500" />
           </div>
-          <p className="text-lg sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate">
-            {cur ? inr(netRevenue) : '—'}
+          <p className={`font-black text-emerald-600 dark:text-emerald-400 truncate tabular-nums ${statFontSize(cur ? inr(netRevenue) : "—")}`}>
+            {cur ? inr(netRevenue) : "—"}
           </p>
           <span className="text-[10px] text-emerald-600/80 font-semibold mt-1 block truncate">
             Retained funds
@@ -420,12 +420,12 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
         </div>
 
         {/* Estimated Gross Margin */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] sm:text-[11px] font-bold uppercase">Gross Margin</span>
             <Award className="w-4 h-4 text-amber-500" />
           </div>
-          <p className="text-lg sm:text-2xl font-black text-amber-600 dark:text-amber-400 truncate">
+          <p className={`font-black text-amber-600 dark:text-amber-400 truncate tabular-nums ${statFontSize(`${grossMarginPct.toFixed(1)}%`)}`}>
             {grossMarginPct.toFixed(1)}%
           </p>
           <span className="text-[10px] text-slate-500 mt-1 block truncate">
@@ -434,7 +434,7 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
         </div>
 
         {/* Average Order Value */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] sm:text-[11px] font-bold uppercase">Avg Order</span>
             <ShoppingBag className="w-4 h-4 text-blue-500" />
@@ -448,7 +448,7 @@ export const FinanceOverviewPage: React.FC<FinanceOverviewProps> = ({
         </div>
 
         {/* Payment Collection Rate */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] sm:text-[11px] font-bold uppercase">Success Rate</span>
             <ShieldCheck className="w-4 h-4 text-emerald-500" />

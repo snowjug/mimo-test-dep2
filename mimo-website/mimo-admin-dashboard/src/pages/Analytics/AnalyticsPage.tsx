@@ -9,7 +9,7 @@ import { LiveIndicator } from '../../components/ui/LiveIndicator';
 import { Delta, ErrorBanner, PeriodComparison, TrendChart, TruncatedNote } from '../../components/insights/InsightBits';
 import { ExecutiveReportsHub } from '../../components/insights/ExecutiveReportsHub';
 import { bucketLabel, describeRange } from '../../lib/dateRange';
-import { inr, int, pct } from '../../lib/format';
+import { inr, int, pct, statFontSize } from '../../lib/format';
 import { exportAnalyticsPdf } from '../../lib/pdfExport';
 import type { Analytics } from '../../types/insights.types';
 
@@ -111,11 +111,17 @@ export const AnalyticsPage: React.FC = () => {
           {q.error && <ErrorBanner message={q.error} onRetry={q.refresh} />}
           <TruncatedNote show={a?.truncated} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {kpis.map((k) => (
-          <div key={k.label} className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0">
-            <span className="text-xs font-bold text-[var(--text-2)]">{k.label}</span>
-            {q.loading ? <div className="skeleton h-8 w-24 mt-3" /> : <p className={`text-2xl sm:text-3xl font-black mt-2 tabular-nums ${k.tone ?? 'text-[var(--text-1)]'}`}>{k.value}</p>}
+          <div key={k.label} className="p-3.5 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden flex flex-col justify-between">
+            <span className="text-xs font-bold text-[var(--text-2)] truncate">{k.label}</span>
+            {q.loading ? (
+              <div className="skeleton h-8 w-24 mt-3" />
+            ) : (
+              <p className={`font-black mt-2 tabular-nums tracking-tight truncate ${k.tone ?? 'text-[var(--text-1)]'} ${statFontSize(k.value)}`}>
+                {k.value}
+              </p>
+            )}
             {!q.loading && k.sub && <p className="mt-1 truncate text-[11px] text-[var(--text-3)]">{k.sub}</p>}
             {!q.loading && k.cur !== undefined && k.cur !== null && <div className="mt-1.5 min-h-[16px]"><Delta current={k.cur} previous={k.prev} /></div>}
           </div>

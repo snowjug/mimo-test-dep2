@@ -7,6 +7,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell
 } from 'recharts';
 import api from '../../api';
+import { statFontSize } from '../../lib/format';
 
 export const ExecutiveReportsHub: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'profitability' | 'simulator' | 'heatmap' | 'peakHours' | 'usageFailures'>('profitability');
@@ -329,27 +330,27 @@ export const ExecutiveReportsHub: React.FC = () => {
 
               {/* Simulation Result KPIs */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Monthly Gross Revenue</p>
-                  <p className="mt-1 text-[24px] font-black text-[var(--text-1)]">₹{simData.projections.monthlyGrossRevenue.toLocaleString('en-IN')}</p>
+                  <p className={`mt-1 font-black text-[var(--text-1)] truncate tabular-nums ${statFontSize(`₹${simData.projections.monthlyGrossRevenue.toLocaleString("en-IN")}`)}`}>₹{simData.projections.monthlyGrossRevenue.toLocaleString('en-IN')}</p>
                   <p className="text-[11.5px] text-[var(--text-3)]">{simData.projections.monthlyTotalPages.toLocaleString('en-IN')} pages/mo</p>
                 </div>
 
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Monthly Net Profit</p>
-                  <p className="mt-1 text-[24px] font-black text-emerald-600 dark:text-emerald-400">₹{simData.projections.monthlyNetProfit.toLocaleString('en-IN')}</p>
+                  <p className={`mt-1 font-black text-emerald-600 dark:text-emerald-400 truncate tabular-nums ${statFontSize(`₹${simData.projections.monthlyNetProfit.toLocaleString("en-IN")}`)}`}>₹{simData.projections.monthlyNetProfit.toLocaleString('en-IN')}</p>
                   <p className="text-[11.5px] font-bold text-emerald-600">{simData.projections.netProfitMarginPct}% profit margin</p>
                 </div>
 
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Payback Timeline</p>
-                  <p className="mt-1 text-[24px] font-black text-blue-600 dark:text-blue-400">{simData.projections.paybackPeriodMonths} mos</p>
+                  <p className={`mt-1 font-black text-blue-600 dark:text-blue-400 truncate tabular-nums ${statFontSize(`${simData.projections.paybackPeriodMonths} mos`)}`}>{simData.projections.paybackPeriodMonths} mos</p>
                   <p className="text-[11.5px] text-[var(--text-3)]">100% Capex break-even</p>
                 </div>
 
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Field Tech Staffing</p>
-                  <p className="mt-1 text-[24px] font-black text-amber-600 dark:text-amber-400">{simData.supplyChain.techniciansNeeded} staff</p>
+                  <p className={`mt-1 font-black text-amber-600 dark:text-amber-400 truncate tabular-nums ${statFontSize(`${simData.supplyChain.techniciansNeeded} staff`)}`}>{simData.supplyChain.techniciansNeeded} staff</p>
                   <p className="text-[11.5px] text-[var(--text-3)]">1 tech per 8 kiosks</p>
                 </div>
               </div>
@@ -384,21 +385,21 @@ export const ExecutiveReportsHub: React.FC = () => {
           {activeTab === 'heatmap' && heatmapData && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Busiest Day</p>
-                  <p className="mt-1 text-[22px] font-black text-[var(--text-1)]">{heatmapData.summary.busiestDay}</p>
+                  <p className={`mt-1 font-black text-[var(--text-1)] truncate tabular-nums ${statFontSize(heatmapData.summary.busiestDay)}`}>{heatmapData.summary.busiestDay}</p>
                 </div>
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Peak Traffic Window</p>
-                  <p className="mt-1 text-[22px] font-black text-amber-600 dark:text-amber-400">{heatmapData.summary.busiestHour}</p>
+                  <p className={`mt-1 font-black text-amber-600 dark:text-amber-400 truncate tabular-nums ${statFontSize(heatmapData.summary.busiestHour)}`}>{heatmapData.summary.busiestHour}</p>
                 </div>
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Peak Velocity</p>
-                  <p className="mt-1 text-[22px] font-black text-blue-600 dark:text-blue-400">{heatmapData.summary.peakVelocityJobsPerHour} jobs/hr</p>
+                  <p className={`mt-1 font-black text-blue-600 dark:text-blue-400 truncate tabular-nums ${statFontSize(`${heatmapData.summary.peakVelocityJobsPerHour} jobs/hr`)}`}>{heatmapData.summary.peakVelocityJobsPerHour} jobs/hr</p>
                 </div>
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Sampled Print Jobs</p>
-                  <p className="mt-1 text-[22px] font-black text-[var(--text-1)]">{heatmapData.summary.totalJobsSampled} jobs</p>
+                  <p className={`mt-1 font-black text-[var(--text-1)] truncate tabular-nums ${statFontSize(`${heatmapData.summary.totalJobsSampled} jobs`)}`}>{heatmapData.summary.totalJobsSampled} jobs</p>
                 </div>
               </div>
 
@@ -520,24 +521,24 @@ export const ExecutiveReportsHub: React.FC = () => {
           {activeTab === 'usageFailures' && usageData && failureData && revData && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">MTBF (Reliability)</p>
-                  <p className="mt-1 text-[24px] font-black text-emerald-600 dark:text-emerald-400">{failureData.summary.mtbfHours} hrs</p>
+                  <p className={`mt-1 font-black text-emerald-600 dark:text-emerald-400 truncate tabular-nums ${statFontSize(`${failureData.summary.mtbfHours} hrs`)}`}>{failureData.summary.mtbfHours} hrs</p>
                   <p className="text-[11.5px] text-[var(--text-3)]">Fleet Mean Time Between Failures</p>
                 </div>
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Paper Saved by Duplex</p>
-                  <p className="mt-1 text-[24px] font-black text-blue-600 dark:text-blue-400">+{usageData.summary.paperSheetsSaved} sheets</p>
+                  <p className={`mt-1 font-black text-blue-600 dark:text-blue-400 truncate tabular-nums ${statFontSize(`+${usageData.summary.paperSheetsSaved} sheets`)}`}>+{usageData.summary.paperSheetsSaved} sheets</p>
                   <p className="text-[11.5px] text-[var(--text-3)]">{usageData.summary.duplexPct}% 2-sided print adoption</p>
                 </div>
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Downtime Loss</p>
-                  <p className="mt-1 text-[24px] font-black text-rose-600 dark:text-rose-400">₹{revData.downtimeLossInr}</p>
+                  <p className={`mt-1 font-black text-rose-600 dark:text-rose-400 truncate tabular-nums ${statFontSize(`₹${revData.downtimeLossInr}`)}`}>₹{revData.downtimeLossInr}</p>
                   <p className="text-[11.5px] text-[var(--text-3)]">Opportunity cost of kiosk offline hrs</p>
                 </div>
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 min-w-0 overflow-hidden">
                   <p className="text-[11px] font-bold uppercase text-[var(--text-3)]">Avg. Pages / Order</p>
-                  <p className="mt-1 text-[24px] font-black text-[var(--text-1)]">{usageData.summary.avgPagesPerJob}</p>
+                  <p className={`mt-1 font-black text-[var(--text-1)] truncate tabular-nums ${statFontSize(usageData.summary.avgPagesPerJob)}`}>{usageData.summary.avgPagesPerJob}</p>
                   <p className="text-[11.5px] text-[var(--text-3)]">Based on {usageData.summary.totalJobsAnalyzed} jobs</p>
                 </div>
               </div>

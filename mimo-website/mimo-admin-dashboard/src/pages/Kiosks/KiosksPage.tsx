@@ -9,7 +9,7 @@ import { LiveIndicator } from '../../components/ui/LiveIndicator';
 import { ErrorBanner } from '../../components/insights/InsightBits';
 import { LevelBar } from '../../components/ui/shared';
 import { describeRange } from '../../lib/dateRange';
-import { inr, timeAgo } from '../../lib/format';
+import { inr, timeAgo, statFontSize } from '../../lib/format';
 import type { KioskLive, KioskRestart, KioskCleaning, PrinterInfo } from '../../types/insights.types';
 import { clockTime } from '../../lib/format';
 
@@ -219,9 +219,9 @@ export const KiosksPage: React.FC = () => {
 
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[['Jobs', String(k.stats.jobs)], ['Printed', String(k.stats.completed)], ['Failed', String(k.stats.failed)], ['Revenue', inr(k.stats.revenue)]].map(([label, value]) => (
-                <div key={label} className="p-3 rounded-xl bg-[var(--surface-2)]/60 border border-[var(--border)]">
-                  <p className="text-[10px] font-bold text-[var(--text-3)]">{label}</p>
-                  <p className={`text-lg font-black tabular-nums ${label === 'Failed' && k.stats.failed > 0 ? 'text-rose-600' : 'text-[var(--text-1)]'}`}>{value}</p>
+                <div key={label} className="p-2.5 sm:p-3 rounded-xl bg-[var(--surface-2)]/60 border border-[var(--border)] min-w-0 overflow-hidden">
+                  <p className="text-[10px] font-bold text-[var(--text-3)] truncate">{label}</p>
+                  <p className={`font-black tabular-nums tracking-tight truncate ${label === 'Failed' && k.stats.failed > 0 ? 'text-rose-600' : 'text-[var(--text-1)]'} ${statFontSize(value)}`}>{value}</p>
                 </div>
               ))}
             </div>

@@ -19,6 +19,7 @@ import {
   Tag,
 } from 'lucide-react';
 import api from '../../api';
+import { statFontSize } from '../../lib/format';
 import { errorMessage } from '../../hooks/useLiveQuery';
 
 export interface CouponItem {
@@ -260,12 +261,12 @@ export const CouponsPage: React.FC = () => {
           ))
         ) : (
           <>
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden">
               <div className="flex items-center justify-between text-[var(--text-3)] mb-1">
                 <span className="text-xs font-semibold">Active Coupons</span>
                 <Sparkles size={14} className="text-amber-500" />
               </div>
-              <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">
+              <p className={`font-black text-emerald-600 dark:text-emerald-400 truncate tabular-nums ${statFontSize(stats.active)}`}>
                 {stats.active}
               </p>
               <span className="text-[11px] text-[var(--text-3)] mt-0.5 block">
@@ -273,12 +274,12 @@ export const CouponsPage: React.FC = () => {
               </span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden">
               <div className="flex items-center justify-between text-[var(--text-3)] mb-1">
                 <span className="text-xs font-semibold">Max Discount</span>
                 <Percent size={14} className="text-indigo-500" />
               </div>
-              <p className="text-2xl sm:text-3xl font-black text-indigo-600 dark:text-indigo-400">
+              <p className={`font-black text-indigo-600 dark:text-indigo-400 truncate tabular-nums ${statFontSize(`${stats.maxDiscount}%`)}`}>
                 {stats.maxDiscount}%
               </p>
               <span className="text-[11px] text-[var(--text-3)] mt-0.5 block">
@@ -286,12 +287,12 @@ export const CouponsPage: React.FC = () => {
               </span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden">
               <div className="flex items-center justify-between text-[var(--text-3)] mb-1">
                 <span className="text-xs font-semibold">Total Redemptions</span>
                 <TrendingUp size={14} className="text-blue-500" />
               </div>
-              <p className="text-2xl sm:text-3xl font-black text-[var(--text-1)]">
+              <p className={`font-black text-[var(--text-1)] truncate tabular-nums ${statFontSize(stats.totalUses)}`}>
                 {stats.totalUses}
               </p>
               <span className="text-[11px] text-[var(--text-3)] mt-0.5 block">
@@ -299,12 +300,12 @@ export const CouponsPage: React.FC = () => {
               </span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden">
               <div className="flex items-center justify-between text-[var(--text-3)] mb-1">
                 <span className="text-xs font-semibold">Campaign Status</span>
                 <Tag size={14} className="text-emerald-500" />
               </div>
-              <p className="text-2xl sm:text-3xl font-black text-emerald-500">
+              <p className={`font-black text-emerald-500 truncate tabular-nums ${statFontSize("LIVE")}`}>
                 LIVE
               </p>
               <span className="text-[11px] text-[var(--text-3)] mt-0.5 block">

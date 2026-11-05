@@ -123,7 +123,7 @@ export const FinanceMetricCard: React.FC<FinanceMetricCardProps> = ({
         <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 tracking-tight block truncate mb-0.5">
           {title}
         </span>
-        <div className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight font-mono truncate">
+        <div className={`font-black text-slate-900 dark:text-white tracking-tight font-mono truncate ${statFontSize(value)}`}>
           {value}
         </div>
       </div>

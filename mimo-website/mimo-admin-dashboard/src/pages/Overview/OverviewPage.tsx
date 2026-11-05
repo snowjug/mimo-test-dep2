@@ -9,7 +9,7 @@ import { DateRangePicker } from '../../components/ui/DateRangePicker';
 import { LiveIndicator } from '../../components/ui/LiveIndicator';
 import { ErrorBanner } from '../../components/insights/InsightBits';
 import { describeRange } from '../../lib/dateRange';
-import { inr, int, timeAgo } from '../../lib/format';
+import { inr, int, timeAgo, statFontSize } from '../../lib/format';
 import { MachineBadge, PrintHistoryList } from '../../components/history/PrintHistory';
 import type { KioskLive, PrinterInfo } from '../../types/insights.types';
 const RECENT_PRINTS = 6;
@@ -25,10 +25,18 @@ const goTo = (tab: string) => {
 };
 
 const Stat: React.FC<{ label: string; value: string; sub?: string; tone?: string; loading: boolean }> = ({ label, value, sub, tone = 'text-[var(--text-1)]', loading }) => (
-  <div className="px-4 py-3.5 sm:px-5 sm:py-4">
-    <p className="text-[12px] font-medium text-[var(--text-3)]">{label}</p>
-    {loading ? <div className="skeleton mt-1.5 h-7 w-20" /> : <p className={`mt-0.5 text-[26px] font-bold leading-tight tabular-nums tracking-tight ${tone}`}>{value}</p>}
-    {!loading && sub && <p className="mt-0.5 truncate text-[11px] text-[var(--text-3)]">{sub}</p>}
+  <div className="px-3.5 py-3 sm:px-5 sm:py-4 min-w-0 overflow-hidden flex flex-col justify-between">
+    <div className="min-w-0">
+      <p className="text-[12px] font-medium text-[var(--text-3)] truncate">{label}</p>
+      {loading ? (
+        <div className="skeleton mt-1.5 h-7 w-20" />
+      ) : (
+        <p className={`mt-0.5 font-bold leading-tight tabular-nums tracking-tight truncate ${tone} ${statFontSize(value)}`}>
+          {value}
+        </p>
+      )}
+    </div>
+    {!loading && sub && <p className="mt-1 truncate text-[11px] text-[var(--text-3)]">{sub}</p>}
   </div>
 );
 

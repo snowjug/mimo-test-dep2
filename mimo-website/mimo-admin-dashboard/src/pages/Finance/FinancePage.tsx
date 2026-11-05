@@ -62,7 +62,7 @@ const fmtDateShort = (key?: string) => {
   return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 };
 import { exportFinancePdf } from '../../lib/pdfExport';
-import { inr, int } from '../../lib/format';
+import { inr, int, statFontSize } from '../../lib/format';
 import type { Analytics } from '../../types/insights.types';
 
 interface PricingSettings {
@@ -541,17 +541,17 @@ export const FinancePage: React.FC = () => {
 
           {/* 6-Card Financial KPI Matrix */}
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden">
               <span className="text-[11px] font-bold text-[var(--text-3)] uppercase block">Gross Customer Collections</span>
-              <p className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+              <p className={`font-black text-indigo-600 dark:text-indigo-400 mt-1 truncate tabular-nums ${statFontSize(analytics?.current ? inr(totalGross) : "—")}`}>
                 {analytics?.current ? inr(totalGross) : '—'}
               </p>
               <p className="text-[10px] text-[var(--text-3)] mt-1">{analytics?.current?.orders ?? 0} orders collected</p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden">
               <span className="text-[11px] font-bold text-[var(--text-3)] uppercase block">Completed Refunds</span>
-              <p className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+              <p className={`font-black text-rose-600 dark:text-rose-400 mt-1 truncate tabular-nums ${statFontSize(analytics?.current ? inr(totalRefunded) : "—")}`}>
                 {analytics?.current ? inr(totalRefunded) : '—'}
               </p>
               <p className="text-[10px] text-rose-500/80 font-bold mt-1">
@@ -559,33 +559,33 @@ export const FinancePage: React.FC = () => {
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs ring-1 ring-emerald-500/20">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs ring-1 ring-emerald-500/20 min-w-0 overflow-hidden">
               <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase block">Net Customer Collections</span>
-              <p className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+              <p className={`font-black text-emerald-600 dark:text-emerald-400 mt-1 truncate tabular-nums ${statFontSize(analytics?.current ? inr(netRevenue) : "—")}`}>
                 {analytics?.current ? inr(netRevenue) : '—'}
               </p>
               <p className="text-[10px] text-emerald-600/80 font-semibold mt-1">Gross minus refunds</p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden">
               <span className="text-[11px] font-bold text-[var(--text-3)] uppercase block">Gross Margin</span>
-              <p className="text-xl sm:text-2xl font-black text-amber-500 mt-1">
+              <p className={`font-black text-amber-500 mt-1 truncate tabular-nums ${statFontSize(analytics?.current ? `${grossMarginPct.toFixed(1)}%` : "—")}`}>
                 {analytics?.current ? `${grossMarginPct.toFixed(1)}%` : '—'}
               </p>
               <p className="text-[10px] text-[var(--text-3)] mt-1">{analytics?.current ? `~${inr(grossProfit)} profit` : '—'}</p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden">
               <span className="text-[11px] font-bold text-[var(--text-3)] uppercase block">Avg Order Value</span>
-              <p className="text-xl sm:text-2xl font-black text-[var(--text-1)] mt-1">
+              <p className={`font-black text-[var(--text-1)] mt-1 truncate tabular-nums ${statFontSize(analytics?.current ? inr(analytics.current.avgOrderValue || 0) : "—")}`}>
                 {analytics?.current ? inr(analytics.current.avgOrderValue || 0) : '—'}
               </p>
               <p className="text-[10px] text-[var(--text-3)] mt-1">Per completed print</p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs min-w-0 overflow-hidden">
               <span className="text-[11px] font-bold text-[var(--text-3)] uppercase block">Success Rate</span>
-              <p className="text-xl sm:text-2xl font-black text-[var(--text-1)] mt-1">
+              <p className={`font-black text-[var(--text-1)] mt-1 truncate tabular-nums ${statFontSize(paymentSuccessRate === null ? "—" : `${paymentSuccessRate}%`)}`}>
                 {paymentSuccessRate === null ? '—' : `${paymentSuccessRate}%`}
               </p>
               <p className="text-[10px] text-[var(--text-3)] font-semibold mt-1">
@@ -639,9 +639,9 @@ export const FinancePage: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10 min-w-0 overflow-hidden">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Last Week Revenue</span>
-                  <p className="text-xl font-black text-white mt-1">
+                  <p className={`font-black text-white mt-1 truncate tabular-nums ${statFontSize(weeklyBenchmark.hasBaseline ? inr(weeklyBenchmark.lastRev) : "—")}`}>
                     {weeklyBenchmark.hasBaseline ? inr(weeklyBenchmark.lastRev) : '—'}
                   </p>
                   <span className="text-[10px] text-slate-400 mt-0.5 block">
@@ -651,9 +651,9 @@ export const FinancePage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10 min-w-0 overflow-hidden">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">This Week Revenue</span>
-                  <p className="text-xl font-black text-emerald-400 mt-1">
+                  <p className={`font-black text-emerald-400 mt-1 truncate tabular-nums ${statFontSize(weeklyBenchmark.hasBaseline ? inr(weeklyBenchmark.thisRev) : "—")}`}>
                     {weeklyBenchmark.hasBaseline ? inr(weeklyBenchmark.thisRev) : '—'}
                   </p>
                   <span className="text-[10px] text-emerald-300/80 font-bold mt-0.5 block">
@@ -663,9 +663,9 @@ export const FinancePage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10 min-w-0 overflow-hidden">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Print Volume Scaled</span>
-                  <p className="text-xl font-black text-white mt-1">
+                  <p className={`font-black text-white mt-1 truncate tabular-nums ${statFontSize(weeklyBenchmark.hasBaseline ? `${int(weeklyBenchmark.thisPages)} pgs` : "—")}`}>
                     {weeklyBenchmark.hasBaseline ? `${int(weeklyBenchmark.thisPages)} pgs` : '—'}
                   </p>
                   <span className="text-[10px] text-indigo-300 font-bold mt-0.5 block">
@@ -673,9 +673,9 @@ export const FinancePage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                <div className="p-3 sm:p-3.5 rounded-2xl bg-white/5 border border-white/10 min-w-0 overflow-hidden">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Orders Handled</span>
-                  <p className="text-xl font-black text-white mt-1">
+                  <p className={`font-black text-white mt-1 truncate tabular-nums ${statFontSize(weeklyBenchmark.hasBaseline ? `${weeklyBenchmark.thisOrders} orders` : "—")}`}>
                     {weeklyBenchmark.hasBaseline ? `${weeklyBenchmark.thisOrders} orders` : '—'}
                   </p>
                   <span className="text-[10px] text-amber-300 font-bold mt-0.5 block">

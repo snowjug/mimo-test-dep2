@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Radio, Clock, HelpCircle } from 'lucide-react';
 import type { GuardianKioskSummary } from '../../../types/guardian.types';
+import { statFontSize } from '../../../lib/format';
 
 interface Props {
   kiosks: GuardianKioskSummary[];
@@ -38,11 +39,11 @@ const Card: React.FC<{ icon: React.ReactNode; label: string; value: number; tone
     slate: 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800',
   };
   return (
-    <div className="rounded-[var(--radius-lg)] p-4 bg-[var(--surface)] border border-[var(--border)] shadow-xs flex items-center gap-3">
+    <div className="rounded-[var(--radius-lg)] p-3.5 sm:p-4 bg-[var(--surface)] border border-[var(--border)] shadow-xs flex items-center gap-3 min-w-0 overflow-hidden">
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${toneCls[tone]}`}>{icon}</div>
       <div className="min-w-0">
         <p className="text-[11px] font-semibold text-[var(--text-3)] truncate">{label}</p>
-        <p className="text-xl font-black tabular-nums text-[var(--text-1)]">{value}</p>
+        <p className={`font-black tabular-nums tracking-tight truncate text-[var(--text-1)] ${statFontSize(value)}`}>{value}</p>
       </div>
     </div>
   );
