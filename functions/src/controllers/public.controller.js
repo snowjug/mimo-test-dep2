@@ -139,6 +139,17 @@ const postCustomerIncident = async (req, res) => {
     if (!message && !type) {
       return res.status(400).json({ error: "message or type required" });
     }
+    // Ignore benign client aborts (user navigation, closing tab, or cancelled upload)
+    const isBenignAbort =
+      details === "Request aborted" ||
+      message === "Upload cancelled." ||
+      String(details || "").includes("AbortError") ||
+      String(details || "").includes("CanceledError");
+
+    if (isBenignAbort) {
+      return res.status(200).json({ success: true, ignored: true });
+    }
+
     const incidentData = {
       type: type || "client_error",
       message: String(message || "Customer reported a website issue").slice(0, 500),

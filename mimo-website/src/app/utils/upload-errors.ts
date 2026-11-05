@@ -8,6 +8,13 @@ type ErrorLike = { response?: { status?: number; data?: { error?: unknown } } };
 export function describeUploadFailure(err: unknown): string {
   const e = (err ?? null) as ErrorLike | null;
   const serverMessage = e?.response?.data?.error;
+  const isAborted =
+    (err as any)?.name === "CanceledError" ||
+    (err as any)?.name === "AbortError" ||
+    (err as any)?.message === "Request aborted" ||
+    (err as any)?.message === "canceled";
+  if (isAborted) return "Upload cancelled.";
+
   if (typeof serverMessage === "string" && serverMessage.trim()) return serverMessage.trim();
   if (e?.response?.status === 401) return "Your session has expired. Please log in again.";
   if (e?.response?.status === 413) return "That file is too large to upload.";

@@ -803,14 +803,26 @@ export function UploadFile() {
       sessionStorage.setItem("uploadTotalPages", totalPages.toString());
       setUploading(false);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      const isAborted =
+        err?.name === "CanceledError" ||
+        err?.name === "AbortError" ||
+        err?.message === "Request aborted" ||
+        err?.message === "canceled";
+
+      if (isAborted) {
+        console.log("[UPLOAD] Upload cancelled by user or navigation.");
+        setUploading(false);
+        return;
+      }
+
       try {
         api.post("/api/customer-incident", {
           type: "upload_failed",
           message: describeUploadFailure(err),
           route: "/upload",
-          details: String((err as any)?.message || err).slice(0, 500),
+          details: String(err?.message || err).slice(0, 500),
         }).catch(() => {});
       } catch {}
       setFiles((prev) =>

@@ -70,7 +70,13 @@ export function Login() {
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err.response?.data || "Login failed");
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        (typeof err.response?.data === "string" ? err.response?.data : null) ||
+        err.message ||
+        "Login failed";
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }

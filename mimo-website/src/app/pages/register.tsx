@@ -35,7 +35,13 @@ export function Register() {
       navigate("/onboarding");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.response?.data || "Registration failed");
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        (typeof err.response?.data === "string" ? err.response?.data : null) ||
+        err.message ||
+        "Registration failed";
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
