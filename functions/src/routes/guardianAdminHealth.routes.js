@@ -143,7 +143,7 @@ function createGuardianAdminHealthRouter({ now = Date.now } = {}) {
   router.get("/admin/guardian/website-health", adminAuthMiddleware, async (req, res) => {
     try {
       const skipProbe = req.query.skipProbe === "1" || req.query.skipProbe === "true";
-      const health = await checkCustomerWebsiteCondition({ skipProbe });
+      const health = await checkCustomerWebsiteCondition({ skipProbe, autoAlert: false });
       return res.json(health);
     } catch (err) {
       console.error("[GUARDIAN-WEBSITE-HEALTH] read failed:", err && err.message);
