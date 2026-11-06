@@ -817,14 +817,21 @@ export function UploadFile() {
         return;
       }
 
-      try {
-        api.post("/api/customer-incident", {
-          type: "upload_failed",
-          message: describeUploadFailure(err),
-          route: "/upload",
-          details: String(err?.message || err).slice(0, 500),
-        }).catch(() => {});
-      } catch {}
+      const status = err?.response?.status;
+      const isClientOffline = typeof navigator !== "undefined" && !navigator.onLine;
+      const isTechnicalError = (status && status >= 500) || (!status && !isClientOffline && (err instanceof TypeError || err instanceof ReferenceError));
+
+      if (isTechnicalError) {
+        try {
+          api.post("/api/customer-incident", {
+            type: "upload_failed",
+            message: describeUploadFailure(err),
+            route: "/upload",
+            status: status || 500,
+            details: String(err?.stack || err?.message || err).slice(0, 500),
+          }).catch(() => {});
+        } catch {}
+      }
       setFiles((prev) =>
         prev.map((f) =>
           newFiles.some((nf) => nf.clientUploadId === f.clientUploadId) ? { ...f, status: "failed", progress: 0 } : f

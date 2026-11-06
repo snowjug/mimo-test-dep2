@@ -1,5 +1,7 @@
 const { db } = require("../config/firebase");
 const { normalizeMediaUrl } = require("../utils/mediaUrl");
+const { classifyIncident } = require("../services/incidentClassifier");
+const { sendWebsiteAlertEmail } = require("../services/email.service");
 
 // ================= VALIDATE COUPON (Public) =================
 const getValidateCoupon = async (req, res) => {
@@ -135,43 +137,59 @@ const getApiStats = async (req, res) => {
 // ================= CUSTOMER WEBSITE INCIDENT REPORTING =================
 const postCustomerIncident = async (req, res) => {
   try {
-    const { type, message, route, details, clientUploadId } = req.body || {};
+    const { type, message, route, details, clientUploadId, status } = req.body || {};
     if (!message && !type) {
       return res.status(400).json({ error: "message or type required" });
     }
-    // Ignore benign client aborts (user navigation, closing tab, or cancelled upload)
-    const isBenignAbort =
-      details === "Request aborted" ||
-      message === "Upload cancelled." ||
-      String(details || "").includes("AbortError") ||
-      String(details || "").includes("CanceledError");
 
-    if (isBenignAbort) {
-      return res.status(200).json({ success: true, ignored: true });
-    }
+    // Classify whether this is a genuine technical issue or a benign user action/mistake
+    const classification = classifyIncident({ type, message, details, route, status });
+
+    const cleanRoute = String(route || "/").slice(0, 100);
+    const cleanMessage = String(message || classification.reason).slice(0, 500);
+    const cleanDetails = String(details || "").slice(0, 1000);
 
     const incidentData = {
       type: type || "client_error",
-      message: String(message || "Customer reported a website issue").slice(0, 500),
-      route: String(route || "/").slice(0, 100),
-      details: String(details || "").slice(0, 1000),
+      message: cleanMessage,
+      route: cleanRoute,
+      details: cleanDetails,
       clientUploadId: clientUploadId || null,
-      status: "unresolved",
+      technical: classification.isTechnical,
+      category: classification.category,
+      severity: classification.severity,
+      reason: classification.reason,
+      status: classification.isTechnical ? "unresolved" : "ignored",
       createdAt: new Date(),
     };
+
     const docRef = await db.collection("customer_website_incidents").add(incidentData);
 
-    // Auto trigger alert email in the background
-    try {
-      const { sendWebsiteAlertEmail } = require("../services/email.service");
-      await sendWebsiteAlertEmail({
-        problem: incidentData.message,
-        location: `Customer Frontend (${incidentData.route})`,
-        details: incidentData.details || `Error occurred on customer website route '${incidentData.route}'`,
-      });
-    } catch (_) {}
+    // ONLY dispatch developer alert email if genuine technical issue (never for user mistakes/cancellations/wrong password/offline)
+    if (classification.isTechnical) {
+      try {
+        await sendWebsiteAlertEmail({
+          problem: cleanMessage,
+          location: `Customer Frontend (${cleanRoute})`,
+          details: cleanDetails || `Technical error occurred on customer website route '${cleanRoute}'`,
+          category: classification.category,
+          route: cleanRoute,
+          severity: classification.severity,
+        });
+      } catch (mailErr) {
+        console.warn("[CUSTOMER-INCIDENT] Alert email dispatch failed:", mailErr.message);
+      }
+    } else {
+      console.log(`[CUSTOMER-INCIDENT] Benign event recorded (no alert email sent): [${classification.category}] ${classification.reason}`);
+    }
 
-    return res.status(201).json({ success: true, incidentId: docRef.id });
+    return res.status(classification.isTechnical ? 201 : 200).json({
+      success: true,
+      incidentId: docRef.id,
+      technical: classification.isTechnical,
+      ignored: !classification.isTechnical,
+      category: classification.category,
+    });
   } catch (err) {
     console.error("[CUSTOMER-INCIDENT] Failed to record:", err.message);
     return res.status(500).json({ error: "Failed to record incident" });
