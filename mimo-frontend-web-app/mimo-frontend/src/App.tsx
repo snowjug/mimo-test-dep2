@@ -43,13 +43,17 @@ function App() {
   useEffect(() => {
     const rootEl = document.getElementById('root');
     // Clear themes first
-    document.body.classList.remove('theme-cv001', 'theme-sv002');
-    rootEl?.classList.remove('theme-cv001', 'theme-sv002');
+    document.body.classList.remove('theme-cv001', 'theme-sv002', 'theme-mimo1-diwali');
+    rootEl?.classList.remove('theme-cv001', 'theme-sv002', 'theme-mimo1-diwali');
 
-    if (dynamicKioskId === 'SV-002') {
+    if (dynamicKioskId === 'CV-001') {
+      // The theme-cv001 stylesheet rules are the old dark look and would repaint the Diwali screens.
+      document.body.classList.add('theme-mimo1-diwali');
+      rootEl?.classList.add('theme-mimo1-diwali');
+    } else if (dynamicKioskId === 'SV-002') {
       document.body.classList.add('theme-sv002');
       rootEl?.classList.add('theme-sv002');
-    } else if (dynamicKioskId === 'CV-001' || isFestiveForKiosk) {
+    } else if (isFestiveForKiosk) {
       document.body.classList.add('theme-cv001');
       rootEl?.classList.add('theme-cv001');
     }
@@ -321,7 +325,11 @@ function App() {
       {toastMsg && (
         <div
           className={`fixed left-1/2 top-9 z-[1000] flex -translate-x-1/2 items-center gap-4 rounded-2xl border px-7 py-4 shadow-2xl backdrop-blur-xl ${
-            toastError
+            dynamicKioskId === 'CV-001'
+              ? toastError
+                ? 'border-[#D4AF37]/60 bg-gradient-to-r from-[#7D1120] to-[#540915] text-[#FFF9EA] shadow-[0_12px_36px_rgba(80,10,20,0.40)]'
+                : 'border-[#D4AF37]/50 bg-white/95 text-[#2D1E12] shadow-[0_12px_36px_rgba(80,50,20,0.12)]'
+              : toastError
               ? 'border-danger-500/30 bg-danger-600/95 text-white'
               : 'border-gold-500/30 bg-white/95 text-[#1A1714]'
           }`}

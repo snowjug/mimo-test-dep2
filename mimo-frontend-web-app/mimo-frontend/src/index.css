@@ -739,3 +739,9 @@ body.theme-sv002 > div > div.bottom-10.rounded-full svg {
     animation: none !important;
   }
 }
+
+/* MIMO 1.0 Diwali theme (CV-001) */
+body.theme-mimo1-diwali,
+#root.theme-mimo1-diwali {
+  background: #FAF4E8;
+}

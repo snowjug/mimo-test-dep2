@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { WarningOctagon, Clock, ArrowClockwise, House, HandHeart } from '@phosphor-icons/react';
 import { FestiveBackdrop, ZariBorder } from '../festive/NavaratriDecor';
+import { DiwaliBackdrop, DiwaliGoldDivider } from '../festive/DiwaliDecor';
 import { isFestivalActive } from '../../config/festivalConfig';
 
 interface SystemErrorScreenProps {
@@ -51,6 +52,102 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({
         }, 1000);
         return () => clearInterval(interval);
     }, [isActive, onReset]);
+
+    if (kioskId === 'CV-001') {
+  if (!isActive) return null;
+
+  return (
+    <div
+      className="screen visible absolute inset-0 flex h-full w-full flex-col items-center justify-between select-none overflow-hidden bg-[#FAF4E8] px-20 py-10 text-center"
+    >
+      {/* Warm Cream and Gold Diwali Canvas */}
+      <DiwaliBackdrop showRangoli={true} />
+
+      {/* Top Status Pill */}
+      <motion.div
+        initial={{ opacity: 0, y: -16, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 flex items-center gap-2.5 rounded-full border border-[#D4AF37]/50 bg-white/90 px-7 py-2.5 shadow-[0_4px_16px_rgba(80,50,20,0.06)] backdrop-blur-md"
+      >
+        <WarningOctagon size={22} weight="fill" className="text-[#8A1726]" />
+        <span className="font-sans text-[14px] font-extrabold uppercase tracking-[0.2em] text-[#8A1726]">
+          Printing Notice
+        </span>
+      </motion.div>
+
+      {/* Main Content Card */}
+      <div className="relative z-10 flex w-full max-w-[960px] flex-1 flex-col justify-center gap-5 text-left">
+        <div className="flex items-baseline gap-3">
+          <span className="font-serif text-[38px] font-bold text-[#6E5A4B]">
+            Hey
+          </span>
+          <span className="font-serif text-[38px] font-bold text-[#A37524] underline decoration-[#D4AF37]/60 underline-offset-8">
+            {firstName}
+          </span>
+          <span className="font-serif text-[38px] font-bold text-[#2D1E12]">
+            , we encountered an issue.
+          </span>
+        </div>
+
+        <p className="max-w-[820px] text-[22px] font-medium leading-relaxed text-[#6E5A4B]">
+          {errorMsg || 'A momentary printing or paper issue occurred while processing your document.'}
+        </p>
+
+        {/* Automatic Refund Banner */}
+        {showRefundBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-4 rounded-2xl border-2 border-[#D4AF37]/50 bg-gradient-to-r from-[#FFFDF8] via-[#FAF1DF] to-[#FFFDF8] p-5 shadow-[0_8px_24px_rgba(212,175,55,0.15)]"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#10B981]/15 text-[#10B981]">
+              <HandHeart size={26} weight="bold" />
+            </div>
+            <div>
+              <h3 className="text-[18px] font-bold text-[#2D1E12]">
+                Your payment is completely safe
+              </h3>
+              <p className="text-[15px] font-medium text-[#6E5A4B]">
+                Since your document could not be completed, an automatic refund has been initiated to your original payment method.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        <div className="my-2">
+          <DiwaliGoldDivider width={200} />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-5 pt-2">
+          <button
+            onClick={onRetry}
+            className="flex items-center gap-3 rounded-full bg-gradient-to-br from-[#7D1120] via-[#630917] to-[#45050E] px-10 py-4 text-[18px] font-bold uppercase tracking-[0.14em] text-white shadow-[0_8px_24px_rgba(100,10,25,0.30)] ring-2 ring-[#ECC778]/80 transition-all hover:brightness-105 active:scale-95"
+          >
+            <ArrowClockwise size={22} weight="bold" className="text-[#FFF2D4]" />
+            Try Again
+          </button>
+
+          <button
+            onClick={onReset}
+            className="flex items-center gap-2.5 rounded-full border-2 border-[#D4AF37]/45 bg-white/90 px-8 py-4 text-[17px] font-bold uppercase tracking-[0.12em] text-[#2D1E12] shadow-sm transition-all hover:border-[#B48528] hover:bg-white active:scale-95"
+          >
+            <House size={22} weight="bold" className="text-[#9A6D24]" />
+            Return to Home
+          </button>
+        </div>
+      </div>
+
+      {/* Auto-reset Countdown Footer */}
+      <footer className="relative z-10 flex items-center justify-center gap-2 text-[15px] font-medium text-[#7C6652]">
+        <Clock size={18} weight="bold" className="text-[#9A6D24]" />
+        <span>Returning to home screen in</span>
+        <strong className="font-bold text-[#2D1E12] tabular-nums">{countdown}s</strong>
+      </footer>
+    </div>
+  );
+    }
 
     return (
         <div

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Check, ArrowDown, WarningCircle } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
 import { DiyaRow, FestiveBackdrop, ZariBorder } from '../festive/NavaratriDecor';
+import { DiwaliHotspot, DiwaliStage } from '../festive/DiwaliStage';
 
 const DandiyaSticks: React.FC = () => (
     <svg width="130" height="130" viewBox="0 0 130 130" className="pointer-events-none absolute -right-6 top-2">
@@ -56,6 +57,28 @@ const ISSUES: { id: string; label: string }[] = [
     { id: 'other', label: 'Something else' },
 ];
 type ReportState = 'ask' | 'choose' | 'sending' | 'sent' | 'failed';
+
+// Layout measured from design-references/03-printing-complete and 04-report-problem (1672px wide, 16:9).
+const K = 1440 / 1672;
+const pill = (x0: number, y0: number, x1: number, y1: number) => ({
+  left: x0 * K,
+  top: y0 * K,
+  width: (x1 - x0) * K,
+  height: (y1 - y0) * K,
+});
+const ISSUE_BUTTONS: { id: string; label: string; box: ReturnType<typeof pill> }[] = [
+  { id: 'blank', label: 'Blank pages', box: pill(498, 474, 685, 527) },
+  { id: 'missing', label: 'Pages missing', box: pill(706, 474, 908, 527) },
+  { id: 'faint', label: 'Too faint or streaky', box: pill(928, 474, 1174, 527) },
+  { id: 'other', label: 'Something else', box: pill(737, 539, 936, 591) },
+];
+const PLATE_FOR: Record<ReportState, string> = {
+  ask: '/diwali-plate-complete.png',
+  choose: '/diwali-plate-report.png',
+  sending: '/diwali-plate-report.png',
+  sent: '/diwali-plate-report-clear.png',
+  failed: '/diwali-plate-report-clear.png',
+};
 
 export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId, printCode }) => {
     const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
@@ -132,6 +155,92 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
             }
         }
     }, [isActive, armReset]);
+
+    if (kioskId === 'CV-001') {
+  if (!isActive) return null;
+
+  const firstName = jobData?.userName?.split(' ')[0] || 'Demo';
+  const isAsking = report === 'ask';
+
+  return (
+    <div
+      className="screen visible absolute inset-0 overflow-hidden bg-[#FDF0DE]"
+      style={{ display: 'block' }}
+    >
+      <DiwaliStage plate={PLATE_FOR[report]}>
+        <h1
+          className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
+          style={
+            isAsking
+              ? { top: 262 * K - 4, color: '#5D0712', fontSize: 35.3, lineHeight: '50px', fontWeight: 500, fontFamily: "'EB Garamond', Georgia, serif" }
+              : { top: 300 * K - 4, color: '#56050B', fontSize: 41.8, lineHeight: '56px', fontWeight: 500, fontFamily: "'EB Garamond', Georgia, serif" }
+          }
+        >
+          {firstName}, your documents are ready.
+        </h1>
+
+        {isAsking && (
+          <>
+            <DiwaliHotspot box={pill(511, 586, 800, 646)} onClick={onReset} aria-label="Yes, done" pressTint="active:bg-black/20" />
+            <DiwaliHotspot
+              box={pill(827, 586, 1161, 646)}
+              onClick={() => {
+                setReport('choose');
+                armReset(REPORT_RESET_MS);
+              }}
+              aria-label="Report a problem"
+            />
+          </>
+        )}
+
+        {(report === 'choose' || report === 'sending') && (
+          <>
+            <p
+              className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[#6F2B18]"
+              style={{ top: 422 * K, fontSize: 18.4, lineHeight: '32px', fontWeight: 400, fontFamily: "'EB Garamond', Georgia, serif" }}
+            >
+              What went wrong with your print?
+            </p>
+            {ISSUE_BUTTONS.map((issue) => (
+              <DiwaliHotspot
+                key={issue.id}
+                box={issue.box}
+                disabled={report === 'sending'}
+                onClick={() => sendReport(issue.id)}
+                aria-label={issue.label}
+              />
+            ))}
+            <DiwaliHotspot
+              box={pill(790, 608, 882, 644)}
+              disabled={report === 'sending'}
+              onClick={() => {
+                setReport('ask');
+                armReset(AUTO_RESET_MS);
+              }}
+              aria-label="Cancel"
+            />
+          </>
+        )}
+
+        {(report === 'sent' || report === 'failed') && (
+          <div className="absolute left-1/2 flex w-[640px] -translate-x-1/2 flex-col items-center gap-6 text-center" style={{ top: 428 * K }}>
+            <p className="text-[24px] font-medium leading-[32px] text-[#6B1226]" style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
+              {report === 'sent'
+                ? 'Thank you. The MIMO team has been told. Please keep the pages, the team may ask to see them.'
+                : `We could not send your report. Please tell the staff your code ${printCode ?? ''}.`}
+            </p>
+            <button
+              onClick={onReset}
+              className="cursor-pointer rounded-full bg-[#6B1230] px-12 py-3 text-[16px] font-bold uppercase tracking-[0.14em] text-white shadow-md active:brightness-90"
+            >
+              Done
+            </button>
+          </div>
+        )}
+      </DiwaliStage>
+    </div>
+  );
+    }
 
     return (
         <div

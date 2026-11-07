@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Check, CaretRight } from '@phosphor-icons/react';
+import { Mimo1WelcomeScreen } from './Mimo1WelcomeScreen';
 import { DiyaRow, FestiveBackdrop, Kalash, Lotus, OrnamentDivider, ZariBorder } from '../festive/NavaratriDecor';
 import { isFestivalActive } from '../../config/festivalConfig';
 
@@ -202,6 +203,10 @@ export const MainScreen: React.FC<MainScreenProps> = ({ onNext, isActive, kioskI
     );
 
     const isCV001 = kioskId === 'CV-001' || (!isSV002 && kioskId !== 'SV-002');
+
+    if (kioskId === 'CV-001') {
+        return <Mimo1WelcomeScreen onNext={onNext} isActive={isActive} kioskId={kioskId} />;
+    }
 
     if (isSV002) {
         return (

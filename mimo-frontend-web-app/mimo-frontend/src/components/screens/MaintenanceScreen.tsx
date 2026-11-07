@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { DiwaliBackdrop, DiwaliDiya, DiwaliGoldDivider, DiwaliMandala } from '../festive/DiwaliDecor';
 
 interface MaintenanceScreenProps {
     isActive: boolean;
@@ -47,6 +48,75 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ isActive, 
 
         handleAdminTap();
     };
+
+    if (isCV001) {
+  if (!isActive) return null;
+
+  return (
+    <div
+      className="screen visible maint-screen absolute inset-0 flex h-full w-full flex-col items-center justify-center select-none overflow-hidden bg-[#FAF4E8]"
+      onPointerDown={handleScreenTouch}
+      style={{ touchAction: 'none' }}
+    >
+      {/* Warm Cream and Gold Diwali Canvas */}
+      <DiwaliBackdrop showRangoli={true} />
+
+      {/* Subtle festive mandala watermark */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.12] select-none">
+        <DiwaliMandala size={680} spin={false} />
+      </div>
+
+      {/* Touch Ripple Animations */}
+      {ripples.map((r) => (
+        <div
+          key={r.id}
+          className="maint-touch-ripple pointer-events-none absolute rounded-full border border-[#D4AF37]/60 bg-[#D4AF37]/15"
+          style={{
+            left: r.x,
+            top: r.y,
+            width: '60px',
+            height: '60px',
+            transform: `translate(-50%, -50%) scale(${r.scale})`,
+            animation: 'maint-ripple-expand 0.8s ease-out forwards',
+          }}
+        />
+      ))}
+
+      {/* Main Elevated Notice Card */}
+      <div className="relative z-10 flex max-w-[760px] flex-col items-center justify-center rounded-[36px] border-2 border-[#D4AF37]/50 bg-white/90 px-16 py-14 text-center shadow-[0_24px_60px_rgba(80,50,20,0.10),0_0_30px_rgba(212,175,55,0.12)] backdrop-blur-xl">
+        {/* Glowing Diya above status */}
+        <div className="mb-4">
+          <DiwaliDiya size={48} lit={true} />
+        </div>
+
+        <p className="font-sans text-[15px] font-extrabold uppercase tracking-[0.28em] text-[#9A6D24]">
+          MIMO 1.0 &bull; KIOSK STATUS
+        </p>
+
+        <h1 className="mt-3 font-serif text-[52px] font-bold leading-[1.1] tracking-tight text-[#2D1E12]">
+          TEMPORARILY<br />OUT OF SERVICE
+        </h1>
+
+        <div className="my-6">
+          <DiwaliGoldDivider width={180} />
+        </div>
+
+        <p className="max-w-[540px] text-[20px] font-medium leading-relaxed text-[#6E5A4B]">
+          We are currently refilling paper supplies and performing scheduled maintenance.
+          <br />
+          <strong className="text-[#2D1E12]">Please check back shortly.</strong>
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes maint-ripple-expand {
+          0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.2); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(3.5); }
+        }
+      `}</style>
+    </div>
+  );
+    }
 
     return (
         <div 

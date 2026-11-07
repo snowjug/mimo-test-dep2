@@ -2,6 +2,17 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Printer } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
 import { DiyaRow, FestiveBackdrop, Mandala, ZariBorder } from '../festive/NavaratriDecor';
+import { DiwaliStage } from '../festive/DiwaliStage';
+
+// Layout measured from design-references/02-printing-progress (1672px wide, 16:9).
+const K = 1440 / 1672;
+const RING = { cx: 1315 * K, cy: 484 * K, r: 147 * K, stroke: 13 * K };
+const DIYA_X = [337.5, 406, 475.5, 546, 616, 686.5];
+const DIYA_Y = 590;
+const DIYA_SIZE = 76;
+// One diya is lit from the start and the row fills as the print advances (27% lights three).
+const litDiyas = (progress: number) => Math.min(DIYA_X.length, Math.ceil((progress / 100) * (DIYA_X.length - 1)) + 1);
+
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
 // '0000' and '9999' are both faked entirely client-side in App.tsx (no print_jobs doc is ever created for
@@ -502,6 +513,149 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   }, [progress, radius]);
 
   // ─── render ───────────────────────────────────────────────────────────────
+
+  if (kioskId === 'CV-001') {
+    const arcCircumference = 2 * Math.PI * RING.r;
+    const arcOffset = arcCircumference - (progress / 100) * arcCircumference;
+
+    if (!isActive) return null;
+
+    return (
+    <div className="screen visible absolute inset-0 overflow-hidden bg-[#FEEFE2]" style={{ display: 'block' }}>
+      <DiwaliStage plate="/diwali-plate-printing.png">
+        {/* Greeting and status text, on the left card */}
+        <div className="absolute whitespace-nowrap text-[#4C0403]" style={{ left: 261 * K, top: 330 * K, fontFamily: 'Gelasio, Georgia, serif' }}>
+          <div className="text-[40.5px] font-medium leading-[54px] tracking-[-0.005em]" style={{ WebkitTextStroke: '0.4px currentColor' }}>{typedTitle || finalTitle}</div>
+        </div>
+        <div
+          className="absolute whitespace-pre-line text-[24.5px] leading-[32.7px] text-[#550909]"
+          style={{ left: 261 * K, top: 396 * K, fontFamily: 'Gelasio, Georgia, serif' }}
+        >
+          {typedSub || finalSub}
+        </div>
+        {!isCompleted && (
+          <div
+            className="absolute whitespace-nowrap text-[24.8px] leading-[32.7px] text-[#550909]"
+            style={{ left: 261 * K, top: 520 * K, fontFamily: 'Gelasio, Georgia, serif', fontVariantNumeric: 'lining-nums' }}
+          >
+            {statusMsg}
+          </div>
+        )}
+
+        {/* Lit diyas sit over the unlit row in the plate */}
+        {DIYA_X.slice(0, litDiyas(progress)).map((x) => (
+          <img
+            key={x}
+            src="/diwali-sprite-diya-lit.png"
+            alt=""
+            draggable={false}
+            className="pointer-events-none absolute"
+            style={{ left: (x - DIYA_SIZE / 2) * K, top: (DIYA_Y - DIYA_SIZE / 2) * K, width: DIYA_SIZE * K, height: DIYA_SIZE * K }}
+          />
+        ))}
+
+        {/* Progress arc on the plate's empty ring */}
+        <svg width="1440" height="810" className="pointer-events-none absolute inset-0">
+          <defs>
+            <linearGradient
+              id="mimo2ArcGradient"
+              gradientUnits="userSpaceOnUse"
+              gradientTransform={`rotate(90 ${RING.cx} ${RING.cy})`}
+              x1={RING.cx}
+              y1={RING.cy - RING.r}
+              x2={RING.cx + RING.r}
+              y2={RING.cy}
+            >
+              <stop offset="0%" stopColor="#F9B233" />
+              <stop offset="45%" stopColor="#EC8C1C" />
+              <stop offset="100%" stopColor="#C96002" />
+            </linearGradient>
+          </defs>
+          <circle
+            cx={RING.cx}
+            cy={RING.cy}
+            r={RING.r}
+            fill="transparent"
+            stroke="url(#mimo2ArcGradient)"
+            strokeWidth={RING.stroke}
+            strokeDasharray={progress >= 100 ? 'none' : arcCircumference}
+            strokeDashoffset={progress >= 100 ? 0 : arcOffset}
+            strokeLinecap="round"
+            opacity={progress > 0 ? 1 : 0}
+            transform={`rotate(-90 ${RING.cx} ${RING.cy})`}
+            style={{ transition: 'stroke-dashoffset 0.14s linear', filter: 'drop-shadow(0 0 3px rgba(230, 150, 40, 0.4))' }}
+          />
+        </svg>
+
+        {/* Percent and sheet readout, inside the ring */}
+        <div
+          className="absolute flex -translate-x-1/2 items-baseline text-[#4E0303]"
+          style={{ left: 1320 * K, top: 398 * K, fontFamily: 'Cardo, Georgia, serif' }}
+        >
+          <span className="text-[64px] font-bold leading-[80px]" style={{ fontVariantNumeric: 'tabular-nums', WebkitTextStroke: '0.5px currentColor' }}>{progress}</span>
+          <span className="ml-[2px] text-[38px] font-bold leading-none">%</span>
+        </div>
+        <div
+          className="absolute -translate-x-1/2 whitespace-nowrap text-[19.8px] font-medium leading-none text-[#570E0C]"
+          style={{ left: 1316 * K, top: 534 * K, fontFamily: 'Gelasio, Georgia, serif', fontVariantNumeric: 'lining-nums' }}
+        >
+          {progress >= 100
+            ? 'READY TO COLLECT'
+            : `SHEET ${sheetsCompletedRef.current + 1} OF ${Math.max(1, pages * copies)}`}
+        </div>
+      </DiwaliStage>
+
+      {/* ── Color print: "Collecting your pages" overlay ── */}
+      {collectingPages && (
+        <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center gap-9 bg-[#FAF4E8]/95 backdrop-blur-2xl">
+          <div className="relative flex items-center justify-center">
+            <div
+              className="flex h-36 w-36 items-center justify-center rounded-full border-2 border-[#D4AF37]/50 bg-white/90 text-[#A37524] shadow-[0_12px_32px_rgba(212,175,55,0.25)]"
+              style={{ animation: 'kiosk-collect-pulse 2s ease-in-out infinite' }}
+            >
+              <Printer size={64} weight="regular" />
+            </div>
+          </div>
+
+          <div className="max-w-2xl px-10 text-center">
+            <h2 className="mb-4 font-serif text-[42px] font-bold leading-tight text-[#2D1E12]">
+              Collecting your pages…
+            </h2>
+            <p className="text-[20px] font-medium leading-relaxed text-[#6E5A4B]">
+              Your color print is being ejected.
+              <br />
+              <strong className="text-[#2D1E12]">Please wait at the printer</strong> for your document.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex h-[80px] w-[80px] items-center justify-center rounded-full border-4 border-[#D4AF37]/50 bg-white shadow-md tabular">
+              <span className="font-sans text-[32px] font-extrabold text-[#7D1120]">{collectCountdown}</span>
+            </div>
+            <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-[#9A6D24]">
+              seconds
+            </p>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes kiosk-spin-slow {
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes kiosk-pulse-ring {
+          0%   { transform: scale(0.85); opacity: 0; }
+          50%  { opacity: 0.8; }
+          100% { transform: scale(1.4);  opacity: 0; }
+        }
+        @keyframes kiosk-collect-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.40); }
+          50%      { box-shadow: 0 0 0 30px rgba(212, 175, 55, 0); }
+        }
+      `}</style>
+    </div>
+    );
+  }
 
   return (
     <div

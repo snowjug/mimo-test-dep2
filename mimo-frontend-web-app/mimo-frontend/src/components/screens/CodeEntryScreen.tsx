@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Backspace, Check, CircleNotch } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
+import { DiwaliHotspot, DiwaliStage } from '../festive/DiwaliStage';
 import { Diya, FestiveBackdrop, GoldenCornerWaves, Mandala, OrnamentDivider } from '../festive/NavaratriDecor';
 
 interface CodeEntryScreenProps {
@@ -14,6 +15,18 @@ interface CodeEntryScreenProps {
   kioskId?: string | null;
 }
 
+// Layout measured from design-references/01-code-entry, whose 1821px width maps onto the 1440px canvas.
+const K = 1440 / 1821;
+const circle = (cx: number, cy: number, r: number) => ({
+  left: (cx - r) * K,
+  top: (cy - r) * K,
+  width: r * 2 * K,
+  height: r * 2 * K,
+});
+const SLOT_X = [540.5, 646, 751.5, 856.5];
+const SLOT_Y = 614;
+const KEY_X = [1092, 1194.5, 1297];
+const KEY_Y = [365, 456, 547, 640];
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
@@ -66,6 +79,82 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isActive]);
+
+  if (kioskId === 'CV-001') {
+    if (!isActive) return null;
+
+    return (
+    <div className="screen visible absolute inset-0 overflow-hidden bg-[#FDEFE1]" style={{ display: 'block' }}>
+      <DiwaliStage plate="/diwali-plate-code-entry.png">
+        <DiwaliHotspot box={circle(79.5, 63.5, 37)} onClick={onBack} aria-label="Return to home screen" />
+
+        {/* The four code slots */}
+        <motion.div
+          animate={isShaking ? { x: [0, -12, 12, -8, 8, -4, 4, 0] } : { x: 0 }}
+          transition={{ duration: 0.5 }}
+          className="pointer-events-none absolute inset-0"
+        >
+          {SLOT_X.map((cx, i) => {
+            const isCurrent = i === code.length && !isShaking;
+            return (
+              <div key={cx} className="absolute flex items-center justify-center" style={circle(cx, SLOT_Y, isCurrent ? 60 : 54)}>
+                <img
+                  src={isCurrent ? '/diwali-sprite-slot-active.png' : '/diwali-sprite-slot.png'}
+                  alt=""
+                  draggable={false}
+                  className="absolute inset-0 h-full w-full"
+                />
+                {code[i] && (
+                  <span className="relative text-[32px] font-bold leading-none text-[#3A0F12]" style={{ fontFamily: "Cardo, Georgia, serif" }}>
+                    {code[i]}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </motion.div>
+
+        {/* Keypad */}
+        {KEYS.map((num, i) => (
+          <DiwaliHotspot
+            key={num}
+            id={`key-${num}`}
+            box={circle(KEY_X[i % 3], KEY_Y[Math.floor(i / 3)], 41)}
+            onClick={() => handleNumClick(num)}
+            aria-label={num}
+          />
+        ))}
+        <DiwaliHotspot
+          id="key-del"
+          box={circle(KEY_X[0], KEY_Y[3], 41)}
+          onClick={() => handleNumClick('del')}
+          aria-label="Delete last digit"
+        />
+        <DiwaliHotspot id="key-0" box={circle(KEY_X[1], KEY_Y[3], 41)} onClick={() => handleNumClick('0')} aria-label="0" />
+        <DiwaliHotspot
+          id="key-submit"
+          box={circle(1299.5, 640.5, 44)}
+          onClick={handleSubmit}
+          disabled={code.length !== 4 || loading}
+          aria-label="Submit Mimo code"
+          pressTint="enabled:active:bg-[#7A1A0A]/25"
+        >
+          {loading && (
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-[#FF6347]">
+              <motion.span
+                animate={{ rotate: 360 }}
+                transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                className="flex"
+              >
+                <CircleNotch size={26} weight="bold" className="text-white" />
+              </motion.span>
+            </span>
+          )}
+        </DiwaliHotspot>
+      </DiwaliStage>
+    </div>
+    );
+  }
 
   if (isFestiveMode) {
     const ready = code.length === 4;
