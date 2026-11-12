@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
+import { clearPendingOrderBinding } from "../utils/checkout-order-state";
 import { ScannerAutoCaptureEngine, AutoCaptureStatus } from "../utils/scanner-auto-capture";
 import {
   loadOpenCV,
@@ -706,6 +707,7 @@ export function DocumentScanner() {
         const { jobId, pageCount, fileName } = finalizeRes.data;
 
         // Start a fresh checkout, same hand-off as the upload screen
+        clearPendingOrderBinding();
         ["printCode", "printOptions", "printStatus", "uploadedImages", "totalPages"].forEach((k) =>
           sessionStorage.removeItem(k)
         );

@@ -4,6 +4,7 @@ import { Loader2, Check, X } from "lucide-react";
 import { PrimaryButton, SecondaryButton } from "../components/mimo/ui";
 import { toast } from "sonner";
 import api from "../api";
+import { clearPendingOrderBinding } from "../utils/checkout-order-state";
 
 export function PaymentVerify() {
   const [searchParams] = useSearchParams();
@@ -28,6 +29,7 @@ export function PaymentVerify() {
           setStatus("success");
 
           if (printCode) {
+            clearPendingOrderBinding();
             // Store in BOTH sessionStorage and localStorage.
             // On mobile, Cashfree UPI redirect causes a full page reload which
             // wipes sessionStorage. localStorage survives the reload so the
@@ -130,7 +132,14 @@ export function PaymentVerify() {
       {status === "failed" && (
         <div className="flex flex-col gap-2">
           <PrimaryButton onClick={() => navigate("/payment")}>Try again</PrimaryButton>
-          <SecondaryButton onClick={() => navigate("/upload")}>Back to home</SecondaryButton>
+          <SecondaryButton
+            onClick={() => {
+              clearPendingOrderBinding();
+              navigate("/upload");
+            }}
+          >
+            Back to home
+          </SecondaryButton>
         </div>
       )}
     </div>

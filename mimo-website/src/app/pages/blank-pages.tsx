@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ActionBar, ActionBarSpacer, AppBar, ChoiceRow, Group, PrimaryButton, Row, Stepper } from "../components/mimo/ui";
 import api from "../api";
+import { clearPendingOrderBinding } from "../utils/checkout-order-state";
 
 export function BlankPages() {
   const navigate = useNavigate();
@@ -77,6 +78,7 @@ export function BlankPages() {
           }
         ])
       );
+      clearPendingOrderBinding();
 
       navigate("/payment");
     } catch (err) {

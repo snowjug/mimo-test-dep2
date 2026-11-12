@@ -5,6 +5,7 @@ import { MimoHeader } from "../components/mimo-header";
 import { Group, PrimaryButton, Row, SecondaryButton, StatusPill } from "../components/mimo/ui";
 import { toast } from "sonner";
 import { AdBanner } from "../components/AdBanner";
+import { clearPendingOrderBinding } from "../utils/checkout-order-state";
 
 export function PrintCode() {
   const navigate = useNavigate();
@@ -82,6 +83,20 @@ export function PrintCode() {
   const [refundRequested, setRefundRequested] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
 
+  const clearCompletedCheckoutSession = () => {
+    sessionStorage.removeItem("printCode");
+    sessionStorage.removeItem("printFiles");
+    sessionStorage.removeItem("printOptions");
+    sessionStorage.removeItem("uploadedImages");
+    sessionStorage.removeItem("uploadAmount");
+    sessionStorage.removeItem("uploadTotalPages");
+    sessionStorage.removeItem("totalPages");
+    sessionStorage.removeItem("printStatus");
+    localStorage.removeItem("mimo_colorMode");
+    localStorage.removeItem("mimo_printOptions");
+    clearPendingOrderBinding();
+  };
+
   useEffect(() => {
     if (!printCode) {
       navigate("/");
@@ -94,19 +109,10 @@ export function PrintCode() {
     const handlePopState = (e: PopStateEvent) => {
       // User pressed back button
       toast.success("Your code has been sent to your mail.");
-      
+
       // Clear session storage just like handleDone
-      sessionStorage.removeItem("printCode");
-      sessionStorage.removeItem("printFiles");
-      sessionStorage.removeItem("printOptions");
-      sessionStorage.removeItem("uploadedImages");
-      sessionStorage.removeItem("uploadAmount");
-      sessionStorage.removeItem("uploadTotalPages");
-      sessionStorage.removeItem("totalPages");
-      sessionStorage.removeItem("printStatus");
-      localStorage.removeItem("mimo_colorMode");
-      localStorage.removeItem("mimo_printOptions");
-      
+      clearCompletedCheckoutSession();
+
       setTimeout(() => {
         navigate("/upload", { replace: true });
       }, 100);
@@ -235,16 +241,7 @@ export function PrintCode() {
 
   const handleDone = () => {
     // Clear ALL session storage to ensure a completely fresh start for next job
-    sessionStorage.removeItem("printCode");
-    sessionStorage.removeItem("printFiles");
-    sessionStorage.removeItem("printOptions");
-    sessionStorage.removeItem("uploadedImages");
-    sessionStorage.removeItem("uploadAmount");
-    sessionStorage.removeItem("uploadTotalPages");
-    sessionStorage.removeItem("totalPages");
-    sessionStorage.removeItem("printStatus");
-    localStorage.removeItem("mimo_colorMode");
-    localStorage.removeItem("mimo_printOptions");
+    clearCompletedCheckoutSession();
     navigate("/upload");
   };
 

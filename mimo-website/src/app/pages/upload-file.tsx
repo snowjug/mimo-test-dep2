@@ -9,6 +9,7 @@ import api from "../api";
 import { AdBanner } from "../components/AdBanner";
 import { getTimeLeft, isCodeActive } from "../utils/print-code-expiry";
 import { describeUploadFailure, failedFilesMessage } from "../utils/upload-errors";
+import { clearPendingOrderBinding } from "../utils/checkout-order-state";
 
 interface UploadedFile {
   clientUploadId?: string;
@@ -462,6 +463,7 @@ export function UploadFile() {
       sessionStorage.removeItem("uploadTotalPages");
       sessionStorage.removeItem("totalPages");
       sessionStorage.removeItem("printStatus");
+      clearPendingOrderBinding();
       setUploadedFilesData([]);
       setFiles([]);
       setBackendTotalPages(0);
@@ -781,6 +783,7 @@ export function UploadFile() {
       // Update uploadedFilesData with explicit fresh jobIds for all active files
       setUploadedFilesData(finalizedAllActive);
       sessionStorage.setItem("printFiles", JSON.stringify(finalizedAllActive));
+      clearPendingOrderBinding();
 
       // Update UI files (strictly correlated by clientUploadId)
       setFiles((prev) =>
@@ -854,6 +857,8 @@ export function UploadFile() {
     const fileToRemove = files[index];
     if (!fileToRemove) return;
 
+    // Any cart modification invalidates the prior order-to-cart binding immediately (even if other files remain).
+    clearPendingOrderBinding();
     const clientUploadId = fileToRemove.clientUploadId;
 
     // 1. Mark as cancelled FIRST so any in-flight completion callback drops it
@@ -973,6 +978,7 @@ export function UploadFile() {
     sessionStorage.removeItem("printOptions");
     sessionStorage.removeItem("uploadAmount");
     sessionStorage.removeItem("uploadTotalPages");
+    clearPendingOrderBinding();
   };
 
   // Hold the whole page (including MimoHeader, which fires its own unguarded /mimo/user fetch) until the
