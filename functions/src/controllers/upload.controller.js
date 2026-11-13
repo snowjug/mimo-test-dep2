@@ -1,4 +1,5 @@
 const path = require("path");
+const crypto = require("crypto");
 const axios = require("axios");
 const { SUPPORTED_OFFICE_EXTENSIONS, callOfficeConverter } = require("../services/converter.service");
 const { admin, db } = require("../config/firebase");
@@ -55,7 +56,8 @@ const postGetUploadUrl = async (req, res) => {
     }
 
     const safeName = sanitizeUploadFileName(fileName);
-    const objectPath = `${prefixFor(userId)}/${Date.now()}_${safeName}`;
+    const uniqueTimestamp = `${Date.now()}${process.hrtime.bigint()}`;
+    const objectPath = `${prefixFor(userId)}/${uniqueTimestamp}_${safeName}`;
     const bucket = admin.storage().bucket();
     const file = bucket.file(objectPath);
 
@@ -388,6 +390,7 @@ const postFinalizeUpload = async (req, res) => {
       batch.set(docRef, {
         userId: userId,
         fileName: f.name,
+        clientUploadId: f.clientUploadId || null,
         fileUrl: f.url, // Points to converted PDF for Office files!
         mimetype: f.type, // "application/pdf" for converted Office files!
         size: f.size,

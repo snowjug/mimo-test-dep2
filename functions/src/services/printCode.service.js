@@ -36,7 +36,16 @@ async function tryClaim(txLike, claimRef, jobsQuery) {
   if (claimSnap.exists && now - (claimSnap.data().claimedAtMs || 0) < CODE_VALIDITY_MS) {
     return false; // still claimed by a previous allocation, not yet expired
   }
-  if (activeJobsSnap.docs.some((d) => ACTIVE_STATUSES.has(d.data().status))) {
+  const isJobStillActive = (d) => {
+    const data = d.data();
+    if (ACTIVE_STATUSES.has(data.status)) return true;
+    // Any unprinted job that hasn't reached a terminal failure state must retain its code
+    if (data.isPrinted === false && !["refunded", "failed", "abandoned", "cancelled"].includes(data.status)) {
+      return true;
+    }
+    return false;
+  };
+  if (activeJobsSnap.docs.some(isJobStillActive)) {
     return false; // held by a still-active job directly, independent of the claim
   }
   txLike.set(claimRef, { claimedAtMs: now });

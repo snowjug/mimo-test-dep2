@@ -107,3 +107,20 @@ test("two distinct active orders within 24h with the same code still fail safely
   assert.match(res.body.error, /matched more than one order/);
 });
 
+test("two distinct active orders with same code targeting different kiosks disambiguate safely to requesting kiosk", async () => {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  fake.reset({
+    print_jobs: {
+      orderCV: job({ status: "paid", orderId: "order_cv", userId: "u_cv", kioskId: "CV-001", createdAt: oneHourAgo, fileName: "cv_doc.pdf" }),
+      orderSV: job({ status: "paid", orderId: "order_sv", userId: "u_sv", kioskId: "SV-002", colorMode: "color", color: true, createdAt: new Date(), fileName: "sv_doc.pdf" }),
+    },
+  });
+  const resCV = await getDocuments("CV-001");
+  assert.strictEqual(resCV.code, 200, JSON.stringify(resCV.body));
+  assert.strictEqual(resCV.body.documents[0].file, "cv_doc.pdf");
+
+  const resSV = await getDocuments("SV-002");
+  assert.strictEqual(resSV.code, 200, JSON.stringify(resSV.body));
+  assert.strictEqual(resSV.body.documents[0].file, "sv_doc.pdf");
+});
+

@@ -145,8 +145,12 @@ const estimateDocxPages = async (file: File): Promise<number> => {
           if (fileName === "docProps/app.xml") {
             const text = await decompressEntry(dataOffset, compSize);
 
-            const pagesMatch = text.match(/<Pages>(\d+)<\/Pages>/);
-            const wordsMatch = text.match(/<Words>(\d+)<\/Words>/);
+            const pagesMatch = text.match(/<(?:\w+:)?pages\b[^>]*>(\d+)<\/(?:\w+:)?pages>/i);
+            const pMatch = text.match(/<(?:\w+:)?paragraphs\b[^>]*>(\d+)<\/(?:\w+:)?paragraphs>/i);
+            if (pMatch && !paragraphs) {
+              paragraphs = parseInt(pMatch[1], 10);
+            }
+            const wordsMatch = text.match(/<(?:\w+:)?words\b[^>]*>(\d+)<\/(?:\w+:)?words>/i);
 
             if (pagesMatch) {
               pagesMetadata = parseInt(pagesMatch[1], 10);
@@ -174,7 +178,9 @@ const estimateDocxPages = async (file: File): Promise<number> => {
             const lrbCount = lrbMatches ? lrbMatches.length : 0;
             const brCount = brMatches ? brMatches.length : 0;
 
-            pageBreaks = lrbCount + brCount;
+            const sectMatches = text.match(/<w:sectPr\b/g);
+            const sectCount = sectMatches && sectMatches.length > 1 ? sectMatches.length - 1 : 0;
+            pageBreaks = Math.max(lrbCount + brCount, sectCount);
           }
         }
       }
@@ -198,9 +204,9 @@ const estimateDocxPages = async (file: File): Promise<number> => {
     }
 
     // Fallback estimates when Word page metadata is unavailable.
-    const estPagesByWords = words > 0 ? Math.ceil(words / 350) : 0;
+    const estPagesByWords = words > 0 ? Math.ceil(words / 250) : 0;
     const estPagesByParagraphs =
-      paragraphs > 0 ? Math.ceil(paragraphs / 22) : 0;
+      paragraphs > 0 ? Math.ceil(paragraphs / 10) : 0;
 
     const estimates = [
       estPagesByWords,
@@ -258,7 +264,7 @@ const estimatePptxSlides = async (file: File): Promise<number> => {
       const fileName = new TextDecoder("utf-8").decode(fileNameBytes);
 
       // Match ppt/slides/slide1.xml, ppt/slides/slide2.xml, etc.
-      if (/^ppt\/slides\/slide\d+\.xml$/.test(fileName)) {
+      if (/^ppt\/slides\/slide[0-9_-]+\.xml$/i.test(fileName)) {
         slideCount++;
       }
 
@@ -309,7 +315,7 @@ const estimateXlsxSheets = async (file: File): Promise<number> => {
       const fileNameBytes = buffer.slice(cdOffset + 46, cdOffset + 46 + fileNameLen);
       const fileName = new TextDecoder("utf-8").decode(fileNameBytes);
 
-      if (/^xl\/worksheets\/sheet\d+\.xml$/.test(fileName)) {
+      if (/^xl\/worksheets\/sheet[0-9_-]+\.xml$/i.test(fileName)) {
         sheetCount++;
       }
 
@@ -340,9 +346,13 @@ export function UploadFile() {
   const activeUploadsRef = useRef<Map<string, ActiveUpload>>(new Map());
   const cancelledUploadIdsRef = useRef<Set<string>>(new Set());
   const filesRef = useRef<UploadedFile[]>(files);
+  const uploadedFilesDataRef = useRef<any[]>(uploadedFilesData);
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
+  useEffect(() => {
+    uploadedFilesDataRef.current = uploadedFilesData;
+  }, [uploadedFilesData]);
 
   const [showScanComingSoon, setShowScanComingSoon] = useState(false);
 
@@ -474,17 +484,21 @@ export function UploadFile() {
         try {
           const parsed = JSON.parse(storedPrintFiles);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setUploadedFilesData(parsed);
-            setFiles(parsed.map((f: any) => ({
-              clientUploadId: f.clientUploadId || `upload_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-              name: f.name,
-              size: f.size,
-              type: f.type,
-              status: "completed",
-              progress: 100,
-              pageCount: f.pageCount || 1
-            })));
-            // Re-calculate total pages
+            const restored = parsed.map((f: any) => {
+              const clientUploadId = f.clientUploadId || `upload_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+              return {
+                ...f,
+                clientUploadId,
+                status: "completed",
+                progress: 100,
+                pageCount: f.pageCount || 1,
+              };
+            });
+            setUploadedFilesData(restored);
+            uploadedFilesDataRef.current = restored;
+            setFiles(restored);
+            filesRef.current = restored;
+                        // Re-calculate total pages
             const totalPages = parsed.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
             setBackendTotalPages(totalPages);
           }
@@ -579,10 +593,11 @@ export function UploadFile() {
         const metaPromise = (async () => {
           let pageCount = 1;
           const nameLower = f.name.toLowerCase();
-          const isDocx = nameLower.endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+          const isPdf = nameLower.endsWith(".pdf") || f.type === "application/pdf" || f.type === "application/x-pdf";
+          const isDocx = nameLower.endsWith(".docx") || nameLower.endsWith(".doc") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || f.type === "application/msword";
           const isPptx = nameLower.endsWith(".pptx") || f.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation";
           const isXlsx = nameLower.endsWith(".xlsx") || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-          if (f.type === "application/pdf") {
+          if (isPdf) {
             try {
               const arrayBuffer = await f.arrayBuffer();
               const { PDFDocument } = await import("pdf-lib");
@@ -721,7 +736,7 @@ export function UploadFile() {
       }
 
       // Filter existing uploadedFilesData to exclude any cancelled files and ensure they match currently completed UI files
-      const currentActiveFiles = uploadedFilesData.filter((d) =>
+      const currentActiveFiles = (uploadedFilesDataRef.current.length > 0 ? uploadedFilesDataRef.current : uploadedFilesData).filter((d) =>
         !cancelledUploadIdsRef.current.has(d.clientUploadId) &&
         filesRef.current.some(
           (f) => f.clientUploadId === d.clientUploadId && f.status === "completed"
@@ -730,6 +745,7 @@ export function UploadFile() {
 
       const filesToFinalize = [...currentActiveFiles, ...validUploadedFiles].map((f) => ({
         clientUploadId: f.clientUploadId,
+        jobId: f.jobId,
         name: f.name,
         url: f.url,
         type: f.type,
@@ -773,7 +789,7 @@ export function UploadFile() {
             url: bf.url || item.url,
             type: bf.type || item.type,
             size: item.size,
-            pageCount: typeof bf.pageCount === "number" ? bf.pageCount : item.pageCount,
+            pageCount: typeof bf.pageCount === "number" && bf.pageCount > 0 ? bf.pageCount : (item.pageCount || 1),
           });
         } else {
           finalizedAllActive.push(item);
@@ -782,6 +798,7 @@ export function UploadFile() {
 
       // Update uploadedFilesData with explicit fresh jobIds for all active files
       setUploadedFilesData(finalizedAllActive);
+      uploadedFilesDataRef.current = finalizedAllActive;
       sessionStorage.setItem("printFiles", JSON.stringify(finalizedAllActive));
       clearPendingOrderBinding();
 
@@ -897,6 +914,7 @@ export function UploadFile() {
 
     setFiles(updatedFiles);
     setUploadedFilesData(updatedData);
+    uploadedFilesDataRef.current = updatedData;
 
     // 4. Remove from sessionStorage image list
     const existingRaw = sessionStorage.getItem("uploadedImages");
@@ -938,7 +956,8 @@ export function UploadFile() {
 
   const handlePrint = () => {
     // Use uploadedFilesData which contains the full metadata WITH Firebase download URLs and explicit jobIds
-    let completedFiles = uploadedFilesData.filter((f) => f && (f.jobId || f.url));
+    const activeList = uploadedFilesDataRef.current.length > 0 ? uploadedFilesDataRef.current : uploadedFilesData;
+    let completedFiles = activeList.filter((f) => f && (f.jobId || f.url));
     if (completedFiles.length === 0) {
       const stored = sessionStorage.getItem("printFiles");
       if (stored) {
@@ -954,6 +973,7 @@ export function UploadFile() {
     if (completedFiles.length === 0) {
       completedFiles = files.filter((f) => f.status === "completed").map((f) => ({
         clientUploadId: f.clientUploadId,
+        jobId: f.jobId,
         name: f.name,
         size: f.size,
         type: f.type,
@@ -962,6 +982,9 @@ export function UploadFile() {
     }
     if (completedFiles.length > 0) {
       sessionStorage.setItem("printFiles", JSON.stringify(completedFiles));
+      const totalPages = completedFiles.reduce((acc: number, curr: any) => acc + (curr.pageCount || 1), 0);
+      sessionStorage.setItem("uploadTotalPages", totalPages.toString());
+      sessionStorage.setItem("uploadAmount", (totalPages * 2).toString());
     }
     navigate("/print-options");
   };
@@ -1003,7 +1026,10 @@ export function UploadFile() {
         multiple
         className="hidden"
         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx,.xls,.xlsx"
-        onChange={(e) => handleFileSelect(e.target.files)}
+        onChange={(e) => {
+          handleFileSelect(e.target.files);
+          e.target.value = "";
+        }}
       />
 
       <div className="rise-in pt-2 pb-4">

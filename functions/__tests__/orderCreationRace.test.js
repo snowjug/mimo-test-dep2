@@ -72,9 +72,11 @@ test("two concurrent checkouts for the same job: exactly one succeeds, the other
   assert.strictEqual(Object.keys(fake.data("print_jobs")).length, 1, "no orphaned second job from the loser");
 });
 
-test("after losing the race, the SAME job cannot be checked out again under its old id (it no longer exists)", async () => {
-  await Promise.all([checkout(), checkout()]);
+test("after the race concludes, checking out the same job id recovers the already-issued order rather than duplicating it", async () => {
+  const [resA, resB] = await Promise.all([checkout(), checkout()]);
+  const winner = resA.code === 200 ? resA : resB;
   const retry = await checkout();
-  assert.strictEqual(retry.code, 400);
-  assert.match(retry.body.error, /not found: j1/);
+  assert.strictEqual(retry.code, 200);
+  assert.strictEqual(retry.body.printCode, winner.body.printCode);
+  assert.strictEqual(Object.keys(fake.data("print_jobs")).length, 1, "still exactly one job, no duplicate created");
 });

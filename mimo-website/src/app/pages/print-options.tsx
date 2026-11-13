@@ -240,11 +240,12 @@ export function PrintOptions() {
         let changed = false;
         parsedFiles.filter(Boolean).forEach((file: any) => {
           const fname = file.name || "Document";
-          if (!updated[fname]) {
+          const currentConfig = updated[fname];
+          if (!currentConfig || (currentConfig.pageSelection === "all" && currentConfig.selectedPages?.length !== pCount)) {
             changed = true;
             const pCount = file.pageCount || 1;
             updated[fname] = {
-              pageSelection: "all",
+              pageSelection: currentConfig?.pageSelection || "all",
               pageRange: `1-${pCount}`,
               selectedPages: Array.from({ length: pCount }, (_, i) => i + 1)
             };
@@ -503,7 +504,7 @@ export function PrintOptions() {
       imageScaling,
       customScale,
       photoLayout,
-      pageRange: files.length > 0 && files[0]?.name ? (fileConfigs[files[0].name]?.pageRange || "") : "", // fallback
+      pageRange: files.length === 1 && files[0]?.name ? (fileConfigs[files[0].name]?.pageRange || "") : "", // fallback only for single file
       fileConfigs: simplifiedConfigs,
       totalCost,
       totalPages: actualPages, // Store actual printable pages per set

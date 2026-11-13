@@ -185,7 +185,7 @@ export function Payment() {
         }
       }
     }
-    return count;
+    return count > 0 ? count : (file.pageCount || 1);
   };
 
   // Helper for formatting date exactly like the cash receipt image (DD-MM-YYYY)

@@ -7,10 +7,12 @@ const crypto = require("node:crypto");
 const { fake, http, mailbox, markPaid, seed, checkout, cashfreeCalls, pendingJob, mergedJobs, response, controller } = require("./helpers/orderHarness");
 
 test.describe("validation of the checkout request", () => {
-  test.beforeEach(() => seed({ jobs: {
-    j1: pendingJob(), other: pendingJob({ userId: "u2" }), paid: pendingJob({ status: "paid" }),
-    removed: pendingJob({ removedByUser: true }), deleted: pendingJob({ fileDeleted: true }),
-  } }));
+  test.beforeEach(() => seed({
+    jobs: {
+      j1: pendingJob(), other: pendingJob({ userId: "u2" }), paid: pendingJob({ status: "paid" }),
+      removed: pendingJob({ removedByUser: true }), deleted: pendingJob({ fileDeleted: true }),
+    }
+  }));
 
   const rejects = async (body, code, pattern) => {
     const res = await checkout(body);
@@ -166,8 +168,10 @@ test.describe("free orders (payable amount below ₹1)", () => {
   });
 
   test("coins used on a free order are deducted from the balance and added to total_used", async () => {
-    seed({ jobs: { j1: pendingJob({ pageCount: 1 }) }, coupons: { ALL: { isActive: true, discountPercentage: 100 } },
-      user: { mimo_coins: { balance: 10, total_earned: 10, total_used: 0 } } });
+    seed({
+      jobs: { j1: pendingJob({ pageCount: 1 }) }, coupons: { ALL: { isActive: true, discountPercentage: 100 } },
+      user: { mimo_coins: { balance: 10, total_earned: 10, total_used: 0 } }
+    });
     const res = await checkout({ coinsToUse: 2, couponCode: "ALL" }); // 2.80 - 1.00 coins-discount = 1.80, coupon 100% -> free
     assert.strictEqual(res.body.free, true);
     assert.deepStrictEqual(fake.data("users").u1.mimo_coins, { balance: 8, total_earned: 10, total_used: 2 });
@@ -198,7 +202,7 @@ test.describe("free orders (payable amount below ₹1)", () => {
     seedFree(); // the first checkout consumed the pending job
     process.env.GMAIL_APP_PASSWORD = "test-app-password";
     mailbox.failNext = true;
-    const original = console.error; console.error = () => {};
+    const original = console.error; console.error = () => { };
     try {
       const res = await free();
       assert.strictEqual(res.code, 200);
@@ -441,6 +445,39 @@ test.describe("re-checking out a job that is already a merge (has a files[] arra
     // reset to "now" just because this is a re-checkout.
     const retained = job.retentionStartAt.toDate ? job.retentionStartAt.toDate() : new Date(job.retentionStartAt);
     assert.strictEqual(retained.getTime(), earlier.getTime());
+  });
+});
+
+test.describe("multi-file checkout and page calculation isolation", () => {
+  test("5 files uploaded: a 15-page file is never clamped to 5 pages even if file1 has a 1-5 range", async () => {
+    seed({
+      jobs: {
+        j1: pendingJob({ fileName: "file1.pdf", pageCount: 5 }),
+        j2: pendingJob({ fileName: "file2.pdf", pageCount: 15 }),
+        j3: pendingJob({ fileName: "file3.pdf", pageCount: 8 }),
+        j4: pendingJob({ fileName: "file4.pdf", pageCount: 12 }),
+        j5: pendingJob({ fileName: "file5.pdf", pageCount: 20 }),
+      },
+    });
+
+    const res = await checkout({
+      jobIds: ["j1", "j2", "j3", "j4", "j5"],
+      printOptions: {
+        pageSelection: "custom",
+        pageRange: "1-5", // File 1's range passed as global fallback
+        fileConfigs: {
+          "file1.pdf": { pageSelection: "custom", pageRange: "1-5", pageCount: 5 },
+          "file2.pdf": { pageSelection: "all", pageRange: "1-15", pageCount: 15 },
+        },
+      },
+    });
+
+    assert.strictEqual(res.code, 200, JSON.stringify(res.body));
+    const [job] = Object.values(fake.data("print_jobs"));
+    assert.strictEqual(job.files.length, 5, "all 5 files must be retained in merged job");
+    const file2Entry = job.files.find((f) => f.name === "file2.pdf");
+    assert.strictEqual(file2Entry.pageCount, 15, "file2 with 15 pages must remain 15 pages, not clamped to 5");
+    assert.strictEqual(job.pageCount, 5 + 15 + 8 + 12 + 20, "total raw pages must be exactly 60");
   });
 });
 void response; void controller; void mergedJobs;

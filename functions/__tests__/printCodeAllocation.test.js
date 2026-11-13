@@ -65,3 +65,13 @@ test("a fresh (non-expired) claim is never handed out again", async () => {
   const second = await withForcedRandom([5500, 1900], () => generateUniquePrintCode(fake.db));
   assert.notStrictEqual(first, second, "a still-fresh claim must not be reused");
 });
+
+test("an unprinted job in print_jobs blocks re-allocation even with no claim doc", async () => {
+  fake.reset({
+    print_jobs: {
+      active: { printCode: "5500", status: "ready", isPrinted: false }
+    }
+  });
+  const code = await withForcedRandom([5500, 1900], () => generateUniquePrintCode(fake.db));
+  assert.strictEqual(code, "1900", "5500 was held by an unprinted job, should have chosen 1900");
+});

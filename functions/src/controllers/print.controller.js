@@ -80,6 +80,23 @@ const postGetDocumentsByCode = async (req, res) => {
 
           if (freshIsSameOrder) {
             validDocs = freshDocs;
+          } else if (kioskId) {
+            // Smart collision disambiguation: if multiple distinct active orders share the same code,
+            // check whether one uniquely matches the requesting kiosk (e.g. CV-001 vs SV-002).
+            const kioskDocs = freshDocs.filter((d) => {
+              const data = d.data();
+              const target = data.kioskId || data.printOptions?.directKioskId || data.settings?.directKioskId;
+              return target === kioskId;
+            });
+            const kOrderIds = new Set(kioskDocs.map((d) => d.data().orderId).filter(Boolean));
+            const kUserIds = new Set(kioskDocs.map((d) => d.data().userId).filter(Boolean));
+            if (kioskDocs.length > 0 && (kOrderIds.size === 1 || (kOrderIds.size === 0 && kUserIds.size === 1))) {
+              console.log(`[PRINT-CODE DISAMBIGUATION] code ${printCode} matched multiple orders, resolved to order on ${kioskId}: ${kioskDocs.map((d) => d.id).join(", ")}`);
+              validDocs = kioskDocs;
+            } else {
+              console.error(`[PRINT-CODE COLLISION] code ${printCode} matches multiple distinct active orders on ${kioskId}: ${freshDocs.map((d) => d.id).join(", ")}`);
+              return res.status(409).json({ error: "This code matched more than one order. Please contact support — do not retry." });
+            }
           } else {
             console.error(`[PRINT-CODE COLLISION] code ${printCode} matches multiple distinct active orders within 24h: ${freshDocs.map((d) => d.id).join(", ")}`);
             return res.status(409).json({ error: "This code matched more than one order. Please contact support — do not retry." });

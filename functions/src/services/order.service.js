@@ -419,8 +419,8 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
         const fileName = fileItem.originalFileName || fileItem.name;
         const fileConfig = printOptions?.fileConfigs?.[fileName] || printOptions?.fileConfigs?.[fileItem.name];
         let numPages = fileItem.pageCount || fileConfig?.pageCount || 1;
-        const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
-        const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
+        const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || (targetJobs.length === 1 ? (printOptions?.pageSelection || printOptions?.pagesToPrint) : "all") || "all";
+        const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || (targetJobs.length === 1 ? (printOptions?.pageRange || printOptions?.customPageRange) : "") || "";
 
         if (jobPageSelection === "custom" && jobPageRange) {
           const ranges = String(jobPageRange).split(",");
@@ -459,8 +459,8 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
     } else {
       const fileConfig = printOptions?.fileConfigs?.[data.fileName];
       let numPages = data.pageCount || fileConfig?.pageCount || 1;
-      const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || printOptions?.pageSelection || printOptions?.pagesToPrint || "all";
-      const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || printOptions?.pageRange || printOptions?.customPageRange || "";
+      const jobPageSelection = fileConfig?.pageSelection || fileConfig?.pagesToPrint || (targetJobs.length === 1 ? (printOptions?.pageSelection || printOptions?.pagesToPrint) : "all") || "all";
+      const jobPageRange = fileConfig?.pageRange || fileConfig?.customPageRange || (targetJobs.length === 1 ? (printOptions?.pageRange || printOptions?.customPageRange) : "") || "";
 
       if (jobPageSelection === "custom" && jobPageRange) {
         const ranges = String(jobPageRange).split(",");
