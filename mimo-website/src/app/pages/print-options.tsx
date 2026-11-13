@@ -240,10 +240,10 @@ export function PrintOptions() {
         let changed = false;
         parsedFiles.filter(Boolean).forEach((file: any) => {
           const fname = file.name || "Document";
+          const pCount = file.pageCount || 1;
           const currentConfig = updated[fname];
           if (!currentConfig || (currentConfig.pageSelection === "all" && currentConfig.selectedPages?.length !== pCount)) {
             changed = true;
-            const pCount = file.pageCount || 1;
             updated[fname] = {
               pageSelection: currentConfig?.pageSelection || "all",
               pageRange: `1-${pCount}`,
