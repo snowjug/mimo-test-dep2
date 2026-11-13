@@ -166,36 +166,44 @@ test("Scenario 8: Crash regression test — verifying bug causes ReferenceError 
   // prev already has the file initialized (from useState initializer), with pageSelection: 'all'
   const prev = {
     "test.pdf": {
-      pageSelection: "all",
+      pageSelection: "all" as const,
       pageRange: "1-2",
       selectedPages: [1, 2]
     }
   };
   const files = [{ name: "test.pdf", pageCount: 2 }];
 
-  // The buggy code:
-  const buggyCode = () => {
+  // Direct reproduction of the original buggy code structure:
+  // pCount is referenced in the if condition, but declared inside the if body below the condition
+  const runOriginalBuggyImplementation = () => {
     const updated: any = { ...prev };
-    files.forEach((file: any) => {
+    files.filter(Boolean).forEach((file: any) => {
       const fname = file.name || "Document";
       const currentConfig = updated[fname];
-      // In buggy code, pCount is evaluated before declaration
-      if (!currentConfig || (currentConfig.pageSelection === "all" && currentConfig.selectedPages?.length !== (eval("pCount")))) {
+
+      // @ts-expect-error Direct reproduction of bug: pCount referenced before declaration in if body
+      if (!currentConfig || (currentConfig.pageSelection === "all" && currentConfig.selectedPages?.length !== pCount)) {
         const pCount = file.pageCount || 1;
-        updated[fname] = { pageSelection: "all", pageRange: `1-${pCount}`, selectedPages: [1] };
+        updated[fname] = {
+          pageSelection: currentConfig?.pageSelection || "all",
+          pageRange: `1-${pCount}`,
+          selectedPages: Array.from({ length: pCount }, (_, i) => i + 1)
+        };
       }
     });
   };
 
-  // Buggy version throws ReferenceError
-  assert.throws(buggyCode, {
+  // Assert that the original implementation throws the expected ReferenceError
+  assert.throws(runOriginalBuggyImplementation, {
     name: "ReferenceError",
     message: /pCount is not defined/
   });
 
-  // Fixed version does NOT throw and returns successfully
+  // Assert that the corrected implementation executes successfully
   assert.doesNotThrow(() => {
-    runFileConfigsUpdate(prev as any, files);
+    const result = runFileConfigsUpdate(prev as any, files);
+    assert.strictEqual(result.changed, false);
+    assert.strictEqual(result.next, prev);
   });
 });
 
