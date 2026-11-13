@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Instagram, ArrowUpRight, Lock } from "lucide-react";
 import { Switch } from "../components/ui/switch";
@@ -6,10 +6,37 @@ import { ActionBar, ActionBarSpacer, AppBar, Group, PrimaryButton, Row, inputCla
 import { ScreenSkeleton } from "../components/mimo/screen-skeleton";
 import { toast } from "sonner";
 import api from "../api";
-import { isCodeActive } from "../utils/print-code-expiry";
+import {
+  clearPendingOrderBinding,
+  getBoundPendingOrderId,
+  savePendingOrderBinding,
+} from "../utils/checkout-order-state";
+
+function getStoredPrintFiles(): any[] {
+  try {
+    const raw = sessionStorage.getItem("printFiles");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function getStoredColorMode(): string | null {
+  try {
+    const raw = sessionStorage.getItem("printOptions");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.colorMode) return parsed.colorMode;
+    }
+  } catch {}
+  return null;
+}
 
 export function Payment() {
   const navigate = useNavigate();
+  const redirectedToCodeRef = useRef(false);
   const [files, setFiles] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCost, setTotalCost] = useState(0);
@@ -23,6 +50,35 @@ export function Payment() {
   const [promoError, setPromoError] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
+
+  const completeCheckoutWithPrintCode = ({
+    code,
+    kioskId,
+    colorMode,
+    message,
+  }: {
+    code: string;
+    kioskId?: string | null;
+    colorMode?: string | null;
+    message: string;
+  }) => {
+    if (redirectedToCodeRef.current) return;
+    redirectedToCodeRef.current = true;
+
+    clearPendingOrderBinding();
+    sessionStorage.setItem("printCode", code);
+    localStorage.setItem("mimo_printCode", code);
+    localStorage.setItem("mimo_printCode_ts", Date.now().toString());
+    if (colorMode) {
+      localStorage.setItem("mimo_colorMode", colorMode);
+    }
+    if (kioskId) {
+      sessionStorage.setItem("directKioskId", kioskId);
+      localStorage.setItem("mimo_directKioskId", kioskId);
+    }
+    toast.success(message);
+    navigate("/print-code");
+  };
 
   useEffect(() => {
     const storedFiles = sessionStorage.getItem("printFiles");
@@ -62,52 +118,45 @@ export function Payment() {
     };
     fetchData();
 
-    // Check if an order was already paid or if code was generated (e.g. returning from mobile UPI app)
+    let cancelled = false;
+
+    // Recover ONLY if the order bound to THIS exact cart was paid (e.g. returning from mobile UPI app).
+    // Never scan /print-history globally on /payment, or an older unprinted order will hijack new checkouts.
     const checkActiveOrderOrCode = async () => {
+      if (cancelled || redirectedToCodeRef.current) return;
+
+      const pendingOrderId = getBoundPendingOrderId(getStoredPrintFiles());
+      if (!pendingOrderId) return;
+
       try {
-        const historyRes = await api.get("/print-history");
-        if (Array.isArray(historyRes.data)) {
-          const now = Date.now();
-          const active = historyRes.data.find((j: any) => isCodeActive(j, now));
-          if (active && active.printCode) {
-            sessionStorage.setItem("printCode", active.printCode);
-            localStorage.setItem("mimo_printCode", active.printCode);
-            if (active.kioskId) {
-              sessionStorage.setItem("directKioskId", active.kioskId);
-              localStorage.setItem("mimo_directKioskId", active.kioskId);
-            }
-            toast.success("Print code ready!");
-            navigate("/print-code");
-            return;
-          }
+        const verifyRes = await api.get(`/verify-payment/${pendingOrderId}`);
+        if (cancelled || redirectedToCodeRef.current) return;
+        if (verifyRes.data?.order_status === "PAID" && verifyRes.data?.printCode) {
+          completeCheckoutWithPrintCode({
+            code: verifyRes.data.printCode,
+            kioskId: verifyRes.data.directKioskId,
+            colorMode: getStoredColorMode(),
+            message: "Payment confirmed! Your print code is ready.",
+          });
         }
       } catch (_) {}
-
-      const pendingOrderId = sessionStorage.getItem("currentOrderId") || localStorage.getItem("mimo_currentOrderId");
-      if (pendingOrderId) {
-        try {
-          const verifyRes = await api.get(`/verify-payment/${pendingOrderId}`);
-          if (verifyRes.data?.order_status === "PAID" && verifyRes.data?.printCode) {
-            sessionStorage.setItem("printCode", verifyRes.data.printCode);
-            localStorage.setItem("mimo_printCode", verifyRes.data.printCode);
-            if (verifyRes.data.directKioskId) {
-              sessionStorage.setItem("directKioskId", verifyRes.data.directKioskId);
-              localStorage.setItem("mimo_directKioskId", verifyRes.data.directKioskId);
-            }
-            toast.success("Payment confirmed! Your print code is ready.");
-            navigate("/print-code");
-          }
-        } catch (_) {}
-      }
     };
     checkActiveOrderOrCode();
 
-    const onWindowFocus = () => { checkActiveOrderOrCode(); };
+    const onWindowFocus = () => {
+      checkActiveOrderOrCode();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkActiveOrderOrCode();
+      }
+    };
     window.addEventListener("focus", onWindowFocus);
-    document.addEventListener("visibilitychange", onWindowFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
+      cancelled = true;
       window.removeEventListener("focus", onWindowFocus);
-      document.removeEventListener("visibilitychange", onWindowFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [navigate]);
 
@@ -270,23 +319,19 @@ export function Payment() {
       const orderResponse = await api.post("/create-order", payload);
       const { orderId, paymentSessionId, free, printCode } = orderResponse.data;
 
-      if (orderId) {
-        sessionStorage.setItem("currentOrderId", orderId);
-        localStorage.setItem("mimo_currentOrderId", orderId);
-      }
-
       // 2. If backend determines it's free or already paid with a code ready, skip Cashfree
       if (printCode) {
-        sessionStorage.setItem("printCode", printCode);
-        localStorage.setItem("mimo_printCode", printCode);
-        localStorage.setItem("mimo_colorMode", printOptions.colorMode || "bw");
-        if (printOptions.directKioskId) {
-          sessionStorage.setItem("directKioskId", printOptions.directKioskId);
-          localStorage.setItem("mimo_directKioskId", printOptions.directKioskId);
-        }
-        toast.success("Order Confirmed!");
-        navigate("/print-code");
+        completeCheckoutWithPrintCode({
+          code: printCode,
+          kioskId: printOptions.directKioskId,
+          colorMode: printOptions.colorMode || "bw",
+          message: "Order Confirmed!",
+        });
         return;
+      }
+
+      if (orderId) {
+        savePendingOrderBinding(orderId, parsedFiles);
       }
 
       // 3. Trigger Cashfree SDK for paid orders
@@ -319,26 +364,23 @@ export function Payment() {
         ? err.response.data 
         : err.response?.data?.error || err.message || "Payment initiation failed";
 
-      // If job was not found or already claimed, check if a print code was generated in the background
+      // If job was not found or already claimed on a retry, check only the order bound to this exact cart.
       if (typeof errorMsg === "string" && (errorMsg.includes("not found") || errorMsg.includes("no longer available"))) {
-        try {
-          const historyRes = await api.get("/print-history");
-          if (Array.isArray(historyRes.data)) {
-            const now = Date.now();
-            const active = historyRes.data.find((j: any) => isCodeActive(j, now));
-            if (active && active.printCode) {
-              sessionStorage.setItem("printCode", active.printCode);
-              localStorage.setItem("mimo_printCode", active.printCode);
-              if (active.kioskId) {
-                sessionStorage.setItem("directKioskId", active.kioskId);
-                localStorage.setItem("mimo_directKioskId", active.kioskId);
-              }
-              toast.success("Print code retrieved!");
-              navigate("/print-code");
+        const pendingOrderId = getBoundPendingOrderId(getStoredPrintFiles());
+        if (pendingOrderId) {
+          try {
+            const verifyRes = await api.get(`/verify-payment/${pendingOrderId}`);
+            if (verifyRes.data?.order_status === "PAID" && verifyRes.data?.printCode) {
+              completeCheckoutWithPrintCode({
+                code: verifyRes.data.printCode,
+                kioskId: verifyRes.data.directKioskId || printOptions?.directKioskId,
+                colorMode: getStoredColorMode() || printOptions?.colorMode || "bw",
+                message: "Print code retrieved!",
+              });
               return;
             }
-          }
-        } catch (_) {}
+          } catch (_) {}
+        }
       }
 
       toast.error(errorMsg);

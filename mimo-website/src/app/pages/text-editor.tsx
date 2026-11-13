@@ -4,6 +4,7 @@ import { AlignLeft, AlignCenter, AlignRight, AlignJustify } from "lucide-react";
 import { ActionBar, ActionBarSpacer, AppBar, ChoiceRow, Group, PrimaryButton, Row, Segmented, Stepper } from "../components/mimo/ui";
 import api from "../api";
 import { toast } from "sonner";
+import { clearPendingOrderBinding } from "../utils/checkout-order-state";
 
 interface SelectablePrinter { id: string; name: string; detail: string; }
 interface ApiMachine { machineId: string; displayName: string; capabilities: { colour?: boolean }; available: boolean; }
@@ -117,6 +118,7 @@ export function TextEditor() {
           }
         ])
       );
+      clearPendingOrderBinding();
 
       toast.success("Document compiled successfully!");
       navigate("/payment");
