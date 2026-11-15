@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var connectivityManager: ConnectivityManager
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var isLoadedSuccessfully = false
-    private var kioskUrl = "https://mimo-kiosk-app.vercel.app/?kioskId=SV-002"
+    private var kioskUrl = "https://mimo-2-0.vercel.app/?kioskId=SV-002"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -317,7 +317,7 @@ class MainActivity : AppCompatActivity() {
             kioskUrl = customUrl
             webView.loadUrl(kioskUrl)
         } else if (!customKioskId.isNullOrEmpty()) {
-            val newUrl = "https://mimo-kiosk-app.vercel.app/?kioskId=$customKioskId"
+            val newUrl = "https://mimo-2-0.vercel.app/?kioskId=$customKioskId"
             if (newUrl != kioskUrl) {
                 kioskUrl = newUrl
                 webView.loadUrl(kioskUrl)

@@ -119,6 +119,7 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
         );
         if (fsRes.ok) {
           const docData = await fsRes.json();
+          let hasGlobalVideos = false;
           if (
             docData.fields &&
             docData.fields.videos &&
@@ -130,6 +131,7 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
               .filter(Boolean);
             if (videoUrls.length > 0) {
               setVideos(videoUrls);
+              hasGlobalVideos = true;
             }
           }
           if (docData.fields?.playSound && typeof docData.fields.playSound.booleanValue === 'boolean') {
@@ -139,7 +141,10 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
             const sec = parseInt(docData.fields.idleTimeoutSeconds.integerValue || '60', 10);
             if (sec > 0) onTimeoutChange(sec);
           }
-          return;
+          // If global videos were loaded, return; otherwise continue to backend API fallback
+          if (hasGlobalVideos) {
+            return;
+          }
         }
       } catch (fsErr) {
         console.warn("Firestore REST global fetch error, falling back to backend API:", fsErr);
@@ -236,13 +241,12 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
 
   const handleMediaError = useCallback((failedUrl: string) => {
     console.warn("Media failed to play/load, removing broken URL:", failedUrl);
-    purgeVideoBuffers();
     setVideos((prev) => {
       const updated = prev.filter((url) => url !== failedUrl);
       return updated;
     });
     setCurrentVideoIndex(0);
-  }, [purgeVideoBuffers]);
+  }, []);
 
   // Watchdog timer: 8s for images, 60s max for videos to prevent stuck black screens
   useEffect(() => {
@@ -305,7 +309,7 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
         left: 0, 
         width: '100vw', 
         height: '100vh', 
-        backgroundColor: '#0F172A', 
+        backgroundColor: '#0B0F19', 
         zIndex: 9999, 
         cursor: 'pointer',
         display: 'flex',
@@ -316,119 +320,134 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
         userSelect: 'none',
       }}
     >
-      {/* ── MODE A: PLAYLIST MEDIA (If URLs exist) ── */}
-      {hasMediaPlaylist && currentMediaUrl ? (
-        isImage ? (
-          <img
-            key={`${currentVideoIndex}-${currentMediaUrl}`}
-            src={currentMediaUrl}
-            alt="Screen Saver"
-            onError={() => handleMediaError(currentMediaUrl)}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : (
-          <video 
-            ref={videoRef}
-            key={`${currentVideoIndex}-${currentMediaUrl}`}
-            src={currentMediaUrl}
-            autoPlay 
-            muted
-            playsInline
-            preload="auto"
-            onCanPlay={() => setIsVideoReady(true)}
-            onLoadedData={() => setIsVideoReady(true)}
-            onEnded={handleVideoEnd}
-            onError={() => {
-              setIsVideoReady(false);
-              handleMediaError(currentMediaUrl);
-            }}
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              objectFit: 'cover',
-              display: isVideoReady ? 'block' : 'none'
-            }}
-          >
-            Your browser does not support the video tag.
-          </video>
-        )
-      ) : (
-        /* ── MODE B: BUILT-IN AMBIENT MOTION GRAPHICS (< 3% CPU, Zero Crash Risk on Pi) ── */
-        <div className="relative flex h-full w-full flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0B0F19] via-[#111827] to-[#1E1B4B] p-10 text-white select-none">
-          {/* Animated Ambient Pulsing Gradient Glows (GPU composited) */}
-          <div className="pointer-events-none absolute -left-32 -top-32 h-[480px] w-[480px] rounded-full bg-gradient-to-br from-amber-500/15 via-gold-500/10 to-transparent blur-3xl animate-pulse" />
-          <div className="pointer-events-none absolute -bottom-32 -right-32 h-[520px] w-[520px] rounded-full bg-gradient-to-tl from-indigo-600/20 via-purple-600/10 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+      {/* ── BASE LAYER: BUILT-IN AMBIENT MOTION GRAPHICS & LIVE CLOCK (Always Active, Never Black) ── */}
+      <div className="absolute inset-0 flex h-full w-full flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0B0F19] via-[#111827] to-[#1E1B4B] p-10 text-white select-none">
+        {/* Animated Ambient Pulsing Gradient Glows (GPU composited) */}
+        <div className="pointer-events-none absolute -left-32 -top-32 h-[480px] w-[480px] rounded-full bg-gradient-to-br from-amber-500/15 via-gold-500/10 to-transparent blur-3xl animate-pulse" />
+        <div className="pointer-events-none absolute -bottom-32 -right-32 h-[520px] w-[520px] rounded-full bg-gradient-to-tl from-indigo-600/20 via-purple-600/10 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
 
-          {/* Top Bar: Brand Badge & Live Clock */}
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-gold-500/40 bg-gold-500/10 shadow-[0_0_20px_rgba(217,165,68,0.25)] backdrop-blur-md">
-                <Sparkle size={22} weight="fill" className="text-gold-400" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-sans text-[22px] font-black tracking-wider text-white">MIMO</span>
-                  <span className="rounded-md bg-gold-500/20 px-2 py-0.5 text-[11px] font-bold text-gold-300 border border-gold-500/30">
-                    KIOSK
-                  </span>
-                </div>
-                <p className="text-[12px] font-medium text-slate-400 tracking-wide">Autonomous Print Station</p>
-              </div>
+        {/* Top Bar: Brand Badge & Live Clock */}
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-gold-500/40 bg-gold-500/10 shadow-[0_0_20px_rgba(217,165,68,0.25)] backdrop-blur-md">
+              <Sparkle size={22} weight="fill" className="text-gold-400" />
             </div>
-
-            <div className="text-right">
-              <div className="font-mono text-[30px] font-black tracking-tight text-white drop-shadow-md">
-                {currentTimeStr}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-sans text-[22px] font-black tracking-wider text-white">MIMO</span>
+                <span className="rounded-md bg-gold-500/20 px-2 py-0.5 text-[11px] font-bold text-gold-300 border border-gold-500/30">
+                  KIOSK
+                </span>
               </div>
-              <div className="text-[13px] font-semibold text-slate-400">{currentDateStr}</div>
+              <p className="text-[12px] font-medium text-slate-400 tracking-wide">Autonomous Print Station</p>
             </div>
           </div>
 
-          {/* Center Stage: Branded Geometric Motion Graphics & Value Proposition */}
-          <div className="relative z-10 flex flex-1 flex-col items-center justify-center text-center">
-            {/* Concentric Pulsing Gold Rings */}
-            <div className="relative mb-6 flex items-center justify-center">
-              <div className="absolute h-56 w-56 rounded-full border border-gold-500/20 animate-ping" style={{ animationDuration: '3.2s' }} />
-              <div className="absolute h-44 w-44 rounded-full border border-gold-500/30 animate-pulse" style={{ animationDuration: '2.4s' }} />
-              <div className="flex h-32 w-32 items-center justify-center rounded-full border border-gold-400/50 bg-gradient-to-tr from-amber-600/20 via-gold-500/30 to-amber-300/10 shadow-[0_0_40px_rgba(217,165,68,0.3)] backdrop-blur-xl">
-                <h1 className="bg-gradient-to-b from-white via-gold-200 to-gold-400 bg-clip-text font-sans text-[48px] font-black tracking-tight text-transparent">
-                  M
-                </h1>
-              </div>
+          <div className="text-right">
+            <div className="font-mono text-[30px] font-black tracking-tight text-white drop-shadow-md">
+              {currentTimeStr}
             </div>
+            <div className="text-[13px] font-semibold text-slate-400">{currentDateStr}</div>
+          </div>
+        </div>
 
-            <h2 className="bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-[38px] font-black tracking-tight text-transparent">
-              Self-Service Fast Printing
-            </h2>
-            <p className="mt-2 text-[17px] font-medium text-slate-300/80 max-w-lg">
-              Upload from mobile, enter your 4-digit code, and collect printed pages in seconds.
-            </p>
-
-            {/* Feature Pills */}
-            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 backdrop-blur-md">
-                <Lightning size={15} weight="fill" className="text-amber-400" />
-                <span>Instant Release</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 backdrop-blur-md">
-                <FileText size={15} weight="fill" className="text-blue-400" />
-                <span>B&W and Color Laser</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 backdrop-blur-md">
-                <ShieldCheck size={15} weight="fill" className="text-emerald-400" />
-                <span>Private & Automated</span>
-              </div>
+        {/* Center Stage: Branded Geometric Motion Graphics & Value Proposition */}
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center text-center">
+          {/* Concentric Pulsing Gold Rings */}
+          <div className="relative mb-6 flex items-center justify-center">
+            <div className="absolute h-56 w-56 rounded-full border border-gold-500/20 animate-ping" style={{ animationDuration: '3.2s' }} />
+            <div className="absolute h-44 w-44 rounded-full border border-gold-500/30 animate-pulse" style={{ animationDuration: '2.4s' }} />
+            <div className="flex h-32 w-32 items-center justify-center rounded-full border border-gold-400/50 bg-gradient-to-tr from-amber-600/20 via-gold-500/30 to-amber-300/10 shadow-[0_0_40px_rgba(217,165,68,0.3)] backdrop-blur-xl">
+              <h1 className="bg-gradient-to-b from-white via-gold-200 to-gold-400 bg-clip-text font-sans text-[48px] font-black tracking-tight text-transparent">
+                M
+              </h1>
             </div>
           </div>
 
-          {/* Bottom Floating Prompt Placeholder for Alignment */}
-          <div className="h-14" />
+          <h2 className="bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-[38px] font-black tracking-tight text-transparent">
+            Self-Service Fast Printing
+          </h2>
+          <p className="mt-2 text-[17px] font-medium text-slate-300/80 max-w-lg">
+            Upload from mobile, enter your 4-digit code, and collect printed pages in seconds.
+          </p>
+
+          {/* Feature Pills */}
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 backdrop-blur-md">
+              <Lightning size={15} weight="fill" className="text-amber-400" />
+              <span>Instant Release</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 backdrop-blur-md">
+              <FileText size={15} weight="fill" className="text-blue-400" />
+              <span>B&W and Color Laser</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 backdrop-blur-md">
+              <ShieldCheck size={15} weight="fill" className="text-emerald-400" />
+              <span>Private & Automated</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Floating Prompt Placeholder for Alignment */}
+        <div className="h-14" />
+      </div>
+
+      {/* ── TOP LAYER: CUSTOM PLAYLIST MEDIA (Cross-fades over Base Layer when Ready) ── */}
+      {hasMediaPlaylist && currentMediaUrl && (
+        <div
+          className="absolute inset-0 h-full w-full pointer-events-none transition-opacity duration-500 ease-in-out"
+          style={{ opacity: isImage || isVideoReady ? 1 : 0 }}
+        >
+          {isImage ? (
+            <img
+              key={`${currentVideoIndex}-${currentMediaUrl}`}
+              src={currentMediaUrl}
+              alt="Screen Saver"
+              onError={() => handleMediaError(currentMediaUrl)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <video 
+              ref={videoRef}
+              key={`${currentVideoIndex}-${currentMediaUrl}`}
+              src={currentMediaUrl}
+              autoPlay 
+              muted
+              playsInline
+              preload="auto"
+              onCanPlay={() => setIsVideoReady(true)}
+              onLoadedData={() => setIsVideoReady(true)}
+              onPlaying={() => setIsVideoReady(true)}
+              onEnded={handleVideoEnd}
+              onError={() => {
+                setIsVideoReady(false);
+                handleMediaError(currentMediaUrl);
+              }}
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover',
+              }}
+            >
+              Your browser does not support the video tag.
+            </video>
+          )}
+        </div>
+      )}
+
+      {/* Persistent Live Clock in top right (visible over video if video is active) */}
+      {hasMediaPlaylist && currentMediaUrl && (isImage || isVideoReady) && (
+        <div className="absolute top-10 right-10 z-20 text-right pointer-events-none select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+          <div className="font-mono text-[30px] font-black tracking-tight text-white">
+            {currentTimeStr}
+          </div>
+          <div className="text-[13px] font-semibold text-slate-300">{currentDateStr}</div>
         </div>
       )}
 
       {/* Floating Touch Prompt Banner */}
       <div
-        className="pointer-events-none absolute bottom-10 flex items-center gap-3 rounded-full border border-gold-500/40 bg-white/95 px-8 py-3.5 text-[#1A1714] shadow-[0_12px_36px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-transform"
+        className="pointer-events-none absolute bottom-10 z-20 flex items-center gap-3 rounded-full border border-gold-500/40 bg-white/95 px-8 py-3.5 text-[#1A1714] shadow-[0_12px_36px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-transform"
       >
         <HandTap size={24} weight="fill" className="text-gold-600" style={{ animation: 'kiosk-tap-bounce 1.1s ease-in-out infinite' }} />
         <span className="text-[19px] font-bold tracking-wide">Tap anywhere to start printing with Mimo</span>
