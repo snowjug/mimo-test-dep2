@@ -45,6 +45,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Per-kiosk screensaver config: safe to read publicly by tablets and kiosks
+    match /kiosk_screensavers/{kioskId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;

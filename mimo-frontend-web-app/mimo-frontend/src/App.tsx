@@ -10,6 +10,7 @@ import { CV001Background } from './components/screens/CV001Background';
 import { Adds } from './components/screens/adds/Adds';
 import { isFestivalActive } from './config/festivalConfig';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
+import { useKioskIdle } from './hooks/useKioskIdle';
 import { loadActivePrint, saveActivePrint, clearActivePrint, markActivePrintCompleted, type ActivePrintJob } from './utils/activePrint';
 
 
@@ -123,43 +124,6 @@ function App() {
       toastTimerRef.current = null;
     }, 3000);
   }, []);
-
-  // ================= IDLE TIMER FOR ADS & SCREENSAVER =================
-  useEffect(() => {
-    let idleTimer: number;
-
-    const resetIdleTimer = () => {
-      clearTimeout(idleTimer);
-      setShowScreensaver(false);
-      // A submitted code is being verified/triggered on the backend — that round trip can take
-      // longer than 20s (cold start, slow network), and this timer must not fire mid-request.
-      if (currentScreen === 'code-entry-screen' && !isSubmittingCode) {
-        idleTimer = window.setTimeout(() => {
-          setCurrentScreen('main-interface');
-        }, 20000); // 20 seconds of idle time -> reset to main interface
-      } else if (currentScreen === 'main-interface') {
-        idleTimer = window.setTimeout(() => {
-          setShowScreensaver(true);
-        }, idleTimeout * 1000);
-      }
-    };
-
-    window.addEventListener('mousemove', resetIdleTimer);
-    window.addEventListener('touchstart', resetIdleTimer);
-    window.addEventListener('click', resetIdleTimer);
-    window.addEventListener('keypress', resetIdleTimer);
-
-    // Initial trigger
-    resetIdleTimer();
-
-    return () => {
-      clearTimeout(idleTimer);
-      window.removeEventListener('mousemove', resetIdleTimer);
-      window.removeEventListener('touchstart', resetIdleTimer);
-      window.removeEventListener('click', resetIdleTimer);
-      window.removeEventListener('keypress', resetIdleTimer);
-    };
-  }, [currentScreen, idleTimeout, isSubmittingCode]);
 
   // ================= VALIDATION + DOWNLOAD =================
   const handleValidationSuccess = useCallback(async () => {
@@ -299,6 +263,17 @@ function App() {
     setShowRefundBanner(false);
     setCurrentScreen('main-interface');
   }, []);
+
+  // ================= HARDWARE-SAFE IDLE & SCREENSAVER DETECTION =================
+  useKioskIdle({
+    idleTimeoutSeconds: idleTimeout,
+    currentScreen,
+    isSubmittingCode,
+    isPrinting: printStatus === 'printing',
+    onResetToHome: handleReset,
+    onTriggerScreensaver: () => setShowScreensaver(true),
+    onHideScreensaver: () => setShowScreensaver(false),
+  });
 
   // ================= RETRY =================
   // Only a job this kiosk actually started can be resumed (re-polled). Otherwise go back to code entry: re-polling
