@@ -3,6 +3,7 @@ package com.example.revautsav
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -84,6 +85,18 @@ class MainActivity : AppCompatActivity() {
     private fun configureWebView() {
         webView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         val webSettings: WebSettings = webView.settings
+
+        // Initialize Media volume for screensaver audio in kiosk lock mode
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (audioManager != null) {
+                val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val targetVolume = (maxVolume * 0.85).toInt()
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
+            }
+        } catch (e: Exception) {
+            Log.w("KioskVolume", "Could not set stream volume: ${e.message}")
+        }
         
         // Basic web settings
         webSettings.javaScriptEnabled = true

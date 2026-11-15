@@ -113,6 +113,7 @@ Environment=GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/etc/ssl/certs/ca-certificates.crt
 ExecStart=/usr/bin/python3 /home/printpi/firebase_listener.py
 Restart=always
 RestartSec=5
+RuntimeMaxSec=86400
 StandardOutput=journal
 StandardError=journal
 

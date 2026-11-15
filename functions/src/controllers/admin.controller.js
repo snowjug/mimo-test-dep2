@@ -227,10 +227,13 @@ const getAdminScreensaver = async (req, res) => {
 const ADMIN_UPLOAD_PREFIXES = { screensaver: "screensaver", ads: "ads" };
 const postGetAdminUploadUrl = async (req, res) => {
   try {
-    const { fileName, contentType, purpose, kioskId } = req.body || {};
+    const { fileName, contentType, purpose, kioskId, fileSizeBytes } = req.body || {};
     const prefix = ADMIN_UPLOAD_PREFIXES[purpose];
     if (!prefix) {
       return res.status(400).json({ error: `purpose must be one of: ${Object.keys(ADMIN_UPLOAD_PREFIXES).join(", ")}` });
+    }
+    if (fileSizeBytes && Number(fileSizeBytes) > 25 * 1024 * 1024) {
+      return res.status(400).json({ error: "Media file exceeds the 25MB limit. Please compress to 720p H.264." });
     }
     if (typeof admin.storage !== "function") {
       return res.status(500).json({ error: "Storage is not configured." });

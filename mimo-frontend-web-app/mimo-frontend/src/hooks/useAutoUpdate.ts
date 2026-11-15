@@ -146,4 +146,24 @@ export function useAutoUpdate({
       window.clearInterval(interval);
     };
   }, [checkForUpdate, checkIntervalMs]);
+
+  // Off-hours daily memory & GPU cache refresh (runs between 3:30 AM and 4:30 AM IST when idle)
+  const lastDailyRefreshRef = useRef<number>(Date.now());
+  useEffect(() => {
+    const dailyTimer = window.setInterval(() => {
+      if (!isIdleRef.current || isReloadingRef.current) return;
+      const now = new Date();
+      // IST hours (UTC + 5:30)
+      const istHours = (now.getUTCHours() + 5 + Math.floor((now.getUTCMinutes() + 30) / 60)) % 24;
+      const hoursSinceLastRefresh = (Date.now() - lastDailyRefreshRef.current) / (1000 * 60 * 60);
+
+      if (istHours === 4 && hoursSinceLastRefresh >= 18) {
+        console.info('[AutoUpdate] Performing off-hours daily Chromium GPU/memory flush...');
+        lastDailyRefreshRef.current = Date.now();
+        triggerSafeReload();
+      }
+    }, 60000);
+
+    return () => window.clearInterval(dailyTimer);
+  }, [triggerSafeReload]);
 }

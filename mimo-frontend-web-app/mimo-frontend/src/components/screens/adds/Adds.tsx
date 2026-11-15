@@ -38,28 +38,22 @@ export function resolveScreensaverMediaUrl(rawUrl: string): string {
   return trimmed;
 }
 
-export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const [videos, setVideos] = useState<string[]>([]);
-  const [playSound, setPlaySound] = useState(false);
-  const [isMutedFallback, setIsMutedFallback] = useState(false);
-  const [isVideoReady, setIsVideoReady] = useState(false);
-  const [currentTimeStr, setCurrentTimeStr] = useState('');
-  const [currentDateStr, setCurrentDateStr] = useState('');
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+// Isolated Leaf Clock Component: updates every second WITHOUT re-rendering the parent or video element
+function ScreensaverClock({ className }: { className?: string }) {
+  const [timeStr, setTimeStr] = useState('');
+  const [dateStr, setDateStr] = useState('');
 
-  // Live Clock updater for screensaver
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
-      setCurrentTimeStr(
+      setTimeStr(
         now.toLocaleTimeString('en-IN', {
           hour: '2-digit',
           minute: '2-digit',
           hour12: true,
         }).toUpperCase()
       );
-      setCurrentDateStr(
+      setDateStr(
         now.toLocaleDateString('en-IN', {
           weekday: 'long',
           day: 'numeric',
@@ -72,6 +66,24 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
     const clockTimer = setInterval(updateClock, 1000);
     return () => clearInterval(clockTimer);
   }, []);
+
+  return (
+    <div className={className}>
+      <div className="font-mono text-[30px] font-black tracking-tight text-white drop-shadow-md">
+        {timeStr}
+      </div>
+      <div className="text-[13px] font-semibold text-slate-300">{dateStr}</div>
+    </div>
+  );
+}
+
+export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [videos, setVideos] = useState<string[]>([]);
+  const [playSound, setPlaySound] = useState(false);
+  const [isMutedFallback, setIsMutedFallback] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Fetch dynamic screen saver configuration directly from Firestore or admin backend
   useEffect(() => {
@@ -271,9 +283,10 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            // Once playing, attempt to enable sound if configured in settings
+            // Once playing, ensure volume is 1.0 and unmute if sound is enabled
             if (playSound && !isMutedFallback) {
               try {
+                vid.volume = 1.0;
                 vid.muted = false;
               } catch {
                 vid.muted = true;
@@ -343,12 +356,7 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
             </div>
           </div>
 
-          <div className="text-right">
-            <div className="font-mono text-[30px] font-black tracking-tight text-white drop-shadow-md">
-              {currentTimeStr}
-            </div>
-            <div className="text-[13px] font-semibold text-slate-400">{currentDateStr}</div>
-          </div>
+          <ScreensaverClock className="text-right" />
         </div>
 
         {/* Center Stage: Branded Geometric Motion Graphics & Value Proposition */}
@@ -412,7 +420,7 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
               key={`${currentVideoIndex}-${currentMediaUrl}`}
               src={currentMediaUrl}
               autoPlay 
-              muted
+              muted={!playSound || isMutedFallback}
               playsInline
               preload="auto"
               onCanPlay={() => setIsVideoReady(true)}
@@ -437,12 +445,7 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
 
       {/* Persistent Live Clock in top right (visible over video if video is active) */}
       {hasMediaPlaylist && currentMediaUrl && (isImage || isVideoReady) && (
-        <div className="absolute top-10 right-10 z-20 text-right pointer-events-none select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-          <div className="font-mono text-[30px] font-black tracking-tight text-white">
-            {currentTimeStr}
-          </div>
-          <div className="text-[13px] font-semibold text-slate-300">{currentDateStr}</div>
-        </div>
+        <ScreensaverClock className="absolute top-10 right-10 z-20 text-right pointer-events-none select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" />
       )}
 
       {/* Floating Touch Prompt Banner */}
