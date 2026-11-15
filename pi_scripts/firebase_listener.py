@@ -2915,6 +2915,55 @@ def color_cleaning_scheduler_loop():
         print(f"⚠️ [CLEAN] Could not start colour cleaning scheduler: {e}")
 
 
+def daily_maintenance_loop():
+    """Background loop that executes 24-hour log rotation, systemd journal vacuum,
+    and temporary file cleanup daily at 4:00 AM IST."""
+    print("⏰ [MAINTENANCE] Daily 4:00 AM log vacuum & self-refresh loop initialized.")
+    while True:
+        try:
+            now = datetime.now()
+            target = now.replace(hour=4, minute=0, second=0, microsecond=0)
+            if target <= now:
+                target += timedelta(days=1)
+            wait_seconds = max(0.0, (target - now).total_seconds())
+            time.sleep(wait_seconds)
+
+            print("🧹 [MAINTENANCE] Starting scheduled 24-hour log vacuum and cache cleanup...")
+            # 1. Vacuum systemd journal logs to 24 hours
+            safe_sudo_run(["/usr/bin/journalctl", "--vacuum-time=24h"], timeout=30)
+
+            # 2. Truncate oversized CUPS error logs if larger than 10MB
+            try:
+                cups_err = "/var/log/cups/error_log"
+                if os.path.exists(cups_err) and os.path.getsize(cups_err) > 10 * 1024 * 1024:
+                    safe_sudo_run(["/usr/bin/truncate", "-s", "0", cups_err], timeout=10)
+                    print("🧹 [MAINTENANCE] Truncated oversized CUPS error_log.")
+            except Exception as cups_e:
+                print(f"⚠️ [MAINTENANCE] CUPS log check error: {cups_e}")
+
+            # 3. Clean temporary convert files from /tmp older than 24h
+            try:
+                for fname in os.listdir("/tmp"):
+                    if fname.startswith(("print_", "mimo_", "cups_")) and fname.endswith((".pdf", ".tmp", ".ps")):
+                        fpath = os.path.join("/tmp", fname)
+                        if os.path.isfile(fpath):
+                            file_age = time.time() - os.path.getmtime(fpath)
+                            if file_age > 86400:
+                                try:
+                                    os.remove(fpath)
+                                except OSError:
+                                    pass
+                print("🧹 [MAINTENANCE] Temporary conversion artifacts older than 24h pruned.")
+            except Exception as tmp_e:
+                print(f"⚠️ [MAINTENANCE] /tmp cleanup error: {tmp_e}")
+
+            print("✅ [MAINTENANCE] 24-hour maintenance cycle completed successfully.")
+            time.sleep(60)
+        except Exception as e:
+            print(f"⚠️ [MAINTENANCE] Error during daily maintenance cycle: {e}")
+            time.sleep(300)
+
+
 def startup_reconcile_cups():
     """On startup, reconcile CUPS queues against Firestore instead of blindly destroying all queued jobs.
     Active jobs whose Firestore status is still 'printing' are preserved; only jobs that have already
@@ -2943,6 +2992,7 @@ if __name__ == "__main__":
     threading.Thread(target=keep_warm_loop, daemon=True).start()
     threading.Thread(target=prefetch_cache_cleanup_loop, daemon=True).start()
     threading.Thread(target=color_cleaning_scheduler_loop, daemon=True).start()
+    threading.Thread(target=daily_maintenance_loop, daemon=True).start()
 
     print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
     print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")

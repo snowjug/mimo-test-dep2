@@ -16,6 +16,8 @@ import {
   Globe,
   Layers,
   Info,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import api from '../../api';
 import { useTheme } from '../../context/ThemeContext';
@@ -54,6 +56,7 @@ export const ConfigurationPage: React.FC = () => {
   const [savingScreensaver, setSavingScreensaver] = useState(false);
   const [savedScreensaver, setSavedScreensaver] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Hardware thresholds
   const [thresholds, setThresholds] = useState({
@@ -122,20 +125,27 @@ export const ConfigurationPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Pi Performance Guardrail: Cap video uploads at 25MB to prevent decoder crash
-    if (file.size > 25 * 1024 * 1024) {
-      alert('Media file exceeds the 25MB limit. Please compress or resize for smooth kiosk playback on Raspberry Pi hardware.');
+    // Pi & Tablet Performance Guardrail: Cap video uploads at 25MB (recommended <=20MB)
+    const MAX_SIZE_BYTES = 25 * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      setUploadError(
+        `Video size (${sizeMB}MB) exceeds the 25MB limit. Please compress to 720p H.264 for smooth playback on kiosk hardware.`
+      );
+      e.target.value = '';
       return;
     }
 
+    setUploadError(null);
     setIsUploadingMedia(true);
     try {
-      // Signed-URL upload: namespaced by selectedKiosk
+      // Signed-URL upload: namespaced by selectedKiosk with size validation
       const { data: urlData } = await api.post('/admin/upload-url', {
         fileName: file.name,
         contentType: file.type || 'application/octet-stream',
         purpose: 'screensaver',
         kioskId: selectedKiosk,
+        fileSizeBytes: file.size,
       });
       const putRes = await fetch(urlData.uploadUrl, {
         method: 'PUT',
@@ -149,9 +159,10 @@ export const ConfigurationPage: React.FC = () => {
         useGlobalFallback: false,
       }));
     } catch (err) {
-      alert('Upload failed: ' + (err as Error).message);
+      setUploadError('Upload failed: ' + (err as Error).message);
     } finally {
       setIsUploadingMedia(false);
+      e.target.value = '';
     }
   };
 
@@ -160,14 +171,15 @@ export const ConfigurationPage: React.FC = () => {
     const trimmed = newVideoUrl.trim();
     if (!trimmed) return;
 
+    setUploadError(null);
     try {
       const parsed = new URL(trimmed);
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        alert('Please enter a valid HTTP or HTTPS media URL');
+        setUploadError('Please enter a valid HTTP or HTTPS media URL');
         return;
       }
     } catch {
-      alert('Invalid URL format. Please paste a valid web media URL (e.g. https://.../video.mp4)');
+      setUploadError('Invalid URL format. Please paste a valid web media URL (e.g. https://.../video.mp4)');
       return;
     }
 
@@ -412,6 +424,23 @@ export const ConfigurationPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Size & Error Notification Popup */}
+              {uploadError && (
+                <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-semibold">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={15} className="shrink-0 text-rose-500" />
+                    <span>{uploadError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUploadError(null)}
+                    className="p-1 hover:bg-rose-500/20 rounded-md transition-colors text-rose-500 cursor-pointer"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+
               {/* Add Video & Upload */}
               <form onSubmit={handleAddVideoUrl} className="flex gap-2">
                 <input
@@ -433,6 +462,9 @@ export const ConfigurationPage: React.FC = () => {
                   <input type="file" accept="video/*" onChange={handleMediaUpload} className="hidden" />
                 </label>
               </form>
+              <p className="text-[10px] text-[var(--text-3)] font-medium">
+                ⚡ Recommended: 720p H.264 MP4 under 20MB (Max 25MB ceiling). Smooth 30fps hardware playback on Pi & tablet.
+              </p>
             </div>
           </div>
 
