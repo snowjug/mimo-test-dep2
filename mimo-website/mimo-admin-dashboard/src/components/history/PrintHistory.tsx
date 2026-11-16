@@ -84,98 +84,212 @@ const JobDetails: React.FC<{ job: JobRow; onRefund?: (job: JobRow) => void }> = 
   const hasCoupon = !!job.couponCode || gross > job.cost || (job.discount && job.discount > 0);
 
   return (
-    <div className="grid gap-5 bg-[var(--surface-2)]/50 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
-      <div className="min-w-0 space-y-4">
-        <div className="flex items-start gap-2.5">
-          <FileText size={16} className="mt-0.5 shrink-0 text-[var(--text-3)]" />
-          <div className="min-w-0 text-xs">
-            <p className="break-words font-bold text-[var(--text-1)]">{job.file}</p>
-            <p className="text-[var(--text-3)]">
-              {totalPgs} page{totalPgs === 1 ? '' : 's'}{job.duplex ? ` (${sheets} sheet${sheets === 1 ? '' : 's'} paper)` : ''}{job.copies > 1 ? ` × ${job.copies} copies` : ''} · {job.colorMode === 'color' ? 'Colour' : 'B&W'}{job.duplex ? ' · double-sided' : ' · single-sided'}
-            </p>
-            <p className="mt-1 break-all text-[var(--text-2)]">
-              {[job.userEmail !== 'Guest' ? job.userEmail : null, job.userPhone].filter(Boolean).join(' · ') || 'Guest'}
-            </p>
-            <p className="font-mono text-[10px] text-[var(--text-3)]">{job.orderId || job.id}</p>
+    <div className="grid gap-4 bg-[var(--surface-2)]/50 px-4 py-4 sm:px-5 lg:grid-cols-2">
+      {/* Left Column: Section 1 (Print Info) + Section 2 (Customer Info) */}
+      <div className="space-y-4">
+        {/* Section 1 — Print Information */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-3.5 space-y-3">
+          <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-3)]">Print Information</p>
+            {job.printCode ? (
+              <div className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 px-2.5 py-1 text-blue-600 dark:text-blue-400 shadow-sm" title="Customer Print Code">
+                <span className="text-[10px] font-bold uppercase tracking-wide">Code</span>
+                <span className="font-mono text-sm sm:text-base font-black tracking-widest select-all">{job.printCode}</span>
+              </div>
+            ) : (
+              <span className="inline-flex items-center rounded-lg bg-slate-100 dark:bg-slate-800 border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] italic text-[var(--text-3)]">
+                Unavailable
+              </span>
+            )}
+          </div>
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-start gap-2">
+              <FileText size={15} className="mt-0.5 shrink-0 text-[var(--text-3)]" />
+              <span className="break-words font-semibold text-[var(--text-1)]">{job.file}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1 text-[11.5px]">
+              <div>
+                <span className="text-[var(--text-3)]">Pages: </span>
+                <span className="font-medium text-[var(--text-1)]">{totalPgs} pgs ({sheets} sheet{sheets === 1 ? '' : 's'}){job.copies > 1 ? ` · ${job.copies} copies` : ''}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-3)]">Type: </span>
+                <span className="font-medium text-[var(--text-1)]">{job.colorMode === 'color' ? 'Colour' : 'Black & White'}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-3)]">Mode: </span>
+                <span className="font-medium text-[var(--text-1)]">{job.duplex ? 'Double-sided' : 'Single-sided'}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-3)]">Machine: </span>
+                <span className="font-medium text-[var(--text-1)]">{job.destination}{job.destinationShortLabel ? ` (${job.destinationShortLabel})` : ''}</span>
+              </div>
+            </div>
+            <div className="pt-1 text-[11px]">
+              <span className="text-[var(--text-3)]">Order ID: </span>
+              <span className="font-mono text-[var(--text-2)] select-all">{job.orderId || '—'}</span>
+            </div>
           </div>
         </div>
 
-        <div>
-          <p className="mb-2 text-[11px] font-bold text-[var(--text-3)]">Timeline</p>
-          {steps.length === 0 ? (
-            <p className="text-xs text-[var(--text-3)]">No timing was recorded for this job.</p>
-          ) : (
-            <ol className="relative ml-1.5 space-y-2.5 border-l border-[var(--border)]">
-              {steps.map((st, i) => {
-                const gap = i > 0 ? ms(st.at) - ms(steps[i - 1].at) : null;
-                const slow = gap !== null && SYSTEM_STEPS.has(st.key) && gap > SLOW_GAP_MS;
-                const bad = st.key === 'failed' || st.key === 'reported';
-                return (
-                  <li key={st.key} className="relative pl-4">
-                    <span className={`absolute -left-[5px] top-1.5 size-2.5 rounded-full ${bad ? 'bg-rose-500' : st.key === 'printed' ? 'bg-emerald-500' : st.key === 'refunded' ? 'bg-blue-500' : 'bg-[var(--text-3)]'}`} />
-                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
-                      <span className="font-mono tabular-nums text-[var(--text-2)]">{clockTime(st.at)}</span>
-                      <span className={`font-bold ${bad ? 'text-rose-600' : 'text-[var(--text-1)]'}`}>{st.label}</span>
-                      {gap !== null && (
-                        <span className={`text-[11px] tabular-nums ${slow ? 'font-bold text-amber-600' : 'text-[var(--text-3)]'}`}>
-                          +{duration(gap)}{slow ? ' · slow' : ''}
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
+        {/* Section 2 — Customer Information */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-3.5 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-3)] border-b border-[var(--border)] pb-1.5">Customer Information</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div>
+              <span className="block text-[10.5px] text-[var(--text-3)]">Name</span>
+              <span className="font-medium text-[var(--text-1)]">{displayName(job)}</span>
+            </div>
+            <div>
+              <span className="block text-[10.5px] text-[var(--text-3)]">Email</span>
+              <span className="break-all font-medium text-[var(--text-1)]">{job.userEmail && job.userEmail !== 'Guest' ? job.userEmail : '—'}</span>
+            </div>
+            <div>
+              <span className="block text-[10.5px] text-[var(--text-3)]">Phone</span>
+              <span className="font-medium text-[var(--text-1)]">{job.userPhone || '—'}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-3 text-xs">
-        <div>
-          <p className="text-[11px] font-bold text-[var(--text-3)]">Printer evidence</p>
-          <p className="mt-1 text-[var(--text-1)]">
-            {job.printVerified ? `Printer counted ${job.sheetsVerified ?? sheets} sheet(s) coming out.` : `Physical paper: ${sheets} sheet${sheets === 1 ? '' : 's'} (${totalPgs} doc pages).`}
-          </p>
-          {job.printerStatus && <p className="mt-0.5 break-words text-[var(--text-2)]">Status: {job.printerStatus}</p>}
+      {/* Right Column: Section 3 (Payment Breakdown) + Section 4 (Timeline & Evidence) */}
+      <div className="space-y-4">
+        {/* Section 3 — Payment Breakdown */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-3.5 space-y-2.5 text-xs">
+          <p className="font-bold text-[11px] uppercase tracking-wider text-[var(--text-3)] border-b border-[var(--border)] pb-1.5">Payment Breakdown</p>
+          <div className="grid grid-cols-2 gap-y-1.5 text-xs">
+            <span className="text-[var(--text-3)]">Original amount:</span>
+            <span className="text-right font-medium text-[var(--text-1)] tabular-nums">
+              {job.recordedOriginalAmount !== null && job.recordedOriginalAmount !== undefined
+                ? inr(job.recordedOriginalAmount)
+                : 'Unavailable'}
+            </span>
+
+            <span className="text-[var(--text-3)]">Coupon:</span>
+            <span className="text-right text-[var(--text-1)]">
+              {job.couponCode || 'Not used'}
+            </span>
+
+            {job.couponDiscountPercentage !== null && job.couponDiscountPercentage !== undefined && (
+              <>
+                <span className="text-[var(--text-3)]">Coupon discount %:</span>
+                <span className="text-right text-[var(--text-1)] tabular-nums">
+                  {job.couponDiscountPercentage}%
+                </span>
+              </>
+            )}
+
+            <span className="text-[var(--text-3)]">Coupon discount:</span>
+            <span className="text-right text-[var(--text-1)] tabular-nums">
+              {!job.couponCode
+                ? 'Not used'
+                : (job.couponDiscountAmount !== null && job.couponDiscountAmount !== undefined
+                  ? `-${inr(job.couponDiscountAmount)}`
+                  : 'Unavailable')}
+            </span>
+
+            <span className="text-[var(--text-3)]">MIMO Coins used:</span>
+            <span className="text-right text-[var(--text-1)] tabular-nums">
+              {job.coinsUsed !== null && job.coinsUsed !== undefined && job.coinsUsed > 0
+                ? `${job.coinsUsed} coins`
+                : 'Not used'}
+            </span>
+
+            <span className="text-[var(--text-3)]">Coins monetary value:</span>
+            <span className="text-right text-[var(--text-1)] tabular-nums">
+              {!job.coinsUsed || job.coinsUsed <= 0
+                ? 'Not used'
+                : (job.coinsValue !== null && job.coinsValue !== undefined
+                  ? `-${inr(job.coinsValue)}`
+                  : 'Unavailable')}
+            </span>
+
+            <span className="border-t border-[var(--border)] pt-1.5 font-bold text-[var(--text-1)]">Actual amount paid:</span>
+            <span className="border-t border-[var(--border)] pt-1.5 text-right font-bold text-[var(--text-1)] tabular-nums">
+              {job.actualAmountPaid !== null && job.actualAmountPaid !== undefined
+                ? inr(job.actualAmountPaid)
+                : 'Unavailable'}
+            </span>
+
+            <span className="text-[var(--text-3)]">Payment status:</span>
+            <span className="text-right font-medium text-[var(--text-1)]">
+              {job.paymentStatus || 'Unavailable'}
+            </span>
+          </div>
         </div>
 
-        {hasCoupon && (
-          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-2.5">
-            <p className="font-bold text-emerald-600 dark:text-emerald-400">Coupon applied: {job.couponCode || 'PROMO'}</p>
-            <p className="mt-0.5 text-[var(--text-2)]">
-              Original price: <span className="line-through">{inr(gross)}</span> · Discount: -{inr(Math.max(0, gross - job.cost))} · Paid: <strong className="font-bold text-slate-900 dark:text-white">{inr(job.cost)}</strong>
-            </p>
-          </div>
-        )}
+        {/* Section 4 — Printing Timeline & Evidence */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-3.5 space-y-3">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-3)] border-b border-[var(--border)] pb-1.5">Printing Timeline & Evidence</p>
 
-        {job.refund && (
-          <div className="rounded-xl border border-blue-500/25 bg-blue-500/5 p-2.5">
-            <p className="font-bold text-blue-600 dark:text-blue-400">
-              {job.refund.state === 'refunded' ? 'Refunded' : 'Refund processing'}{job.refund.amount ? ` ${inr(job.refund.amount)}` : ''}
+          <div>
+            <p className="text-[11px] font-bold text-[var(--text-3)] mb-1">Printer Evidence</p>
+            <p className="text-xs text-[var(--text-1)]">
+              {job.printVerified ? `Printer counted ${job.sheetsVerified ?? sheets} sheet(s) coming out.` : `Physical paper: ${sheets} sheet${sheets === 1 ? '' : 's'} (${totalPgs} doc pages).`}
             </p>
-            <p className="mt-0.5 text-[var(--text-2)]">
-              {REFUND_SOURCE[job.refund.source] ? `Done ${REFUND_SOURCE[job.refund.source]}` : ''}{job.refund.at ? ` · ${clockTime(job.refund.at)}` : ''}
-            </p>
+            {job.printerStatus && <p className="mt-0.5 break-words text-xs text-[var(--text-2)]">Status: {job.printerStatus}</p>}
           </div>
-        )}
 
-        {job.customerIssue && (
-          <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-2.5">
-            <p className="font-bold text-rose-600">Customer reported: {job.customerIssue.label}</p>
-            {job.customerIssue.verdict && <p className="mt-0.5 font-semibold text-[var(--text-1)]">{VERDICT_TEXT[job.customerIssue.verdict] ?? job.customerIssue.verdict}</p>}
-            {job.customerIssue.evidence && <p className="mt-0.5 text-[var(--text-2)]">{job.customerIssue.evidence}</p>}
+          <div>
+            <p className="mb-2 text-[11px] font-bold text-[var(--text-3)]">Timeline</p>
+            {steps.length === 0 ? (
+              <p className="text-xs text-[var(--text-3)]">No timing was recorded for this job.</p>
+            ) : (
+              <ol className="relative ml-1.5 space-y-2.5 border-l border-[var(--border)]">
+                {steps.map((st, i) => {
+                  const gap = i > 0 ? ms(st.at) - ms(steps[i - 1].at) : null;
+                  const slow = gap !== null && SYSTEM_STEPS.has(st.key) && gap > SLOW_GAP_MS;
+                  const bad = st.key === 'failed' || st.key === 'reported';
+                  return (
+                    <li key={st.key} className="relative pl-4">
+                      <span className={`absolute -left-[5px] top-1.5 size-2.5 rounded-full ${bad ? 'bg-rose-500' : st.key === 'printed' ? 'bg-emerald-500' : st.key === 'refunded' ? 'bg-blue-500' : 'bg-[var(--text-3)]'}`} />
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+                        <span className="font-mono tabular-nums text-[var(--text-2)]">{clockTime(st.at)}</span>
+                        <span className={`font-bold ${bad ? 'text-rose-600' : 'text-[var(--text-1)]'}`}>{st.label}</span>
+                        {gap !== null && (
+                          <span className={`text-[11px] tabular-nums ${slow ? 'font-bold text-amber-600' : 'text-[var(--text-3)]'}`}>
+                            +{duration(gap)}{slow ? ' · slow' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
           </div>
-        )}
 
-        {canRefund && (
-          <button
-            type="button"
-            onClick={() => onRefund!(job)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-500/20"
-          >
-            <RotateCcw size={13} /> Refund {inr(job.cost)}
-          </button>
-        )}
+          {job.refund && (
+            <div className="rounded-xl border border-blue-500/25 bg-blue-500/5 p-2.5 text-xs">
+              <p className="font-bold text-blue-600 dark:text-blue-400">
+                {job.refund.state === 'refunded' ? 'Refunded' : 'Refund processing'}{job.refund.amount ? ` ${inr(job.refund.amount)}` : ''}
+              </p>
+              <p className="mt-0.5 text-[var(--text-2)]">
+                {REFUND_SOURCE[job.refund.source] ? `Done ${REFUND_SOURCE[job.refund.source]}` : ''}{job.refund.at ? ` · ${clockTime(job.refund.at)}` : ''}
+              </p>
+            </div>
+          )}
+
+          {job.customerIssue && (
+            <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-2.5 text-xs">
+              <p className="font-bold text-rose-600">Customer reported: {job.customerIssue.label}</p>
+              {job.customerIssue.verdict && <p className="mt-0.5 font-semibold text-[var(--text-1)]">{VERDICT_TEXT[job.customerIssue.verdict] ?? job.customerIssue.verdict}</p>}
+              {job.customerIssue.evidence && <p className="mt-0.5 text-[var(--text-2)]">{job.customerIssue.evidence}</p>}
+            </div>
+          )}
+
+          {canRefund && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => onRefund!(job)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-500/20"
+              >
+                <RotateCcw size={13} /> Refund {inr(job.cost)}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

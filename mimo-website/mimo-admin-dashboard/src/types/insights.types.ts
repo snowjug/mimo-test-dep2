@@ -191,6 +191,14 @@ export interface JobRow {
   originalCost?: number;
   discount?: number;
   couponCode?: string | null;
+  printCode?: string | null;
+  recordedOriginalAmount?: number | null;
+  couponDiscountPercentage?: number | null;
+  couponDiscountAmount?: number | null;
+  coinsUsed?: number | null;
+  coinsValue?: number | null;
+  actualAmountPaid?: number | null;
+  paymentStatus?: string | null;
   copies: number;
   pageCount: number;
   totalPages: number;
