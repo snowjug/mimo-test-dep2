@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../api";
 
+export interface HardwareAlertItem {
+  kioskId: string;
+  name: string;
+  paperOut: boolean;
+  tonerOut?: boolean;
+  inkOut?: boolean;
+  hasIssue: boolean;
+  problem: string | null;
+  message: string | null;
+  suggestedMachine: string | null;
+  suggestedKioskId: string | null;
+}
+
 export interface KioskOutageData {
   allDown: boolean;
   mimo1Down: boolean;
@@ -10,6 +23,11 @@ export interface KioskOutageData {
   updatedAt: string | null;
   hasActiveOutage: boolean;
   activeNotices: string[];
+  hardwareAlerts?: {
+    mimo1?: HardwareAlertItem;
+    mimo2_bw?: HardwareAlertItem;
+    mimo2_color?: HardwareAlertItem;
+  };
 }
 
 const DEFAULT_OUTAGES: KioskOutageData = {

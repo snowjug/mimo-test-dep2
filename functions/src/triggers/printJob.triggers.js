@@ -268,27 +268,30 @@ exports.printerHardwareNotification = onDocumentUpdated(
 
         const transporter = getTransporter();
 
-        // ── 1. LOW PAPER ALERTS ──
+        // ── 1. LOW & OUT OF PAPER ALERTS ──
         const paperLevel = Number(printer.paperLevel);
         const prevPaperLevel = Number(beforePrinter.paperLevel);
 
         if (Number.isFinite(paperLevel)) {
           const paperCapacity = isColor ? 100 : 250;
           const paperThreshold = isColor ? 70 : 50;
+          const isOutOfPaper = paperLevel <= 0;
 
           const paperCrossed =
-            paperLevel <= paperThreshold &&
-            (prevPaperLevel > paperThreshold || !Number.isFinite(prevPaperLevel));
+            (paperLevel <= paperThreshold &&
+              (prevPaperLevel > paperThreshold || !Number.isFinite(prevPaperLevel))) ||
+            (isOutOfPaper && prevPaperLevel > 0);
 
           if (paperCrossed) {
             try {
+              const alertPrefix = isOutOfPaper ? "OUT OF PAPER" : "Low Paper";
               await transporter.sendMail({
                 from: '"Mimo Printing" <visionprintt@gmail.com>',
                 to: "visionprintt@gmail.com",
-                subject: `MIMO Low Paper Alert - ${printerName}`,
+                subject: `MIMO ${alertPrefix} Alert - ${printerName}`,
                 text:
-                  `MIMO Kiosk Low Paper Alert\n\n` +
-                  `Alert Type: Low Paper\n` +
+                  `MIMO Kiosk ${alertPrefix} Alert\n\n` +
+                  `Alert Type: ${alertPrefix}\n` +
                   `Printer ID: ${printerId}\n` +
                   `Printer: ${printerName}\n` +
                   `Kiosk: ${kioskId}\n` +
@@ -296,11 +299,11 @@ exports.printerHardwareNotification = onDocumentUpdated(
                   `Printer Capacity: ${paperCapacity} sheets\n` +
                   `Alert Threshold: ${paperThreshold} sheets\n` +
                   `Current Paper Level: ${paperLevel} sheets\n\n` +
-                  `Recommended Action: Please refill the ${isColor ? "colour " : ""}paper tray immediately.`,
+                  `Recommended Action: Please refill the ${isColor ? "colour " : ""}paper tray immediately. Printing is ${isOutOfPaper ? "HALTED" : "at risk"}.`,
               });
 
               console.log(
-                `[EMAIL] Low paper notification sent for ${printerId}. Current level: ${paperLevel}`
+                `[EMAIL] ${alertPrefix} notification sent for ${printerId}. Current level: ${paperLevel}`
               );
             } catch (mailErr) {
               console.error(`[EMAIL ERROR] Low paper email failed for ${printerId}:`, mailErr.message || mailErr);
@@ -308,37 +311,40 @@ exports.printerHardwareNotification = onDocumentUpdated(
           }
         }
 
-        // ── 2. LOW TONER ALERT (B&W Printers) ──
+        // ── 2. LOW & OUT OF TONER ALERT (B&W Printers) ──
         if (!isColor && printer.tonerLevel !== undefined) {
           const tonerLevel = Number(printer.tonerLevel);
           const prevTonerLevel = Number(beforePrinter.tonerLevel);
 
           if (Number.isFinite(tonerLevel)) {
             const tonerThreshold = 20;
+            const isOutOfToner = tonerLevel <= 0;
             const tonerCrossed =
-              tonerLevel <= tonerThreshold &&
-              (prevTonerLevel > tonerThreshold || !Number.isFinite(prevTonerLevel));
+              (tonerLevel <= tonerThreshold &&
+                (prevTonerLevel > tonerThreshold || !Number.isFinite(prevTonerLevel))) ||
+              (isOutOfToner && prevTonerLevel > 0);
 
             if (tonerCrossed) {
               try {
+                const alertPrefix = isOutOfToner ? "OUT OF TONER" : "Low Toner";
                 await transporter.sendMail({
                   from: '"Mimo Printing" <visionprintt@gmail.com>',
                   to: "visionprintt@gmail.com",
-                  subject: `MIMO Low Toner Alert - ${printerName}`,
+                  subject: `MIMO ${alertPrefix} Alert - ${printerName}`,
                   text:
-                    `MIMO Kiosk Low Toner Alert\n\n` +
-                    `Alert Type: Low Toner\n` +
+                    `MIMO Kiosk ${alertPrefix} Alert\n\n` +
+                    `Alert Type: ${alertPrefix}\n` +
                     `Printer ID: ${printerId}\n` +
                     `Printer: ${printerName}\n` +
                     `Kiosk: ${kioskId}\n` +
                     `Printer Type: B&W\n` +
                     `Alert Threshold: ${tonerThreshold}%\n` +
                     `Current Toner Level: ${tonerLevel}%\n\n` +
-                    `Recommended Action: Please replace or order a replacement toner cartridge.`,
+                    `Recommended Action: Please replace or order a replacement toner cartridge. Printing is ${isOutOfToner ? "HALTED" : "at risk"}.`,
                 });
 
                 console.log(
-                  `[EMAIL] Low toner notification sent for ${printerId}. Current level: ${tonerLevel}%`
+                  `[EMAIL] ${alertPrefix} notification sent for ${printerId}. Current level: ${tonerLevel}%`
                 );
               } catch (mailErr) {
                 console.error(`[EMAIL ERROR] Low toner email failed for ${printerId}:`, mailErr.message || mailErr);
@@ -347,37 +353,47 @@ exports.printerHardwareNotification = onDocumentUpdated(
           }
         }
 
-        // ── 3. LOW INK ALERT (Colour Printers) ──
+        // ── 3. LOW & OUT OF INK ALERT (Colour Printers) ──
         if (isColor && printer.inkLevel !== undefined) {
           const inkLevel = Number(printer.inkLevel);
           const prevInkLevel = Number(beforePrinter.inkLevel);
 
           if (Number.isFinite(inkLevel)) {
             const inkThreshold = 20;
+            const isOutOfInk = inkLevel <= 0;
             const inkCrossed =
-              inkLevel <= inkThreshold &&
-              (prevInkLevel > inkThreshold || !Number.isFinite(prevInkLevel));
+              (inkLevel <= inkThreshold &&
+                (prevInkLevel > inkThreshold || !Number.isFinite(prevInkLevel))) ||
+              (isOutOfInk && prevInkLevel > 0);
 
             if (inkCrossed) {
               try {
+                const alertPrefix = isOutOfInk ? "OUT OF INK" : "Low Ink";
                 await transporter.sendMail({
                   from: '"Mimo Printing" <visionprintt@gmail.com>',
                   to: "visionprintt@gmail.com",
-                  subject: `MIMO Low Ink Alert - ${printerName}`,
+                  subject: `MIMO ${alertPrefix} Alert - ${printerName}`,
                   text:
-                    `MIMO Kiosk Low Ink Alert\n\n` +
-                    `Alert Type: Low Ink\n` +
+                    `MIMO Kiosk ${alertPrefix} Alert\n\n` +
+                    `Alert Type: ${alertPrefix}\n` +
                     `Printer ID: ${printerId}\n` +
                     `Printer: ${printerName}\n` +
                     `Kiosk: ${kioskId}\n` +
                     `Printer Type: Colour\n` +
                     `Alert Threshold: ${inkThreshold}%\n` +
                     `Current Ink Level: ${inkLevel}%\n\n` +
-                    `Recommended Action: Please refill the colour ink tanks immediately.`,
+                    `Recommended Action: Please refill the colour ink tanks immediately. Printing is ${isOutOfInk ? "HALTED" : "at risk"}.`,
                 });
 
                 console.log(
-                  `[EMAIL] Low ink notification sent for ${printerId}. Current level: ${inkLevel}%`
+                  `[EMAIL] ${alertPrefix} notification sent for ${printerId}. Current level: ${inkLevel}%`
+                );
+              } catch (mailErr) {
+                console.error(`[EMAIL ERROR] Low ink email failed for ${printerId}:`, mailErr.message || mailErr);
+              }
+            }
+          }
+        }
                 );
               } catch (mailErr) {
                 console.error(`[EMAIL ERROR] Low ink email failed for ${printerId}:`, mailErr.message || mailErr);

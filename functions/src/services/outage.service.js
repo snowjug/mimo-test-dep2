@@ -2,6 +2,7 @@ const { db } = require("../config/firebase");
 const { sendPrinterRestoredNotificationEmail } = require("./email.service");
 
 const SETTINGS_DOC_REF = db.collection("mimo_settings").doc("outage_overrides");
+const HARDWARE_DOC_REF = db.collection("hardware").doc("printers");
 const SUBSCRIBERS_COLL = db.collection("printer_restored_subscribers");
 
 const DEFAULT_OUTAGES = {
@@ -16,21 +17,114 @@ const DEFAULT_OUTAGES = {
 
 /**
  * Returns human-readable outage summaries and active flags.
+ * Incorporates both manual admin overrides and live hardware printer supplies (paper / toner / ink exhaustion).
  */
-function summarizeOutages(data) {
-  const allDown = Boolean(data.allDown);
-  const mimo1Down = Boolean(data.mimo1Down);
-  const mimo2BwDown = Boolean(data.mimo2BwDown);
-  const mimo2ColorDown = Boolean(data.mimo2ColorDown);
+function summarizeOutages(data = {}, hardwareData = {}) {
+  let allDown = Boolean(data.allDown);
+  let mimo1Down = Boolean(data.mimo1Down);
+  let mimo2BwDown = Boolean(data.mimo2BwDown);
+  let mimo2ColorDown = Boolean(data.mimo2ColorDown);
+
+  const cv001 = hardwareData["CV-001"] || hardwareData["CV-001-BW"] || {};
+  const sv002Bw = hardwareData["SV-002-BW"] || hardwareData["SV-002"] || {};
+  const sv002Color = hardwareData["SV-002-COLOR"] || {};
+
+  // Supply exhaustion checks: level <= 0 means completely out of supply
+  const cv001PaperOut = Number.isFinite(Number(cv001.paperLevel)) && Number(cv001.paperLevel) <= 0;
+  const cv001TonerOut = Number.isFinite(Number(cv001.tonerLevel)) && Number(cv001.tonerLevel) <= 0;
+
+  const sv002BwPaperOut = Number.isFinite(Number(sv002Bw.paperLevel)) && Number(sv002Bw.paperLevel) <= 0;
+  const sv002BwTonerOut = Number.isFinite(Number(sv002Bw.tonerLevel)) && Number(sv002Bw.tonerLevel) <= 0;
+
+  const sv002ColorPaperOut = Number.isFinite(Number(sv002Color.paperLevel)) && Number(sv002Color.paperLevel) <= 0;
+  const sv002ColorInkOut =
+    (Number.isFinite(Number(sv002Color.inkLevel)) && Number(sv002Color.inkLevel) <= 0) ||
+    (Number.isFinite(Number(sv002Color.tonerLevel)) && Number(sv002Color.tonerLevel) <= 0);
+
+  // If a printer has no paper or no toner/ink, it cannot print and is marked down
+  if (cv001PaperOut || cv001TonerOut) mimo1Down = true;
+  if (sv002BwPaperOut || sv002BwTonerOut) mimo2BwDown = true;
+  if (sv002ColorPaperOut || sv002ColorInkOut) mimo2ColorDown = true;
+
+  if (mimo1Down && mimo2BwDown) {
+    allDown = true;
+  }
+
+  const hardwareAlerts = {
+    mimo1: {
+      kioskId: "CV-001",
+      name: "MIMO 1.0",
+      paperOut: cv001PaperOut,
+      tonerOut: cv001TonerOut,
+      hasIssue: cv001PaperOut || cv001TonerOut,
+      problem: cv001PaperOut ? "Paper is not in MIMO 1.0" : (cv001TonerOut ? "Toner is exhausted in MIMO 1.0" : null),
+      message: cv001PaperOut
+        ? "Paper is not in MIMO 1.0. Getting a printout is not possible on this machine. Please go and take your printout in MIMO 2.0 where paper is available."
+        : (cv001TonerOut
+          ? "Toner is exhausted in MIMO 1.0. Getting a printout is not possible on this machine. Please go and take your printout in MIMO 2.0."
+          : null),
+      suggestedMachine: "MIMO 2.0",
+      suggestedKioskId: "SV-002",
+    },
+    mimo2_bw: {
+      kioskId: "SV-002",
+      name: "MIMO 2.0 (B&W)",
+      paperOut: sv002BwPaperOut,
+      tonerOut: sv002BwTonerOut,
+      hasIssue: sv002BwPaperOut || sv002BwTonerOut,
+      problem: sv002BwPaperOut ? "Paper is not in MIMO 2.0 (B&W)" : (sv002BwTonerOut ? "Toner is exhausted in MIMO 2.0 (B&W)" : null),
+      message: sv002BwPaperOut
+        ? "Paper is not in MIMO 2.0 (B&W). Getting a printout is not possible on this machine. Please go and take your printout in MIMO 1.0 where paper is available."
+        : (sv002BwTonerOut
+          ? "Toner is exhausted in MIMO 2.0 (B&W). Getting a printout is not possible on this machine. Please go and take your printout in MIMO 1.0."
+          : null),
+      suggestedMachine: "MIMO 1.0",
+      suggestedKioskId: "CV-001",
+    },
+    mimo2_color: {
+      kioskId: "SV-002",
+      name: "MIMO 2.0 (Colour)",
+      paperOut: sv002ColorPaperOut,
+      inkOut: sv002ColorInkOut,
+      hasIssue: sv002ColorPaperOut || sv002ColorInkOut,
+      problem: sv002ColorPaperOut ? "Colour paper is out in MIMO 2.0" : (sv002ColorInkOut ? "Colour ink is exhausted in MIMO 2.0" : null),
+      message: sv002ColorPaperOut
+        ? "Colour paper is out in MIMO 2.0. Getting a colour printout is currently not possible."
+        : (sv002ColorInkOut
+          ? "Colour ink is exhausted in MIMO 2.0. Getting a colour printout is currently not possible."
+          : null),
+      suggestedMachine: null,
+      suggestedKioskId: null,
+    },
+  };
+
   const hasActiveOutage = allDown || mimo1Down || mimo2BwDown || mimo2ColorDown;
 
   const activeNotices = [];
   if (allDown) {
-    activeNotices.push("Both MIMO 1.0 and MIMO 2.0 machines are currently offline for maintenance.");
+    if (cv001PaperOut && sv002BwPaperOut) {
+      activeNotices.push("Both MIMO 1.0 and MIMO 2.0 are out of paper. Getting printouts is currently not possible.");
+    } else {
+      activeNotices.push("Both MIMO 1.0 and MIMO 2.0 machines are currently offline for maintenance.");
+    }
   } else {
-    if (mimo1Down) activeNotices.push("MIMO 1.0 is currently not working.");
-    if (mimo2ColorDown) activeNotices.push("MIMO 2.0 Colour printer is currently not working.");
-    if (mimo2BwDown) activeNotices.push("MIMO 2.0 Black & White printer is currently not working.");
+    if (hardwareAlerts.mimo1.message) {
+      activeNotices.push(hardwareAlerts.mimo1.message);
+    } else if (mimo1Down) {
+      activeNotices.push("MIMO 1.0 is currently not working. MIMO 2.0 is operational and ready for your prints.");
+    }
+
+    if (hardwareAlerts.mimo2_bw.message) {
+      activeNotices.push(hardwareAlerts.mimo2_bw.message);
+    } else if (mimo2BwDown) {
+      activeNotices.push("MIMO 2.0 Black & White printer is currently not working. B&W is available on MIMO 1.0.");
+    }
+
+    if (hardwareAlerts.mimo2_color.message) {
+      activeNotices.push(hardwareAlerts.mimo2_color.message);
+    } else if (mimo2ColorDown) {
+      activeNotices.push("MIMO 2.0 Colour printer is currently not working. Black & white is available on both MIMO 1.0 and MIMO 2.0.");
+    }
   }
 
   return {
@@ -38,6 +132,7 @@ function summarizeOutages(data) {
     mimo1Down,
     mimo2BwDown,
     mimo2ColorDown,
+    hardwareAlerts,
     customNotice: data.customNotice || "",
     updatedAt: data.updatedAt || null,
     updatedBy: data.updatedBy || null,
@@ -51,11 +146,13 @@ function summarizeOutages(data) {
  */
 async function getOutageStatus() {
   try {
-    const snap = await SETTINGS_DOC_REF.get();
-    if (!snap.exists) {
-      return summarizeOutages(DEFAULT_OUTAGES);
-    }
-    return summarizeOutages(snap.data() || {});
+    const [settingsSnap, hwSnap] = await Promise.all([
+      SETTINGS_DOC_REF.get().catch(() => null),
+      HARDWARE_DOC_REF.get().catch(() => null),
+    ]);
+    const settingsData = settingsSnap && settingsSnap.exists ? settingsSnap.data() || {} : {};
+    const hardwareData = hwSnap && hwSnap.exists ? hwSnap.data() || {} : {};
+    return summarizeOutages(settingsData, hardwareData);
   } catch (err) {
     console.error("[OUTAGE-SERVICE] getOutageStatus error:", err.message);
     return summarizeOutages(DEFAULT_OUTAGES);
@@ -225,7 +322,7 @@ async function updateOutageStatus(updates, updatedBy = "admin") {
     notifyResult = await notifySubscribersOnRestoration(restoredScopes);
   }
 
-  const updatedStatus = summarizeOutages(savePayload);
+  const updatedStatus = await getOutageStatus();
   return {
     ...updatedStatus,
     restoredScopes,
@@ -239,5 +336,6 @@ module.exports = {
   subscribeCustomerEmail,
   updateOutageStatus,
   notifySubscribersOnRestoration,
+  summarizeOutages,
   DEFAULT_OUTAGES,
 };
