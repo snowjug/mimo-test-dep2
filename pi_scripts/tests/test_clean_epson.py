@@ -148,6 +148,19 @@ class CleanEpsonScheduleTests(unittest.TestCase):
         sec = CE.seconds_until_target_time(target_hour=6, target_minute=0, now=now)
         self.assertEqual(sec, 23.5 * 3600.0)
 
+    def test_run_daily_scheduler_is_disabled(self):
+        # Automated cleaning is disabled; run_daily_scheduler must return immediately
+        with mock.patch("clean_epson.run_cleaning_job") as mock_job:
+            CE.run_daily_scheduler("Epson_L3250", "SV-002")
+            mock_job.assert_not_called()
+
+    def test_color_cleaning_scheduler_loop_is_disabled(self):
+        from test_listener_inputs import _load_listener
+        L = _load_listener()
+        with mock.patch("clean_epson.run_cleaning_job") as mock_job:
+            L.color_cleaning_scheduler_loop()
+            mock_job.assert_not_called()
+
 
 class FirebaseListenerCleanCommandTests(unittest.TestCase):
     def test_handle_clean_head_command_executes_and_marks_done(self):

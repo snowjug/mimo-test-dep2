@@ -2904,15 +2904,11 @@ def on_command_snapshot(doc_snapshots, changes, read_time):
 
 
 def color_cleaning_scheduler_loop():
-    """Background loop that schedules and executes colour ink cleaning daily at 6:00 AM IST."""
-    if KIOSK_ID != "SV-002" and not is_color_queue(COLOR_PRINTER_NAME):
-        return
-    try:
-        print("⏰ [CLEAN] Starting 6:00 AM daily colour ink cleaning scheduler...")
-        from clean_epson import run_daily_scheduler
-        run_daily_scheduler(printer_name=COLOR_PRINTER_NAME, kiosk_id=KIOSK_ID, target_hour=6, target_minute=0)
-    except Exception as e:
-        print(f"⚠️ [CLEAN] Could not start colour cleaning scheduler: {e}")
+    """Automatic colour ink cleaning is completely disabled.
+    Printhead cleaning is performed manually only when requested by the developer/admin
+    via the Admin Dashboard ('Clean Colour Ink' button)."""
+    print("ℹ️ [CLEAN] Automatic colour ink cleaning scheduler is disabled. Head cleaning is admin-triggered only.")
+    return
 
 
 def daily_maintenance_loop():
@@ -2991,8 +2987,8 @@ if __name__ == "__main__":
     threading.Thread(target=watchdog_loop, daemon=True).start()
     threading.Thread(target=keep_warm_loop, daemon=True).start()
     threading.Thread(target=prefetch_cache_cleanup_loop, daemon=True).start()
-    threading.Thread(target=color_cleaning_scheduler_loop, daemon=True).start()
     threading.Thread(target=daily_maintenance_loop, daemon=True).start()
+    # Note: Automated colour cleaning thread removed; cleaning is triggered manually from Admin Dashboard
 
     print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
     print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")

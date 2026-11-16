@@ -1,14 +1,15 @@
 """
-MIMO Colour Printer Ink Automated Cleaning
-==========================================
-Schedules and performs automated printhead cleaning for the Epson colour ink printer (Epson L3250)
-daily at 6:00 AM. After cleaning completes, dispatches an email notification to visionprintt@gmail.com.
+MIMO Colour Printer Ink Cleaning (Manual / Admin Triggered)
+==========================================================
+Performs printhead cleaning for the Epson colour ink printer (Epson L3250)
+when triggered manually via the Admin Dashboard. Automatic daily scheduling has been completely removed.
+After cleaning completes, dispatches an email notification to visionprintt@gmail.com.
 
 Safety Architecture:
 - Never interrupts or disturbs customer prints: checks CUPS queue and active jobs before cleaning.
 - If printer is busy, waits up to 5 minutes for the active job to finish. If still busy, aborts safely.
 - Dispatches notification to visionprintt@gmail.com via backend API and direct SMTP fallback.
-- Can be run as a standalone cron job (0 6 * * *), as a long-running daemon (--daemon), or invoked from firebase_listener.
+- Triggered manually from Admin Dashboard ("Clean Colour Ink" button) or CLI invocation with --now / --manual.
 """
 
 import os
@@ -172,8 +173,8 @@ def send_cleaning_notification(kiosk_id=None, printer_name=DEFAULT_PRINTER_NAME,
         f"=============================================\n\n"
         f"Kiosk: {kiosk_id} (MIMO 2.0)\n"
         f"Printer: {printer_name} (Colour Ink Tank)\n"
-        f"Task: Automated Colour Ink Head Cleaning\n"
-        f"Scheduled Time: 6:00 AM Daily\n"
+        f"Task: Manual Colour Ink Head Cleaning (Admin Triggered)\n"
+        f"Trigger: Manual (Admin Dashboard)\n"
         f"Execution Time: {now_str}\n"
         f"Status: {'SUCCESS - Cleaning is done in colour printer ink' if success else 'SKIPPED/FAILED'}\n"
         f"Details: {detail or 'Head cleaning executed without disturbing any active print jobs.'}\n\n"
@@ -226,6 +227,7 @@ def send_cleaning_notification(kiosk_id=None, printer_name=DEFAULT_PRINTER_NAME,
                 "kioskId": kiosk_id,
                 "printerName": printer_name,
                 "type": "color_ink_cleaning",
+                "trigger": "manual",
                 "status": "completed" if success else "failed",
                 "detail": detail or "Cleaning is done in colour printer ink",
                 "cleanedAt": firestore.SERVER_TIMESTAMP,
@@ -301,36 +303,29 @@ def run_cleaning_job(printer_name=DEFAULT_PRINTER_NAME, kiosk_id=None, now=None,
 
 def run_daily_scheduler(printer_name=DEFAULT_PRINTER_NAME, kiosk_id=None, target_hour=6, target_minute=0, clock=time):
     """
-    Long-running scheduler loop that triggers colour ink cleaning daily at 6:00 AM.
+    Deprecated / Disabled: Automated scheduling is disabled.
+    Head cleaning is now triggered manually only from the Admin Dashboard.
     """
-    log(f"⏰ Daily colour ink cleaning scheduler active for {target_hour:02d}:{target_minute:02d} AM.")
-    while True:
-        sec = seconds_until_target_time(target_hour=target_hour, target_minute=target_minute)
-        hours = sec / 3600.0
-        log(f"⏰ Next colour ink cleaning scheduled in {hours:.2f} hours ({int(sec)} seconds).")
-        clock.sleep(sec)
-        try:
-            run_cleaning_job(printer_name=printer_name, kiosk_id=kiosk_id, clock=clock)
-        except Exception as e:
-            log(f"❌ Error during scheduled cleaning: {e}")
-        # Sleep 60 seconds to step past the scheduled minute
-        clock.sleep(60)
+    log("ℹ️ Automatic colour ink cleaning scheduler is disabled. Head cleaning is admin-triggered only.")
+    return
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MIMO Colour Ink Automated Cleaning (6:00 AM)")
-    parser.add_argument("--daemon", action="store_true", help="Run in continuous daemon mode scheduled at 6:00 AM daily")
-    parser.add_argument("--schedule", action="store_true", help="Alias for --daemon")
-    parser.add_argument("--now", action="store_true", help="Run the cleaning procedure immediately with safety checks")
+    parser = argparse.ArgumentParser(description="MIMO Colour Ink Manual Cleaning (Admin Triggered)")
+    parser.add_argument("--daemon", action="store_true", help="(Disabled) Automatic cleaning is disabled")
+    parser.add_argument("--schedule", action="store_true", help="(Disabled) Automatic cleaning is disabled")
+    parser.add_argument("--now", action="store_true", help="Run manual colour head cleaning immediately with safety checks")
+    parser.add_argument("--manual", action="store_true", help="Alias for --now")
     parser.add_argument("--printer", default=DEFAULT_PRINTER_NAME, help="CUPS printer queue name (default: Epson_L3250)")
     parser.add_argument("--kiosk", default=KIOSK_ID, help="Kiosk identifier (default: SV-002)")
     args = parser.parse_args()
 
     if args.daemon or args.schedule:
-        run_daily_scheduler(printer_name=args.printer, kiosk_id=args.kiosk)
-    else:
-        # Default: execute one safe cleaning run and notification (standard crontab invocation at 6:00 AM)
-        run_cleaning_job(printer_name=args.printer, kiosk_id=args.kiosk)
+        log("⚠️ Automatic colour ink cleaning schedule is disabled. Trigger cleaning manually via Admin Dashboard or run with --now / --manual.")
+        return
+
+    # Execute safe manual cleaning run and notification
+    run_cleaning_job(printer_name=args.printer, kiosk_id=args.kiosk)
 
 
 if __name__ == "__main__":

@@ -704,6 +704,7 @@ function createKioskRouter(dependencies) {
           kioskId: targetKiosk,
           printerName: targetPrinter,
           type: "color_ink_cleaning",
+          trigger: "manual",
           status: cleanStatus,
           detail: detail || "Cleaning is done in colour printer ink",
           cleanedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -727,9 +728,9 @@ function createKioskRouter(dependencies) {
             `=============================================\n\n` +
             `Kiosk: ${targetKiosk} (${kioskName})\n` +
             `Printer: ${targetPrinter} (Colour Ink Tank)\n` +
+            `Task: Manual Colour Ink Head Cleaning (Admin Dashboard)\n` +
             `Status: Cleaning is done in colour printer ink\n` +
-            `Scheduled Time: 6:00 AM Daily\n` +
-            `Details: ${detail || "Automated head cleaning routine finished successfully without disturbing customer prints."}\n\n` +
+            `Details: ${detail || "Head cleaning routine finished successfully without disturbing customer prints."}\n\n` +
             `The colour printer is clean, verified, and operational for printouts.`,
         });
         console.log(`[EMAIL] Colour ink cleaning notification sent for ${targetKiosk}`);
