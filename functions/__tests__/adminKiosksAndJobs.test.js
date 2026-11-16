@@ -195,7 +195,7 @@ test("getAdminJobs merges orders and payment_transactions by exact orderId", asy
   assert.strictEqual(byId.j_free.couponCode, "FREE100");
   assert.strictEqual(byId.j_free.couponDiscountPercentage, 100);
   assert.strictEqual(byId.j_free.coinsUsed, 20);
-  assert.strictEqual(byId.j_free.paymentStatus, "PAID");
+  assert.strictEqual(byId.j_free.paymentStatus, "PAID (FREE)");
 });
 
 test("getAdminJobs provides complete payment breakdown across all coupon and coin scenarios with zero invented values", async () => {
@@ -307,4 +307,341 @@ test("getAdminJobs maintains strict cross-customer and cross-order data isolatio
   assert.strictEqual(byId.j_u3.couponCode, null);
   assert.strictEqual(byId.j_u3.actualAmountPaid, null, "actualAmountPaid is null when order is missing, never inferred from job cost");
   assert.strictEqual(byId.j_u3.cost, 5, "job cost is preserved");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SPECIFICATION COVERAGE: 18 SPECIFIC EXPANDED DETAIL SCENARIOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("Case 1: Valid 4-digit code is retrieved directly from print_jobs", async () => {
+  fake.reset({
+    print_jobs: {
+      j_code: { kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "doc.pdf", pageCount: 1, printCode: "4183" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].printCode, "4183");
+});
+
+test("Case 2: Code with leading zero (e.g. 0412) preserves string format and leading zeroes", async () => {
+  fake.reset({
+    print_jobs: {
+      j_zero: { kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "doc.pdf", pageCount: 1, printCode: "0412" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].printCode, "0412");
+});
+
+test("Case 3: Multiple jobs belonging to same order each display the order's print code", async () => {
+  fake.reset({
+    print_jobs: {
+      j_m1: { orderId: "ord_multi", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(Date.now() - 1000), fileName: "file1.pdf", pageCount: 1, printCode: "9988" },
+      j_m2: { orderId: "ord_multi", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "file2.pdf", pageCount: 2, printCode: "9988" },
+    },
+    orders: {
+      ord_multi: { orderId: "ord_multi", userId: "u1", amount: 20, status: "PAID" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  const byId = Object.fromEntries(res.body.jobs.map((j) => [j.id, j]));
+  assert.strictEqual(byId.j_m1.printCode, "9988");
+  assert.strictEqual(byId.j_m2.printCode, "9988");
+  assert.strictEqual(byId.j_m1.orderId, "ord_multi");
+  assert.strictEqual(byId.j_m2.orderId, "ord_multi");
+});
+
+test("Case 4: Order with recorded original amount resolves totalCost or pricing.jobCost", async () => {
+  fake.reset({
+    print_jobs: {
+      j_tc: { orderId: "ord_tc", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(Date.now() - 1000), fileName: "tc.pdf", pageCount: 1, totalCost: 13.20 },
+      j_jc: { orderId: "ord_jc", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "jc.pdf", pageCount: 1, pricing: { jobCost: 26.40 } },
+    },
+    orders: {
+      ord_tc: { orderId: "ord_tc", amount: 0, status: "PAID" },
+      ord_jc: { orderId: "ord_jc", amount: 20, status: "PAID" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  const byId = Object.fromEntries(res.body.jobs.map((j) => [j.id, j]));
+  assert.strictEqual(byId.j_tc.recordedOriginalAmount, 13.20);
+  assert.strictEqual(byId.j_jc.recordedOriginalAmount, 26.40);
+});
+
+test("Case 5: Valid coupon percentage with 0 coins yields verified calculated discount amount", async () => {
+  fake.reset({
+    print_jobs: {
+      j_coup: { orderId: "ord_sfk", kioskId: "SV-002", userId: "u1", status: "completed", createdAt: new Date(), fileName: "review.pdf", pageCount: 8, totalCost: 13.20, printCode: "4183" },
+    },
+    orders: {
+      ord_sfk: { orderId: "ord_sfk", couponCode: "SFK", discountPercentage: 100, amount: 0, coinsUsed: 0, status: "PAID" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  const job = res.body.jobs[0];
+  assert.strictEqual(job.printCode, "4183");
+  assert.strictEqual(job.recordedOriginalAmount, 13.20);
+  assert.strictEqual(job.couponCode, "SFK");
+  assert.strictEqual(job.couponDiscountPercentage, 100);
+  assert.strictEqual(job.couponDiscountAmount, 13.20);
+  assert.strictEqual(job.coinsUsed, 0);
+  assert.strictEqual(job.actualAmountPaid, 0);
+  assert.strictEqual(job.paymentStatus, "PAID (FREE)");
+});
+
+test("Case 6: Coupon percentage with coins used returns null for coupon discount amount when not explicitly stored", async () => {
+  fake.reset({
+    print_jobs: {
+      j_mix: { orderId: "ord_mix", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "mix.pdf", pageCount: 4, totalCost: 20.00 },
+    },
+    orders: {
+      ord_mix: { orderId: "ord_mix", couponCode: "SAVE10", discountPercentage: 10, amount: 8, coinsUsed: 20, status: "PAID" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  const job = res.body.jobs[0];
+  assert.strictEqual(job.recordedOriginalAmount, 20.00);
+  assert.strictEqual(job.couponCode, "SAVE10");
+  assert.strictEqual(job.couponDiscountPercentage, 10);
+  assert.strictEqual(job.couponDiscountAmount, null, "Discount currency amount is null when coins were also used and discount was not explicitly recorded");
+  assert.strictEqual(job.coinsUsed, 20);
+});
+
+test("Case 7: Order with zero coins used strictly preserves coinsUsed as 0, not null", async () => {
+  fake.reset({
+    print_jobs: {
+      j_zero_coins: { orderId: "ord_zc", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "zc.pdf", pageCount: 1, totalCost: 10 },
+    },
+    orders: {
+      ord_zc: { orderId: "ord_zc", amount: 10, coinsUsed: 0, status: "PAID" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].coinsUsed, 0, "coinsUsed: 0 is strictly preserved as numeric 0 to indicate customer chose not to use coins");
+});
+
+test("Case 8: Order with positive recorded coin count preserves coinsUsed as integer", async () => {
+  fake.reset({
+    print_jobs: {
+      j_coins5: { orderId: "ord_c5", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "c5.pdf", pageCount: 1, totalCost: 10 },
+    },
+    orders: {
+      ord_c5: { orderId: "ord_c5", amount: 7.5, coinsUsed: 5, status: "PAID" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].coinsUsed, 5);
+});
+
+test("Case 9: Coin monetary value missing returns null, never inferred", async () => {
+  fake.reset({
+    print_jobs: {
+      j_nocoinval: { orderId: "ord_ncv", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "ncv.pdf", pageCount: 1, totalCost: 10 },
+    },
+    orders: {
+      ord_ncv: { orderId: "ord_ncv", amount: 7.5, coinsUsed: 5, status: "PAID" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].coinsValue, null, "coinsValue is null when not explicitly saved in Firestore; never guessed at ₹0.50/coin");
+});
+
+test("Case 10: Paid order with matching payment transaction displays actualAmountPaid and PAID status", async () => {
+  fake.reset({
+    print_jobs: {
+      j_paid_tx: { orderId: "ord_tx_paid", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "paid.pdf", pageCount: 2, totalCost: 22.40 },
+    },
+    orders: {
+      ord_tx_paid: { orderId: "ord_tx_paid", amount: 22.40, status: "PAID" },
+    },
+    payment_transactions: {
+      tx_1: { orderId: "ord_tx_paid", amount: 22.40, status: "PAID" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].actualAmountPaid, 22.40);
+  assert.strictEqual(res.body.jobs[0].paymentStatus, "PAID");
+});
+
+test("Case 11: Free order with actual amount zero displays actualAmountPaid 0 and paymentStatus PAID (FREE)", async () => {
+  fake.reset({
+    print_jobs: {
+      j_free: { orderId: "ord_free_zero", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "free.pdf", pageCount: 1, totalCost: 10 },
+    },
+    orders: {
+      ord_free_zero: { orderId: "ord_free_zero", amount: 0, status: "PAID", couponCode: "FREE100" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].actualAmountPaid, 0);
+  assert.strictEqual(res.body.jobs[0].paymentStatus, "PAID (FREE)");
+});
+
+test("Case 12: Successful refund displays paymentStatus REFUNDED with refund precedence over order status PAID", async () => {
+  fake.reset({
+    print_jobs: {
+      j_ref: { orderId: "ord_ref", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "ref.pdf", pageCount: 1, totalCost: 15 },
+    },
+    orders: {
+      ord_ref: { orderId: "ord_ref", amount: 15, status: "PAID", refundStatus: "SUCCESS" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].paymentStatus, "REFUNDED");
+});
+
+test("Case 13: Pending refund displays paymentStatus REFUND_PENDING", async () => {
+  fake.reset({
+    print_jobs: {
+      j_pend_ref: { orderId: "ord_pref", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "pref.pdf", pageCount: 1, totalCost: 15 },
+    },
+    orders: {
+      ord_pref: { orderId: "ord_pref", amount: 15, status: "PAID", refundStatus: "PENDING" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].paymentStatus, "REFUND_PENDING");
+});
+
+test("Case 14: Partial order doc with matching payment transaction merges payment amount", async () => {
+  fake.reset({
+    print_jobs: {
+      j_partial: { orderId: "ord_partial", kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "part.pdf", pageCount: 2, totalCost: 18 },
+    },
+    orders: {
+      ord_partial: { orderId: "ord_partial", amount: null, status: "PAID" },
+    },
+    payment_transactions: {
+      tx_part: { orderId: "ord_partial", amount: 18, status: "PAID" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].actualAmountPaid, 18);
+  assert.strictEqual(res.body.jobs[0].paymentStatus, "PAID");
+});
+
+test("Case 15: Missing payment data displays actualAmountPaid null and paymentStatus null", async () => {
+  fake.reset({
+    print_jobs: {
+      j_orphan: { kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "orphan.pdf", pageCount: 1, totalCost: 10 },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].actualAmountPaid, null);
+  assert.strictEqual(res.body.jobs[0].paymentStatus, null);
+});
+
+test("Case 16: Strict cross-customer and cross-order isolation", async () => {
+  fake.reset({
+    print_jobs: {
+      j_cust_a: { orderId: "ord_a", kioskId: "CV-001", userId: "user_a", status: "completed", createdAt: new Date(Date.now() - 1000), fileName: "a.pdf", pageCount: 1, printCode: "1111", totalCost: 10 },
+      j_cust_b: { orderId: "ord_b", kioskId: "SV-002", userId: "user_b", status: "completed", createdAt: new Date(), fileName: "b.pdf", pageCount: 2, printCode: "2222", totalCost: 20 },
+    },
+    orders: {
+      ord_a: { orderId: "ord_a", userId: "user_a", couponCode: "DISCA", discountPercentage: 50, amount: 5, status: "PAID" },
+      ord_b: { orderId: "ord_b", userId: "user_b", amount: 20, status: "PAID" },
+    },
+    users: {
+      user_a: { name: "Alice", email: "alice@mimo.tech" },
+      user_b: { name: "Bob", email: "bob@mimo.tech" },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  const byId = Object.fromEntries(res.body.jobs.map((j) => [j.id, j]));
+  // Customer A
+  assert.strictEqual(byId.j_cust_a.userName, "Alice");
+  assert.strictEqual(byId.j_cust_a.printCode, "1111");
+  assert.strictEqual(byId.j_cust_a.couponCode, "DISCA");
+  assert.strictEqual(byId.j_cust_a.actualAmountPaid, 5);
+  // Customer B (must NOT see Customer A's data)
+  assert.strictEqual(byId.j_cust_b.userName, "Bob");
+  assert.strictEqual(byId.j_cust_b.printCode, "2222");
+  assert.strictEqual(byId.j_cust_b.couponCode, null);
+  assert.strictEqual(byId.j_cust_b.actualAmountPaid, 20);
+});
+
+test("Case 17: Missing print code returns null (displays Unavailable)", async () => {
+  fake.reset({
+    print_jobs: {
+      j_nocode: { kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "nocode.pdf", pageCount: 1 },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].printCode, null);
+});
+
+test("Case 18: Missing original pricing data returns null (displays Unavailable)", async () => {
+  fake.reset({
+    print_jobs: {
+      j_noprice: { kioskId: "CV-001", userId: "u1", status: "completed", createdAt: new Date(), fileName: "noprice.pdf", pageCount: 1 },
+    },
+  });
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.jobs[0].recordedOriginalAmount, null);
+});
+
+test("Regression: legacy originalCost is insulated from totalCost and pricing.jobCost while recordedOriginalAmount resolves them", async () => {
+  fake.reset({
+    print_jobs: {
+      j_with_tc: {
+        orderId: "ord_tc_only",
+        kioskId: "CV-001",
+        userId: "u1",
+        status: "completed",
+        createdAt: new Date(Date.now() - 1000),
+        fileName: "tc.pdf",
+        pageCount: 1,
+        finalCost: 10,
+        totalCost: 15,
+        pricing: { jobCost: 20 },
+      },
+      j_with_jc_only: {
+        orderId: "ord_jc_only",
+        kioskId: "SV-002",
+        userId: "u2",
+        status: "completed",
+        createdAt: new Date(),
+        fileName: "jc.pdf",
+        pageCount: 1,
+        finalCost: 8,
+        pricing: { jobCost: 25 },
+      },
+    },
+    orders: {
+      ord_tc_only: { orderId: "ord_tc_only", amount: 10, status: "PAID" },
+      ord_jc_only: { orderId: "ord_jc_only", amount: 8, status: "PAID" },
+    },
+  });
+
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  const byId = Object.fromEntries(res.body.jobs.map((j) => [j.id, j]));
+
+  // Case A: Legacy originalCost still resolves using n.cost, unaffected by totalCost or pricing.jobCost
+  assert.strictEqual(byId.j_with_tc.cost, 10, "job cost matches normalized finalCost");
+  assert.strictEqual(byId.j_with_tc.originalCost, 10, "legacy originalCost strictly uses n.cost when originalCost/grossAmount/order.gross absent");
+  assert.strictEqual(byId.j_with_jc_only.cost, 8, "job cost matches normalized finalCost");
+  assert.strictEqual(byId.j_with_jc_only.originalCost, 8, "legacy originalCost strictly uses n.cost, not pricing.jobCost");
+
+  // Case B: Payment Breakdown recordedOriginalAmount resolves totalCost and pricing.jobCost
+  assert.strictEqual(byId.j_with_tc.recordedOriginalAmount, 15, "recordedOriginalAmount resolves d.totalCost when higher-priority fields absent");
+  assert.strictEqual(byId.j_with_jc_only.recordedOriginalAmount, 25, "recordedOriginalAmount resolves d.pricing.jobCost when d.totalCost absent");
 });

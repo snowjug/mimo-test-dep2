@@ -72,6 +72,7 @@ async function lookupOrders(orderIds) {
           map.set(d.orderId, {
             couponCode: d.couponCode || null,
             discountPercentage: d.discountPercentage !== undefined && d.discountPercentage !== null ? Number(d.discountPercentage) : null,
+            discount: d.discount !== undefined && d.discount !== null ? Number(d.discount) : (d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null),
             discountAmount: d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null,
             amount: d.amount !== undefined && d.amount !== null ? Number(d.amount) : null,
             gross: d.gross !== undefined && d.gross !== null ? Number(d.gross) : null,
@@ -91,6 +92,7 @@ async function lookupOrders(orderIds) {
             map.set(d.orderId, {
               couponCode: d.couponCode || null,
               discountPercentage: d.discountPercentage !== undefined && d.discountPercentage !== null ? Number(d.discountPercentage) : null,
+              discount: d.discount !== undefined && d.discount !== null ? Number(d.discount) : (d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null),
               discountAmount: d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null,
               amount: d.amount !== undefined && d.amount !== null ? Number(d.amount) : null,
               gross: d.gross !== undefined && d.gross !== null ? Number(d.gross) : null,
@@ -121,6 +123,9 @@ async function lookupOrders(orderIds) {
             }
             if (d.discountPercentage !== undefined && d.discountPercentage !== null && existing.discountPercentage === null) {
               existing.discountPercentage = Number(d.discountPercentage);
+            }
+            if (d.discount !== undefined && d.discount !== null && existing.discount === null) {
+              existing.discount = Number(d.discount);
             }
             if (d.discountAmount !== undefined && d.discountAmount !== null && existing.discountAmount === null) {
               existing.discountAmount = Number(d.discountAmount);
@@ -287,12 +292,21 @@ const getAdminJobs = async (req, res) => {
         : null;
       const printCode = rawPrintCode;
 
-      const rawOriginalAmount = d.originalCost !== undefined && d.originalCost !== null
-        ? d.originalCost
-        : (d.grossAmount !== undefined && d.grossAmount !== null
-          ? d.grossAmount
-          : (order?.gross !== undefined && order?.gross !== null ? order.gross : null));
-      const recordedOriginalAmount = rawOriginalAmount !== null ? Number(rawOriginalAmount) : null;
+      let rawOriginalAmount = null;
+      if (d.originalCost !== undefined && d.originalCost !== null) {
+        rawOriginalAmount = d.originalCost;
+      } else if (d.grossAmount !== undefined && d.grossAmount !== null) {
+        rawOriginalAmount = d.grossAmount;
+      } else if (order?.gross !== undefined && order?.gross !== null) {
+        rawOriginalAmount = order.gross;
+      } else if (d.totalCost !== undefined && d.totalCost !== null) {
+        rawOriginalAmount = d.totalCost;
+      } else if (d.pricing?.jobCost !== undefined && d.pricing?.jobCost !== null) {
+        rawOriginalAmount = d.pricing.jobCost;
+      }
+      const recordedOriginalAmount = (rawOriginalAmount !== null && Number.isFinite(Number(rawOriginalAmount)))
+        ? Number(rawOriginalAmount)
+        : null;
 
       const rawDiscountPercentage = (d.discountPercentage !== undefined && d.discountPercentage !== null && Number(d.discountPercentage) > 0)
         ? Number(d.discountPercentage)
@@ -301,22 +315,48 @@ const getAdminJobs = async (req, res) => {
           : null;
       const couponDiscountPercentage = rawDiscountPercentage;
 
-      const rawDiscountAmount = d.discount !== undefined && d.discount !== null
-        ? d.discount
-        : (d.discountAmount !== undefined && d.discountAmount !== null
-          ? d.discountAmount
-          : (order?.discountAmount !== undefined && order?.discountAmount !== null ? order.discountAmount : null));
-      const couponDiscountAmount = rawDiscountAmount !== null ? Number(rawDiscountAmount) : null;
+      let rawDiscountAmount = null;
+      if (d.discount !== undefined && d.discount !== null) {
+        rawDiscountAmount = d.discount;
+      } else if (d.discountAmount !== undefined && d.discountAmount !== null) {
+        rawDiscountAmount = d.discountAmount;
+      } else if (order?.discount !== undefined && order?.discount !== null) {
+        rawDiscountAmount = order.discount;
+      } else if (order?.discountAmount !== undefined && order?.discountAmount !== null) {
+        rawDiscountAmount = order.discountAmount;
+      }
 
-      const rawCoinsUsed = d.coinsToDeduct || d.coinsUsed || order?.coinsUsed || null;
-      const coinsUsed = rawCoinsUsed !== null ? Number(rawCoinsUsed) : null;
+      let rawCoinsUsed = null;
+      if (d.coinsToDeduct !== undefined && d.coinsToDeduct !== null) {
+        rawCoinsUsed = d.coinsToDeduct;
+      } else if (d.coinsUsed !== undefined && d.coinsUsed !== null) {
+        rawCoinsUsed = d.coinsUsed;
+      } else if (order?.coinsUsed !== undefined && order?.coinsUsed !== null) {
+        rawCoinsUsed = order.coinsUsed;
+      }
+      const coinsUsed = (rawCoinsUsed !== null && Number.isFinite(Number(rawCoinsUsed)))
+        ? Number(rawCoinsUsed)
+        : null;
+
+      // When no currency discount was explicitly persisted, but a verified coupon percentage is recorded on a known original amount,
+      // and NO coins were used, the coupon discount was applied to 100% of recordedOriginalAmount.
+      if (rawDiscountAmount === null && couponCode && couponDiscountPercentage && recordedOriginalAmount !== null) {
+        if (coinsUsed === 0) {
+          rawDiscountAmount = A.round2(recordedOriginalAmount * (couponDiscountPercentage / 100));
+        }
+      }
+      const couponDiscountAmount = (couponCode && rawDiscountAmount !== null && Number.isFinite(Number(rawDiscountAmount)))
+        ? Number(rawDiscountAmount)
+        : null;
 
       const rawCoinsValue = d.coinsValue !== undefined && d.coinsValue !== null
         ? d.coinsValue
         : (order?.coinsValue !== undefined && order?.coinsValue !== null ? order.coinsValue : null);
-      const coinsValue = rawCoinsValue !== null ? Number(rawCoinsValue) : null;
+      const coinsValue = (rawCoinsValue !== null && Number.isFinite(Number(rawCoinsValue)))
+        ? Number(rawCoinsValue)
+        : null;
 
-      const actualAmountPaid = (order && order.amount !== undefined && order.amount !== null)
+      const actualAmountPaid = (order && order.amount !== undefined && order.amount !== null && Number.isFinite(Number(order.amount)))
         ? Number(order.amount)
         : null;
 
@@ -333,10 +373,16 @@ const getAdminJobs = async (req, res) => {
         order?.refundStatus === "PENDING" ||
         d.refundStatus === "PENDING";
 
+      const isFreeOrder =
+        (order?.amount === 0 || actualAmountPaid === 0) &&
+        (order?.status === "PAID" || order?.orderStatus === "completed" || String(d.status || "").toLowerCase() === "completed" || String(d.status || "").toLowerCase() === "paid");
+
       if (isConfirmedRefund) {
         paymentStatus = "REFUNDED";
       } else if (isPendingRefund) {
         paymentStatus = "REFUND_PENDING";
+      } else if (isFreeOrder) {
+        paymentStatus = "PAID (FREE)";
       } else if (order?.status) {
         paymentStatus = String(order.status).toUpperCase();
       } else if (order?.orderStatus) {
