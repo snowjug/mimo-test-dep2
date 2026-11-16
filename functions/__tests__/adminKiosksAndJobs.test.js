@@ -597,3 +597,51 @@ test("Case 18: Missing original pricing data returns null (displays Unavailable)
   assert.strictEqual(res.code, 200);
   assert.strictEqual(res.body.jobs[0].recordedOriginalAmount, null);
 });
+
+test("Regression: legacy originalCost is insulated from totalCost and pricing.jobCost while recordedOriginalAmount resolves them", async () => {
+  fake.reset({
+    print_jobs: {
+      j_with_tc: {
+        orderId: "ord_tc_only",
+        kioskId: "CV-001",
+        userId: "u1",
+        status: "completed",
+        createdAt: new Date(Date.now() - 1000),
+        fileName: "tc.pdf",
+        pageCount: 1,
+        finalCost: 10,
+        totalCost: 15,
+        pricing: { jobCost: 20 },
+      },
+      j_with_jc_only: {
+        orderId: "ord_jc_only",
+        kioskId: "SV-002",
+        userId: "u2",
+        status: "completed",
+        createdAt: new Date(),
+        fileName: "jc.pdf",
+        pageCount: 1,
+        finalCost: 8,
+        pricing: { jobCost: 25 },
+      },
+    },
+    orders: {
+      ord_tc_only: { orderId: "ord_tc_only", amount: 10, status: "PAID" },
+      ord_jc_only: { orderId: "ord_jc_only", amount: 8, status: "PAID" },
+    },
+  });
+
+  const res = await jobs();
+  assert.strictEqual(res.code, 200);
+  const byId = Object.fromEntries(res.body.jobs.map((j) => [j.id, j]));
+
+  // Case A: Legacy originalCost still resolves using n.cost, unaffected by totalCost or pricing.jobCost
+  assert.strictEqual(byId.j_with_tc.cost, 10, "job cost matches normalized finalCost");
+  assert.strictEqual(byId.j_with_tc.originalCost, 10, "legacy originalCost strictly uses n.cost when originalCost/grossAmount/order.gross absent");
+  assert.strictEqual(byId.j_with_jc_only.cost, 8, "job cost matches normalized finalCost");
+  assert.strictEqual(byId.j_with_jc_only.originalCost, 8, "legacy originalCost strictly uses n.cost, not pricing.jobCost");
+
+  // Case B: Payment Breakdown recordedOriginalAmount resolves totalCost and pricing.jobCost
+  assert.strictEqual(byId.j_with_tc.recordedOriginalAmount, 15, "recordedOriginalAmount resolves d.totalCost when higher-priority fields absent");
+  assert.strictEqual(byId.j_with_jc_only.recordedOriginalAmount, 25, "recordedOriginalAmount resolves d.pricing.jobCost when d.totalCost absent");
+});

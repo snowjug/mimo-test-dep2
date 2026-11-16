@@ -278,7 +278,7 @@ const getAdminJobs = async (req, res) => {
       const order = n.orderId ? orders.get(n.orderId) : null;
       const couponCode = d.couponCode || order?.couponCode || null;
       const discountPct = d.discountPercentage || order?.discountPercentage || 0;
-      let originalCost = d.originalCost || d.grossAmount || order?.gross || d.totalCost || d.pricing?.jobCost || n.cost;
+      let originalCost = d.originalCost || d.grossAmount || order?.gross || n.cost;
       if (couponCode && discountPct > 0 && originalCost <= n.cost) {
         originalCost = A.round2(n.cost / (1 - discountPct / 100));
       } else if (couponCode && n.cost === 0 && originalCost === 0) {
