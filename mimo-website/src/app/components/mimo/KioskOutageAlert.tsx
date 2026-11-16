@@ -126,28 +126,58 @@ export const KioskOutageAlert: React.FC<Props> = ({ className = "", onColorOutag
   }> = [];
 
   if (outages.mimo1Down && !dismissedScopes.mimo1) {
+    const hw = outages.hardwareAlerts?.mimo1;
+    const title = hw?.paperOut
+      ? "MIMO 1.0 is Out of Paper"
+      : hw?.tonerOut
+        ? "MIMO 1.0 is Out of Toner"
+        : "MIMO 1.0 is currently not working";
+    const description =
+      hw?.message ||
+      "MIMO 1.0 is currently undergoing maintenance. MIMO 2.0 is operational and ready for your prints.";
+
     activeAlerts.push({
       scope: "mimo1",
-      title: "MIMO 1.0 is currently not working",
-      description: "MIMO 1.0 is currently undergoing maintenance. MIMO 2.0 is operational and ready for your prints.",
+      title,
+      description,
       tone: "amber",
     });
   }
 
   if (outages.mimo2ColorDown && !dismissedScopes.mimo2_color) {
+    const hw = outages.hardwareAlerts?.mimo2_color;
+    const title = hw?.paperOut
+      ? "MIMO 2.0 Colour is Out of Paper"
+      : hw?.inkOut
+        ? "MIMO 2.0 Colour Ink is Exhausted"
+        : "MIMO 2.0 Colour printer is currently not working";
+    const description =
+      hw?.message ||
+      "The colour printer on MIMO 2.0 is currently under maintenance. Black & white printing is available on both MIMO 1.0 and MIMO 2.0.";
+
     activeAlerts.push({
       scope: "mimo2_color",
-      title: "MIMO 2.0 Colour printer is currently not working",
-      description: "The colour printer on MIMO 2.0 is currently under maintenance. Black & white printing is available on both MIMO 1.0 and MIMO 2.0.",
+      title,
+      description,
       tone: "purple",
     });
   }
 
   if (outages.mimo2BwDown && !dismissedScopes.mimo2_bw) {
+    const hw = outages.hardwareAlerts?.mimo2_bw;
+    const title = hw?.paperOut
+      ? "MIMO 2.0 Black & White is Out of Paper"
+      : hw?.tonerOut
+        ? "MIMO 2.0 Black & White is Out of Toner"
+        : "MIMO 2.0 Black & White is currently not working";
+    const description =
+      hw?.message ||
+      "Black & white printing on MIMO 2.0 is currently unavailable. Colour printing on MIMO 2.0 and B&W on MIMO 1.0 are operational.";
+
     activeAlerts.push({
       scope: "mimo2_bw",
-      title: "MIMO 2.0 Black & White is currently not working",
-      description: "Black & white printing on MIMO 2.0 is currently unavailable. Colour printing on MIMO 2.0 and B&W on MIMO 1.0 are operational.",
+      title,
+      description,
       tone: "amber",
     });
   }

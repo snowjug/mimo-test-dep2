@@ -85,6 +85,54 @@ function App() {
 
   const [jobData, setJobData] = useState<ActivePrintJob | null>(resumedPrint?.job ?? null);
 
+  const [hardwareAlert, setHardwareAlert] = useState<{
+    hasIssue: boolean;
+    problem: string | null;
+    message: string | null;
+    suggestedMachine: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchOutages = async () => {
+      try {
+        const res = await fetch("https://api-upqxuj7evq-uc.a.run.app/api/kiosk-outages");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const alerts = data.hardwareAlerts;
+        if (!alerts) return;
+
+        if (dynamicKioskId === "CV-001") {
+          if (alerts.mimo1?.hasIssue) {
+            setHardwareAlert(alerts.mimo1);
+          } else {
+            setHardwareAlert(null);
+          }
+        } else if (dynamicKioskId === "SV-002") {
+          if (alerts.mimo2_bw?.hasIssue) {
+            setHardwareAlert(alerts.mimo2_bw);
+          } else if (alerts.mimo2_color?.hasIssue) {
+            setHardwareAlert(alerts.mimo2_color);
+          } else {
+            setHardwareAlert(null);
+          }
+        } else {
+          setHardwareAlert(null);
+        }
+      } catch {
+        // non-blocking
+      }
+    };
+
+    fetchOutages();
+    const interval = setInterval(fetchOutages, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [dynamicKioskId]);
+
   const toastTimerRef = useRef<number | null>(null);
   const validationTimerRef = useRef<number | null>(null);
 
@@ -331,6 +379,27 @@ function App() {
         onTap={() => setShowScreensaver(false)} 
         onTimeoutChange={(sec) => setIdleTimeout(sec)} 
       />
+
+      {/* ================= HARDWARE ALERT BANNER ================= */}
+      {hardwareAlert?.hasIssue && (currentScreen === 'main-interface' || currentScreen === 'code-entry-screen') && (
+        <div
+          className={`fixed left-1/2 top-4 z-[999] flex w-[92%] max-w-[850px] -translate-x-1/2 items-center gap-3.5 rounded-2xl border px-6 py-3.5 shadow-2xl backdrop-blur-xl ${
+            dynamicKioskId === 'CV-001'
+              ? 'border-[#D4AF37]/80 bg-[#7D1120]/95 text-[#FFF9EA]'
+              : 'border-amber-400/80 bg-amber-700/95 text-white'
+          }`}
+        >
+          <WarningCircle size={28} weight="fill" className="shrink-0 text-amber-300" />
+          <div className="flex-1 text-left">
+            <span className="block text-[15px] font-bold uppercase tracking-wider text-amber-200">
+              Notice: {hardwareAlert.problem}
+            </span>
+            <span className="text-[14px] font-medium leading-snug">
+              {hardwareAlert.message}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ================= SCREENS ================= */}
       {isFestiveForKiosk && <CV001Background />}

@@ -297,10 +297,14 @@ function createKioskRouter(dependencies) {
       const [registryMachines, registryTemplates] = await Promise.all([loadMachinesMap(db), loadMachineTemplatesMap(db)]);
       const destination = describeDestination(registryMachines, registryTemplates, kioskId);
 
+      let hardwarePrinters = {};
       try {
-        const statusDoc = await db.collection("system_status").doc(kioskId).get();
-        if (statusDoc.exists) {
-          // Status check hook if needed
+        const [statusDoc, hwDoc] = await Promise.all([
+          db.collection("system_status").doc(kioskId).get().catch(() => null),
+          db.collection("hardware").doc("printers").get().catch(() => null),
+        ]);
+        if (hwDoc && hwDoc.exists) {
+          hardwarePrinters = hwDoc.data() || {};
         }
       } catch (statusErr) {
         console.error("⚠️ Pre-flight health check error:", statusErr);
@@ -418,6 +422,33 @@ function createKioskRouter(dependencies) {
               status: 400,
               message: "This is a Color print job. This machine can only print black & white. Please use a colour-capable machine."
             };
+            throw new Error("TX_ABORT");
+          }
+
+          // Hardware supply guard: verify destination printer has not run out of paper, toner, or colour ink
+          const targetPrinterKey = isColor
+            ? (hardwarePrinters[`${kioskId}-COLOR`] ? `${kioskId}-COLOR` : kioskId)
+            : (hardwarePrinters[`${kioskId}-BW`] ? `${kioskId}-BW` : kioskId);
+          const printerHardware = hardwarePrinters[targetPrinterKey] || hardwarePrinters[kioskId] || {};
+          const paperLevel = printerHardware.paperLevel;
+          const tonerLevel = printerHardware.tonerLevel;
+          const inkLevel = printerHardware.inkLevel;
+
+          const isPaperOut = Number.isFinite(Number(paperLevel)) && Number(paperLevel) <= 0;
+          const isSupplyOut = isColor
+            ? ((Number.isFinite(Number(inkLevel)) && Number(inkLevel) <= 0) || (Number.isFinite(Number(tonerLevel)) && Number(tonerLevel) <= 0))
+            : (Number.isFinite(Number(tonerLevel)) && Number(tonerLevel) <= 0);
+
+          if (isPaperOut || isSupplyOut) {
+            const machineLabel = kioskId === "CV-001" ? "MIMO 1.0" : (kioskId === "SV-002" ? "MIMO 2.0" : kioskId);
+            const altMachine = kioskId === "CV-001" ? "MIMO 2.0" : "MIMO 1.0";
+            const problem = isPaperOut ? "Paper is not in" : (isColor ? "Colour ink is exhausted in" : "Toner is exhausted in");
+
+            let message = `${problem} ${machineLabel}. Getting a printout is not possible on this machine.`;
+            if (!isColor) {
+              message += ` Please go and take your printout in ${altMachine} where paper is available.`;
+            }
+            transactionFailedError = { status: 400, message };
             throw new Error("TX_ABORT");
           }
 

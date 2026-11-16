@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check, MessageCircle, ShieldCheck, Printer } from "lucide-react";
+import { Copy, Check, MessageCircle, ShieldCheck, Printer, AlertCircle } from "lucide-react";
 import { MimoHeader } from "../components/mimo-header";
 import { Group, PrimaryButton, Row, SecondaryButton, StatusPill } from "../components/mimo/ui";
 import { toast } from "sonner";
 import { AdBanner } from "../components/AdBanner";
 import { clearPendingOrderBinding } from "../utils/checkout-order-state";
+import { useKioskOutage } from "../utils/useKioskOutage";
 
 export function PrintCode() {
   const navigate = useNavigate();
+  const { outages } = useKioskOutage();
   const [printCode, setPrintCode] = useState(() => {
     // Primary: sessionStorage (set within the same browser tab session)
     let code = sessionStorage.getItem("printCode") || "";
@@ -302,47 +304,158 @@ export function PrintCode() {
         <p className="mx-auto mt-4 max-w-[30ch] text-[15px] text-ink-2">{subtitle}</p>
 
         {isBlackAndWhite ? (
-          <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-brand/15 bg-brand-soft/70 p-4 text-left shadow-sm">
-            <div className="flex items-start gap-3.5">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-white">
-                <Printer className="size-5" strokeWidth={2} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-[14px] font-semibold text-ink">
-                    Black &amp; white printout
-                  </p>
-                  <span className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand-text">
-                    B&amp;W
-                  </span>
+          (() => {
+            const m1Hw = outages.hardwareAlerts?.mimo1;
+            const m2Hw = outages.hardwareAlerts?.mimo2_bw;
+            const bothDown = outages.allDown || (Boolean(m1Hw?.hasIssue) && Boolean(m2Hw?.hasIssue));
+            const m1HasIssue = Boolean(m1Hw?.hasIssue) || outages.mimo1Down;
+            const m2HasIssue = Boolean(m2Hw?.hasIssue) || outages.mimo2BwDown;
+
+            if (bothDown) {
+              return (
+                <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-amber-300 bg-amber-50 p-4 text-left shadow-sm">
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
+                      <AlertCircle className="size-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-semibold text-amber-950">
+                        Paper / Toner currently unavailable
+                      </p>
+                      <p className="mt-1 text-[13px] leading-relaxed text-amber-800">
+                        Both MIMO 1.0 and MIMO 2.0 are currently low or out of paper/toner. Getting a printout is momentarily paused while the team refills supplies.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
-                  This is a black &amp; white print, so this code works at both <strong>MIMO 1.0</strong> and <strong>MIMO 2.0</strong>. Use whichever machine is closer to you.
-                </p>
+              );
+            }
+
+            if (m1HasIssue) {
+              return (
+                <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-amber-300 bg-amber-50 p-4 text-left shadow-sm">
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
+                      <AlertCircle className="size-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[14px] font-semibold text-amber-950">
+                          {m1Hw?.paperOut ? "Paper is not in MIMO 1.0" : m1Hw?.tonerOut ? "Toner is exhausted in MIMO 1.0" : "MIMO 1.0 Unavailable"}
+                        </p>
+                        <span className="inline-flex items-center rounded-full bg-amber-200/80 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                          Use MIMO 2.0
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[13px] leading-relaxed text-amber-800">
+                        {m1Hw?.message || "Paper is not in MIMO 1.0. Getting a printout is not possible on this machine. Please go and take your printout in MIMO 2.0 where paper is available."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            if (m2HasIssue) {
+              return (
+                <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-amber-300 bg-amber-50 p-4 text-left shadow-sm">
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
+                      <AlertCircle className="size-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[14px] font-semibold text-amber-950">
+                          {m2Hw?.paperOut ? "Paper is not in MIMO 2.0" : m2Hw?.tonerOut ? "Toner is exhausted in MIMO 2.0" : "MIMO 2.0 B&W Unavailable"}
+                        </p>
+                        <span className="inline-flex items-center rounded-full bg-amber-200/80 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                          Use MIMO 1.0
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[13px] leading-relaxed text-amber-800">
+                        {m2Hw?.message || "Paper is not in MIMO 2.0 (B&W). Getting a printout is not possible on this machine. Please go and take your printout in MIMO 1.0 where paper is available."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-brand/15 bg-brand-soft/70 p-4 text-left shadow-sm">
+                <div className="flex items-start gap-3.5">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+                    <Printer className="size-5" strokeWidth={2} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[14px] font-semibold text-ink">
+                        Black &amp; white printout
+                      </p>
+                      <span className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand-text">
+                        B&amp;W
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                      This is a black &amp; white print, so this code works at both <strong>MIMO 1.0</strong> and <strong>MIMO 2.0</strong>. Use whichever machine is closer to you.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()
         ) : isColor ? (
-          <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-hairline bg-surface p-4 text-left shadow-sm">
-            <div className="flex items-start gap-3.5">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink">
-                <Printer className="size-5" strokeWidth={2} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-[14px] font-semibold text-ink">
-                    Collect at MIMO 2.0
-                  </p>
-                  <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
-                    Colour
-                  </span>
+          (() => {
+            const m2ColorHw = outages.hardwareAlerts?.mimo2_color;
+            const colorHasIssue = Boolean(m2ColorHw?.hasIssue) || outages.mimo2ColorDown;
+
+            if (colorHasIssue) {
+              return (
+                <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-amber-300 bg-amber-50 p-4 text-left shadow-sm">
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
+                      <AlertCircle className="size-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-semibold text-amber-950">
+                        {m2ColorHw?.paperOut
+                          ? "Colour paper is out in MIMO 2.0"
+                          : m2ColorHw?.inkOut
+                          ? "Colour ink is exhausted in MIMO 2.0"
+                          : "MIMO 2.0 Colour Unavailable"}
+                      </p>
+                      <p className="mt-1 text-[13px] leading-relaxed text-amber-800">
+                        {m2ColorHw?.message || "Colour printing is currently not possible on MIMO 2.0. Black & white is available on both MIMO 1.0 and MIMO 2.0."}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
-                  Colour printing is available only on <strong>MIMO 2.0</strong>. Please enter your code at the MIMO 2.0 kiosk.
-                </p>
+              );
+            }
+
+            return (
+              <div className="mx-auto mt-5 max-w-sm rounded-[20px] border border-hairline bg-surface p-4 text-left shadow-sm">
+                <div className="flex items-start gap-3.5">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink">
+                    <Printer className="size-5" strokeWidth={2} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[14px] font-semibold text-ink">
+                        Collect at MIMO 2.0
+                      </p>
+                      <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
+                        Colour
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                      Colour printing is available only on <strong>MIMO 2.0</strong>. Please enter your code at the MIMO 2.0 kiosk.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()
         ) : null}
       </section>
 
