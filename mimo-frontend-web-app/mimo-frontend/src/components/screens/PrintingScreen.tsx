@@ -2,16 +2,6 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Printer } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
 import { DiyaRow, FestiveBackdrop, Mandala, ZariBorder } from '../festive/NavaratriDecor';
-import { DiwaliStage } from '../festive/DiwaliStage';
-
-// Layout measured from design-references/02-printing-progress (1672px wide, 16:9).
-const K = 1440 / 1672;
-const RING = { cx: 1315 * K, cy: 484 * K, r: 147 * K, stroke: 13 * K };
-const DIYA_X = [337.5, 406, 475.5, 546, 616, 686.5];
-const DIYA_Y = 590;
-const DIYA_SIZE = 76;
-// One diya is lit from the start and the row fills as the print advances (27% lights three).
-const litDiyas = (progress: number) => Math.min(DIYA_X.length, Math.ceil((progress / 100) * (DIYA_X.length - 1)) + 1);
 
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
@@ -515,145 +505,283 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   // ─── render ───────────────────────────────────────────────────────────────
 
   if (kioskId === 'CV-001') {
-    const arcCircumference = 2 * Math.PI * RING.r;
-    const arcOffset = arcCircumference - (progress / 100) * arcCircumference;
-
     if (!isActive) return null;
 
+    // Same text production shows: statusMsg on the left, printer-verified sheet count in the ring.
+    const dynamicSheetText = progress >= 100
+      ? 'Ready to collect'
+      : `Sheet ${sheetsCompletedRef.current + 1} of ${Math.max(1, pages * copies)}`;
+    const leftStatusText = isCompleted ? '' : statusMsg;
+
+    // Geometry of Circular Progress Indicator:
+    // Center: (1132, 402), Radius: 141px, Stroke: 20px
+    const arcRadius = 141;
+    const arcCircumference = 2 * Math.PI * arcRadius;
+    const arcOffset = arcCircumference - (progress / 100) * arcCircumference;
+
+    // Angle of knob at tip of progress arc (starts at 12 o'clock / -90 deg)
+    const knobAngleRad = (-90 + (progress / 100) * 360) * (Math.PI / 180);
+    const knobX = 190 + arcRadius * Math.cos(knobAngleRad);
+    const knobY = 190 + arcRadius * Math.sin(knobAngleRad);
+
     return (
-    <div className="screen visible absolute inset-0 overflow-hidden bg-[#FEEFE2]" style={{ display: 'block' }}>
-      <DiwaliStage plate="/diwali-plate-printing.png">
-        {/* Greeting and status text, on the left card */}
-        <div className="absolute whitespace-nowrap text-[#4C0403]" style={{ left: 261 * K, top: 330 * K, fontFamily: 'Gelasio, Georgia, serif' }}>
-          <div className="text-[40.5px] font-medium leading-[54px] tracking-[-0.005em]" style={{ WebkitTextStroke: '0.4px currentColor' }}>{typedTitle || finalTitle}</div>
-        </div>
+      <div
+        className="screen visible mimo1-printing-screen absolute left-1/2 top-1/2 h-[810px] w-[1440px] -translate-x-1/2 -translate-y-1/2 select-none overflow-hidden"
+        style={{
+          display: 'block',
+          backgroundImage: 'url(/mimo1-golden-bg.png)',
+          backgroundSize: '100% 100%',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: '#FAF5EE',
+        }}
+      >
+        {/* Left Side: Frosted Glass Progress Card */}
         <div
-          className="absolute whitespace-pre-line text-[24.5px] leading-[32.7px] text-[#550909]"
-          style={{ left: 261 * K, top: 396 * K, fontFamily: 'Gelasio, Georgia, serif' }}
+          className="absolute flex flex-col select-none"
+          style={{
+            left: '148px',
+            top: '268px',
+            width: '710px',
+            height: '292px',
+            padding: '46px 54px',
+            borderRadius: '32px',
+            background:
+              'linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(252, 248, 242, 0.86) 100%)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1.5px solid rgba(255, 255, 255, 0.95)',
+            boxShadow:
+              '0 18px 45px rgba(180, 140, 90, 0.14), 0 2px 6px rgba(0, 0, 0, 0.03), inset 0 2px 4px rgba(255, 255, 255, 0.95)',
+            zIndex: 10,
+          }}
         >
-          {typedSub || finalSub}
-        </div>
-        {!isCompleted && (
-          <div
-            className="absolute whitespace-nowrap text-[24.8px] leading-[32.7px] text-[#550909]"
-            style={{ left: 261 * K, top: 520 * K, fontFamily: 'Gelasio, Georgia, serif', fontVariantNumeric: 'lining-nums' }}
+          {/* Greeting / Title */}
+          <h1
+            style={{
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              fontSize: '54px',
+              fontWeight: 800,
+              lineHeight: 1.15,
+              letterSpacing: '-0.025em',
+              color: '#151515',
+              margin: 0,
+            }}
           >
-            {statusMsg}
+            {typedTitle || finalTitle}
+          </h1>
+
+          {/* Subtext */}
+          <p
+            style={{
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              fontSize: '22px',
+              fontWeight: 500,
+              lineHeight: 1.45,
+              color: '#726A61',
+              margin: 0,
+              marginTop: '14px',
+              whiteSpace: 'pre-line',
+            }}
+          >
+            {typedSub || finalSub}
+          </p>
+
+          {/* Gold Dynamic Status Text */}
+          <p
+            style={{
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              fontSize: '22px',
+              fontWeight: 700,
+              lineHeight: 1.3,
+              color: '#B88344',
+              margin: 0,
+              marginTop: '16px',
+            }}
+          >
+            {leftStatusText}
+          </p>
+        </div>
+
+        {/* Right Side: Circular Progress Indicator & Disc */}
+        <div
+          className="absolute flex items-center justify-center select-none"
+          style={{
+            left: '942px',
+            top: '206px',
+            width: '380px',
+            height: '380px',
+            borderRadius: '50%',
+            background:
+              'linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 245, 238, 0.88) 100%)',
+            boxShadow:
+              '0 20px 50px rgba(180, 140, 90, 0.16), 0 2px 8px rgba(0, 0, 0, 0.03), inset 0 2px 5px rgba(255, 255, 255, 1)',
+            border: '1.5px solid rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            zIndex: 10,
+          }}
+        >
+          {/* SVG Progress Rings */}
+          <svg
+            width="380"
+            height="380"
+            viewBox="0 0 380 380"
+            className="absolute inset-0 pointer-events-none"
+          >
+            <defs>
+              {/* Soft Champagne-Gold Gradient matching luminous background light streaks */}
+              <linearGradient id="mimo1ProgressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FFF5E3" />
+                <stop offset="25%" stopColor="#F7DFB2" />
+                <stop offset="65%" stopColor="#E8BE68" />
+                <stop offset="100%" stopColor="#D8A440" />
+              </linearGradient>
+
+              {/* Luminous Champagne-Gold Metallic Knob Gradient */}
+              <radialGradient id="mimo1KnobGradient" cx="35%" cy="35%" r="65%">
+                <stop offset="0%" stopColor="#FFF8EB" />
+                <stop offset="45%" stopColor="#F3D59B" />
+                <stop offset="100%" stopColor="#D8A546" />
+              </radialGradient>
+            </defs>
+
+            {/* Inner subtle dotted guide ring */}
+            <circle
+              cx="190"
+              cy="190"
+              r="118"
+              fill="none"
+              stroke="rgba(190, 160, 130, 0.3)"
+              strokeWidth="1.5"
+              strokeDasharray="4 6"
+            />
+
+            {/* Background circular track: Neutral Ivory */}
+            <circle
+              cx="190"
+              cy="190"
+              r={arcRadius}
+              fill="none"
+              stroke="rgba(226, 215, 200, 0.45)"
+              strokeWidth="20"
+            />
+
+            {/* Dynamic Progress Arc: Soft Champagne Gold */}
+            <circle
+              cx="190"
+              cy="190"
+              r={arcRadius}
+              fill="none"
+              stroke="url(#mimo1ProgressGradient)"
+              strokeWidth="20"
+              strokeDasharray={arcCircumference}
+              strokeDashoffset={progress >= 100 ? 0 : arcOffset}
+              strokeLinecap="round"
+              transform="rotate(-90 190 190)"
+              style={{
+                transition: 'stroke-dashoffset 0.18s linear',
+                filter: 'drop-shadow(0 2px 10px rgba(220, 168, 70, 0.40)) drop-shadow(0 0 6px rgba(255, 230, 160, 0.35))',
+              }}
+            />
+
+            {/* Knob at leading tip of progress arc: Warm Metallic Gold with Soft Glow */}
+            {progress > 0 && progress < 100 && (
+              <circle
+                cx={knobX}
+                cy={knobY}
+                r="10"
+                fill="url(#mimo1KnobGradient)"
+                stroke="#FFFFFF"
+                strokeWidth="2.5"
+                style={{
+                  filter: 'drop-shadow(0 2px 6px rgba(215, 160, 50, 0.50)) drop-shadow(0 0 4px rgba(255, 235, 180, 0.45))',
+                  transition: 'cx 0.18s linear, cy 0.18s linear',
+                }}
+              />
+            )}
+          </svg>
+
+          {/* Central Percentage and Sheet Status Readout */}
+          <div className="relative flex flex-col items-center justify-center text-center select-none" style={{ zIndex: 5 }}>
+            <div
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: '76px',
+                fontWeight: 800,
+                letterSpacing: '-0.025em',
+                lineHeight: 1,
+                color: '#151515',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {progress}%
+            </div>
+            <div
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: '17px',
+                fontWeight: 500,
+                color: '#6E5A4B',
+                lineHeight: 1.2,
+                marginTop: '10px',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {dynamicSheetText}
+            </div>
+          </div>
+        </div>
+
+        {/* Color print: "Collecting your pages" overlay */}
+        {collectingPages && (
+          <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center gap-9 bg-[#FAF4E8]/95 backdrop-blur-2xl">
+            <div className="relative flex items-center justify-center">
+              <div
+                className="flex h-36 w-36 items-center justify-center rounded-full border-2 border-[#D4AF37]/50 bg-white/90 text-[#A37524] shadow-[0_12px_32px_rgba(212,175,55,0.25)]"
+                style={{ animation: 'kiosk-collect-pulse 2s ease-in-out infinite' }}
+              >
+                <Printer size={64} weight="regular" />
+              </div>
+            </div>
+
+            <div className="max-w-2xl px-10 text-center">
+              <h2 className="mb-4 font-sans text-[42px] font-bold leading-tight text-[#2D1E12]">
+                Collecting your pages…
+              </h2>
+              <p className="text-[20px] font-medium leading-relaxed text-[#6E5A4B]">
+                Your color print is being ejected.
+                <br />
+                <strong className="text-[#2D1E12]">Please wait at the printer</strong> for your document.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex h-[80px] w-[80px] items-center justify-center rounded-full border-4 border-[#D4AF37]/50 bg-white shadow-md tabular">
+                <span className="font-sans text-[32px] font-extrabold text-[#7D1120]">{collectCountdown}</span>
+              </div>
+              <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-[#9A6D24]">
+                seconds
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Lit diyas sit over the unlit row in the plate */}
-        {DIYA_X.slice(0, litDiyas(progress)).map((x) => (
-          <img
-            key={x}
-            src="/diwali-sprite-diya-lit.png"
-            alt=""
-            draggable={false}
-            className="pointer-events-none absolute"
-            style={{ left: (x - DIYA_SIZE / 2) * K, top: (DIYA_Y - DIYA_SIZE / 2) * K, width: DIYA_SIZE * K, height: DIYA_SIZE * K }}
-          />
-        ))}
-
-        {/* Progress arc on the plate's empty ring */}
-        <svg width="1440" height="810" className="pointer-events-none absolute inset-0">
-          <defs>
-            <linearGradient
-              id="mimo2ArcGradient"
-              gradientUnits="userSpaceOnUse"
-              gradientTransform={`rotate(90 ${RING.cx} ${RING.cy})`}
-              x1={RING.cx}
-              y1={RING.cy - RING.r}
-              x2={RING.cx + RING.r}
-              y2={RING.cy}
-            >
-              <stop offset="0%" stopColor="#F9B233" />
-              <stop offset="45%" stopColor="#EC8C1C" />
-              <stop offset="100%" stopColor="#C96002" />
-            </linearGradient>
-          </defs>
-          <circle
-            cx={RING.cx}
-            cy={RING.cy}
-            r={RING.r}
-            fill="transparent"
-            stroke="url(#mimo2ArcGradient)"
-            strokeWidth={RING.stroke}
-            strokeDasharray={progress >= 100 ? 'none' : arcCircumference}
-            strokeDashoffset={progress >= 100 ? 0 : arcOffset}
-            strokeLinecap="round"
-            opacity={progress > 0 ? 1 : 0}
-            transform={`rotate(-90 ${RING.cx} ${RING.cy})`}
-            style={{ transition: 'stroke-dashoffset 0.14s linear', filter: 'drop-shadow(0 0 3px rgba(230, 150, 40, 0.4))' }}
-          />
-        </svg>
-
-        {/* Percent and sheet readout, inside the ring */}
-        <div
-          className="absolute flex -translate-x-1/2 items-baseline text-[#4E0303]"
-          style={{ left: 1320 * K, top: 398 * K, fontFamily: 'Cardo, Georgia, serif' }}
-        >
-          <span className="text-[64px] font-bold leading-[80px]" style={{ fontVariantNumeric: 'tabular-nums', WebkitTextStroke: '0.5px currentColor' }}>{progress}</span>
-          <span className="ml-[2px] text-[38px] font-bold leading-none">%</span>
-        </div>
-        <div
-          className="absolute -translate-x-1/2 whitespace-nowrap text-[19.8px] font-medium leading-none text-[#570E0C]"
-          style={{ left: 1316 * K, top: 534 * K, fontFamily: 'Gelasio, Georgia, serif', fontVariantNumeric: 'lining-nums' }}
-        >
-          {progress >= 100
-            ? 'READY TO COLLECT'
-            : `SHEET ${sheetsCompletedRef.current + 1} OF ${Math.max(1, pages * copies)}`}
-        </div>
-      </DiwaliStage>
-
-      {/* ── Color print: "Collecting your pages" overlay ── */}
-      {collectingPages && (
-        <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center gap-9 bg-[#FAF4E8]/95 backdrop-blur-2xl">
-          <div className="relative flex items-center justify-center">
-            <div
-              className="flex h-36 w-36 items-center justify-center rounded-full border-2 border-[#D4AF37]/50 bg-white/90 text-[#A37524] shadow-[0_12px_32px_rgba(212,175,55,0.25)]"
-              style={{ animation: 'kiosk-collect-pulse 2s ease-in-out infinite' }}
-            >
-              <Printer size={64} weight="regular" />
-            </div>
-          </div>
-
-          <div className="max-w-2xl px-10 text-center">
-            <h2 className="mb-4 font-serif text-[42px] font-bold leading-tight text-[#2D1E12]">
-              Collecting your pages…
-            </h2>
-            <p className="text-[20px] font-medium leading-relaxed text-[#6E5A4B]">
-              Your color print is being ejected.
-              <br />
-              <strong className="text-[#2D1E12]">Please wait at the printer</strong> for your document.
-            </p>
-          </div>
-
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex h-[80px] w-[80px] items-center justify-center rounded-full border-4 border-[#D4AF37]/50 bg-white shadow-md tabular">
-              <span className="font-sans text-[32px] font-extrabold text-[#7D1120]">{collectCountdown}</span>
-            </div>
-            <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-[#9A6D24]">
-              seconds
-            </p>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes kiosk-spin-slow {
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes kiosk-pulse-ring {
-          0%   { transform: scale(0.85); opacity: 0; }
-          50%  { opacity: 0.8; }
-          100% { transform: scale(1.4);  opacity: 0; }
-        }
-        @keyframes kiosk-collect-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.40); }
-          50%      { box-shadow: 0 0 0 30px rgba(212, 175, 55, 0); }
-        }
-      `}</style>
-    </div>
+        <style>{`
+          @keyframes kiosk-spin-slow {
+            100% { transform: rotate(360deg); }
+          }
+          @keyframes kiosk-pulse-ring {
+            0%   { transform: scale(0.85); opacity: 0; }
+            50%  { opacity: 0.8; }
+            100% { transform: scale(1.4);  opacity: 0; }
+          }
+          @keyframes kiosk-collect-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.40); }
+            50%      { box-shadow: 0 0 0 30px rgba(212, 175, 55, 0); }
+          }
+        `}</style>
+      </div>
     );
   }
 

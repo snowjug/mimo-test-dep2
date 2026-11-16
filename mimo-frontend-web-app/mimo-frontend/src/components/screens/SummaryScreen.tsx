@@ -3,7 +3,6 @@ import { motion } from 'motion/react';
 import { Check, ArrowDown, WarningCircle } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
 import { DiyaRow, FestiveBackdrop, ZariBorder } from '../festive/NavaratriDecor';
-import { DiwaliHotspot, DiwaliStage } from '../festive/DiwaliStage';
 
 const DandiyaSticks: React.FC = () => (
     <svg width="130" height="130" viewBox="0 0 130 130" className="pointer-events-none absolute -right-6 top-2">
@@ -57,28 +56,6 @@ const ISSUES: { id: string; label: string }[] = [
     { id: 'other', label: 'Something else' },
 ];
 type ReportState = 'ask' | 'choose' | 'sending' | 'sent' | 'failed';
-
-// Layout measured from design-references/03-printing-complete and 04-report-problem (1672px wide, 16:9).
-const K = 1440 / 1672;
-const pill = (x0: number, y0: number, x1: number, y1: number) => ({
-  left: x0 * K,
-  top: y0 * K,
-  width: (x1 - x0) * K,
-  height: (y1 - y0) * K,
-});
-const ISSUE_BUTTONS: { id: string; label: string; box: ReturnType<typeof pill> }[] = [
-  { id: 'blank', label: 'Blank pages', box: pill(498, 474, 685, 527) },
-  { id: 'missing', label: 'Pages missing', box: pill(706, 474, 908, 527) },
-  { id: 'faint', label: 'Too faint or streaky', box: pill(928, 474, 1174, 527) },
-  { id: 'other', label: 'Something else', box: pill(737, 539, 936, 591) },
-];
-const PLATE_FOR: Record<ReportState, string> = {
-  ask: '/diwali-plate-complete.png',
-  choose: '/diwali-plate-report.png',
-  sending: '/diwali-plate-report.png',
-  sent: '/diwali-plate-report-clear.png',
-  failed: '/diwali-plate-report-clear.png',
-};
 
 export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId, printCode }) => {
     const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
@@ -164,80 +141,355 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
 
   return (
     <div
-      className="screen visible absolute inset-0 overflow-hidden bg-[#FDF0DE]"
-      style={{ display: 'block' }}
+      className="screen visible mimo1-summary-screen absolute left-1/2 top-1/2 h-[810px] w-[1440px] -translate-x-1/2 -translate-y-1/2 select-none overflow-hidden"
+      style={{
+        display: 'block',
+        backgroundImage: 'url(/mimo1-golden-bg.png)',
+        backgroundSize: '100% 100%',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundColor: '#FAF5EE',
+      }}
     >
-      <DiwaliStage plate={PLATE_FOR[report]}>
+      <div className="absolute inset-0 flex flex-col items-center justify-center select-none" style={{ paddingTop: '50px' }}>
         <h1
-          className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
-          style={
-            isAsking
-              ? { top: 262 * K - 4, color: '#5D0712', fontSize: 35.3, lineHeight: '50px', fontWeight: 500, fontFamily: "'EB Garamond', Georgia, serif" }
-              : { top: 300 * K - 4, color: '#56050B', fontSize: 41.8, lineHeight: '56px', fontWeight: 500, fontFamily: "'EB Garamond', Georgia, serif" }
-          }
+          style={{
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontSize: '48px',
+            fontWeight: 800,
+            lineHeight: 1.15,
+            letterSpacing: '-0.025em',
+            color: '#151515',
+            margin: 0,
+            textAlign: 'center',
+          }}
         >
-          {firstName}, your documents are ready.
+          <span style={{ color: '#BA7A2C', textTransform: 'uppercase' }}>{firstName}</span>
+          , your documents are ready.
         </h1>
 
         {isAsking && (
           <>
-            <DiwaliHotspot box={pill(511, 586, 800, 646)} onClick={onReset} aria-label="Yes, done" pressTint="active:bg-black/20" />
-            <DiwaliHotspot
-              box={pill(827, 586, 1161, 646)}
-              onClick={() => {
-                setReport('choose');
-                armReset(REPORT_RESET_MS);
-              }}
-              aria-label="Report a problem"
-            />
+                {/* Printer & Document Illustration Container */}
+                <div
+                  className="relative flex items-center justify-center select-none"
+                  style={{
+                    width: '480px',
+                    height: '300px',
+                    marginTop: '36px',
+                  }}
+                >
+                  {/* Outer Printer Slot / Chassis */}
+                  <div
+                    className="absolute flex items-center justify-center"
+                    style={{
+                      top: '0px',
+                      width: '386px',
+                      height: '148px',
+                      borderRadius: '26px',
+                      background:
+                        'linear-gradient(180deg, #FBF8F2 0%, #EFE5D5 45%, #DFCEB7 100%)',
+                      boxShadow:
+                        '0 16px 36px rgba(180, 140, 90, 0.22), inset 0 2px 4px rgba(255, 255, 255, 1)',
+                      border: '2px solid rgba(255, 255, 255, 0.95)',
+                      zIndex: 2,
+                    }}
+                  >
+                    {/* Inner Slot Mouth (Dark Opening) */}
+                    <div
+                      style={{
+                        width: '316px',
+                        height: '66px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(180deg, #0A0A0A 0%, #1A1A1A 100%)',
+                        boxShadow: 'inset 0 6px 14px rgba(0, 0, 0, 0.85)',
+                      }}
+                    />
+                  </div>
+
+                  {/* Printed Document Paper Sheet (extending out of slot) */}
+                  <motion.div
+                    initial={{ y: -30, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute flex flex-col items-center"
+                    style={{
+                      top: '46px',
+                      width: '276px',
+                      height: '212px',
+                      borderRadius: '4px 4px 12px 12px',
+                      background: '#FFFFFF',
+                      boxShadow:
+                        '0 18px 36px rgba(140, 100, 60, 0.18), 0 4px 10px rgba(0, 0, 0, 0.05)',
+                      padding: '16px 20px',
+                      zIndex: 10,
+                    }}
+                  >
+                    {/* Circular Gold Checkmark Badge */}
+                    <div
+                      className="flex items-center justify-center rounded-full"
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        border: '2px solid #BA7A2C',
+                        background: 'rgba(250, 245, 238, 0.8)',
+                        boxShadow: '0 2px 8px rgba(186, 122, 44, 0.15)',
+                      }}
+                    >
+                      <Check size={24} weight="bold" color="#BA7A2C" />
+                    </div>
+
+                    {/* Document Text Line Previews */}
+                    <div
+                      style={{
+                        width: '180px',
+                        height: '7px',
+                        borderRadius: '4px',
+                        background: '#D5CFC7',
+                        marginTop: '14px',
+                      }}
+                    />
+                    <div
+                      style={{
+                        width: '144px',
+                        height: '7px',
+                        borderRadius: '4px',
+                        background: '#E4DFD8',
+                        marginTop: '8px',
+                      }}
+                    />
+                    <div
+                      style={{
+                        width: '124px',
+                        height: '7px',
+                        borderRadius: '4px',
+                        background: '#E4DFD8',
+                        marginTop: '8px',
+                      }}
+                    />
+
+                    {/* Document Bottom Elements */}
+                    <div
+                      className="flex items-center justify-between w-full"
+                      style={{ marginTop: '16px', padding: '0 8px' }}
+                    >
+                      {/* Photo / Stamp Placeholder */}
+                      <div
+                        style={{
+                          width: '42px',
+                          height: '42px',
+                          borderRadius: '8px',
+                          border: '1.5px dashed #C8C2BA',
+                        }}
+                      />
+                      {/* Text Line */}
+                      <div
+                        style={{
+                          width: '88px',
+                          height: '8px',
+                          borderRadius: '4px',
+                          background: '#D5CFC7',
+                        }}
+                      />
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* Collection Instruction */}
+                <div
+                  className="flex items-center justify-center select-none"
+                  style={{
+                    marginTop: '30px',
+                    gap: '12px',
+                  }}
+                >
+                  <span style={{ fontSize: '20px', fontWeight: 800, color: '#BA7A2C' }}>↓</span>
+                  <p
+                    style={{
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      fontSize: '17px',
+                      fontWeight: 700,
+                      letterSpacing: '0.16em',
+                      color: '#4D453E',
+                      margin: 0,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Please collect your documents from below
+                  </p>
+                  <span style={{ fontSize: '20px', fontWeight: 800, color: '#BA7A2C' }}>↓</span>
+                </div>
+
+            {/* Same two choices as production: done, or report a problem */}
+            <div className="flex items-center justify-center" style={{ marginTop: '34px', gap: '18px' }}>
+              <button
+                onClick={onReset}
+                aria-label="Yes, done"
+                className="flex items-center justify-center transition-all active:scale-95 cursor-pointer select-none"
+                style={{
+                  width: '218px',
+                  height: '54px',
+                  borderRadius: '9999px',
+                  background: 'linear-gradient(180deg, #D49B48 0%, #BA7A2C 100%)',
+                  border: '1.5px solid rgba(255, 255, 255, 0.5)',
+                  boxShadow:
+                    '0 10px 24px rgba(186, 122, 44, 0.38), 0 2px 6px rgba(0, 0, 0, 0.04), inset 0 2px 3px rgba(255, 255, 255, 0.5)',
+                  gap: '10px',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    fontSize: '19px',
+                    fontWeight: 800,
+                    letterSpacing: '0.12em',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  DONE
+                </span>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="#FFFFFF" strokeWidth="2.2" />
+                  <path d="M7.5 12L10.5 15L16.5 9" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                onClick={() => {
+                  setReport('choose');
+                  armReset(REPORT_RESET_MS);
+                }}
+                aria-label="Report a problem"
+                className="flex items-center justify-center transition-all active:scale-95 cursor-pointer select-none"
+                style={{
+                  height: '54px',
+                  borderRadius: '9999px',
+                  padding: '0 30px',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  fontSize: '17px',
+                  fontWeight: 700,
+                  color: '#2E2823',
+                  background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(247, 241, 234, 0.90) 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.95)',
+                  boxShadow: '0 8px 24px rgba(180, 140, 90, 0.14), 0 2px 6px rgba(0, 0, 0, 0.03), inset 0 2px 3px rgba(255, 255, 255, 1)',
+                }}
+              >
+                Report a problem
+              </button>
+            </div>
           </>
         )}
 
         {(report === 'choose' || report === 'sending') && (
           <>
             <p
-              className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[#6F2B18]"
-              style={{ top: 422 * K, fontSize: 18.4, lineHeight: '32px', fontWeight: 400, fontFamily: "'EB Garamond', Georgia, serif" }}
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: '22px',
+                fontWeight: 600,
+                color: '#4D453E',
+                margin: '44px 0 0 0',
+              }}
             >
               What went wrong with your print?
             </p>
-            {ISSUE_BUTTONS.map((issue) => (
-              <DiwaliHotspot
-                key={issue.id}
-                box={issue.box}
-                disabled={report === 'sending'}
-                onClick={() => sendReport(issue.id)}
-                aria-label={issue.label}
-              />
-            ))}
-            <DiwaliHotspot
-              box={pill(790, 608, 882, 644)}
+            <div className="flex flex-wrap items-center justify-center" style={{ marginTop: '28px', gap: '16px', maxWidth: '760px' }}>
+              {ISSUES.map((issue) => (
+                <button
+                  key={issue.id}
+                  disabled={report === 'sending'}
+                  onClick={() => sendReport(issue.id)}
+                  aria-label={issue.label}
+                  className="flex items-center justify-center transition-all enabled:active:scale-95 enabled:cursor-pointer disabled:opacity-60 select-none"
+                  style={{
+                    height: '54px',
+                    borderRadius: '9999px',
+                    padding: '0 30px',
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    fontSize: '17px',
+                    fontWeight: 700,
+                    color: '#2E2823',
+                    background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(247, 241, 234, 0.90) 100%)',
+                    border: '1px solid rgba(255, 255, 255, 0.95)',
+                    boxShadow: '0 8px 24px rgba(180, 140, 90, 0.14), 0 2px 6px rgba(0, 0, 0, 0.03), inset 0 2px 3px rgba(255, 255, 255, 1)',
+                  }}
+                >
+                  {issue.label}
+                </button>
+              ))}
+            </div>
+            <button
               disabled={report === 'sending'}
               onClick={() => {
                 setReport('ask');
                 armReset(AUTO_RESET_MS);
               }}
               aria-label="Cancel"
-            />
+              className="cursor-pointer select-none bg-transparent disabled:opacity-60"
+              style={{
+                marginTop: '28px',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: '16px',
+                fontWeight: 700,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: '#BA7A2C',
+              }}
+            >
+              Cancel
+            </button>
           </>
         )}
 
         {(report === 'sent' || report === 'failed') && (
-          <div className="absolute left-1/2 flex w-[640px] -translate-x-1/2 flex-col items-center gap-6 text-center" style={{ top: 428 * K }}>
-            <p className="text-[24px] font-medium leading-[32px] text-[#6B1226]" style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
+          <div className="flex w-[640px] flex-col items-center text-center" style={{ marginTop: '44px', gap: '30px' }}>
+            <p
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: '22px',
+                fontWeight: 500,
+                lineHeight: 1.45,
+                color: '#4D453E',
+                margin: 0,
+              }}
+            >
               {report === 'sent'
                 ? 'Thank you. The MIMO team has been told. Please keep the pages, the team may ask to see them.'
                 : `We could not send your report. Please tell the staff your code ${printCode ?? ''}.`}
             </p>
             <button
               onClick={onReset}
-              className="cursor-pointer rounded-full bg-[#6B1230] px-12 py-3 text-[16px] font-bold uppercase tracking-[0.14em] text-white shadow-md active:brightness-90"
+              aria-label="Done"
+              className="flex items-center justify-center transition-all active:scale-95 cursor-pointer select-none"
+              style={{
+                width: '218px',
+                height: '54px',
+                borderRadius: '9999px',
+                background: 'linear-gradient(180deg, #D49B48 0%, #BA7A2C 100%)',
+                border: '1.5px solid rgba(255, 255, 255, 0.5)',
+                boxShadow:
+                  '0 10px 24px rgba(186, 122, 44, 0.38), 0 2px 6px rgba(0, 0, 0, 0.04), inset 0 2px 3px rgba(255, 255, 255, 0.5)',
+                gap: '10px',
+              }}
             >
-              Done
+              <span
+                style={{
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  fontSize: '19px',
+                  fontWeight: 800,
+                  letterSpacing: '0.12em',
+                  color: '#FFFFFF',
+                }}
+              >
+                DONE
+              </span>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="#FFFFFF" strokeWidth="2.2" />
+                <path d="M7.5 12L10.5 15L16.5 9" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
           </div>
         )}
-      </DiwaliStage>
+      </div>
     </div>
   );
     }

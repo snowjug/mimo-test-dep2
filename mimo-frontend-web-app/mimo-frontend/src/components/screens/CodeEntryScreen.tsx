@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Backspace, Check, CircleNotch } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
-import { DiwaliHotspot, DiwaliStage } from '../festive/DiwaliStage';
 import { Diya, FestiveBackdrop, GoldenCornerWaves, Mandala, OrnamentDivider } from '../festive/NavaratriDecor';
 
 interface CodeEntryScreenProps {
@@ -15,18 +14,6 @@ interface CodeEntryScreenProps {
   kioskId?: string | null;
 }
 
-// Layout measured from design-references/01-code-entry, whose 1821px width maps onto the 1440px canvas.
-const K = 1440 / 1821;
-const circle = (cx: number, cy: number, r: number) => ({
-  left: (cx - r) * K,
-  top: (cy - r) * K,
-  width: r * 2 * K,
-  height: r * 2 * K,
-});
-const SLOT_X = [540.5, 646, 751.5, 856.5];
-const SLOT_Y = 614;
-const KEY_X = [1092, 1194.5, 1297];
-const KEY_Y = [365, 456, 547, 640];
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
@@ -84,75 +71,242 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
     if (!isActive) return null;
 
     return (
-    <div className="screen visible absolute inset-0 overflow-hidden bg-[#FDEFE1]" style={{ display: 'block' }}>
-      <DiwaliStage plate="/diwali-plate-code-entry.png">
-        <DiwaliHotspot box={circle(79.5, 63.5, 37)} onClick={onBack} aria-label="Return to home screen" />
-
-        {/* The four code slots */}
-        <motion.div
-          animate={isShaking ? { x: [0, -12, 12, -8, 8, -4, 4, 0] } : { x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="pointer-events-none absolute inset-0"
+      <div
+        className="screen visible mimo1-code-entry-screen absolute left-1/2 top-1/2 h-[810px] w-[1440px] -translate-x-1/2 -translate-y-1/2 select-none overflow-hidden"
+        style={{
+          display: 'block',
+          backgroundImage: 'url(/mimo1-golden-bg.png)',
+          backgroundSize: '100% 100%',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: '#FAF5EE',
+        }}
+      >
+        {/* Top-Left Circular Back Button */}
+        <button
+          onClick={onBack}
+          aria-label="Return to home screen"
+          className="absolute flex items-center justify-center rounded-full transition-all active:scale-95 cursor-pointer select-none"
+          style={{
+            left: '101px',
+            top: '77px',
+            width: '78px',
+            height: '78px',
+            background:
+              'linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 241, 235, 0.90) 100%)',
+            boxShadow:
+              '0 4px 16px rgba(180, 140, 90, 0.14), 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 2px 3px rgba(255, 255, 255, 1)',
+            border: '1px solid rgba(255, 255, 255, 0.95)',
+            zIndex: 20,
+          }}
         >
-          {SLOT_X.map((cx, i) => {
-            const isCurrent = i === code.length && !isShaking;
-            return (
-              <div key={cx} className="absolute flex items-center justify-center" style={circle(cx, SLOT_Y, isCurrent ? 60 : 54)}>
-                <img
-                  src={isCurrent ? '/diwali-sprite-slot-active.png' : '/diwali-sprite-slot.png'}
-                  alt=""
-                  draggable={false}
-                  className="absolute inset-0 h-full w-full"
-                />
-                {code[i] && (
-                  <span className="relative text-[32px] font-bold leading-none text-[#3A0F12]" style={{ fontFamily: "Cardo, Georgia, serif" }}>
-                    {code[i]}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </motion.div>
+          <ArrowLeft size={30} weight="bold" color="#1A1A1A" />
+        </button>
 
-        {/* Keypad */}
-        {KEYS.map((num, i) => (
-          <DiwaliHotspot
-            key={num}
-            id={`key-${num}`}
-            box={circle(KEY_X[i % 3], KEY_Y[Math.floor(i / 3)], 41)}
-            onClick={() => handleNumClick(num)}
-            aria-label={num}
-          />
-        ))}
-        <DiwaliHotspot
-          id="key-del"
-          box={circle(KEY_X[0], KEY_Y[3], 41)}
-          onClick={() => handleNumClick('del')}
-          aria-label="Delete last digit"
-        />
-        <DiwaliHotspot id="key-0" box={circle(KEY_X[1], KEY_Y[3], 41)} onClick={() => handleNumClick('0')} aria-label="0" />
-        <DiwaliHotspot
-          id="key-submit"
-          box={circle(1299.5, 640.5, 44)}
-          onClick={handleSubmit}
-          disabled={code.length !== 4 || loading}
-          aria-label="Submit Mimo code"
-          pressTint="enabled:active:bg-[#7A1A0A]/25"
+        {/* Left Side: Heading and 4 PIN Slots */}
+        <div
+          className="absolute flex flex-col justify-center select-none"
+          style={{
+            left: '192px',
+            top: '280px',
+            zIndex: 10,
+          }}
         >
-          {loading && (
-            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-[#FF6347]">
-              <motion.span
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                className="flex"
+          {/* Heading */}
+          <h1
+            style={{
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              fontSize: '58px',
+              fontWeight: 800,
+              lineHeight: 1.1,
+              letterSpacing: '-0.025em',
+              color: '#151515',
+              margin: 0,
+            }}
+          >
+            Enter Your Mimo
+            <br />
+            Code Here
+          </h1>
+
+          {/* Four PIN Slots */}
+          <motion.div
+            animate={isShaking ? { x: [0, -12, 12, -8, 8, -4, 4, 0] } : { x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex items-center"
+            style={{ marginTop: '52px', gap: '20px' }}
+          >
+            {[0, 1, 2, 3].map((idx) => {
+              const isCurrent = idx === code.length && !isShaking;
+              const isFilled = idx < code.length;
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center justify-center select-none transition-all duration-200"
+                  style={{
+                    width: '88px',
+                    height: '88px',
+                    borderRadius: '22px',
+                    background:
+                      'linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(247, 241, 235, 0.88) 100%)',
+                    border: isCurrent
+                      ? '2px solid #C48D4D'
+                      : '1.5px solid rgba(255, 255, 255, 0.95)',
+                    boxShadow: isCurrent
+                      ? '0 0 18px rgba(196, 141, 77, 0.32), 0 4px 14px rgba(180, 140, 90, 0.12), inset 0 2px 4px rgba(255, 255, 255, 0.9)'
+                      : '0 4px 16px rgba(180, 140, 90, 0.12), inset 0 2px 4px rgba(255, 255, 255, 0.9)',
+                  }}
+                >
+                  {isFilled && (
+                    <span
+                      style={{
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        fontSize: '38px',
+                        fontWeight: 700,
+                        color: '#151515',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {code[idx]}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </motion.div>
+        </div>
+
+        {/* Right Side: Numeric Keypad Grid (3 columns x 4 rows) */}
+        <div
+          className="absolute grid select-none"
+          style={{
+            left: '905px',
+            top: '196px',
+            gridTemplateColumns: 'repeat(3, 98px)',
+            gap: '22px',
+            zIndex: 10,
+          }}
+        >
+          {/* Digits 1 to 9 */}
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+            <button
+              key={num}
+              id={`key-${num}`}
+              onClick={() => handleNumClick(num)}
+              aria-label={num}
+              className="flex items-center justify-center rounded-full transition-all active:scale-95 cursor-pointer select-none"
+              style={{
+                width: '98px',
+                height: '98px',
+                background:
+                  'linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(247, 241, 234, 0.90) 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.95)',
+                boxShadow:
+                  '0 8px 24px rgba(180, 140, 90, 0.14), 0 2px 6px rgba(0, 0, 0, 0.03), inset 0 2px 3px rgba(255, 255, 255, 1)',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  fontSize: '35px',
+                  fontWeight: 500,
+                  color: '#151515',
+                  lineHeight: 1,
+                }}
               >
-                <CircleNotch size={26} weight="bold" className="text-white" />
-              </motion.span>
+                {num}
+              </span>
+            </button>
+          ))}
+
+          {/* Row 4 Col 1: Delete Button with soft blush tint */}
+          <button
+            id="key-del"
+            onClick={() => handleNumClick('del')}
+            aria-label="Delete last digit"
+            className="flex items-center justify-center rounded-full transition-all active:scale-95 cursor-pointer select-none"
+            style={{
+              width: '98px',
+              height: '98px',
+              background:
+                'linear-gradient(180deg, rgba(255, 240, 242, 0.96) 0%, rgba(255, 228, 231, 0.92) 100%)',
+              border: '1px solid rgba(255, 205, 212, 0.85)',
+              boxShadow:
+                '0 8px 24px rgba(220, 100, 100, 0.12), inset 0 2px 3px rgba(255, 255, 255, 0.9)',
+            }}
+          >
+            <Backspace size={34} weight="regular" color="#D32F2F" />
+          </button>
+
+          {/* Row 4 Col 2: Digit 0 */}
+          <button
+            id="key-0"
+            onClick={() => handleNumClick('0')}
+            aria-label="0"
+            className="flex items-center justify-center rounded-full transition-all active:scale-95 cursor-pointer select-none"
+            style={{
+              width: '98px',
+              height: '98px',
+              background:
+                'linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(247, 241, 234, 0.90) 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.95)',
+              boxShadow:
+                '0 8px 24px rgba(180, 140, 90, 0.14), 0 2px 6px rgba(0, 0, 0, 0.03), inset 0 2px 3px rgba(255, 255, 255, 1)',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: '35px',
+                fontWeight: 500,
+                color: '#151515',
+                lineHeight: 1,
+              }}
+            >
+              0
             </span>
-          )}
-        </DiwaliHotspot>
-      </DiwaliStage>
-    </div>
+          </button>
+
+          {/* Row 4 Col 3: Submit / Confirm Checkmark */}
+          <button
+            id="key-submit"
+            onClick={handleSubmit}
+            disabled={code.length !== 4 || loading}
+            aria-label="Submit Mimo code"
+            className={`relative flex items-center justify-center rounded-full transition-all select-none ${
+              code.length === 4 && !loading
+                ? 'cursor-pointer active:scale-95'
+                : 'cursor-default opacity-85'
+            }`}
+            style={{
+              width: '98px',
+              height: '98px',
+              background:
+                code.length === 4
+                  ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 244, 235, 0.94) 100%)'
+                  : 'linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 241, 234, 0.90) 100%)',
+              border:
+                code.length === 4
+                  ? '1.5px solid #C48D4D'
+                  : '1px solid rgba(255, 255, 255, 0.95)',
+              boxShadow:
+                code.length === 4
+                  ? '0 0 24px rgba(196, 141, 77, 0.4), 0 8px 24px rgba(180, 140, 90, 0.18)'
+                  : '0 8px 24px rgba(180, 140, 90, 0.14), 0 2px 6px rgba(0, 0, 0, 0.03), inset 0 2px 3px rgba(255, 255, 255, 1)',
+            }}
+          >
+            {loading ? (
+              <CircleNotch size={32} weight="bold" className="animate-spin text-[#C48D4D]" />
+            ) : (
+              <Check
+                size={36}
+                weight="bold"
+                color={code.length === 4 ? '#C48D4D' : '#151515'}
+              />
+            )}
+          </button>
+        </div>
+      </div>
     );
   }
 

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Check, CaretRight } from '@phosphor-icons/react';
-import { DiwaliStage, preloadDiwaliPlates } from '../festive/DiwaliStage';
+import { ArrowRight, Check } from '@phosphor-icons/react';
 
 interface Mimo1WelcomeScreenProps {
   onNext: () => void;
@@ -20,14 +19,12 @@ export const Mimo1WelcomeScreen: React.FC<Mimo1WelcomeScreenProps> = ({
   const trackRef = useRef<HTMLDivElement>(null);
   const hasTriggeredRef = useRef<boolean>(false);
 
-  // Exact coordinates matching the approved master artwork (1440x810 canvas):
-  // Track: left 237px, top 552px, width 452px, height 74px
-  // Knob: left 243px (6px relative to track), top 552px, width 84px, height 74px
-  // Max travel: 452 - 6 - 84 - 6 = 356px
-  const TRACK_PADDING = 6;
-  const KNOB_WIDTH = 84;
-  const KNOB_HEIGHT = 74;
-  const MAX_DRAG = 356;
+  // Exact coordinates matching the 1440x810 canonical design
+  const TRACK_WIDTH = 464;
+  const TRACK_HEIGHT = 78;
+  const KNOB_DIAMETER = 68;
+  const TRACK_PADDING = 5;
+  const MAX_DRAG = TRACK_WIDTH - (TRACK_PADDING * 2) - KNOB_DIAMETER; // 386px
 
   // Complete unlock action with safe animation and transition
   const handleUnlock = useCallback(() => {
@@ -76,7 +73,7 @@ export const Mimo1WelcomeScreen: React.FC<Mimo1WelcomeScreenProps> = ({
     if (!isDragging || isUnlocked || hasTriggeredRef.current || !trackRef.current) return;
 
     const trackRect = trackRef.current.getBoundingClientRect();
-    const scale = trackRect.width / 452;
+    const scale = trackRect.width / TRACK_WIDTH;
     const delta = (e.clientX - dragStartX.current) / (scale || 1);
     const newX = Math.max(0, Math.min(MAX_DRAG, dragStartThumbX.current + delta));
 
@@ -128,96 +125,195 @@ export const Mimo1WelcomeScreen: React.FC<Mimo1WelcomeScreenProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isActive, animateToUnlock]);
 
-  useEffect(preloadDiwaliPlates, []);
-
   if (!isActive) return null;
 
-  const showActiveState = dragX > 0 || isUnlocked;
-
   return (
-    <div className="screen visible mimo1-welcome-screen absolute inset-0 overflow-hidden bg-[#FAF4E8]" style={{ display: 'block' }}>
-      <DiwaliStage plate="/mimo1-diwali-welcome.png">
-      {/* =========================================================================
-          INTERACTION LAYER DIRECTLY OVER THE APPROVED ARTWORK'S SWIPE TRACK
-          Position: left 237px, top 552px, width 452px, height 74px
-          At rest (dragX = 0): 100% transparent. Only the approved artwork is visible.
-          During drag (dragX > 0): active progress fill covers resting knob and moves.
-          ========================================================================= */}
-      <div
-        ref={trackRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-        role="slider"
-        aria-label="Swipe to start printing"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round((dragX / MAX_DRAG) * 100)}
-        tabIndex={0}
-        className="absolute z-20 cursor-grab active:cursor-grabbing select-none"
-        style={{
-          left: '237px',
-          top: '552px',
-          width: '452px',
-          height: '74px',
-          touchAction: 'none',
-        }}
-      >
-        {/* Active progress fill trailing the knob — covers the resting knob in artwork */}
-        {showActiveState && (
-          <div
-            className="pointer-events-none absolute inset-y-0 rounded-full transition-all duration-300"
+    <div
+      className="screen visible mimo1-welcome-screen absolute left-1/2 top-1/2 h-[810px] w-[1440px] -translate-x-1/2 -translate-y-1/2 select-none overflow-hidden"
+      style={{
+        display: isActive ? 'block' : 'none',
+        backgroundImage: 'url(/mimo1-golden-bg.png)',
+        backgroundSize: '100% 100%',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundColor: '#FAF5EE',
+      }}
+    >
+      {/* Centered Main Brand Content */}
+      <main className="absolute inset-0 flex flex-col items-center justify-center select-none pt-4">
+        {/* WELCOME TO Tagline */}
+        <p
+          style={{
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontSize: '18px',
+            fontWeight: 500,
+            letterSpacing: '0.36em',
+            color: '#2E2823',
+            textTransform: 'uppercase',
+            marginBottom: '12px',
+          }}
+        >
+          WELCOME TO
+        </p>
+
+        {/* MIMO 1.0 Brand Row */}
+        <div
+          className="relative flex items-baseline justify-center"
+          style={{ marginBottom: '10px' }}
+        >
+          {/* MIMO Word */}
+          <div className="relative inline-flex items-baseline">
+            <span
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: '124px',
+                fontWeight: 900,
+                letterSpacing: '-0.025em',
+                color: '#1A1A1A',
+                lineHeight: 1,
+              }}
+            >
+              MIMO
+            </span>
+          </div>
+
+          {/* 1.0 in Warm Caramel Gold */}
+          <span
             style={{
-              left: `${TRACK_PADDING}px`,
-              width: `${Math.min(440, dragX + KNOB_WIDTH)}px`,
-              background: isUnlocked
-                ? 'linear-gradient(90deg, #10B981 0%, #34D399 100%)'
-                : 'linear-gradient(90deg, #7D1120 0%, #A81C2E 60%, #D4AF37 100%)',
-              boxShadow: isUnlocked
-                ? '0 0 24px rgba(16, 185, 129, 0.45)'
-                : '0 4px 14px rgba(122, 18, 30, 0.35)',
-              transition: isDragging ? 'none' : 'width 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              fontSize: '94px',
+              fontWeight: 600,
+              letterSpacing: '-0.01em',
+              color: '#C48D4D',
+              marginLeft: '20px',
+              lineHeight: 1,
             }}
-          />
-        )}
-
-        {/* Unlocked feedback text */}
-        {isUnlocked && (
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center pl-4 text-[17px] font-extrabold uppercase tracking-[0.22em] text-white select-none">
-            UNLOCKED
+          >
+            1.0
           </span>
-        )}
+        </div>
 
-        {/* Draggable Active Maroon Knob — only visible when dragging or unlocked */}
-        {showActiveState && (
+        {/* Self-Service Printing Kiosk Subheading */}
+        <h2
+          style={{
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontSize: '36px',
+            fontWeight: 500,
+            letterSpacing: '-0.015em',
+            color: '#342D27',
+            margin: '0 0 46px 0',
+            textAlign: 'center',
+          }}
+        >
+          Self-Service Printing Kiosk
+        </h2>
+
+        {/* Swipe-to-Start Pill Interaction Container */}
+        <div
+          ref={trackRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          role="slider"
+          aria-label="Swipe to start printing"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round((dragX / MAX_DRAG) * 100)}
+          tabIndex={0}
+          className="relative flex items-center justify-center select-none"
+          style={{
+            width: `${TRACK_WIDTH}px`,
+            height: `${TRACK_HEIGHT}px`,
+            borderRadius: '9999px',
+            background:
+              'linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 243, 237, 0.92) 100%)',
+            boxShadow:
+              '0 10px 32px rgba(180, 140, 90, 0.18), 0 2px 6px rgba(0, 0, 0, 0.04), inset 0 1px 2px rgba(255, 255, 255, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.95)',
+            touchAction: 'none',
+            cursor: isUnlocked ? 'default' : (isDragging ? 'grabbing' : 'grab'),
+          }}
+        >
+          {/* Active progress fill trailing behind the knob */}
+          {(dragX > 0 || isUnlocked) && (
+            <div
+              className="pointer-events-none absolute inset-y-0 rounded-full"
+              style={{
+                left: `${TRACK_PADDING}px`,
+                width: `${Math.min(TRACK_WIDTH - (TRACK_PADDING * 2), dragX + KNOB_DIAMETER)}px`,
+                background: isUnlocked
+                  ? 'linear-gradient(90deg, #10B981 0%, #34D399 100%)'
+                  : 'linear-gradient(90deg, #D4AF37 0%, #E5C365 70%, #F5DF8E 100%)',
+                boxShadow: isUnlocked
+                  ? '0 0 24px rgba(16, 185, 129, 0.45)'
+                  : '0 2px 10px rgba(212, 175, 55, 0.35)',
+                transition: isDragging ? 'none' : 'width 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            />
+          )}
+
+          {/* Swipe Track Text */}
+          <span
+            className="pointer-events-none select-none text-center"
+            style={{
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              fontSize: '14.5px',
+              fontWeight: 700,
+              letterSpacing: '0.28em',
+              color: isUnlocked ? '#FFFFFF' : '#2E2823',
+              textTransform: 'uppercase',
+              paddingLeft: '56px',
+              opacity: isUnlocked ? 1 : Math.max(0.15, 1 - (dragX / (MAX_DRAG * 0.55))),
+              transition: isDragging ? 'none' : 'opacity 0.25s ease',
+            }}
+          >
+            {isUnlocked ? 'UNLOCKED' : 'SWIPE TO START'}
+          </span>
+
+          {/* Draggable Circular Knob */}
           <div
-            className={`pointer-events-none absolute top-0 flex items-center justify-center rounded-full select-none shadow-[0_4px_16px_rgba(74,9,18,0.45)] ring-2 transition-all ${
-              isUnlocked
-                ? 'bg-gradient-to-br from-[#10B981] via-[#059669] to-[#047857] text-white ring-white/90 shadow-[0_0_24px_rgba(16,185,129,0.5)]'
-                : 'bg-gradient-to-br from-[#7D1120] via-[#630917] to-[#45050E] text-[#FFF2D4] ring-[#ECC778]/90'
-            }`}
+            className="pointer-events-none absolute flex items-center justify-center rounded-full select-none"
             style={{
               left: `${TRACK_PADDING}px`,
-              width: `${KNOB_WIDTH}px`,
-              height: `${KNOB_HEIGHT}px`,
+              top: `${TRACK_PADDING}px`,
+              width: `${KNOB_DIAMETER}px`,
+              height: `${KNOB_DIAMETER}px`,
               transform: `translateX(${dragX}px)`,
+              background: isUnlocked
+                ? 'radial-gradient(circle at 35% 35%, #10B981 0%, #047857 100%)'
+                : 'radial-gradient(circle at 35% 35%, #423A33 0%, #1F1B18 100%)',
+              boxShadow: isUnlocked
+                ? '0 0 24px rgba(16, 185, 129, 0.6), 0 4px 12px rgba(0, 0, 0, 0.3)'
+                : '0 0 22px rgba(220, 160, 75, 0.75), 0 4px 12px rgba(0, 0, 0, 0.35)',
+              border: '1px solid rgba(255, 230, 180, 0.45)',
               transition: isDragging ? 'none' : 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
             {isUnlocked ? (
-              <Check size={32} weight="bold" className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]" />
+              <Check size={30} weight="bold" color="#FFFFFF" />
             ) : (
-              <CaretRight
-                size={34}
-                weight="bold"
-                className="translate-x-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-              />
+              <ArrowRight size={28} weight="bold" color="#FFFFFF" />
             )}
           </div>
-        )}
-      </div>
-      </DiwaliStage>
+        </div>
+
+        {/* Footer Copyright */}
+        <footer
+          style={{
+            position: 'absolute',
+            bottom: '48px',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontSize: '13.5px',
+            fontWeight: 500,
+            letterSpacing: '0.01em',
+            color: '#585049',
+            textAlign: 'center',
+          }}
+        >
+          &copy; 2026 VisionPrintt. All rights reserved.
+        </footer>
+      </main>
     </div>
   );
 };
