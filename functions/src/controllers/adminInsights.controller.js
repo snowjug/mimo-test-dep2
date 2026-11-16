@@ -61,15 +61,77 @@ async function lookupOrders(orderIds) {
   await Promise.all(
     chunks.map(async (c) => {
       try {
-        const snap = await db.collection("orders").where("orderId", "in", c).get();
-        snap.docs.forEach((doc) => {
+        const [ordersSnap, txnSnap] = await Promise.all([
+          db.collection("orders").where("orderId", "in", c).get(),
+          db.collection("payment_transactions").where("orderId", "in", c).get(),
+        ]);
+
+        ordersSnap.docs.forEach((doc) => {
           const d = doc.data();
+          if (!d.orderId) return;
           map.set(d.orderId, {
             couponCode: d.couponCode || null,
-            discountPercentage: d.discountPercentage || 0,
-            amount: d.amount,
-            gross: d.gross || d.totalCost || d.amount,
+            discountPercentage: d.discountPercentage !== undefined && d.discountPercentage !== null ? Number(d.discountPercentage) : null,
+            discountAmount: d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null,
+            amount: d.amount !== undefined && d.amount !== null ? Number(d.amount) : null,
+            gross: d.gross !== undefined && d.gross !== null ? Number(d.gross) : null,
+            coinsUsed: d.coinsUsed !== undefined && d.coinsUsed !== null ? Number(d.coinsUsed) : null,
+            coinsValue: d.coinsValue !== undefined && d.coinsValue !== null ? Number(d.coinsValue) : null,
+            status: d.status || d.orderStatus || null,
+            orderStatus: d.orderStatus || null,
+            refundStatus: d.refundStatus || null,
           });
+        });
+
+        txnSnap.docs.forEach((doc) => {
+          const d = doc.data();
+          if (!d.orderId) return;
+          const existing = map.get(d.orderId);
+          if (!existing) {
+            map.set(d.orderId, {
+              couponCode: d.couponCode || null,
+              discountPercentage: d.discountPercentage !== undefined && d.discountPercentage !== null ? Number(d.discountPercentage) : null,
+              discountAmount: d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null,
+              amount: d.amount !== undefined && d.amount !== null ? Number(d.amount) : null,
+              gross: d.gross !== undefined && d.gross !== null ? Number(d.gross) : null,
+              coinsUsed: d.coinsUsed !== undefined && d.coinsUsed !== null ? Number(d.coinsUsed) : null,
+              coinsValue: d.coinsValue !== undefined && d.coinsValue !== null ? Number(d.coinsValue) : null,
+              status: d.status || d.orderStatus || null,
+              orderStatus: d.orderStatus || null,
+              refundStatus: d.refundStatus || null,
+            });
+          } else {
+            if (d.amount !== undefined && d.amount !== null) {
+              existing.amount = Number(d.amount);
+            }
+            if (d.status) {
+              existing.status = d.status;
+            }
+            if (d.orderStatus) {
+              existing.orderStatus = d.orderStatus;
+            }
+            if (d.refundStatus) {
+              existing.refundStatus = d.refundStatus;
+            }
+            if (d.gross !== undefined && d.gross !== null && existing.gross === null) {
+              existing.gross = Number(d.gross);
+            }
+            if (d.couponCode && !existing.couponCode) {
+              existing.couponCode = d.couponCode;
+            }
+            if (d.discountPercentage !== undefined && d.discountPercentage !== null && existing.discountPercentage === null) {
+              existing.discountPercentage = Number(d.discountPercentage);
+            }
+            if (d.discountAmount !== undefined && d.discountAmount !== null && existing.discountAmount === null) {
+              existing.discountAmount = Number(d.discountAmount);
+            }
+            if (d.coinsUsed !== undefined && d.coinsUsed !== null && existing.coinsUsed === null) {
+              existing.coinsUsed = Number(d.coinsUsed);
+            }
+            if (d.coinsValue !== undefined && d.coinsValue !== null && existing.coinsValue === null) {
+              existing.coinsValue = Number(d.coinsValue);
+            }
+          }
         });
       } catch (err) {
         console.error("[ADMIN-INSIGHTS] lookupOrders chunk failed:", err.message || err);
@@ -219,6 +281,68 @@ const getAdminJobs = async (req, res) => {
       }
       const discount = Math.max(0, A.round2(originalCost - n.cost));
 
+      // ─── Authoritative fields for expanded details (zero guessing / derivation) ───
+      const rawPrintCode = (d.printCode !== undefined && d.printCode !== null && String(d.printCode).trim() !== "")
+        ? String(d.printCode).trim()
+        : null;
+      const printCode = rawPrintCode;
+
+      const rawOriginalAmount = d.originalCost !== undefined && d.originalCost !== null
+        ? d.originalCost
+        : (d.grossAmount !== undefined && d.grossAmount !== null
+          ? d.grossAmount
+          : (order?.gross !== undefined && order?.gross !== null ? order.gross : null));
+      const recordedOriginalAmount = rawOriginalAmount !== null ? Number(rawOriginalAmount) : null;
+
+      const rawDiscountPercentage = (d.discountPercentage !== undefined && d.discountPercentage !== null && Number(d.discountPercentage) > 0)
+        ? Number(d.discountPercentage)
+        : (order?.discountPercentage !== undefined && order?.discountPercentage !== null && Number(order.discountPercentage) > 0)
+          ? Number(order.discountPercentage)
+          : null;
+      const couponDiscountPercentage = rawDiscountPercentage;
+
+      const rawDiscountAmount = d.discount !== undefined && d.discount !== null
+        ? d.discount
+        : (d.discountAmount !== undefined && d.discountAmount !== null
+          ? d.discountAmount
+          : (order?.discountAmount !== undefined && order?.discountAmount !== null ? order.discountAmount : null));
+      const couponDiscountAmount = rawDiscountAmount !== null ? Number(rawDiscountAmount) : null;
+
+      const rawCoinsUsed = d.coinsToDeduct || d.coinsUsed || order?.coinsUsed || null;
+      const coinsUsed = rawCoinsUsed !== null ? Number(rawCoinsUsed) : null;
+
+      const rawCoinsValue = d.coinsValue !== undefined && d.coinsValue !== null
+        ? d.coinsValue
+        : (order?.coinsValue !== undefined && order?.coinsValue !== null ? order.coinsValue : null);
+      const coinsValue = rawCoinsValue !== null ? Number(rawCoinsValue) : null;
+
+      const actualAmountPaid = (order && order.amount !== undefined && order.amount !== null)
+        ? Number(order.amount)
+        : null;
+
+      let paymentStatus = null;
+      const isConfirmedRefund =
+        (refund && refund.state === "refunded") ||
+        order?.refundStatus === "SUCCESS" ||
+        order?.orderStatus === "refunded" ||
+        d.refundStatus === "SUCCESS" ||
+        String(d.status || "").toLowerCase() === "refunded";
+
+      const isPendingRefund =
+        (refund && refund.state === "pending") ||
+        order?.refundStatus === "PENDING" ||
+        d.refundStatus === "PENDING";
+
+      if (isConfirmedRefund) {
+        paymentStatus = "REFUNDED";
+      } else if (isPendingRefund) {
+        paymentStatus = "REFUND_PENDING";
+      } else if (order?.status) {
+        paymentStatus = String(order.status).toUpperCase();
+      } else if (order?.orderStatus) {
+        paymentStatus = String(order.orderStatus).toUpperCase();
+      }
+
       return {
         id: d.id,
         createdAt: A.iso(n.createdAtMs),
@@ -233,6 +357,14 @@ const getAdminJobs = async (req, res) => {
         originalCost,
         discount,
         couponCode,
+        printCode,
+        recordedOriginalAmount,
+        couponDiscountPercentage,
+        couponDiscountAmount,
+        coinsUsed,
+        coinsValue,
+        actualAmountPaid,
+        paymentStatus,
         copies: n.copies,
         pageCount: num0(d.pageCount) || 1,
         totalPages: n.pages,
