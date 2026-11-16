@@ -394,13 +394,6 @@ exports.printerHardwareNotification = onDocumentUpdated(
             }
           }
         }
-                );
-              } catch (mailErr) {
-                console.error(`[EMAIL ERROR] Low ink email failed for ${printerId}:`, mailErr.message || mailErr);
-              }
-            }
-          }
-        }
 
         // ── 4. PRINTER POWER / OFFLINE / NETWORK ALERT ──
         const currentStatus = String(printer.status || "").trim();
