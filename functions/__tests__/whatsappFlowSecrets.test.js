@@ -36,6 +36,8 @@ test("exports.api binds FLOW_PRIVATE_KEY_PEM and FLOW_APP_SECRET from Secret Man
   assert.ok(secrets.includes("GMAIL_APP_PASSWORD"), "pre-existing binding must be preserved");
   assert.ok(secrets.includes("FLOW_PRIVATE_KEY_PEM"), "Flow private key must be bound or it reads as \"\" in production");
   assert.ok(secrets.includes("FLOW_APP_SECRET"), "Flow app secret must be bound or it reads as \"\" in production");
+  assert.ok(secrets.includes("WA_ACCESS_TOKEN"), "WA_ACCESS_TOKEN must be bound from Secret Manager");
+  assert.ok(secrets.includes("WA_APP_SECRET"), "WA_APP_SECRET must be bound from Secret Manager");
 });
 
 test("exports.scheduledWhatsappFlowWorkerSweep is registered and exported", () => {

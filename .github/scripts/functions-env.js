@@ -69,7 +69,19 @@ const RECOMMENDED = [
 // functions/src/config/env.js's getSecretKey()) after a plain functions/.env value for these was found live
 // in production -- Firebase bundles a plain `.env` into every deploy, which is how that happened. Secret
 // Manager is now the only place a real value for these three is ever written.
-const SECRET_MANAGED = ["GMAIL_APP_PASSWORD", "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD", "FINANCE_EMAIL", "FINANCE_PASSWORD"];
+const SECRET_MANAGED = [
+  "GMAIL_APP_PASSWORD",
+  "JWT_SECRET",
+  "ADMIN_EMAIL",
+  "ADMIN_PASSWORD",
+  "FINANCE_EMAIL",
+  "FINANCE_PASSWORD",
+  "FLOW_PRIVATE_KEY_PEM",
+  "FLOW_APP_SECRET",
+  "GUARDIAN_MASTER_KEY",
+  "WA_ACCESS_TOKEN",
+  "WA_APP_SECRET",
+];
 // Moving from a plain value to Secret Manager: functions/index.js binds these, but the live function may still
 // carry them as plain env for one more deploy. They must not be written to .env in that deploy either (Google
 // rejects a name that is both plain and secret). The secrets MUST exist in Secret Manager before that deploy.

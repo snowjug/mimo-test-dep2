@@ -40,6 +40,8 @@ exports.api = onRequest(
       "FINANCE_PASSWORD",
       "FLOW_PRIVATE_KEY_PEM",
       "FLOW_APP_SECRET",
+      "WA_ACCESS_TOKEN",
+      "WA_APP_SECRET",
     ],
   },
   app

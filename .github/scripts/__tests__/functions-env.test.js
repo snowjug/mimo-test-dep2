@@ -143,6 +143,17 @@ test("a Secret Manager reference on the live function satisfies the requirement 
   assert.ok(r.stdout.includes("Secret Manager references: GMAIL_APP_PASSWORD"));
 });
 
+test("WA_ACCESS_TOKEN as a Secret Manager reference satisfies the requirement and is kept out of .env", () => {
+  const doc = liveDoc({ ADMIN_EMAIL: "ops@example.com" });
+  doc.spec.template.spec.containers[0].env.push({ name: "WA_ACCESS_TOKEN", valueFrom: { secretKeyRef: { name: "WA_ACCESS_TOKEN", key: "latest" } } });
+  assert.deepStrictEqual(parseLiveSecretRefs(doc), ["WA_ACCESS_TOKEN"]);
+  const { WA_ACCESS_TOKEN, ...rest } = GOOD;
+  const r = run(rest, doc);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.ok(!("WA_ACCESS_TOKEN" in parseDotenv(fs.readFileSync(r.out, "utf8"))));
+  assert.ok(r.stdout.includes("Secret Manager references: WA_ACCESS_TOKEN"));
+});
+
 test("without a live secret reference GMAIL_APP_PASSWORD is still required", () => {
   const { GMAIL_APP_PASSWORD, ...rest } = GOOD;
   const r = run(rest);
