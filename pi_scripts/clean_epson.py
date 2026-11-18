@@ -2,7 +2,9 @@
 MIMO Colour Printer Ink Cleaning (Manual / Admin Triggered)
 ==========================================================
 Performs printhead cleaning for the Epson colour ink printer (Epson L3250)
-when triggered manually via the Admin Dashboard. Automatic daily scheduling has been completely removed.
+only when triggered manually via the Admin Dashboard.
+All automatic scheduling (including 3:00 AM and 6:00 AM routines)
+has been completely removed and disabled.
 After cleaning completes, dispatches an email notification to visionprintt@gmail.com.
 
 Safety Architecture:
@@ -10,6 +12,7 @@ Safety Architecture:
 - If printer is busy, waits up to 5 minutes for the active job to finish. If still busy, aborts safely.
 - Dispatches notification to visionprintt@gmail.com via backend API and direct SMTP fallback.
 - Triggered manually from Admin Dashboard ("Clean Colour Ink" button) or CLI invocation with --now / --manual.
+- Automatic/crontab invocations without --manual / --now are explicitly rejected.
 """
 
 import os
@@ -301,12 +304,13 @@ def run_cleaning_job(printer_name=DEFAULT_PRINTER_NAME, kiosk_id=None, now=None,
     return success, detail
 
 
-def run_daily_scheduler(printer_name=DEFAULT_PRINTER_NAME, kiosk_id=None, target_hour=6, target_minute=0, clock=time):
+def run_daily_scheduler(printer_name=DEFAULT_PRINTER_NAME, kiosk_id=None, target_hour=None, target_minute=0, clock=time):
     """
-    Deprecated / Disabled: Automated scheduling is disabled.
-    Head cleaning is now triggered manually only from the Admin Dashboard.
+    Deprecated / Disabled: All automated colour ink cleaning scheduling (including 3:00 AM and 6:00 AM) is disabled.
+    Head cleaning is now triggered manually only from the Admin Dashboard ('Clean Colour Ink' button).
     """
-    log("ℹ️ Automatic colour ink cleaning scheduler is disabled. Head cleaning is admin-triggered only.")
+    timing_str = f" at {target_hour}:{target_minute:02d}" if target_hour is not None else ""
+    log(f"ℹ️ Automatic colour ink cleaning scheduler{timing_str} is completely disabled. Head cleaning is admin-triggered only.")
     return
 
 
@@ -320,8 +324,9 @@ def main():
     parser.add_argument("--kiosk", default=KIOSK_ID, help="Kiosk identifier (default: SV-002)")
     args = parser.parse_args()
 
-    if args.daemon or args.schedule:
-        log("⚠️ Automatic colour ink cleaning schedule is disabled. Trigger cleaning manually via Admin Dashboard or run with --now / --manual.")
+    # Reject any scheduled, daemon, or unattended invocations (e.g. legacy 3:00 AM or 6:00 AM crontab jobs)
+    if args.daemon or args.schedule or not (args.now or args.manual):
+        log("⚠️ Automatic colour ink cleaning schedule (including 3:00 AM and 6:00 AM) is disabled. Head cleaning must be triggered manually via Admin Dashboard ('Clean Colour Ink' button) or CLI with --manual / --now.")
         return
 
     # Execute safe manual cleaning run and notification

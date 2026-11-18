@@ -148,9 +148,23 @@ class CleanEpsonScheduleTests(unittest.TestCase):
         sec = CE.seconds_until_target_time(target_hour=6, target_minute=0, now=now)
         self.assertEqual(sec, 23.5 * 3600.0)
 
+    def test_seconds_until_target_time_3am(self):
+        # 2:30 AM today -> exactly 30 minutes (1800 seconds) to 3:00 AM today
+        now = datetime(2026, 10, 14, 2, 30, 0)
+        sec = CE.seconds_until_target_time(target_hour=3, target_minute=0, now=now)
+        self.assertEqual(sec, 1800.0)
+
+        # 3:30 AM today -> 23.5 hours (84600 seconds) to 3:00 AM tomorrow
+        now_after = datetime(2026, 10, 14, 3, 30, 0)
+        sec_after = CE.seconds_until_target_time(target_hour=3, target_minute=0, now=now_after)
+        self.assertEqual(sec_after, 23.5 * 3600.0)
+
     def test_run_daily_scheduler_is_disabled(self):
-        # Automated cleaning is disabled; run_daily_scheduler must return immediately
+        # Automated cleaning is disabled for all hours (including 3:00 AM and 6:00 AM);
+        # run_daily_scheduler must return immediately without calling run_cleaning_job.
         with mock.patch("clean_epson.run_cleaning_job") as mock_job:
+            CE.run_daily_scheduler("Epson_L3250", "SV-002", target_hour=3)
+            CE.run_daily_scheduler("Epson_L3250", "SV-002", target_hour=6)
             CE.run_daily_scheduler("Epson_L3250", "SV-002")
             mock_job.assert_not_called()
 
@@ -160,6 +174,35 @@ class CleanEpsonScheduleTests(unittest.TestCase):
         with mock.patch("clean_epson.run_cleaning_job") as mock_job:
             L.color_cleaning_scheduler_loop()
             mock_job.assert_not_called()
+
+    def test_main_cli_without_manual_flag_refuses_unattended_cleaning(self):
+        # When called without arguments (like standard cron jobs at 3:00 AM or 6:00 AM)
+        with mock.patch.object(sys, "argv", ["clean_epson.py"]):
+            with mock.patch("clean_epson.run_cleaning_job") as mock_job:
+                CE.main()
+                mock_job.assert_not_called()
+
+    def test_main_cli_with_schedule_or_daemon_refuses_cleaning(self):
+        with mock.patch.object(sys, "argv", ["clean_epson.py", "--daemon"]):
+            with mock.patch("clean_epson.run_cleaning_job") as mock_job:
+                CE.main()
+                mock_job.assert_not_called()
+
+        with mock.patch.object(sys, "argv", ["clean_epson.py", "--schedule"]):
+            with mock.patch("clean_epson.run_cleaning_job") as mock_job:
+                CE.main()
+                mock_job.assert_not_called()
+
+    def test_main_cli_with_manual_or_now_executes_safely(self):
+        with mock.patch.object(sys, "argv", ["clean_epson.py", "--manual"]):
+            with mock.patch("clean_epson.run_cleaning_job", return_value=(True, "ok")) as mock_job:
+                CE.main()
+                mock_job.assert_called_once()
+
+        with mock.patch.object(sys, "argv", ["clean_epson.py", "--now"]):
+            with mock.patch("clean_epson.run_cleaning_job", return_value=(True, "ok")) as mock_job:
+                CE.main()
+                mock_job.assert_called_once()
 
 
 class FirebaseListenerCleanCommandTests(unittest.TestCase):
