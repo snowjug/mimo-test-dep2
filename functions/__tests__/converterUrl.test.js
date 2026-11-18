@@ -38,6 +38,24 @@ test("the Functions emulator counts as local development", () => {
   assert.strictEqual(resolveConverterUrl(env), "http://localhost:8082");
 });
 
+test("NODE_ENV=production ignores a localhost converter URL even without K_SERVICE", () => {
+  assert.strictEqual(
+    resolveConverterUrl({ NODE_ENV: "production", CONVERTER_SERVICE_URL: "http://127.0.0.1:8082" }),
+    DEFAULT_CONVERTER_SERVICE_URL
+  );
+});
+
+test("GCLOUD_PROJECT or FIREBASE_CONFIG runtime ignores a localhost converter URL", () => {
+  assert.strictEqual(
+    resolveConverterUrl({ GCLOUD_PROJECT: "mimo-v2-11868", CONVERTER_SERVICE_URL: "http://localhost:8082" }),
+    DEFAULT_CONVERTER_SERVICE_URL
+  );
+  assert.strictEqual(
+    resolveConverterUrl({ FIREBASE_CONFIG: "{}", CONVERTER_SERVICE_URL: "http://127.0.0.1:8082" }),
+    DEFAULT_CONVERTER_SERVICE_URL
+  );
+});
+
 test("with nothing configured the Cloud Run converter is used", () => {
   assert.strictEqual(resolveConverterUrl({ ...CLOUD }, ""), DEFAULT_CONVERTER_SERVICE_URL);
 });

@@ -15,6 +15,10 @@ const { isDeployedRuntime } = require("../src/config/credentialSource");
 test("a Cloud Run / Cloud Functions runtime counts as deployed", () => {
   assert.strictEqual(isDeployedRuntime({ K_SERVICE: "api" }), true);
   assert.strictEqual(isDeployedRuntime({ FUNCTION_TARGET: "api" }), true);
+  assert.strictEqual(isDeployedRuntime({ NODE_ENV: "production" }), true);
+  assert.strictEqual(isDeployedRuntime({ FIREBASE_CONFIG: "{}" }), true);
+  assert.strictEqual(isDeployedRuntime({ GCLOUD_PROJECT: "mimo-v2-11868" }), true);
+  assert.strictEqual(isDeployedRuntime({ K_REVISION: "api-00001" }), true);
 });
 
 test("plain local development is not deployed", () => {

@@ -18,7 +18,7 @@ const LOCAL_URL_RE = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\
  */
 function resolveConverterUrl(env = process.env, configured = CONVERTER_SERVICE_URL) {
   const url = String(env.CONVERTER_SERVICE_URL || configured || DEFAULT_CONVERTER_SERVICE_URL).trim().replace(/\/+$/, "");
-  if (isDeployedRuntime(env) && LOCAL_URL_RE.test(url)) {
+  if ((isDeployedRuntime(env) || env.NODE_ENV === "production") && LOCAL_URL_RE.test(url)) {
     console.warn(`[CONVERTER] CONVERTER_SERVICE_URL (${url}) points at this machine, which cannot work on a deployed function. Using the Cloud Run converter instead.`);
     return DEFAULT_CONVERTER_SERVICE_URL;
   }
@@ -27,10 +27,11 @@ function resolveConverterUrl(env = process.env, configured = CONVERTER_SERVICE_U
 
 /**
  * Invokes the private LibreOffice converter service on Cloud Run via authenticated service-to-service call.
+ * If a local converter fails due to connection refused or host unreachable, automatically falls back to Cloud Run converter.
  * Returns { pageCount, fileUrl, storagePath } where fileUrl is the rendered PDF in Cloud Storage.
  */
 async function callOfficeConverter({ fileUrl, fileName, userId, jobId }) {
-  const converterUrl = resolveConverterUrl();
+  let converterUrl = resolveConverterUrl();
 
   const payload = {
     fileUrl,
@@ -47,13 +48,31 @@ async function callOfficeConverter({ fileUrl, fileName, userId, jobId }) {
   if (isLocalOrDirect) {
     // Local development, container testing, or direct secret invocation
     const secret = process.env.INTERNAL_CONVERTER_SECRET || INTERNAL_CONVERTER_SECRET;
-    response = await axios.post(`${converterUrl}/convert`, payload, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(secret ? { "x-internal-secret": secret } : {})
-      },
-      timeout: 75000
-    });
+    try {
+      response = await axios.post(`${converterUrl}/convert`, payload, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(secret ? { "x-internal-secret": secret } : {})
+        },
+        timeout: 75000
+      });
+    } catch (localErr) {
+      const isConnError = localErr.code === "ECONNREFUSED" || localErr.code === "ENOTFOUND" || localErr.code === "EAI_AGAIN" || localErr.message?.includes("ECONNREFUSED");
+      if (isConnError && converterUrl !== DEFAULT_CONVERTER_SERVICE_URL) {
+        console.warn(`[CONVERTER] Local converter at ${converterUrl} failed (${localErr.code || localErr.message}). Automatically falling back to Cloud Run converter ${DEFAULT_CONVERTER_SERVICE_URL}...`);
+        converterUrl = DEFAULT_CONVERTER_SERVICE_URL;
+        const auth = new GoogleAuth();
+        const client = await auth.getIdTokenClient(converterUrl);
+        response = await client.request({
+          url: `${converterUrl}/convert`,
+          method: "POST",
+          data: payload,
+          timeout: 75000
+        });
+      } else {
+        throw localErr;
+      }
+    }
   } else {
     // Production Cloud Run service-to-service IAM authentication
     const auth = new GoogleAuth();

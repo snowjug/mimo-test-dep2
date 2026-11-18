@@ -7,7 +7,18 @@
 
 function isDeployedRuntime(env = process.env) {
   if (env.FUNCTIONS_EMULATOR === "true") return false; // the emulator is local development, key files are fine
-  return Boolean(env.K_SERVICE || env.FUNCTION_TARGET); // Cloud Run / Cloud Functions set these on every revision
+  return Boolean(
+    env.K_SERVICE ||
+    env.FUNCTION_TARGET ||
+    env.FUNCTION_NAME ||
+    env.K_REVISION ||
+    env.K_CONFIGURATION ||
+    env.CLOUD_RUN_JOB ||
+    env.FIREBASE_CONFIG ||
+    env.GCLOUD_PROJECT ||
+    env.GOOGLE_CLOUD_PROJECT ||
+    env.NODE_ENV === "production"
+  );
 }
 
 module.exports = { isDeployedRuntime };
