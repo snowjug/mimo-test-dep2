@@ -85,6 +85,23 @@ test("CLI: complete secure config writes .env and prints no secret values", () =
   assert.ok(fs.readFileSync(r.out, "utf8").includes("JWT_SECRET="));
 });
 
+test("CLI: localhost CONVERTER_SERVICE_URL is stripped from production .env", () => {
+  const r = run({ ...GOOD, CONVERTER_SERVICE_URL: "http://localhost:8082" });
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.ok(r.written);
+  const parsed = parseDotenv(fs.readFileSync(r.out, "utf8"));
+  assert.strictEqual(parsed.CONVERTER_SERVICE_URL, undefined, "localhost CONVERTER_SERVICE_URL must be stripped");
+  assert.ok(r.stdout.includes("[ENV] CONVERTER_SERVICE_URL points at localhost"));
+});
+
+test("CLI: valid remote CONVERTER_SERVICE_URL is preserved", () => {
+  const r = run({ ...GOOD, CONVERTER_SERVICE_URL: "https://custom-converter.example.run.app" });
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.ok(r.written);
+  const parsed = parseDotenv(fs.readFileSync(r.out, "utf8"));
+  assert.strictEqual(parsed.CONVERTER_SERVICE_URL, "https://custom-converter.example.run.app");
+});
+
 test("CLI: live production values are preserved and empty secret values do not overwrite them", () => {
   const r = run({ ADMIN_PASSWORD: "", JWT_SECRET: "" }, liveDoc(GOOD));
   assert.strictEqual(r.status, 0, r.stderr);

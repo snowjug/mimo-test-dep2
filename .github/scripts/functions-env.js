@@ -179,6 +179,11 @@ function main() {
   const liveSecretRefs = parseLiveSecretRefs(liveJson);
   const secretEnv = parseDotenv(process.env.FUNCTIONS_ENV_FILE || "");
   const { merged, dropped } = mergeSources({ live, secretEnv });
+  const LOCAL_CONVERTER_RE = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i;
+  if (merged.CONVERTER_SERVICE_URL && LOCAL_CONVERTER_RE.test(merged.CONVERTER_SERVICE_URL)) {
+    say(`[ENV] CONVERTER_SERVICE_URL points at localhost (${merged.CONVERTER_SERVICE_URL}); stripping it so the deployed function uses DEFAULT_CONVERTER_SERVICE_URL`);
+    delete merged.CONVERTER_SERVICE_URL;
+  }
   const boundSecrets = SECRET_MANAGED.filter((n) => liveSecretRefs.includes(n) || MIGRATING_TO_SECRET.includes(n));
   boundSecrets.forEach((n) => delete merged[n]);
   const validation = validate(merged);

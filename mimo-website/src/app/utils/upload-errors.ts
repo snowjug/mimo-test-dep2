@@ -15,7 +15,13 @@ export function describeUploadFailure(err: unknown): string {
     (err as any)?.message === "canceled";
   if (isAborted) return "Upload cancelled.";
 
-  if (typeof serverMessage === "string" && serverMessage.trim()) return serverMessage.trim();
+  if (typeof serverMessage === "string" && serverMessage.trim()) {
+    const trimmed = serverMessage.trim();
+    if (trimmed.includes("ECONNREFUSED") || trimmed.includes("127.0.0.1") || trimmed.includes("ETIMEDOUT")) {
+      return "Document conversion service is temporarily unavailable. Please try again in a moment or upload a PDF.";
+    }
+    return trimmed;
+  }
   if (e?.response?.status === 401) return "Your session has expired. Please log in again.";
   if (e?.response?.status === 413) return "That file is too large to upload.";
   if (e && !e.response) return "Couldn't reach MIMO. Check your internet connection and try again.";
