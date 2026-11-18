@@ -2904,10 +2904,10 @@ def on_command_snapshot(doc_snapshots, changes, read_time):
 
 
 def color_cleaning_scheduler_loop():
-    """Automatic colour ink cleaning is completely disabled.
+    """Automatic colour ink cleaning is completely disabled (both 3:00 AM and 6:00 AM schedules removed).
     Printhead cleaning is performed manually only when requested by the developer/admin
     via the Admin Dashboard ('Clean Colour Ink' button)."""
-    print("ℹ️ [CLEAN] Automatic colour ink cleaning scheduler is disabled. Head cleaning is admin-triggered only.")
+    print("ℹ️ [CLEAN] Automatic colour ink cleaning scheduler (3:00 AM and 6:00 AM) is disabled. Head cleaning is admin-triggered only.")
     return
 
 
@@ -2988,7 +2988,7 @@ if __name__ == "__main__":
     threading.Thread(target=keep_warm_loop, daemon=True).start()
     threading.Thread(target=prefetch_cache_cleanup_loop, daemon=True).start()
     threading.Thread(target=daily_maintenance_loop, daemon=True).start()
-    # Note: Automated colour cleaning thread removed; cleaning is triggered manually from Admin Dashboard
+    # Note: Automated colour cleaning thread (3:00 AM / 6:00 AM) removed; cleaning is triggered manually from Admin Dashboard
 
     print(f"📡 Pi Listener Started. Identity: {KIOSK_ID}")
     print(f"📡 Target Printers -> B&W: {BW_PRINTER_NAME} | Color: {COLOR_PRINTER_NAME}")

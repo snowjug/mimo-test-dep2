@@ -715,8 +715,9 @@ function createKioskRouter(dependencies) {
   });
 
   // ================= 5. KIOSK: REPORT CLEANING STATUS =================
-  // The Pi's automated colour ink cleaning routine (scheduled at 6:00 AM) calls this after cleaning finishes
-  // to notify visionprintt@gmail.com and record the maintenance event in Firestore.
+  // Head cleaning routine for colour printer ink, triggered manually via Admin Dashboard ('Clean Colour Ink' button).
+  // All automated schedules (including 3:00 AM and 6:00 AM routines) have been completely removed.
+  // Records the maintenance event in Firestore and sends a notification email to visionprintt@gmail.com.
   router.post("/report-clean", async (req, res) => {
     try {
       const { kioskId, printerName, secret, status, detail } = req.body || {};

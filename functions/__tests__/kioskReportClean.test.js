@@ -2,6 +2,12 @@ const test = require("node:test");
 require("./helpers/quiet");
 const assert = require("node:assert");
 const { createFakeFirestore } = require("./helpers/fakeFirestore");
+const nodemailer = require("nodemailer");
+
+// Mock nodemailer in unit test to avoid external network calls
+nodemailer.createTransport = () => ({
+  sendMail: async () => ({ messageId: "mock-test-id" }),
+});
 
 process.env.INTERNAL_WEBHOOK_SECRET = "test-internal-secret-12345";
 
@@ -56,7 +62,7 @@ test.describe("POST /kiosk/report-clean route", () => {
       printerName: "Epson_L3250",
       secret: "test-internal-secret-12345",
       status: "completed",
-      detail: "Automated daily 6:00 AM colour ink head cleaning finished successfully.",
+      detail: "Manual colour ink head cleaning from Admin Dashboard finished successfully.",
     });
 
     assert.strictEqual(res.code, 200);
