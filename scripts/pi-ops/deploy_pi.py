@@ -6,6 +6,7 @@ import os
 sys.stdout.reconfigure(encoding='utf-8')
 
 LOCAL_LISTENER_PATH = str(pi.LISTENER_PATH)
+LOCAL_CLEAN_PATH = str(pi.REPO_ROOT / "pi_scripts" / "clean_epson.py")
 
 def main():
     if not os.path.exists(LOCAL_LISTENER_PATH):
@@ -24,13 +25,27 @@ def main():
         client.exec_command(f"@SUDO@ systemctl stop mimo-listener")
 
         # 3. SFTP upload to pi
-        print("Uploading listener to pi...")
+        print("Uploading scripts to pi...")
         sftp = client.open_sftp()
         sftp.put(LOCAL_LISTENER_PATH, '/home/pi/mimo/firebase_listener.py')
+        if os.path.exists(LOCAL_CLEAN_PATH):
+            sftp.put(LOCAL_CLEAN_PATH, '/home/pi/mimo/clean_epson.py')
         sftp.close()
-        print("Uploaded successfully to pi!")
+        print("Uploaded scripts successfully to pi!")
 
-        # 4. Start mimo-listener on pi
+        # 4. Remove automatic crontab for clean_epson if present
+        stdin, stdout, stderr = client.exec_command("crontab -l")
+        cron_content = stdout.read().decode('utf-8', errors='replace')
+        if "clean_epson" in cron_content:
+            new_cron = "\n".join([l for l in cron_content.splitlines() if "clean_epson" not in l]).strip() + "\n"
+            sftp = client.open_sftp()
+            with sftp.open("/home/pi/new_crontab.txt", "w") as f:
+                f.write(new_cron)
+            sftp.close()
+            client.exec_command("crontab /home/pi/new_crontab.txt && rm -f /home/pi/new_crontab.txt")
+            print("Removed legacy clean_epson from crontab.")
+
+        # 5. Start mimo-listener on pi
         print("Starting service on pi...")
         client.exec_command(f"@SUDO@ systemctl start mimo-listener")
         print("mimo-listener restarted on pi!")
