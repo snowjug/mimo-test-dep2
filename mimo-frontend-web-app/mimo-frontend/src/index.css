@@ -759,3 +759,15 @@ body.theme-mimo1-diwali,
 #root.theme-mimo1-diwali {
   background: #FAF4E8;
 }
+
+#root.theme-mimo1-diwali {
+  height: var(--kiosk-height, 810px);
+}
+
+#root.theme-mimo1-diwali .mimo1-welcome-screen,
+#root.theme-mimo1-diwali .mimo1-code-entry-screen,
+#root.theme-mimo1-diwali .mimo1-printing-screen,
+#root.theme-mimo1-diwali .mimo1-summary-screen {
+  height: 100% !important;
+  width: 100% !important;
+}

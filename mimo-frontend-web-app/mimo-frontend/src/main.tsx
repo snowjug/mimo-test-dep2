@@ -19,15 +19,37 @@ const resolveKioskId = () => {
 };
 const isMimo1Diwali = resolveKioskId() === 'CV-001';
 
-// MIMO 1.0's Diwali screens are drawn on a fixed 1440x810 canvas. Every other kiosk keeps the flexible width below.
+// MIMO 1.0 (CV-001) responsive scaling: preserves 1440px base width, expands height to fill viewport on non-16:9 screens (e.g. Lenovo Tab M9 1340x800)
 const updateMimo1DiwaliScale = () => {
   const isPortrait = window.innerWidth <= 1000 && window.innerHeight > window.innerWidth;
-  const scale = isPortrait
-    ? Math.min(window.innerWidth / 810, window.innerHeight / 1440)
-    : Math.min(window.innerWidth / 1440, window.innerHeight / 810);
+  let scale = 1;
+  let kioskWidth = 1440;
+  let kioskHeight = 810;
+
+  if (isPortrait) {
+    scale = Math.min(window.innerWidth / 810, window.innerHeight / 1440);
+    kioskWidth = 810;
+    kioskHeight = window.innerHeight / scale;
+  } else {
+    const screenAspect = window.innerWidth / window.innerHeight;
+    const baseAspect = 1440 / 810;
+
+    if (screenAspect >= baseAspect) {
+      // Screen is wider than 16:9
+      scale = window.innerHeight / 810;
+      kioskWidth = window.innerWidth / scale;
+      kioskHeight = 810;
+    } else {
+      // Screen is narrower than 16:9 (e.g. Lenovo Tab M9 1340x800)
+      scale = window.innerWidth / 1440;
+      kioskWidth = 1440;
+      kioskHeight = window.innerHeight / scale;
+    }
+  }
+
   document.documentElement.style.setProperty('--kiosk-scale', `${scale}`);
-  document.documentElement.style.setProperty('--kiosk-width', '1440px');
-  document.documentElement.style.setProperty('--kiosk-height', '810px');
+  document.documentElement.style.setProperty('--kiosk-width', `${kioskWidth}px`);
+  document.documentElement.style.setProperty('--kiosk-height', `${kioskHeight}px`);
 };
 
 const updateScale = () => {
