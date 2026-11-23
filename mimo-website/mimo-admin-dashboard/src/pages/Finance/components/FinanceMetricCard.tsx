@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { statFontSize } from '../../../lib/format';
 
 export interface FinanceMetricCardProps {
   title: string;

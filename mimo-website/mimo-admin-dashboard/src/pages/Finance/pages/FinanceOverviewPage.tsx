@@ -51,7 +51,7 @@ import { ErrorBanner, TruncatedNote } from '../../../components/insights/Insight
 import { LiveIndicator } from '../../../components/ui/LiveIndicator';
 import { useRange } from '../../../context/RangeContext';
 import { describeRange, pctChange, bucketLabel, presetRange, toDateKey } from '../../../lib/dateRange';
-import { clockTime, dateTime, inr, int } from '../../../lib/format';
+import { clockTime, dateTime, inr, int, statFontSize } from '../../../lib/format';
 
 const fmtDateShort = (key?: string) => {
   if (!key) return '';
