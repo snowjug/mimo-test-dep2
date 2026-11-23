@@ -20,7 +20,7 @@ const { admin, db: defaultDb } = require("../config/firebase");
 const { sendWhatsAppMessage } = require("../services/whatsapp.service");
 const { getTransporter } = require("../services/email.service");
 const { loadPricing } = require("../services/pricing.service");
-const { generateUniquePrintCode } = require("../services/printCode.service");
+const { generateUniquePrintCode, ensureCodeIsUnique } = require("../services/printCode.service");
 const { loadMachinesMap, loadMachineTemplatesMap, describeDestination } = require("../services/machineRegistry.service");
 
 // Upper bound for copies of one order (the customer site allows 1-99). Verbatim from payment.controller.js.
@@ -275,13 +275,19 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
     if (candidateJob && candidateOrderId) {
       const cData = candidateJob.data();
 
-      // Case A: Print code was already issued!
+      // Case A: Print code was already issued! Still-redeemable jobs go back through fulfillPaidOrder so the code
+      // is uniqueness-checked (and reissued if another active order holds it) before the customer sees it.
       if (cData.printCode) {
+        let printCode = cData.printCode;
+        if (["pending", "paid"].includes(cData.status)) {
+          const verified = await fulfillPaidOrder({ db, userId, orderId: candidateOrderId, reqUser, customerEmail: customer?.email });
+          printCode = verified.printCode;
+        }
         return {
           orderId: candidateOrderId,
           paymentSessionId: null,
           amount: cData.pricing?.jobCost || cData.totalCost || 0,
-          printCode: cData.printCode,
+          printCode,
           free: true,
           alreadyIssued: true,
         };
@@ -760,16 +766,20 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
 async function fulfillPaidOrder({ db = defaultDb, userId, orderId, reqUser, customerEmail } = {}) {
   const now = new Date();
 
+  // orderId is mandatory. Without it the query below used to match EVERY pending/paid job this user has, across
+  // all of their orders, and stamp one shared code onto all of them -- which the kiosk then rejects as
+  // "matched more than one order". Every in-repo caller already passes it.
+  if (typeof orderId !== "string" || !orderId.trim()) {
+    throw new OrderServiceError(400, "orderId is required to issue a print code.");
+  }
+
   // The whole read-check-write sequence runs inside a single Firestore transaction, keyed by orderId —
   // identical to current main's postPaymentSuccess.
   const outcome = await db.runTransaction(async (tx) => {
-    let queryRef = db.collection("print_jobs")
+    const queryRef = db.collection("print_jobs")
       .where("userId", "==", userId)
-      .where("status", "in", ["pending", "paid"]);
-
-    if (orderId) {
-      queryRef = queryRef.where("orderId", "==", orderId);
-    }
+      .where("status", "in", ["pending", "paid"])
+      .where("orderId", "==", orderId);
 
     const snapshot = await tx.get(queryRef);
 
@@ -784,7 +794,12 @@ async function fulfillPaidOrder({ db = defaultDb, userId, orderId, reqUser, cust
       if (recentJob) {
         const jobData = recentJob.data();
         const directKioskId = jobData.printOptions?.directKioskId || jobData.settings?.directKioskId || jobData.kioskId || null;
-        return { status: 200, alreadyIssued: true, body: { printCode: recentJob.data().printCode, directKioskId } };
+        // The code may have been stamped by something other than this API (the legacy backend). Never hand out a
+        // code another active order also holds -- swap in a fresh unique one first.
+        const printCode = await ensureCodeIsUnique(db, tx, {
+          orderId, code: jobData.printCode, orderJobDocs: snapshot.docs.filter((d) => d.data().printCode),
+        });
+        return { status: 200, alreadyIssued: true, body: { printCode, directKioskId } };
       }
       return { status: 400, body: { error: "No pending jobs without code" } };
     }
