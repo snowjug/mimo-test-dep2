@@ -21,6 +21,12 @@ const CODE_VALIDITY_MS = 24 * 60 * 60 * 1000;
 // crypto.randomInt's upper bound is exclusive, so (1000, 10000) is the 1000-9999 inclusive range.
 const randomCode = () => crypto.randomInt(1000, 10000).toString();
 
+const TERMINAL_STATUSES = new Set(["refunded", "failed", "abandoned", "cancelled"]);
+
+/** True while a print_jobs doc still owns its printCode (redeemable, or unprinted and not terminally failed). */
+const isJobHoldingCode = (data) =>
+  ACTIVE_STATUSES.has(data.status) || (data.isPrinted === false && !TERMINAL_STATUSES.has(data.status));
+
 /** Runs the check-and-claim against whatever transaction-like object is given (a real transaction, or the
  * per-attempt one generateUniquePrintCode opens itself) -- reads and the claim write all join the SAME
  * transaction's read/write set either way, which is what makes the claim atomic. */
@@ -36,16 +42,7 @@ async function tryClaim(txLike, claimRef, jobsQuery) {
   if (claimSnap.exists && now - (claimSnap.data().claimedAtMs || 0) < CODE_VALIDITY_MS) {
     return false; // still claimed by a previous allocation, not yet expired
   }
-  const isJobStillActive = (d) => {
-    const data = d.data();
-    if (ACTIVE_STATUSES.has(data.status)) return true;
-    // Any unprinted job that hasn't reached a terminal failure state must retain its code
-    if (data.isPrinted === false && !["refunded", "failed", "abandoned", "cancelled"].includes(data.status)) {
-      return true;
-    }
-    return false;
-  };
-  if (activeJobsSnap.docs.some(isJobStillActive)) {
+  if (activeJobsSnap.docs.some((d) => isJobHoldingCode(d.data()))) {
     return false; // held by a still-active job directly, independent of the claim
   }
   txLike.set(claimRef, { claimedAtMs: now });
@@ -73,4 +70,43 @@ async function generateUniquePrintCode(db, tx = null) {
   throw new Error("Could not allocate a unique print code");
 }
 
-module.exports = { generateUniquePrintCode, ACTIVE_STATUSES, MAX_ATTEMPTS, CODE_VALIDITY_MS };
+/**
+ * Called, inside the caller's transaction, before an ALREADY-STAMPED code is handed to a customer. A code can reach
+ * a job without going through generateUniquePrintCode -- the retired legacy backend (deleteable/backend, still live
+ * on 2026-11-23 and sharing this Firestore) stamps codes with a bare Math.random() and no uniqueness check, which
+ * caused the 9139 "matched more than one order" incident. The customer only ever learns the code from THIS API's
+ * response, so it is safe to correct it here:
+ *  - another order's job still holds the same code -> allocate a fresh unique code and re-stamp this order's jobs;
+ *  - otherwise, the code is ours to keep -> record a claim (if missing) so the allocator never hands it out again.
+ * Reads happen before any write, as Firestore transactions require.
+ * @returns {Promise<string>} the code the customer must be given.
+ */
+async function ensureCodeIsUnique(db, tx, { orderId, code, orderJobDocs }) {
+  const codeStr = String(code);
+  const claimRef = db.collection("print_code_claims").doc(codeStr);
+  const [claimSnap, sameCodeSnap] = await Promise.all([
+    tx.get(claimRef),
+    tx.get(db.collection("print_jobs").where("printCode", "==", codeStr)),
+  ]);
+  const otherOrders = [...new Set(sameCodeSnap.docs
+    .filter((d) => d.data().orderId !== orderId && isJobHoldingCode(d.data()))
+    .map((d) => d.data().orderId || d.id))];
+
+  if (otherOrders.length === 0) {
+    const claimFresh = claimSnap.exists && Date.now() - (claimSnap.data().claimedAtMs || 0) < CODE_VALIDITY_MS;
+    if (!claimFresh) tx.set(claimRef, { claimedAtMs: Date.now(), orderId, adopted: true });
+    return codeStr;
+  }
+
+  const fresh = await generateUniquePrintCode(db, tx);
+  console.error(`[PRINT-CODE REISSUED] order ${orderId} carried code ${codeStr}, also held by active order(s) ` +
+    `${otherOrders.join(",")} -- reissued as ${fresh} before showing it to the customer`);
+  orderJobDocs.forEach((d) => {
+    const update = { printCode: fresh, codeCreatedAt: new Date(), codeReissuedFrom: codeStr };
+    if (d.data().tokenId !== undefined) update.tokenId = fresh; // legacy jobs mirror the code into tokenId
+    tx.update(d.ref, update);
+  });
+  return fresh;
+}
+
+module.exports = { generateUniquePrintCode, ensureCodeIsUnique, isJobHoldingCode, ACTIVE_STATUSES, MAX_ATTEMPTS, CODE_VALIDITY_MS };

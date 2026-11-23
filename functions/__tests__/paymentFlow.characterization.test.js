@@ -135,11 +135,49 @@ test.describe("POST /payment-success (assigns the 4-digit print code)", () => {
   });
 
   test("jobs that already have a code: the existing code is returned and nothing is written (idempotent)", async () => {
-    fake.reset({ print_jobs: { j1: job({ status: "paid", printCode: "1111", kioskId: "SV-002" }) } });
+    fake.reset({
+      print_jobs: { j1: job({ status: "paid", printCode: "1111", kioskId: "SV-002" }) },
+      print_code_claims: { 1111: { claimedAtMs: Date.now() } },
+    });
     const res = response();
     await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
     assert.deepStrictEqual(res.body, { printCode: "1111", directKioskId: "SV-002" });
     assert.strictEqual(fake.log.writes.length, 0);
+  });
+
+  test("a code stamped outside this API (no claim) but unique is kept, and claimed so it is never handed out again", async () => {
+    fake.reset({ print_jobs: { j1: job({ status: "paid", printCode: "4242", tokenId: "4242" }) } });
+    const res = response();
+    await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
+    assert.strictEqual(res.body.printCode, "4242");
+    assert.strictEqual(fake.data("print_jobs").j1.printCode, "4242");
+    assert.ok(fake.data("print_code_claims")["4242"], "the adopted code now has a claim");
+  });
+
+  test("REGRESSION 9139: a legacy-stamped code another customer's active order holds is reissued before the customer sees it", async () => {
+    fake.reset({ print_jobs: {
+      theirs: job({ userId: "u2", orderId: "order_other", status: "paid", printCode: "9139", tokenId: "9139", isPrinted: false }),
+      mine: job({ status: "paid", printCode: "9139", tokenId: "9139", isPrinted: false }),
+    } });
+    const res = response();
+    await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
+    const jobs = fake.data("print_jobs");
+    assert.match(res.body.printCode, /^[1-9]\d{3}$/);
+    assert.notStrictEqual(res.body.printCode, "9139");
+    assert.strictEqual(jobs.mine.printCode, res.body.printCode);
+    assert.strictEqual(jobs.mine.tokenId, res.body.printCode);
+    assert.strictEqual(jobs.mine.codeReissuedFrom, "9139");
+    assert.strictEqual(jobs.theirs.printCode, "9139", "the other customer's code is never touched");
+  });
+
+  test("an old, already-printed job on the same code does not force a reissue", async () => {
+    fake.reset({ print_jobs: {
+      old: job({ userId: "u2", orderId: "order_old", status: "completed", printCode: "5555", isPrinted: true }),
+      mine: job({ status: "paid", printCode: "5555" }),
+    } });
+    const res = response();
+    await postPaymentSuccess({ user: { userId: "u1" }, body: { orderId: "order_1" } }, res);
+    assert.strictEqual(res.body.printCode, "5555");
   });
 
   test("no pending or paid jobs: 400", async () => {
@@ -177,7 +215,16 @@ test.describe("POST /payment-success (assigns the 4-digit print code)", () => {
     await refused({ o1: order({ status: "REFUNDED" }) });                               // refunded
     await refused({ o1: order({ userId: "u2" }) });                                     // someone else's paid order
     await refused({ o1: order({ orderId: "order_9" }) });                               // a different order
-    await refused({ o1: order() }, { j1: job({ orderId: undefined }) }, {});          // job without an order id
+  });
+
+  test("a call without an orderId is refused before anything is read or written", async () => {
+    fake.reset({ print_jobs: { j1: job({ orderId: undefined }) }, orders: { o1: order() } });
+    const res = response();
+    await postPaymentSuccess({ user: { userId: "u1" }, body: {} }, res);
+    assert.strictEqual(res.code, 400);
+    assert.deepStrictEqual(res.body, { error: "orderId is required to issue a print code." });
+    assert.strictEqual(fake.log.writes.length, 0);
+    assert.strictEqual(fake.data("print_jobs").j1.status, "pending");
   });
 
   test("a PAID order in payment_transactions (the gateway path) is accepted, and so is one in orders (free orders)", async () => {
@@ -190,12 +237,17 @@ test.describe("POST /payment-success (assigns the 4-digit print code)", () => {
     }
   });
 
-  test("all orders behind a multi-order call must be paid, otherwise nothing is issued", async () => {
-    fake.reset({ print_jobs: { a: job(), b: job({ orderId: "order_2" }) }, orders: { o1: order(), o2: order({ orderId: "order_2", status: "INITIATED" }) } });
+  test("one call never spans orders: two PAID orders of the same user are not stamped with one shared code", async () => {
+    // Regression for the 2026-11-23 "this code matched more than one order" incident: an orderId-less call used to
+    // give every pending job of the user, across ALL their orders, one code -- which the kiosk then rejects.
+    fake.reset({ print_jobs: { a: job(), b: job({ orderId: "order_2" }) }, orders: { o1: order(), o2: order({ orderId: "order_2" }) } });
     const res = response();
     await postPaymentSuccess({ user: { userId: "u1" }, body: {} }, res);
-    assert.strictEqual(res.code, 403);
+    assert.strictEqual(res.code, 400);
     assert.strictEqual(fake.log.writes.length, 0);
+    const jobs = fake.data("print_jobs");
+    assert.strictEqual(jobs.a.printCode, undefined);
+    assert.strictEqual(jobs.b.printCode, undefined);
   });
 
   test("KNOWN RISK: print codes are random 4-digit numbers with no uniqueness check across users", async () => {
