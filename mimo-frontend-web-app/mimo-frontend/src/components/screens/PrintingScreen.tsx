@@ -183,7 +183,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     // "page counter moved N" at completion), so per-sheet milestones would park the bar and then jump.
     // Pace it to real CV-001 job durations instead (Pi receives job -> physical finish, 2026-11-25 logs:
     // 1 sheet 26-28 s, 3 sheets 26 s, 4-6 sheets 34-35 s, 9 sheets 34 s, 12 sheets 43 s => ~22 s + 1.8 s/sheet).
-    const cv001TickMs = kioskId === 'CV-001' ? Math.round(((22 + 1.8 * totalSheets) * 1000) / 95) : null;
+    const cv001TickMs = kioskId === 'CV-001' ? Math.round(((27 + 1.8 * totalSheets) * 1000) / 95) : null; // +5 s: the screen starts ~4-5 s before the Pi receives the job (real test print 2026-11-26: 2 sheets, screen start -> physical finish 37 s)
     const initialDelay = cv001TickMs ?? getVisualTickDelay(progressRef.current, colorMode, totalSheets);
     tickTimerRef.current = window.setTimeout(tick, initialDelay);
   }, [colorMode, pages, copies, doubleSided, kioskId]);
