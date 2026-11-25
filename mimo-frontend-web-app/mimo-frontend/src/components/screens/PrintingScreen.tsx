@@ -175,13 +175,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         setProgress(next);
       }
 
-      const delay = getVisualTickDelay(progressRef.current, colorMode, totalSheets);
+      const delay = cv001TickMs ?? getVisualTickDelay(progressRef.current, colorMode, totalSheets);
       tickTimerRef.current = window.setTimeout(tick, delay);
     };
 
-    const initialDelay = getVisualTickDelay(progressRef.current, colorMode, totalSheets);
+    // CV-001's Brother reports its page count only when the whole job has finished (listener log:
+    // "page counter moved N" at completion), so per-sheet milestones would park the bar and then jump.
+    // Pace it to real CV-001 job durations instead (Pi receives job -> physical finish, 2026-11-25 logs:
+    // 1 sheet 26-28 s, 3 sheets 26 s, 4-6 sheets 34-35 s, 9 sheets 34 s, 12 sheets 43 s => ~22 s + 1.8 s/sheet).
+    const cv001TickMs = kioskId === 'CV-001' ? Math.round(((22 + 1.8 * totalSheets) * 1000) / 95) : null;
+    const initialDelay = cv001TickMs ?? getVisualTickDelay(progressRef.current, colorMode, totalSheets);
     tickTimerRef.current = window.setTimeout(tick, initialDelay);
-  }, [colorMode, pages, copies, doubleSided]);
+  }, [colorMode, pages, copies, doubleSided, kioskId]);
 
   // ─── polling ───────────────────────────────────────────────────────────────
 
@@ -246,7 +251,10 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
         sheetsCompletedRef.current = result.sheetsCompleted;
         milestoneFloorRef.current = result.milestoneFloor;
-        milestoneCeilingRef.current = result.milestoneCeiling;
+        // CV-001: time-paced up to 95% (see startSmoothTick); real stages/sheets still raise the floor.
+        milestoneCeilingRef.current = kioskId === 'CV-001' && !result.isCompleted
+          ? Math.max(result.milestoneFloor, 95)
+          : result.milestoneCeiling;
 
         if (result.isCompleted) {
           setPrintDone(true);
@@ -287,7 +295,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         isPollingRef.current = false;
       }
     }, delayMs);
-  }, [printCode, isActive, pages, copies, doubleSided, onError, clearAllTimers, printTimeoutMs, colorMode, startSmoothTick]);
+  }, [printCode, isActive, pages, copies, doubleSided, onError, clearAllTimers, printTimeoutMs, colorMode, startSmoothTick, kioskId]);
 
   // ─── demo mode fallback (used ONLY when printCode is '0000'/'9999' or missing) ──
 
