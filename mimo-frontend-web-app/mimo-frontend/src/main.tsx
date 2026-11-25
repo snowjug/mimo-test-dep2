@@ -22,6 +22,8 @@ const resolveKioskId = () => {
   return import.meta.env.VITE_KIOSK_ID;
 };
 const isMimo1Diwali = resolveKioskId() === 'CV-001';
+// MIMO 2.0 (SV-002) white-lily theme: its stylesheet is scoped to this class (src/components/mimo2/mimo2-lily.css).
+if (resolveKioskId() === 'SV-002') document.documentElement.classList.add('mimo2-lily');
 
 // MIMO 1.0's Diwali screens are drawn on a fixed 1440x810 canvas. Every other kiosk keeps the flexible width below.
 const updateMimo1DiwaliScale = () => {

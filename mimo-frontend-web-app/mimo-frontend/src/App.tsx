@@ -7,6 +7,15 @@ import { SummaryScreen } from './components/screens/SummaryScreen';
 import { SystemErrorScreen } from './components/screens/SystemErrorScreen';
 import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
 import { CV001Background } from './components/screens/CV001Background';
+// MIMO 2.0 (SV-002) keeps its elegant white-lily screens (restored from 2e5bd172); every other kiosk uses the screens above.
+import { MainScreen as Mimo2MainScreen } from './components/mimo2/MainScreen';
+import { CodeEntryScreen as Mimo2CodeEntryScreen } from './components/mimo2/CodeEntryScreen';
+import { PrintingScreen as Mimo2PrintingScreen } from './components/mimo2/PrintingScreen';
+import { SummaryScreen as Mimo2SummaryScreen } from './components/mimo2/SummaryScreen';
+import { SystemErrorScreen as Mimo2SystemErrorScreen } from './components/mimo2/SystemErrorScreen';
+import { MaintenanceScreen as Mimo2MaintenanceScreen } from './components/mimo2/MaintenanceScreen';
+import './components/mimo2/mimo2-lily.css';
+import './components/mimo2/mimo2-lily-fixes.css';
 import { Adds } from './components/screens/adds/Adds';
 import { isFestivalActive } from './config/festivalConfig';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
@@ -39,26 +48,28 @@ function App() {
   const defaultKioskFromHost = (host.includes('mimo-2-0') || host.includes('mimo-2') || host.includes('mimo-kiosk-app') || host.includes('sv-002')) ? 'SV-002' : undefined;
   const dynamicKioskId = currentKioskId || defaultKioskFromHost || cachedKioskId || import.meta.env.VITE_KIOSK_ID;
   const isFestive = isFestivalActive();
-  const isFestiveForKiosk = dynamicKioskId === 'CV-001' || dynamicKioskId === 'SV-002' || isFestive;
+  // SV-002 never uses a festival theme: it always shows the white-lily screens.
+  const isMimo2Lily = dynamicKioskId === 'SV-002';
+  const isFestiveForKiosk = dynamicKioskId === 'CV-001' || (!isMimo2Lily && isFestive);
 
   useEffect(() => {
     const rootEl = document.getElementById('root');
     // Clear themes first
-    document.body.classList.remove('theme-cv001', 'theme-sv002', 'theme-mimo1-diwali');
-    rootEl?.classList.remove('theme-cv001', 'theme-sv002', 'theme-mimo1-diwali');
+    document.body.classList.remove('theme-cv001', 'theme-sv002', 'theme-sv002-lily', 'theme-mimo1-diwali');
+    rootEl?.classList.remove('theme-cv001', 'theme-sv002', 'theme-sv002-lily', 'theme-mimo1-diwali');
 
     if (dynamicKioskId === 'CV-001') {
       // The theme-cv001 stylesheet rules are the old dark look and would repaint the Diwali screens.
       document.body.classList.add('theme-mimo1-diwali');
       rootEl?.classList.add('theme-mimo1-diwali');
-    } else if (dynamicKioskId === 'SV-002') {
-      document.body.classList.add('theme-sv002');
-      rootEl?.classList.add('theme-sv002');
+    } else if (isMimo2Lily) {
+      document.body.classList.add('theme-sv002-lily');
+      rootEl?.classList.add('theme-sv002-lily');
     } else if (isFestiveForKiosk) {
       document.body.classList.add('theme-cv001');
       rootEl?.classList.add('theme-cv001');
     }
-  }, [dynamicKioskId, isFestiveForKiosk]);
+  }, [dynamicKioskId, isFestiveForKiosk, isMimo2Lily]);
 
   // A print this kiosk started before the page was reloaded (see utils/activePrint.ts): reopen its printing screen
   // instead of the home screen, and let the backend job status finish the flow.
@@ -346,6 +357,12 @@ function App() {
   const goToSummary = useCallback(() => setCurrentScreen('summary-screen'), []);
 
   // Setup screen removed as per user request to drop URL parameters
+  const MainScreenView = isMimo2Lily ? Mimo2MainScreen : MainScreen;
+  const CodeEntryScreenView = isMimo2Lily ? Mimo2CodeEntryScreen : CodeEntryScreen;
+  const PrintingScreenView = isMimo2Lily ? Mimo2PrintingScreen : PrintingScreen;
+  const SummaryScreenView = isMimo2Lily ? Mimo2SummaryScreen : SummaryScreen;
+  const SystemErrorScreenView = isMimo2Lily ? Mimo2SystemErrorScreen : SystemErrorScreen;
+  const MaintenanceScreenView = isMimo2Lily ? Mimo2MaintenanceScreen : MaintenanceScreen;
 
   return (
     <>
@@ -409,13 +426,13 @@ function App() {
       {/* ================= SCREENS ================= */}
       {isFestiveForKiosk && <CV001Background />}
 
-      <MainScreen
+      <MainScreenView
         isActive={currentScreen === 'main-interface'}
         onNext={goToCodeEntry}
         kioskId={dynamicKioskId}
       />
 
-      <CodeEntryScreen
+      <CodeEntryScreenView
         isActive={currentScreen === 'code-entry-screen'}
         code={code}
         setCode={setCode}
@@ -425,7 +442,7 @@ function App() {
         kioskId={dynamicKioskId}
       />
 
-      <PrintingScreen
+      <PrintingScreenView
         isActive={currentScreen === 'printing-screen'}
         statusTitle={
           printStatus === 'completed'
@@ -466,7 +483,7 @@ function App() {
         }}
       />
 
-      <SummaryScreen
+      <SummaryScreenView
         isActive={currentScreen === 'summary-screen'}
         onReset={handleReset}
         jobData={jobData}
@@ -474,7 +491,7 @@ function App() {
         printCode={code}
       />
 
-      <SystemErrorScreen
+      <SystemErrorScreenView
         isActive={currentScreen === 'system-error-screen'}
         jobData={jobData}
         onReset={handleReset}
@@ -484,7 +501,7 @@ function App() {
         kioskId={dynamicKioskId}
       />
 
-      <MaintenanceScreen
+      <MaintenanceScreenView
         isActive={currentScreen === 'maintenance-screen'}
         onReset={handleReset}
         kioskId={dynamicKioskId}

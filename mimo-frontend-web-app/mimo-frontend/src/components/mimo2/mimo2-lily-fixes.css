@@ -1,0 +1,63 @@
+/* MIMO 2.0 (SV-002) white-lily theme — readability fixes only.
+   The lily screens were built from the old dark theme and still set several texts to white inline
+   (style={{ color: 'rgba(255,255,255,…)' }}), so they vanished on the white lily background.
+   These rules only change text/border colours to readable dark tones; layout and design are untouched.
+   !important is needed because the colours being corrected are inline styles. */
+
+html.mimo2-lily {
+  --lily-ink: #1c2420;        /* primary text */
+  --lily-ink-muted: #4d5a53;  /* secondary text */
+  --lily-gold: #b07f2c;       /* accent, same gold as the summary screen */
+}
+
+/* ── Welcome screen ── */
+html.mimo2-lily .tag-line {
+  color: var(--lily-ink) !important;
+}
+html.mimo2-lily .sub-heading {
+  color: var(--lily-ink) !important;
+}
+html.mimo2-lily .kiosk-footer,
+html.mimo2-lily .kiosk-footer strong {
+  color: var(--lily-ink-muted) !important;
+}
+
+/* ── Error screen ── */
+html.mimo2-lily .err-hey-label {
+  color: var(--lily-ink) !important;
+}
+html.mimo2-lily .err-hey-name {
+  color: var(--lily-gold) !important;
+}
+html.mimo2-lily .err-glass-card {
+  background: rgba(255, 255, 255, 0.78) !important;
+  box-shadow: 0 20px 60px rgba(28, 36, 32, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+html.mimo2-lily .err-apology-main {
+  color: var(--lily-ink) !important;
+}
+html.mimo2-lily .err-retry-line {
+  color: var(--lily-gold) !important;
+}
+html.mimo2-lily .err-auto-return {
+  color: var(--lily-ink-muted) !important;
+}
+html.mimo2-lily .err-auto-return strong {
+  color: var(--lily-gold) !important;
+}
+html.mimo2-lily .err-btn-glass {
+  color: var(--lily-ink) !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(28, 36, 32, 0.22) !important;
+}
+html.mimo2-lily .err-refund-text strong {
+  color: #1f7a4d !important;
+}
+html.mimo2-lily .err-refund-text span {
+  color: var(--lily-ink-muted) !important;
+}
+
+/* ── Maintenance screen ── */
+html.mimo2-lily .maint-main-headline {
+  color: var(--lily-ink) !important;
+}
