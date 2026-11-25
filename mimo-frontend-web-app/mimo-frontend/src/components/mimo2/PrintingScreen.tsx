@@ -1,4 +1,20 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+// Same tested progress model as the MIMO 1.0 screen: the bar moves inside bounds set by the printer's real stages
+// (Pi received file → sent to printer → each sheet from the printer's page counter) and reaches 100% only on completion.
+import { calculatePrintProgress } from '../../utils/printProgress';
+
+// SV-002's printers report their page count only once, when the whole job has physically finished
+// (listener log: "page counter moved N" at completion), so per-sheet milestones would park the bar
+// early and then jump. Instead the bar is paced to the real duration of a job on these printers,
+// measured from the SV-002 listener logs (Pi receives job -> physical finish), 2026-11-25:
+//   Brother HL-L2440DW B&W: 1 sheet 17-25 s, 2-4 sheets 17-28 s, 7 sheets 33 s, 15 sheets 45 s
+//   Epson L3250 colour:     1 sheet 27-28 s
+// It reaches 95% at about the expected finish and only shows 100% once the printer confirms.
+const expectedPrintMs = (colorMode: 'color' | 'bw' | undefined, totalSheets: number) =>
+  colorMode === 'color'
+    ? (27 + 22 * Math.max(0, totalSheets - 1)) * 1000
+    : (16 + 2.2 * totalSheets) * 1000;
+const SV002_CEILING = 95;
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
 
@@ -227,6 +243,8 @@ const FestivePlaqueArtwork: React.FC = () => (
   </svg>
 );
 
+const isDemoCode = (code: string) => code === '0000' || code === '9999';
+
 interface PrintingScreenProps {
   isActive: boolean;
   statusTitle?: string;
@@ -278,6 +296,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const collectTimerRef = useRef<number | null>(null);
 
   const progressRef         = useRef(1);   // mirror of progress for closures
+  const milestoneFloorRef   = useRef(0);   // lowest % the printer's current stage justifies
+  const milestoneCeilingRef = useRef(0);   // highest % allowed before the printer confirms the next stage
+  const sheetsCompletedRef  = useRef(0);   // sheets confirmed by the printer's page counter
   const tickTimerRef        = useRef<number | null>(null);
   const pollTimerRef        = useRef<number | null>(null);
   const completionTimerRef  = useRef<number | null>(null);
@@ -360,10 +381,31 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     }, 90);
   }, [onComplete]);
 
+  // Smooth visual tick: creeps 1% at a time towards the current stage's ceiling, paced per printer
+  // (getVisualTickDelay), so the bar never freezes and never runs ahead of the printer.
+  const startSmoothTick = useCallback(() => {
+    if (tickTimerRef.current) return;
+    const totalSheets = Math.max(1, pages * copies);
+    const tick = () => {
+      if (isCompletingRef.current) return;
+      const current = progressRef.current;
+      if (current < milestoneFloorRef.current) {
+        progressRef.current = milestoneFloorRef.current;
+        setProgress(milestoneFloorRef.current);
+      } else if (current < milestoneCeilingRef.current) {
+        progressRef.current = current + 1;
+        setProgress(current + 1);
+      }
+      tickTimerRef.current = window.setTimeout(tick, tickMs);
+    };
+    const tickMs = Math.round(expectedPrintMs(colorMode, totalSheets) / SV002_CEILING);
+    tickTimerRef.current = window.setTimeout(tick, tickMs);
+  }, [colorMode, pages, copies]);
+
   // ─── polling ───────────────────────────────────────────────────────────────
 
   const schedulePoll = useCallback((delayMs = 250) => {
-    if (!printCode || printCode === '0000' || !isActive) return;
+    if (!printCode || isDemoCode(printCode) || !isActive) return;
 
     pollTimerRef.current = window.setTimeout(async () => {
       // Enforce the colour/page-aware print deadline from the start of printing
@@ -398,30 +440,40 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           setStatusMsg(errMsg);
           clearAllTimers();
           if (onError) onError(errMsg);
-        } else if (data.status === 'printing') {
-          const total = Number(data.totalSheets) || Math.max(1, pages * copies);
-          const completed = Number(data.sheetsCompleted) || 0;
-
-          if (completed === 0) {
-            const initialWarmup = Math.min(15, Math.max(5, Math.round(10 / total)));
-            if (initialWarmup > progressRef.current) {
-              progressRef.current = initialWarmup;
-              setProgress(initialWarmup);
-            }
-            setStatusMsg('Warming up printer…');
-          } else {
-            const sheetPercent = Math.round((completed / total) * 100);
-            // Strictly cap at 98% during printing — 100% only on CUPS completion
-            const cappedPercent = Math.min(98, Math.max(progressRef.current, sheetPercent));
-            progressRef.current = cappedPercent;
-            setProgress(cappedPercent);
-
-            setStatusMsg(
-              total === 1
-                ? 'Printing document…'
-                : `Printing sheet ${completed} of ${total}…`
-            );
+        } else if (data.status === 'printing' || data.piReceivedAt || data.sentToPrinterAt) {
+          const result = calculatePrintProgress({
+            status: 'printing',
+            sheetsCompleted: data.sheetsCompleted,
+            totalSheets: data.totalSheets,
+            previousProgress: progressRef.current,
+            previousSheetsCompleted: sheetsCompletedRef.current,
+            pages,
+            copies,
+            piReceivedAt: data.piReceivedAt,
+            sentToPrinterAt: data.sentToPrinterAt,
+            colorMode,
+          });
+          sheetsCompletedRef.current = result.sheetsCompleted;
+          milestoneFloorRef.current = result.milestoneFloor;
+          // Time-paced towards 95% (see expectedPrintMs); real stages/sheets still raise the floor.
+          milestoneCeilingRef.current = Math.max(result.milestoneFloor, SV002_CEILING);
+          if (result.progress > progressRef.current) {
+            progressRef.current = result.progress;
+            setProgress(result.progress);
           }
+          startSmoothTick();
+
+          const total = result.totalSheets;
+          const completed = result.sheetsCompleted;
+          // Lily's own wording; "printing" as soon as the Pi has handed the job to the printer (sentToPrinterAt),
+          // since SV-002's printers only report sheets at the very end.
+          setStatusMsg(
+            completed > 0 && total > 1
+              ? `Printing sheet ${Math.min(total, completed + 1)} of ${total}…`
+              : data.sentToPrinterAt || completed > 0
+              ? total === 1 ? 'Printing document…' : `Printing ${total} sheets…`
+              : 'Warming up printer…'
+          );
 
           schedulePoll(300);
         } else {
@@ -437,7 +489,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         }
       }
     }, delayMs);
-  }, [printCode, isActive, pages, copies, onError, clearAllTimers, printTimeoutMs]);
+  }, [printCode, isActive, pages, copies, onError, clearAllTimers, printTimeoutMs, colorMode, startSmoothTick]);
 
   // ─── demo mode fallback (used ONLY when printCode is '0000' or missing) ──
 
@@ -491,6 +543,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       setProgress(1);
       progressRef.current = 1;
       lastProgressRef.current = 1;
+      milestoneFloorRef.current = 0;
+      milestoneCeilingRef.current = 0;
+      sheetsCompletedRef.current = 0;
       startTimeRef.current = Date.now();
       lastSuccessfulPollTimeRef.current = Date.now();
       setTypedTitle('');
@@ -507,6 +562,9 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     setProgress(1);
     progressRef.current = 1;
     lastProgressRef.current = 1;
+    milestoneFloorRef.current = 0;
+    milestoneCeilingRef.current = 0;
+    sheetsCompletedRef.current = 0;
     setTypedTitle('');
     setTypedSub('');
     startTimeRef.current = Date.now();
@@ -534,7 +592,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       if (manualProgress >= 100) {
         animateTo100AndComplete();
       }
-    } else if (printCode && printCode !== '0000') {
+    } else if (printCode && !isDemoCode(printCode)) {
       schedulePoll(200); // Live polling driven by backend sheet progress
     } else {
       startSlowTick(); // Demo mode simulation
