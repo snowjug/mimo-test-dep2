@@ -399,11 +399,11 @@ export const Mimo3Screensaver: React.FC<Mimo3ScreensaverProps> = ({
       aria-label="Bhagwan Hanuman Ji Screensaver"
       className="fixed inset-0 z-[999] flex h-full w-full select-none flex-col items-center justify-between overflow-hidden bg-gradient-to-br from-[#FFFDF7] via-[#FEFBF2] to-[#FEF3C7]/40 text-[#0F172A]"
     >
-      {/* Fullscreen Interactive Canvas - Touch anywhere on canvas to auto-reboot drawing */}
+      {/* Fullscreen canvas — touching anywhere starts, as the "Touch screen to start" button says (and as on
+          MIMO 1.0 / 2.0). Redrawing Hanuman Ji is still available to staff through the ॐ badge. */}
       <canvas
         ref={canvasRef}
-        onClick={rebootDrawing}
-        onTouchStart={rebootDrawing}
+        onClick={onTap}
         className="absolute inset-0 z-10 h-full w-full cursor-pointer"
       />
 
@@ -467,7 +467,7 @@ export const Mimo3Screensaver: React.FC<Mimo3ScreensaverProps> = ({
             drawProgressPercent > 15 ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
           }`}
         >
-          <p className="font-serif text-[30px] sm:text-[38px] font-bold tracking-[0.2em] text-[#B45309] drop-shadow-[0_2px_8px_rgba(217,119,6,0.2)]">
+          <p className="font-serif text-[30px] sm:text-[38px] font-bold tracking-[0.2em] text-[#B45309] drop-shadow-[0_2px_8px_rgba(217,119,6,0.2)]" style={{ fontFamily: "'Tiro Devanagari Hindi', serif" }}>
             ॥ ॐ श्री हनुमते नमः ॥
           </p>
         </div>
