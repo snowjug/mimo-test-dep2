@@ -329,6 +329,10 @@ function App() {
   const triggerScreensaver = useCallback(() => setShowScreensaver(true), []);
   const hideScreensaver = useCallback(() => setShowScreensaver(false), []);
   const handleIdleTimeoutChange = useCallback((sec: number) => setIdleTimeout(sec), []);
+  // Pause the (hidden) screens' animations while the opaque screensaver covers them — see index.css.
+  useEffect(() => {
+    document.documentElement.classList.toggle('kiosk-screensaver-on', showScreensaver);
+  }, [showScreensaver]);
   useKioskIdle({
     idleTimeoutSeconds: idleTimeout,
     currentScreen,

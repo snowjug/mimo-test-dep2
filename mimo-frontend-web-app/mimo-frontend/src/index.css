@@ -798,3 +798,10 @@ html.kiosk-full-bleed body.theme-mimo3 {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+/* While the screensaver covers the kiosk (an opaque full-screen overlay), pause every animation of the
+   screens underneath: nothing there is visible, but the Pi would otherwise keep drawing it. */
+html.kiosk-screensaver-on .screen,
+html.kiosk-screensaver-on .screen * {
+  animation-play-state: paused !important;
+}

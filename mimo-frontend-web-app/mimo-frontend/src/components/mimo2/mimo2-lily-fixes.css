@@ -61,3 +61,19 @@ html.mimo2-lily .err-refund-text span {
 html.mimo2-lily .maint-main-headline {
   color: var(--lily-ink) !important;
 }
+
+/* ── Performance (Raspberry Pi 5, 1 GB) — no visible change ──
+   The three warm glow orbs are 900–1100 px layers with blur(90px) + mix-blend-mode: overlay, and the
+   "MIMO" watermark is white text at 2.5% opacity on a white background. Their slow 22–28 s drift is
+   invisible on the lily background, but animating them made the Pi's GPU re-blur and re-blend three
+   full-size layers every frame on every screen. They now stay exactly where the design starts them
+   (keyframe 0%), so each frame is pixel-identical to the existing design at t = 0. */
+html.mimo2-lily .ambient-glow {
+  animation: none !important;
+  transform: translate(0, 0) scale(1) rotate(0deg);
+}
+html.mimo2-lily .watermark-mimo {
+  animation: none !important;
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 0.025;
+}
