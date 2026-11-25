@@ -759,3 +759,42 @@ body.theme-mimo1-diwali,
 #root.theme-mimo1-diwali {
   background: #FAF4E8;
 }
+
+/* ==================================================================
+   MIMO 3.0 (SV-003) — Hanuman devotional kiosk. Scoped to .theme-mimo3 only;
+   CV-001 / SV-002 are not affected. Restored after 6d6bf397 removed it.
+   ================================================================== */
+#root.theme-mimo3,
+body.theme-mimo3,
+html.kiosk-full-bleed body.theme-mimo3 {
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+@keyframes devotionalFlame {
+  0%, 100% { transform: scale(1, 1) rotate(0deg); opacity: 1; }
+  25% { transform: scale(0.92, 1.08) rotate(-2.5deg); opacity: 0.94; }
+  50% { transform: scale(1.06, 0.94) rotate(2deg); opacity: 1; }
+  75% { transform: scale(0.96, 1.04) rotate(-1.5deg); opacity: 0.96; }
+}
+
+@keyframes hanumanBreathe {
+  0% {
+    filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.55)) drop-shadow(0 0 35px rgba(234, 88, 12, 0.35));
+    transform: scale(1);
+  }
+  100% {
+    filter: drop-shadow(0 0 32px rgba(245, 158, 11, 0.9)) drop-shadow(0 0 70px rgba(234, 88, 12, 0.6));
+    transform: scale(1.018);
+  }
+}
+
+@keyframes divineAuraPulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.95); }
+  50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+@keyframes divineShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}

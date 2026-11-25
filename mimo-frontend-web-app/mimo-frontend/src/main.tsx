@@ -1,7 +1,11 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+// Loaded only on SV-003 so CV-001 / SV-002 never download the MIMO 3.0 screens.
+const Mimo3KioskPage = lazy(() =>
+  import('./components/mimo3/Mimo3KioskPage').then((m) => ({ default: m.Mimo3KioskPage })),
+)
 
 // Same lookup order as App.tsx.
 const resolveKioskId = () => {
@@ -66,9 +70,27 @@ window.addEventListener('resize', updateScale);
 window.addEventListener('orientationchange', updateScale);
 updateScale();
 
+// MIMO 3.0 (SV-003, Hanuman UI) has its own self-contained page. It is chosen only for
+// ?kioskId=SV-003 / MIMO-3 or a /mimo3 path, so CV-001 and SV-002 keep rendering <App />.
+const isMimo3 = (() => {
+  const id = (resolveKioskId() || '').trim().toUpperCase();
+  return id === 'SV-003' || id === 'MIMO-3' || window.location.pathname.startsWith('/mimo3');
+})();
+if (isMimo3) {
+  document.documentElement.classList.add('kiosk-full-bleed');
+  document.body.classList.add('theme-mimo3');
+  document.getElementById('root')?.classList.add('theme-mimo3');
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {isMimo3 ? (
+      <Suspense fallback={null}>
+        <Mimo3KioskPage kioskId="SV-003" />
+      </Suspense>
+    ) : (
+      <App />
+    )}
   </StrictMode>,
 )
 

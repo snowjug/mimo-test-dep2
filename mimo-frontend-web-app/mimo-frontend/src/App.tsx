@@ -313,14 +313,19 @@ function App() {
   }, []);
 
   // ================= HARDWARE-SAFE IDLE & SCREENSAVER DETECTION =================
+  // These must be stable: useKioskIdle restarts its idle timer whenever they change, so inline arrows
+  // (new on every render) let the 30s outage poll keep resetting the 60s timer and the screensaver never showed.
+  const triggerScreensaver = useCallback(() => setShowScreensaver(true), []);
+  const hideScreensaver = useCallback(() => setShowScreensaver(false), []);
+  const handleIdleTimeoutChange = useCallback((sec: number) => setIdleTimeout(sec), []);
   useKioskIdle({
     idleTimeoutSeconds: idleTimeout,
     currentScreen,
     isSubmittingCode,
     isPrinting: printStatus === 'printing',
     onResetToHome: handleReset,
-    onTriggerScreensaver: () => setShowScreensaver(true),
-    onHideScreensaver: () => setShowScreensaver(false),
+    onTriggerScreensaver: triggerScreensaver,
+    onHideScreensaver: hideScreensaver,
   });
 
   // ================= RETRY =================
@@ -376,8 +381,8 @@ function App() {
       <Adds 
         isActive={showScreensaver} 
         kioskId={dynamicKioskId} 
-        onTap={() => setShowScreensaver(false)} 
-        onTimeoutChange={(sec) => setIdleTimeout(sec)} 
+        onTap={hideScreensaver}
+        onTimeoutChange={handleIdleTimeoutChange}
       />
 
       {/* ================= HARDWARE ALERT BANNER ================= */}
