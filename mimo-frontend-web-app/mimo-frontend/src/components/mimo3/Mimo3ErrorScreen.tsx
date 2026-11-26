@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { WarningOctagon, Clock, ArrowClockwise, House, HandHeart } from '@phosphor-icons/react';
 import { SacredMandala, TempleZariBorder } from './Mimo3Motifs';
+import { Mimo3XmasError } from '../festive/christmas/screens/mimo3/Mimo3XmasError';
 
 interface Mimo3ErrorScreenProps {
   isActive: boolean;
@@ -13,6 +14,8 @@ interface Mimo3ErrorScreenProps {
     fileName: string;
   } | null;
   kioskId?: string | null;
+  /** Christmas theme: same countdown and handlers, festive presentation (the default look is unchanged). */
+  christmas?: boolean;
 }
 
 const AUTO_RESET_SECONDS = 15;
@@ -25,6 +28,7 @@ export const Mimo3ErrorScreen: React.FC<Mimo3ErrorScreenProps> = ({
   showRefundBanner = false,
   jobData,
   kioskId = 'SV-003',
+  christmas = false,
 }) => {
   const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
   const firstName = jobData?.userName?.split(' ')[0] || 'Customer';
@@ -48,6 +52,20 @@ export const Mimo3ErrorScreen: React.FC<Mimo3ErrorScreenProps> = ({
   }, [isActive, countdown, onReset]);
 
   if (!isActive) return null;
+
+  if (christmas) {
+    return (
+      <Mimo3XmasError
+        countdown={countdown}
+        firstName={firstName}
+        errorMsg={errorMsg}
+        showRefundBanner={showRefundBanner}
+        kioskId={kioskId}
+        onRetry={onRetry}
+        onHome={onReset}
+      />
+    );
+  }
 
   return (
     <div

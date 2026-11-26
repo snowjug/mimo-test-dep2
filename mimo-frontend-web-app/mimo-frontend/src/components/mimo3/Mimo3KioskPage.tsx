@@ -3,8 +3,7 @@ import { WarningCircle, Info, X, Wrench, WifiSlash } from '@phosphor-icons/react
 import { Mimo3Screensaver } from './Mimo3Screensaver';
 import { Mimo3MainScreen } from './Mimo3MainScreen';
 import { useKioskTheme } from '../../hooks/useKioskTheme';
-import { ChristmasWelcome, ChristmasBackdrop } from '../festive/christmas/ChristmasWelcome';
-import { ChristmasScreenDecor } from '../festive/christmas/screens/ChristmasScreenDecor';
+import { ChristmasWelcome } from '../festive/christmas/ChristmasWelcome';
 import { Mimo3CodeEntry } from './Mimo3CodeEntry';
 import { Mimo3PrintingScreen } from './Mimo3PrintingScreen';
 import { Mimo3SummaryScreen } from './Mimo3SummaryScreen';
@@ -312,10 +311,6 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
         kioskTheme === 'christmas' ? 'mimo3-xmas bg-[#FBF5EC]' : 'bg-gradient-to-br from-[#FAFAF9] via-[#F8FAFC] to-[#F1F5F9]'
       }`}
     >
-      {/* Code entry and printing draw their own Christmas background (Mimo3XmasShell), so the animated backdrop is skipped there. */}
-      {kioskTheme === 'christmas' && currentScreen !== 'code-entry-screen' && currentScreen !== 'printing-screen' && (
-        <ChristmasBackdrop variant="mimo3" />
-      )}
       {/* ================= TOAST NOTIFICATION ================= */}
       {toastMsg && (
         <div
@@ -445,6 +440,7 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
         jobData={jobData}
         kioskId={activeKioskId}
         printCode={code}
+        christmas={kioskTheme === 'christmas'}
       />
 
       {/* ================= ERROR & GUARDED REFUND SCREEN ================= */}
@@ -462,6 +458,7 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
         errorMsg={printError}
         showRefundBanner={showRefundBanner}
         kioskId={activeKioskId}
+        christmas={kioskTheme === 'christmas'}
       />
 
       {/* ================= SECRET DIAGNOSTIC MODAL TRIGGER ================= */}
@@ -560,7 +557,6 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
           </div>
         </div>
       )}
-      {kioskTheme === 'christmas' && <ChristmasScreenDecor variant="mimo3" screen={currentScreen} />}
     </div>
   );
 };

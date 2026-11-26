@@ -3,28 +3,27 @@ import heroPhoto from '../../../../../assets/christmas/mimo3-hero.jpg';
 import './mimo3-xmas-flow.css';
 
 /**
- * Shared frame for the MIMO 3.0 Christmas code-entry and printing screens: a tall candle-lit photo panel on the
- * left (CC0, see assets/christmas/CREDITS.md) and the working area on the right. Bright, warm and quiet.
- * Raspberry Pi budget: the photo drifts with one compositor-only transform, a few sparkles twinkle (opacity /
- * transform only), nothing reads the DOM and nothing runs on timers.
+ * Full-screen frame for every MIMO 3.0 Christmas screen after the welcome (code entry, printing, summary, error):
+ * the candle-lit house photo (CC0, see assets/christmas/CREDITS.md) fills the whole screen as the background,
+ * with a bright cream wash where the content sits so text stays readable. Each screen frames the photo
+ * differently (the house between text and keypad, close-up candlelight while printing, the house on the right).
+ * Raspberry Pi budget: the photo drifts with one compositor-only transform, one glow breathes, three sparkles
+ * twinkle (opacity / transform only). Nothing reads the DOM, nothing runs on timers.
  */
-const PHOTO_POS = { code: '62% 50%', print: '16% 40%' } as const;
+export type Mimo3XmasFrame = 'code' | 'print' | 'side';
 
-export const Mimo3XmasShell: React.FC<{ photo: keyof typeof PHOTO_POS; caption: string; children: React.ReactNode }> = ({ photo, caption, children }) => (
-  <div className={`x3f x3f--${photo}`} data-theme="christmas">
-    <aside className="x3f-photo" aria-hidden>
-      <img className="x3f-photo-img" src={heroPhoto} alt="" draggable={false} style={{ objectPosition: PHOTO_POS[photo] }} />
-      <span className="x3f-photo-glow" />
-      <span className="x3f-photo-shade" />
-      <span className="x3f-spark" style={{ left: '18%', top: '14%' }} />
-      <span className="x3f-spark x3f-spark--sm" style={{ left: '78%', top: '24%', animationDelay: '1.3s' }} />
-      <span className="x3f-spark" style={{ left: '64%', top: '58%', animationDelay: '2.4s' }} />
-      <div className="x3f-photo-copy">
-        <p className="x3f-script">Merry Christmas</p>
-        <p className="x3f-photo-sub">{caption}</p>
-        <p className="x3f-photo-brand">MIMO 3.0 · Self-service printing</p>
+export const Mimo3XmasShell: React.FC<{ frame: Mimo3XmasFrame; children: React.ReactNode }> = ({ frame, children }) => (
+  <div className={`x3f x3f--${frame}`} data-theme="christmas">
+    <div className="x3f-bg" aria-hidden>
+      <div className="x3f-bg-frame">
+        <img className="x3f-bg-img" src={heroPhoto} alt="" draggable={false} />
       </div>
-    </aside>
-    <div className="x3f-work">{children}</div>
+      <span className="x3f-bg-glow" />
+      <span className="x3f-bg-wash" />
+      <span className="x3f-spark" />
+      <span className="x3f-spark x3f-spark--sm" />
+      <span className="x3f-spark x3f-spark--3" />
+    </div>
+    {children}
   </div>
 );

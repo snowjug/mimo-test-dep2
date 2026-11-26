@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, ArrowDown, House, WarningCircle } from '@phosphor-icons/react';
 import { SacredMandala, TempleZariBorder } from './Mimo3Motifs';
+import { Mimo3XmasSummary } from '../festive/christmas/screens/mimo3/Mimo3XmasSummary';
 
 interface Mimo3SummaryScreenProps {
   isActive: boolean;
@@ -14,6 +15,8 @@ interface Mimo3SummaryScreenProps {
   } | null;
   kioskId?: string | null;
   printCode?: string;
+  /** Christmas theme: same countdown and report logic, festive presentation (the default look is unchanged). */
+  christmas?: boolean;
 }
 
 const BACKEND_URL = 'https://api-upqxuj7evq-uc.a.run.app';
@@ -26,6 +29,7 @@ export const Mimo3SummaryScreen: React.FC<Mimo3SummaryScreenProps> = ({
   jobData,
   kioskId = 'SV-003',
   printCode,
+  christmas = false,
 }) => {
   const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
   const [isReporting, setIsReporting] = useState(false);
@@ -71,6 +75,21 @@ export const Mimo3SummaryScreen: React.FC<Mimo3SummaryScreenProps> = ({
   };
 
   if (!isActive) return null;
+
+  if (christmas) {
+    return (
+      <Mimo3XmasSummary
+        countdown={countdown}
+        fileName={jobData?.fileName}
+        sheets={(jobData?.pages || 1) * (jobData?.copies || 1)}
+        isReporting={isReporting}
+        reportSuccess={reportSuccess}
+        onDone={onReset}
+        onToggleReport={() => setIsReporting(!isReporting)}
+        onReport={handleReport}
+      />
+    );
+  }
 
   return (
     <div
