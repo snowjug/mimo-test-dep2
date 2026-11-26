@@ -313,7 +313,8 @@ export const ChristmasWelcome: React.FC<ChristmasWelcomeProps> = ({ isActive, on
  */
 export const ChristmasBackdrop: React.FC<{ variant: ChristmasVariant }> = ({ variant }) => (
   <div className={`xmas-backdrop xmas-backdrop--${variant}`} aria-hidden>
-    <ChristmasLights variant={variant} count={6} sweep={false} />
-    <ChristmasSnow color={variant === 'mimo1' ? '#E6C98A' : variant === 'mimo3' ? '#E2C9A6' : '#B9CCDA'} light />
+    {/* MIMO 1.0 keeps a crisp, static wash: the soft bokeh blobs and snow dots read as "blurry" on its screens. */}
+    {variant !== 'mimo1' && <ChristmasLights variant={variant} count={6} sweep={false} />}
+    {variant !== 'mimo1' && <ChristmasSnow color={variant === 'mimo3' ? '#E2C9A6' : '#B9CCDA'} light />}
   </div>
 );

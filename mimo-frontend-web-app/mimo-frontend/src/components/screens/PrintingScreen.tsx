@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Printer } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
 import { DiyaRow, FestiveBackdrop, Mandala, ZariBorder } from '../festive/NavaratriDecor';
+import { Mimo1XmasPrinting } from '../festive/christmas/screens/mimo1/Mimo1XmasScreens';
 
 
 const BACKEND_URL = "https://api-upqxuj7evq-uc.a.run.app";
@@ -24,6 +25,8 @@ interface PrintingScreenProps {
   manualProgress?: number;  // ← optional override for testing
   colorMode?: 'color' | 'bw';
   kioskId?: string | null;
+  /** MIMO 1.0 Christmas theme: same progress pacing and polling, the festive presentation (default look unchanged). */
+  christmas?: boolean;
 }
 
 export {
@@ -60,6 +63,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   manualProgress,
   colorMode = 'bw',
   kioskId,
+  christmas = false,
 }) => {
   const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
   const [progress, setProgress]         = useState(0);
@@ -543,6 +547,21 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       ? 'Ready to collect'
       : `Sheet ${sheetsCompletedRef.current + 1} of ${Math.max(1, pages * copies)}`;
     const leftStatusText = isCompleted ? '' : statusMsg;
+
+    if (christmas) {
+      const totalSheets = Math.max(1, pages * copies);
+      return (
+        <Mimo1XmasPrinting
+          title={finalTitle}
+          sub={finalSub}
+          statusMsg={leftStatusText}
+          progress={progress}
+          pageText={progress >= 100 ? `Page ${totalSheets} of ${totalSheets}` : `Page ${Math.min(totalSheets, sheetsCompletedRef.current + 1)} of ${totalSheets}`}
+          collectingPages={collectingPages}
+          collectCountdown={collectCountdown}
+        />
+      );
+    }
 
     // Geometry of Circular Progress Indicator:
     // Center: (1132, 402), Radius: 141px, Stroke: 20px

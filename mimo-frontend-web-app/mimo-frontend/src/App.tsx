@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import type { ComponentProps, FC } from 'react';
 import { WarningCircle, Info, X } from '@phosphor-icons/react';
 import { MainScreen } from './components/screens/MainScreen';
 import { CodeEntryScreen } from './components/screens/CodeEntryScreen';
@@ -376,10 +377,13 @@ function App() {
   // Setup screen removed as per user request to drop URL parameters
   // Festival UI chosen in the admin dashboard (Configuration → Kiosk Theme); 'default' keeps the normal screens.
   const MainScreenView = kioskTheme === 'christmas' ? ChristmasWelcome : isMimo2Lily ? Mimo2MainScreen : MainScreen;
-  const CodeEntryScreenView = isMimo2Lily ? Mimo2CodeEntryScreen : CodeEntryScreen;
-  const PrintingScreenView = isMimo2Lily ? Mimo2PrintingScreen : PrintingScreen;
-  const SummaryScreenView = isMimo2Lily ? Mimo2SummaryScreen : SummaryScreen;
-  const SystemErrorScreenView = isMimo2Lily ? Mimo2SystemErrorScreen : SystemErrorScreen;
+  // The MIMO 2.0 screens accept the same props minus `christmas` (only the 1.0 screens have a Christmas presentation).
+  const CodeEntryScreenView: FC<ComponentProps<typeof CodeEntryScreen>> = isMimo2Lily ? Mimo2CodeEntryScreen : CodeEntryScreen;
+  const PrintingScreenView: FC<ComponentProps<typeof PrintingScreen>> = isMimo2Lily ? Mimo2PrintingScreen : PrintingScreen;
+  const SummaryScreenView: FC<ComponentProps<typeof SummaryScreen>> = isMimo2Lily ? Mimo2SummaryScreen : SummaryScreen;
+  const SystemErrorScreenView: FC<ComponentProps<typeof SystemErrorScreen>> = isMimo2Lily ? Mimo2SystemErrorScreen : SystemErrorScreen;
+  // MIMO 1.0 Christmas: the code, printing, summary and error screens use the design from github.com/Saketsasanka30/MIMO.
+  const mimo1Christmas = kioskTheme === 'christmas' && dynamicKioskId === 'CV-001';
   const MaintenanceScreenView = isMimo2Lily ? Mimo2MaintenanceScreen : MaintenanceScreen;
 
   return (
@@ -459,6 +463,7 @@ function App() {
         onBack={handleReset}
         hasError={toastError && currentScreen === 'code-entry-screen'}
         kioskId={dynamicKioskId}
+        christmas={mimo1Christmas}
       />
 
       <PrintingScreenView
@@ -480,6 +485,7 @@ function App() {
         printCode={code}
         colorMode={jobData?.mode?.toLowerCase().match(/color|colour/) ? 'color' : 'bw'}
         kioskId={dynamicKioskId}
+        christmas={mimo1Christmas}
         onComplete={() => {
           markActivePrintCompleted();
           setPrintStatus('completed');
@@ -508,6 +514,7 @@ function App() {
         jobData={jobData}
         kioskId={dynamicKioskId}
         printCode={code}
+        christmas={mimo1Christmas}
       />
 
       <SystemErrorScreenView
@@ -518,6 +525,7 @@ function App() {
         errorMsg={printError}
         showRefundBanner={showRefundBanner}
         kioskId={dynamicKioskId}
+        christmas={mimo1Christmas}
       />
 
       <MaintenanceScreenView

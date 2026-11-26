@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Backspace, Check, CircleNotch } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
 import { Diya, FestiveBackdrop, GoldenCornerWaves, Mandala, OrnamentDivider } from '../festive/NavaratriDecor';
+import { Mimo1XmasCodeEntry } from '../festive/christmas/screens/mimo1/Mimo1XmasScreens';
 
 interface CodeEntryScreenProps {
   onSuccess: () => void;
@@ -12,6 +13,8 @@ interface CodeEntryScreenProps {
   setCode: React.Dispatch<React.SetStateAction<string>>;
   hasError?: boolean;
   kioskId?: string | null;
+  /** MIMO 1.0 Christmas theme: same state and handlers, the festive presentation (default look unchanged). */
+  christmas?: boolean;
 }
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
@@ -24,6 +27,7 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
   setCode,
   hasError,
   kioskId,
+  christmas = false,
 }) => {
   const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
   const [isShaking, setIsShaking] = useState(false);
@@ -69,6 +73,20 @@ export const CodeEntryScreen: React.FC<CodeEntryScreenProps> = ({
 
   if (kioskId === 'CV-001') {
     if (!isActive) return null;
+
+    if (christmas) {
+      return (
+        <Mimo1XmasCodeEntry
+          code={code}
+          isShaking={isShaking}
+          loading={loading}
+          hasError={hasError}
+          onKey={handleNumClick}
+          onSubmit={handleSubmit}
+          onBack={onBack}
+        />
+      );
+    }
 
     return (
       <div

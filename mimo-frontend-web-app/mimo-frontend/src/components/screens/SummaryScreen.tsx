@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Check, ArrowDown, WarningCircle } from '@phosphor-icons/react';
 import { isFestivalActive } from '../../config/festivalConfig';
 import { DiyaRow, FestiveBackdrop, ZariBorder } from '../festive/NavaratriDecor';
+import { Mimo1XmasSummary } from '../festive/christmas/screens/mimo1/Mimo1XmasScreens';
 
 const DandiyaSticks: React.FC = () => (
     <svg width="130" height="130" viewBox="0 0 130 130" className="pointer-events-none absolute -right-6 top-2">
@@ -42,6 +43,8 @@ interface SummaryScreenProps {
     } | null;
     kioskId?: string | null;
     printCode?: string;
+    /** MIMO 1.0 Christmas theme: same timers and report flow, the festive presentation (default look unchanged). */
+    christmas?: boolean;
 }
 
 const BACKEND_URL = 'https://api-upqxuj7evq-uc.a.run.app';
@@ -57,7 +60,7 @@ const ISSUES: { id: string; label: string }[] = [
 ];
 type ReportState = 'ask' | 'choose' | 'sending' | 'sent' | 'failed';
 
-export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId, printCode }) => {
+export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset, jobData, kioskId, printCode, christmas = false }) => {
     const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
     const timeoutRef = useRef<number | null>(null);
     const [report, setReport] = useState<ReportState>('ask');
@@ -138,6 +141,27 @@ export const SummaryScreen: React.FC<SummaryScreenProps> = ({ isActive, onReset,
 
   const firstName = jobData?.userName?.split(' ')[0] || 'Demo';
   const isAsking = report === 'ask';
+
+  if (christmas) {
+    return (
+      <Mimo1XmasSummary
+        firstName={firstName}
+        report={report}
+        issues={ISSUES}
+        printCode={printCode}
+        onDone={onReset}
+        onReportProblem={() => {
+          setReport('choose');
+          armReset(REPORT_RESET_MS);
+        }}
+        onCancelReport={() => {
+          setReport('ask');
+          armReset(AUTO_RESET_MS);
+        }}
+        onSendReport={sendReport}
+      />
+    );
+  }
 
   return (
     <div

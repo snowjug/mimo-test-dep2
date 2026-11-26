@@ -4,6 +4,7 @@ import { WarningOctagon, Clock, ArrowClockwise, House, HandHeart } from '@phosph
 import { FestiveBackdrop, ZariBorder } from '../festive/NavaratriDecor';
 import { DiwaliBackdrop, DiwaliGoldDivider } from '../festive/DiwaliDecor';
 import { isFestivalActive } from '../../config/festivalConfig';
+import { Mimo1XmasError } from '../festive/christmas/screens/mimo1/Mimo1XmasScreens';
 
 interface SystemErrorScreenProps {
     isActive: boolean;
@@ -17,6 +18,8 @@ interface SystemErrorScreenProps {
     errorMsg?: string;
     showRefundBanner?: boolean;
     kioskId?: string;
+    /** MIMO 1.0 Christmas theme: same countdown and handlers, the festive presentation (default look unchanged). */
+    christmas?: boolean;
 }
 
 const AUTO_RESET_SECONDS = 15;
@@ -29,6 +32,7 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({
     errorMsg,
     showRefundBanner,
     kioskId,
+    christmas = false,
 }) => {
     const isFestiveMode = kioskId === 'CV-001' || kioskId === 'SV-002' || isFestivalActive();
     const firstName = jobData?.userName?.split(' ')[0] || 'there';
@@ -55,6 +59,19 @@ export const SystemErrorScreen: React.FC<SystemErrorScreenProps> = ({
 
     if (kioskId === 'CV-001') {
   if (!isActive) return null;
+
+  if (christmas) {
+    return (
+      <Mimo1XmasError
+        firstName={firstName}
+        errorMsg={errorMsg}
+        showRefundBanner={showRefundBanner}
+        countdown={countdown}
+        onRetry={onRetry}
+        onHome={onReset}
+      />
+    );
+  }
 
   return (
     <div
