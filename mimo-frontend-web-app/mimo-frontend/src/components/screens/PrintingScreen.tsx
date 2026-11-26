@@ -557,6 +557,8 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
           statusMsg={leftStatusText}
           progress={progress}
           pageText={progress >= 100 ? `Page ${totalSheets} of ${totalSheets}` : `Page ${Math.min(totalSheets, sheetsCompletedRef.current + 1)} of ${totalSheets}`}
+          sheetsDone={progress >= 100 ? totalSheets : Math.min(totalSheets, sheetsCompletedRef.current)}
+          totalSheets={totalSheets}
           collectingPages={collectingPages}
           collectCountdown={collectCountdown}
         />

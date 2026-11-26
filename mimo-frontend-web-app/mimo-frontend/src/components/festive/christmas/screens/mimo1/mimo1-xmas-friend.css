@@ -259,3 +259,77 @@ html.kiosk-xmas.m1f-inner .xmas-backdrop { display: none; }
 @keyframes m1f-breathe { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
 @keyframes m1f-ready { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
 @media (prefers-reduced-motion: reduce) { .m1f-atmo { display: none; } }
+
+/* ═════════════ welcome (same language as the code-entry page) ═════════════ */
+.m1w { background: transparent; }
+.m1w-lights { position: absolute; inset: 0; pointer-events: none; }
+.m1w-light { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; opacity: 0.35; will-change: opacity, transform; animation: m1f-lamp-a 3.2s ease-in-out infinite; }
+.m1w-light::after { content: ''; position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 214, 120, 0.6) 0%, rgba(255, 214, 120, 0) 65%); }
+.m1w-light--b { animation-name: m1f-lamp-b; }
+.m1w-light--c { animation-name: m1f-lamp-c; }
+.m1f-c-0 { background: #fde68a; }
+.m1f-c-1 { background: #fbbf24; }
+.m1f-c-2 { background: #fff7e0; }
+.m1f-c-3 { background: #f59e0b; }
+.m1w-glow { position: absolute; left: 50%; top: 50%; width: 900px; height: 640px; margin: -330px 0 0 -450px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255, 249, 235, 0.85) 0%, rgba(255, 244, 220, 0.45) 40%, rgba(255, 240, 210, 0) 70%); animation: m1f-breathe-glow 5s ease-in-out infinite; pointer-events: none; }
+.m1w-card {
+  position: absolute; left: 50%; top: 50%; width: 600px; margin-left: -300px; transform: translateY(-52%);
+  padding: 34px 44px 40px; display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.m1w-script { font-family: 'Great Vibes', cursive; font-size: 52px; line-height: 1.1; color: var(--m1f-gold-strong); animation: m1f-card-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both; }
+.m1w-title { margin-top: 2px !important; font-family: var(--m1f-display); font-size: 96px; line-height: 1; font-weight: 800; letter-spacing: -0.035em; color: var(--m1f-ink); animation: m1f-card-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 220ms both; }
+.m1w-title span { background: linear-gradient(135deg, #fbbf24 0%, #d97706 60%, #b45309 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.m1w-rule { display: flex; align-items: center; gap: 12px; width: 260px; margin: 16px 0 12px; color: #d97706; }
+.m1w-rule > span { flex: 1; height: 1.5px; background: linear-gradient(90deg, rgba(217, 119, 6, 0), rgba(217, 119, 6, 0.6), rgba(217, 119, 6, 0)); }
+.m1w-rule svg { animation: m1f-star-spin 6s ease-in-out infinite; }
+.m1w-sub { font-family: var(--m1f-display); font-size: 28px; font-weight: 600; color: var(--m1f-ink-2); animation: m1f-card-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 340ms both; }
+.m1w-swipe { margin-top: 30px; animation: m1f-card-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 460ms both; }
+.m1w-footer { left: 50%; bottom: 22px; transform: translateX(-50%); padding: 7px 20px; border-radius: 999px; background: rgba(255, 255, 255, 0.9); color: var(--m1f-ink-2); white-space: nowrap; }
+
+/* gold, polished swipe with a shimmer on the track (same ChristmasSwipe drag logic) */
+.xmas-swipe--tree { background: linear-gradient(180deg, #fffdf8 0%, #fbf3e3 100%); border: 1.5px solid rgba(217, 119, 6, 0.45) !important; box-shadow: 0 14px 34px rgba(180, 110, 20, 0.22), inset 0 1px 0 #ffffff; }
+.xmas-swipe--tree::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 38%; z-index: 0; pointer-events: none; background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 236, 180, 0.75) 50%, rgba(255, 255, 255, 0) 100%); transform: translate3d(-110%, 0, 0); animation: m1f-shimmer 3.2s ease-in-out infinite; }
+.xmas-swipe--tree .xmas-swipe-fill { background: linear-gradient(90deg, rgba(251, 191, 36, 0.35), rgba(245, 158, 11, 0.45)); }
+.xmas-swipe--tree .xmas-swipe-label { color: #92400e; font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif; font-weight: 700; z-index: 1; }
+.xmas-swipe--tree .xmas-swipe-thumb { z-index: 2; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #18130a; border: 2px solid #ffffff; box-shadow: 0 8px 20px rgba(217, 119, 6, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+
+/* ═════════════ printing: a living dial ═════════════ */
+.m1f-dial-halo { position: absolute; left: 50%; top: 50%; width: 360px; height: 360px; margin: -180px 0 0 -180px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 236, 180, 0.0) 44%, rgba(251, 191, 36, 0.28) 54%, rgba(251, 191, 36, 0) 70%); animation: m1f-breathe-glow 3.2s ease-in-out infinite; }
+.m1f-dial-track { stroke: #eadcc3 !important; opacity: 1 !important; stroke-width: 10 !important; }
+.m1f-dial-glow { fill: none; stroke: #fbbf24; stroke-width: 20; stroke-linecap: round; opacity: 0.22; transition: stroke-dasharray 400ms cubic-bezier(0.22, 1, 0.36, 1); }
+.m1f-dial-lit { stroke: url(#m1fGold) !important; stroke-width: 10 !important; }
+.m1f-dial-trail { fill: #fde68a; }
+.m1f-dial-head-glow { fill: rgba(251, 191, 36, 0.35); transform-box: fill-box; transform-origin: center; animation: m1f-head-pulse 1.4s ease-in-out infinite; }
+.m1f-dial-head { fill: #ffffff !important; stroke: #f59e0b; stroke-width: 3; }
+.m1f-ring-light { fill: #e9dcc5; transition: fill 400ms ease; }
+.m1f-ring-light.is-on.m1f-c-0 { fill: #f59e0b; }
+.m1f-ring-light.is-on.m1f-c-1 { fill: #dc2626; }
+.m1f-ring-light.is-on.m1f-c-2 { fill: #fbbf24; }
+.m1f-ring-light.is-on.m1f-c-3 { fill: #059669; }
+.m1f-ring-light.is-on.m1f-tw-a { animation: m1f-lamp-a 2.6s ease-in-out infinite; }
+.m1f-ring-light.is-on.m1f-tw-b { animation: m1f-lamp-b 2.6s ease-in-out infinite; }
+.m1f-dial-num { display: inline-block; animation: m1f-tick 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.m1f-dial.is-done .m1f-dial-num { color: #15803d; }
+.m1f-feed { position: relative; width: 300px; height: 64px; margin-top: -6px; }
+.m1f-feed-slot { position: absolute; left: 60px; width: 150px; top: 0; height: 9px; border-radius: 999px; background: linear-gradient(180deg, #d49b38, #92400e); }
+.m1f-feed-sheet { position: absolute; left: 92px; width: 86px; top: 4px; height: 52px; border-radius: 0 0 5px 5px; background: #ffffff; border: 1px solid rgba(15, 23, 42, 0.12); border-top: 0; box-shadow: 0 6px 12px rgba(15, 23, 42, 0.1); background-image: repeating-linear-gradient(180deg, #e2e8f0 0 3px, transparent 3px 9px); background-size: 70% 70%; background-position: 50% 60%; background-repeat: no-repeat; transform-origin: 50% 0; animation: m1f-feed 2.4s cubic-bezier(0.45, 0.05, 0.3, 1) infinite; }
+.m1f-feed-stack { position: absolute; right: 18px; bottom: 0; width: 52px; height: 60px; }
+.m1f-stack-sheet { position: absolute; left: 0; bottom: calc(var(--i) * 5px); width: 48px; height: 10px; border-radius: 3px; background: #f1f5f9; border: 1px solid rgba(15, 23, 42, 0.1); }
+.m1f-stack-sheet.is-done { background: #ffffff; border-color: rgba(217, 119, 6, 0.5); box-shadow: 0 2px 4px rgba(217, 119, 6, 0.2); animation: m1f-stack-in 420ms cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.m1f-shimmer-text { position: relative; display: inline-block; overflow: hidden; padding: 0 2px; }
+.m1f-shimmer-text::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.85) 50%, rgba(255, 255, 255, 0) 100%); transform: translate3d(-120%, 0, 0); animation: m1f-shimmer 2.8s ease-in-out infinite; }
+
+@keyframes m1f-lamp-a { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes m1f-lamp-b { 0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); } 25% { opacity: 1; transform: scale(1.15); } }
+@keyframes m1f-lamp-c { 0%, 40%, 100% { opacity: 0.3; transform: scale(0.8); } 75% { opacity: 1; transform: scale(1.15); } }
+@keyframes m1f-breathe-glow { 0%, 100% { opacity: 0.6; transform: scale(0.97); } 50% { opacity: 1; transform: scale(1.03); } }
+@keyframes m1f-shimmer { 0% { transform: translate3d(-120%, 0, 0); } 60%, 100% { transform: translate3d(300%, 0, 0); } }
+@keyframes m1f-star-spin { 0%, 100% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(72deg) scale(1.15); } }
+@keyframes m1f-head-pulse { 0%, 100% { transform: scale(0.8); opacity: 0.6; } 50% { transform: scale(1.25); opacity: 1; } }
+@keyframes m1f-tick { from { opacity: 0.3; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: none; } }
+@keyframes m1f-feed { 0% { transform: scaleY(0); opacity: 1; } 60% { transform: scaleY(1); opacity: 1; } 85% { transform: scaleY(1) translate3d(0, 4px, 0); opacity: 1; } 100% { transform: scaleY(1) translate3d(0, 10px, 0); opacity: 0; } }
+@keyframes m1f-stack-in { from { opacity: 0; transform: translate3d(0, -14px, 0); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .m1w-lights, .m1w-glow, .m1f-dial-halo, .m1f-feed-sheet { animation: none !important; }
+  .xmas-swipe--tree::before, .m1f-shimmer-text::after { display: none; }
+}

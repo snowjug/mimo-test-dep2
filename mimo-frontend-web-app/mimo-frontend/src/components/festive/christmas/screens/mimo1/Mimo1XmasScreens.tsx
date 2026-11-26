@@ -52,6 +52,44 @@ const GoldCheck: React.FC<{ size: number }> = ({ size }) => (
   </svg>
 );
 
+/* ─────────────────────────── welcome ─────────────────────────── */
+
+/** Warm lights twinkling over the two trees of the background photo (canvas %, three staggered groups). */
+const TREE_LIGHTS: [number, number, string][] = [
+  [7, 22, 'a'], [14, 40, 'b'], [5, 58, 'c'], [17, 70, 'a'], [10, 86, 'b'], [21, 18, 'c'],
+  [80, 14, 'b'], [90, 30, 'a'], [76, 48, 'c'], [94, 62, 'b'], [84, 78, 'a'], [73, 90, 'c'],
+];
+
+/** MIMO 1.0 Christmas welcome, in the same language as the code-entry page: tree photo, cream card, gold, Outfit. */
+export const Mimo1XmasWelcome: React.FC<{ swipe: React.ReactNode; footer: React.ReactNode }> = ({ swipe, footer }) => {
+  useInnerBackground();
+  return (
+    <div className="xmas-screen m1f m1w" data-theme="christmas">
+      <Atmosphere />
+      <div className="m1w-lights" aria-hidden="true">
+        {TREE_LIGHTS.map(([x, y, g], i) => (
+          <span key={i} className={`m1w-light m1w-light--${g} m1f-c-${i % 4}`} style={{ left: `${x}%`, top: `${y}%` }} />
+        ))}
+      </div>
+      <span className="m1w-glow" aria-hidden="true" />
+      <main className="m1f-card m1w-card">
+        <p className="m1w-script">Merry Christmas</p>
+        <h1 className="m1w-title">
+          MIMO <span>1.0</span>
+        </h1>
+        <div className="m1w-rule" aria-hidden="true">
+          <span />
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2l2.6 6.9L22 9.3l-5.6 4.8L18.2 22 12 17.9 5.8 22l1.8-7.9L2 9.3l7.4-.4z" /></svg>
+          <span />
+        </div>
+        <h2 className="m1w-sub">Self-Service Printing Kiosk</h2>
+        <div className="m1w-swipe">{swipe}</div>
+      </main>
+      {footer}
+    </div>
+  );
+};
+
 /* ─────────────────────────── code entry ─────────────────────────── */
 
 export interface Mimo1XmasCodeEntryProps {
@@ -152,6 +190,16 @@ const TRACK = (() => {
   return `M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${R} ${R} 0 1 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;
 })();
 const [HEAD_X, HEAD_Y] = pointAt(START);
+/* A short sparkle trail just behind the head (rotates with it) and 20 lights just outside the ring. */
+const TRAIL = [5, 10, 15, 20].map((back, i) => {
+  const [x, y] = pointAt(START - back);
+  return { x, y, r: 4.2 - i * 0.8, o: 0.75 - i * 0.17 };
+});
+const RING_LIGHTS = Array.from({ length: 20 }, (_, i) => {
+  const a = START + (i / 19) * SWEEP;
+  const rad = (a * Math.PI) / 180;
+  return { x: 100 + Math.cos(rad) * 94, y: 100 + Math.sin(rad) * 94 };
+});
 
 export interface Mimo1XmasPrintingProps {
   title: string;
@@ -159,11 +207,13 @@ export interface Mimo1XmasPrintingProps {
   statusMsg: string;
   progress: number;
   pageText: string;
+  sheetsDone: number;
+  totalSheets: number;
   collectingPages: boolean;
   collectCountdown: number;
 }
 
-export const Mimo1XmasPrinting: React.FC<Mimo1XmasPrintingProps> = ({ title, sub, statusMsg, progress, pageText, collectingPages, collectCountdown }) => {
+export const Mimo1XmasPrinting: React.FC<Mimo1XmasPrintingProps> = ({ title, sub, statusMsg, progress, pageText, sheetsDone, totalSheets, collectingPages, collectCountdown }) => {
   useInnerBackground();
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
   const hello = /^Hello (.+)\.\.!$/.exec(title);
@@ -190,27 +240,58 @@ export const Mimo1XmasPrinting: React.FC<Mimo1XmasPrintingProps> = ({ title, sub
           ))}
           {pct < 100 && statusMsg && (
             <p className="m1f-print-stage" role="status" aria-live="polite">
-              {statusMsg}
+              <span className="m1f-shimmer-text">{statusMsg}</span>
             </p>
           )}
         </div>
 
         <div className="m1f-card m1f-print-dialcard">
-          <div className="m1f-dial" role="progressbar" aria-label="Printing progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+          <div className={`m1f-dial${pct >= 100 ? ' is-done' : ''}`} role="progressbar" aria-label="Printing progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+            <span className="m1f-dial-halo" aria-hidden="true" />
             <svg viewBox="0 0 200 200" className="m1f-dial-ring" aria-hidden="true">
+              <defs>
+                <linearGradient id="m1fGold" x1="0" y1="1" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#b45309" />
+                  <stop offset="45%" stopColor="#f59e0b" />
+                  <stop offset="100%" stopColor="#fde68a" />
+                </linearGradient>
+              </defs>
+              {RING_LIGHTS.map((l, i) => (
+                <circle
+                  key={i}
+                  className={`m1f-ring-light m1f-c-${i % 4}${i < Math.round((pct / 100) * RING_LIGHTS.length) ? ' is-on' : ''}${i % 4 === 0 ? ' m1f-tw-a' : i % 4 === 2 ? ' m1f-tw-b' : ''}`}
+                  cx={l.x}
+                  cy={l.y}
+                  r={3.1}
+                />
+              ))}
               <path className="m1f-dial-track" d={TRACK} />
+              <path className="m1f-dial-glow" d={TRACK} pathLength={100} style={{ strokeDasharray: `${pct} 100` }} />
               <path className="m1f-dial-lit" d={TRACK} pathLength={100} style={{ strokeDasharray: `${pct} 100` }} />
               <g className="m1f-dial-head-rot" style={{ transform: `rotate(${(pct / 100) * SWEEP}deg)` }}>
-                <circle className="m1f-dial-head" cx={HEAD_X} cy={HEAD_Y} r={16.2 / 2 + 3} />
+                {TRAIL.map((t, i) => (
+                  <circle key={i} className="m1f-dial-trail" cx={t.x} cy={t.y} r={t.r} style={{ opacity: t.o }} />
+                ))}
+                <circle className="m1f-dial-head-glow" cx={HEAD_X} cy={HEAD_Y} r={11} />
+                <circle className="m1f-dial-head" cx={HEAD_X} cy={HEAD_Y} r={6.5} />
               </g>
             </svg>
             <div className="m1f-dial-readout">
               <span className="m1f-dial-value">
-                {pct}
+                <span key={pct} className="m1f-dial-num">{pct}</span>
                 <span className="m1f-dial-unit">%</span>
               </span>
             </div>
             <span className="m1f-dial-stage">{label}</span>
+          </div>
+          <div className="m1f-feed" aria-hidden="true">
+            <span className="m1f-feed-slot" />
+            {pct < 100 && <span className="m1f-feed-sheet" />}
+            <span className="m1f-feed-stack">
+              {Array.from({ length: Math.min(8, totalSheets) }, (_, i) => (
+                <i key={i} className={`m1f-stack-sheet${i < Math.min(8, sheetsDone) ? ' is-done' : ''}`} style={{ ['--i' as string]: i } as React.CSSProperties} />
+              ))}
+            </span>
           </div>
           <p className="m1f-print-pages">{pageText}</p>
         </div>

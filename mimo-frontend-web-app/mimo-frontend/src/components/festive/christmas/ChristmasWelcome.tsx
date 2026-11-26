@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check } from '@phosphor-icons/react';
-import mimo1Hero from '../../../assets/christmas/mimo1-hero.jpg';
 import mimo2Hero from '../../../assets/christmas/mimo2-hero.jpg';
 import mimo3Hero from '../../../assets/christmas/mimo3-hero.jpg';
 import './christmas.css';
+import { Mimo1XmasWelcome } from './screens/mimo1/Mimo1XmasScreens';
 
 /**
  * Christmas theme for MIMO 1.0 (CV-001), 2.0 (SV-002) and 3.0 (SV-003): a different photographic welcome
@@ -58,23 +58,6 @@ export const ChristmasSnow: React.FC<{ color?: string; dense?: boolean; light?: 
   </div>
 );
 
-const GoldDust: React.FC = () => (
-  <div className="xmas-dust" aria-hidden>
-    {Array.from({ length: 18 }, (_, i) => (
-      <span
-        key={i}
-        className="xmas-mote"
-        style={{
-          left: `${(i * 53 + 7) % 100}%`,
-          top: `${(i * 29 + 13) % 100}%`,
-          animationDelay: `${-((i * 7) % 11)}s`,
-          animationDuration: `${8 + (i % 5) * 2}s`,
-        }}
-      />
-    ))}
-  </div>
-);
-
 /* Fairy-light bokeh: soft out-of-focus lights that drift and twinkle around the edges (never behind the
    content in the middle), plus one slow sweep of light across the screen. transform/opacity only. */
 const BOKEH_SPOTS = [
@@ -114,7 +97,7 @@ export const ChristmasLights: React.FC<{ variant: ChristmasVariant; sweep?: bool
 
 /* ─────────────── swipe to start (same interaction as the default screens) ─────────────── */
 
-const ChristmasSwipe: React.FC<{ onNext: () => void; isActive: boolean; tone: 'gold' | 'snow' | 'ember'; width?: number }> = ({
+const ChristmasSwipe: React.FC<{ onNext: () => void; isActive: boolean; tone: 'gold' | 'snow' | 'ember' | 'tree'; width?: number }> = ({
   onNext,
   isActive,
   tone,
@@ -234,26 +217,13 @@ export const ChristmasWelcome: React.FC<ChristmasWelcomeProps> = ({ isActive, on
   if (!isActive) return null;
   const variant = christmasVariantFor(kioskId);
 
-  // MIMO 1.0 - "Golden Eve": gold baubles full-bleed, warm dark fade on the left, text left-aligned.
+  // MIMO 1.0: the friend's ornamented-tree design, matching the 1.0 Christmas code-entry page (Mimo1XmasScreens.tsx).
   if (variant === 'mimo1') {
     return (
-      <div className="xmas-screen xmas-1" data-theme="christmas">
-        <img className="xmas-photo xmas-kenburns" src={mimo1Hero} alt="" draggable={false} />
-        <div className="xmas-1-scrim" />
-        <ChristmasLights variant="mimo1" />
-        <GoldDust />
-        <main className="xmas-1-copy">
-          <p className="xmas-script xmas-reveal" style={{ ['--i' as string]: 0 }}>Merry Christmas</p>
-          <h1 className="xmas-1-title xmas-reveal" style={{ ['--i' as string]: 1 }}>
-            MIMO <span>1.0</span>
-          </h1>
-          <h2 className="xmas-1-sub xmas-reveal" style={{ ['--i' as string]: 2 }}>Self-Service Printing Kiosk</h2>
-          <div className="xmas-reveal" style={{ ['--i' as string]: 3 }}>
-            <ChristmasSwipe isActive={isActive} onNext={onNext} tone="gold" width={470} />
-          </div>
-        </main>
-        <Footer className="xmas-1-footer" />
-      </div>
+      <Mimo1XmasWelcome
+        swipe={<ChristmasSwipe isActive={isActive} onNext={onNext} tone="tree" width={470} />}
+        footer={<Footer className="m1w-footer" />}
+      />
     );
   }
 
