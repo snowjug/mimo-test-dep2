@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import api from '../../api';
 import { useTheme } from '../../context/ThemeContext';
+import { KioskThemeCard } from './KioskThemeCard';
 
 interface KioskOption {
   kioskId: string;
@@ -486,6 +487,9 @@ export const ConfigurationPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Kiosk Theme (festival UI per machine) */}
+        <KioskThemeCard />
 
         {/* Hardware Alerts & Telemetry Thresholds */}
         <div className="p-5 sm:p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs flex flex-col justify-between space-y-5">

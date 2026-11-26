@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WarningCircle, Info, X, Wrench, WifiSlash } from '@phosphor-icons/react';
 import { Mimo3Screensaver } from './Mimo3Screensaver';
 import { Mimo3MainScreen } from './Mimo3MainScreen';
+import { useKioskTheme } from '../../hooks/useKioskTheme';
+import { ChristmasWelcome, ChristmasBackdrop } from '../festive/christmas/ChristmasWelcome';
 import { Mimo3CodeEntry } from './Mimo3CodeEntry';
 import { Mimo3PrintingScreen } from './Mimo3PrintingScreen';
 import { Mimo3SummaryScreen } from './Mimo3SummaryScreen';
@@ -59,6 +61,8 @@ function playTactileClick() {
 
 export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-003' }) => {
   const activeKioskId = kioskId || 'SV-003';
+  // Festival UI chosen in the admin dashboard (Configuration → Kiosk Theme); 'default' keeps Mimo3MainScreen.
+  const kioskTheme = useKioskTheme(activeKioskId);
 
   // Navigation & Screen State
   const [currentScreen, setCurrentScreen] = useState<Mimo3ScreenState>('main-interface');
@@ -299,7 +303,12 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
   }, [code, activeKioskId, showToast]);
 
   return (
-    <div className="relative h-full w-full select-none overflow-hidden bg-gradient-to-br from-[#FAFAF9] via-[#F8FAFC] to-[#F1F5F9] font-sans text-[#0F172A]">
+    <div
+      className={`relative h-full w-full select-none overflow-hidden font-sans text-[#0F172A] ${
+        kioskTheme === 'christmas' ? 'mimo3-xmas bg-[#FBF5EC]' : 'bg-gradient-to-br from-[#FAFAF9] via-[#F8FAFC] to-[#F1F5F9]'
+      }`}
+    >
+      {kioskTheme === 'christmas' && <ChristmasBackdrop variant="mimo3" />}
       {/* ================= TOAST NOTIFICATION ================= */}
       {toastMsg && (
         <div
@@ -343,8 +352,18 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
       />
 
       {/* ================= STEP 2: MAIN WELCOME SCREEN ================= */}
+      {kioskTheme === 'christmas' && (
+        <ChristmasWelcome
+          isActive={currentScreen === 'main-interface' && !showScreensaver}
+          kioskId={activeKioskId}
+          onNext={() => {
+            playTactileClick();
+            setCurrentScreen('code-entry-screen');
+          }}
+        />
+      )}
       <Mimo3MainScreen
-        isActive={currentScreen === 'main-interface'}
+        isActive={currentScreen === 'main-interface' && kioskTheme !== 'christmas'}
         onNext={() => {
           playTactileClick();
           setCurrentScreen('code-entry-screen');

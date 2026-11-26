@@ -1,0 +1,137 @@
+/* Christmas theme (ChristmasWelcome.tsx). Every class is prefixed xmas- and the screen overrides at the bottom
+   only apply under html.kiosk-xmas, so the default UI is untouched while the theme is off.
+   Raspberry Pi friendly: photos are static textures; motion is transform/opacity only; no runtime blur. */
+
+/* ─────────── shared ─────────── */
+.xmas-screen { position: absolute; inset: 0; overflow: hidden; user-select: none; z-index: 5; font-family: 'Plus Jakarta Sans', sans-serif; }
+.xmas-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; will-change: transform; pointer-events: none; }
+.xmas-kenburns { animation: xmas-kenburns 26s ease-in-out infinite alternate; transform-origin: 60% 45%; }
+@keyframes xmas-kenburns { from { transform: scale(1.02); } to { transform: scale(1.1) translate3d(-1.2%, -1%, 0); } }
+.xmas-pan { animation: xmas-pan 30s ease-in-out infinite alternate; }
+@keyframes xmas-pan { from { transform: scale(1.08) translate3d(-1.5%, 0, 0); } to { transform: scale(1.08) translate3d(1.5%, -1%, 0); } }
+
+.xmas-reveal { opacity: 0; transform: translate3d(0, 22px, 0); animation: xmas-reveal .9s cubic-bezier(.16, 1, .3, 1) forwards; animation-delay: calc(var(--i, 0) * 140ms + 150ms); }
+@keyframes xmas-reveal { to { opacity: 1; transform: none; } }
+
+.xmas-script { font-family: 'Great Vibes', cursive; line-height: 1.15; margin: 0; padding-bottom: 4px; }
+
+.xmas-snow { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: hidden; }
+.xmas-flake { position: absolute; top: -12px; border-radius: 50%; will-change: transform; animation-name: xmas-fall; animation-timing-function: linear; animation-iteration-count: infinite; }
+@keyframes xmas-fall {
+  0%   { transform: translate3d(0, -20px, 0); }
+  50%  { transform: translate3d(var(--drift), 460px, 0); }
+  100% { transform: translate3d(0, 940px, 0); }
+}
+
+.xmas-dust { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.xmas-mote { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle, #E9B54A 0%, rgba(214, 160, 60, 0) 70%); animation: xmas-mote ease-in-out infinite; }
+@keyframes xmas-mote {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(.6); opacity: 0; }
+  30% { opacity: .95; }
+  50% { transform: translate3d(14px, -34px, 0) scale(1.4); opacity: .8; }
+  80% { opacity: .2; }
+}
+
+.xmas-footer { position: absolute; bottom: 22px; z-index: 6; font-size: 13px; }
+
+/* swipe */
+.xmas-swipe { position: relative; border-radius: 999px; overflow: hidden; border: 1.5px solid; }
+.xmas-swipe-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; }
+.xmas-swipe-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-left: 72px; font-size: 17px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; pointer-events: none; }
+.xmas-swipe-thumb { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: grab; }
+.xmas-swipe-thumb::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid currentColor; opacity: 0; animation: xmas-ping 2.4s ease-out infinite; }
+.xmas-swipe-thumb.is-done { background: #15803D !important; color: #FFFFFF !important; }
+.xmas-swipe-thumb.is-done::after { display: none; }
+@keyframes xmas-ping { 0% { transform: scale(.85); opacity: .55; } 100% { transform: scale(1.35); opacity: 0; } }
+
+.xmas-swipe--gold { background: rgba(255, 252, 244, .95); border-color: rgba(192, 138, 42, .55); box-shadow: 0 18px 40px rgba(150, 100, 30, .2); }
+.xmas-swipe--gold .xmas-swipe-fill { background: rgba(214, 168, 70, .22); }
+.xmas-swipe--gold .xmas-swipe-label { color: #8A5E14; }
+.xmas-swipe--gold .xmas-swipe-thumb { background: linear-gradient(135deg, #E2B04E, #B57F22); color: #FFFFFF; }
+
+.xmas-swipe--snow { background: rgba(255, 255, 255, .88); border-color: rgba(255, 255, 255, .95); box-shadow: 0 18px 44px rgba(22, 44, 34, .22); }
+.xmas-swipe--snow .xmas-swipe-fill { background: rgba(184, 29, 47, .12); }
+.xmas-swipe--snow .xmas-swipe-label { color: #9E1B2C; }
+.xmas-swipe--snow .xmas-swipe-thumb { background: linear-gradient(135deg, #C8243A, #941626); color: #FFFFFF; }
+
+.xmas-swipe--ember { background: rgba(255, 252, 246, .92); border-color: rgba(176, 102, 32, .35); box-shadow: 0 18px 40px rgba(122, 52, 12, .16); }
+.xmas-swipe--ember .xmas-swipe-fill { background: rgba(214, 120, 40, .16); }
+.xmas-swipe--ember .xmas-swipe-label { color: #8A3A12; }
+.xmas-swipe--ember .xmas-swipe-thumb { background: linear-gradient(135deg, #E08A3C, #B5561C); color: #FFFFFF; }
+
+/* ─────────── MIMO 1.0: Golden Eve ─────────── */
+.xmas-1 { background: #FBF4E6; }
+.xmas-1-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(253, 248, 238, .96) 0%, rgba(253, 248, 238, .9) 34%, rgba(253, 248, 238, .45) 56%, rgba(253, 248, 238, 0) 76%); }
+.xmas-1-copy { position: relative; z-index: 4; height: 100%; width: 58%; display: flex; flex-direction: column; justify-content: center; padding-left: 8%; }
+.xmas-1-copy .xmas-script { font-size: 60px; color: #B07A1E; }
+.xmas-1-title { margin: 4px 0 0; font-size: 116px; line-height: 1; font-weight: 800; letter-spacing: -.035em; color: #2B1A0A; }
+.xmas-1-title span { color: #C08A2A; }
+.xmas-1-sub { margin: 14px 0 40px; font-size: 30px; font-weight: 500; color: #4A3520; }
+.xmas-1-footer { left: 8%; color: #8A6E4E; }
+
+/* ─────────── MIMO 2.0: First Snow ─────────── */
+.xmas-2 { background: #E9EEF0; }
+.xmas-2-veil { position: absolute; inset: 0; z-index: 1; background: radial-gradient(ellipse 46% 52% at 50% 36%, rgba(255, 255, 255, .78) 0%, rgba(255, 255, 255, .35) 55%, rgba(255, 255, 255, 0) 80%), linear-gradient(0deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, 0) 30%); }
+.xmas-2-copy { position: absolute; z-index: 4; top: 9%; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.xmas-2-eyebrow { margin: 0 0 8px; font-size: 15px; font-weight: 700; letter-spacing: .5em; text-transform: uppercase; color: #22352B; }
+.xmas-2-title { margin: 0; font-size: 128px; line-height: 1; font-weight: 900; letter-spacing: -.02em; background: linear-gradient(180deg, #E9BE5F 0%, #B8862D 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.xmas-2-title sup { font-size: 48px; font-weight: 800; vertical-align: top; position: relative; top: 10px; margin-left: 8px; -webkit-text-fill-color: #C3922F; }
+.xmas-2-sub { margin: 10px 0 0; font-size: 32px; font-weight: 500; color: #18261F; }
+.xmas-2-script { font-size: 58px; color: #A8192D; margin-top: 4px; }
+.xmas-2-swipe { position: absolute; z-index: 4; left: 50%; bottom: 13%; transform: translateX(-50%); }
+.xmas-2-swipe.xmas-reveal { animation-name: xmas-reveal-x; }
+@keyframes xmas-reveal-x { from { opacity: 0; transform: translate3d(-50%, 22px, 0); } to { opacity: 1; transform: translate3d(-50%, 0, 0); } }
+.xmas-2-footer { left: 0; right: 0; text-align: center; color: #33463C; }
+
+/* ─────────── MIMO 3.0: Candlelight ─────────── */
+.xmas-3 { background: #FBF5EC; }
+.xmas-3-photo { position: absolute; top: 0; right: 0; bottom: 0; width: 62%; overflow: hidden; z-index: 0; }
+.xmas-3-flicker { position: absolute; inset: 0; background: radial-gradient(circle at 34% 30%, rgba(255, 196, 110, .45) 0%, rgba(255, 196, 110, 0) 30%), radial-gradient(circle at 58% 44%, rgba(255, 210, 140, .35) 0%, rgba(255, 210, 140, 0) 26%); animation: xmas-flicker 3.6s ease-in-out infinite; }
+@keyframes xmas-flicker { 0%, 100% { opacity: .55; } 20% { opacity: .9; } 45% { opacity: .65; } 70% { opacity: 1; } }
+.xmas-3-fade { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, #FBF5EC 0%, #FBF5EC 38%, rgba(251, 245, 236, .85) 46%, rgba(251, 245, 236, 0) 64%); }
+.xmas-3-copy { position: relative; z-index: 4; height: 100%; width: 50%; display: flex; flex-direction: column; justify-content: center; padding-left: 6.5%; }
+.xmas-3-script { font-size: 60px; color: #B5561C; }
+.xmas-3-title { margin: 2px 0 0; font-size: 120px; line-height: 1; font-weight: 800; letter-spacing: -.035em; color: #3A160A; }
+.xmas-3-title span { color: #B5561C; }
+.xmas-3-sub { margin: 12px 0 0; font-size: 32px; font-weight: 500; color: #3A2A1E; }
+.xmas-3-note { margin: 12px 0 38px; font-size: 18px; color: #7A5A45; }
+.xmas-3-footer { left: 6.5%; color: #8F6F57; }
+
+/* ─────────── lighting: twinkling fairy-light bokeh + a slow sweep of light ─────────── */
+.xmas-lights { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.xmas-bokeh { position: absolute; border-radius: 50%; will-change: transform, opacity; animation-name: xmas-bokeh-drift, xmas-bokeh-twinkle; animation-timing-function: ease-in-out, ease-in-out; animation-iteration-count: infinite, infinite; animation-direction: alternate, alternate; }
+@keyframes xmas-bokeh-drift { from { transform: translate3d(-10px, 8px, 0) scale(.92); } to { transform: translate3d(14px, -16px, 0) scale(1.08); } }
+@keyframes xmas-bokeh-twinkle { 0% { opacity: .25; } 55% { opacity: .95; } 100% { opacity: .5; } }
+.xmas-sweep { position: absolute; top: -20%; bottom: -20%; left: 0; width: 34%; background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 248, 225, .22) 50%, rgba(255, 255, 255, 0) 100%); transform: translate3d(-120%, 0, 0) rotate(8deg); animation: xmas-sweep 11s ease-in-out infinite; }
+@keyframes xmas-sweep { 0%, 15% { transform: translate3d(-120%, 0, 0) rotate(8deg); } 70%, 100% { transform: translate3d(400%, 0, 0) rotate(8deg); } }
+
+/* ─────────── every other screen: breathing festive backdrop ─────────── */
+.xmas-backdrop { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.xmas-backdrop::before { content: ''; position: absolute; inset: -4%; background-size: cover; background-position: center; animation: xmas-breathe 14s ease-in-out infinite alternate; will-change: transform; }
+.xmas-backdrop::after { content: ''; position: absolute; inset: 0; animation: xmas-glow 6s ease-in-out infinite; }
+@keyframes xmas-breathe { from { transform: scale(1); } to { transform: scale(1.06) translate3d(-1%, -.6%, 0); } }
+@keyframes xmas-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.xmas-backdrop--mimo1::before { background-image: linear-gradient(rgba(255, 248, 232, .42), rgba(255, 244, 222, .52)), url('../../../assets/christmas/mimo1-soft.jpg'); }
+.xmas-backdrop--mimo1::after { background: radial-gradient(circle at 12% 18%, rgba(255, 214, 120, .35) 0%, transparent 28%), radial-gradient(circle at 88% 82%, rgba(255, 196, 96, .3) 0%, transparent 30%); }
+.xmas-backdrop--mimo2::before { background-image: linear-gradient(rgba(255, 255, 255, .38), rgba(246, 250, 252, .46)), url('../../../assets/christmas/mimo2-soft.jpg'); }
+.xmas-backdrop--mimo2::after { background: radial-gradient(circle at 15% 85%, rgba(200, 36, 58, .1) 0%, transparent 26%), radial-gradient(circle at 85% 15%, rgba(200, 36, 58, .08) 0%, transparent 24%); }
+.xmas-backdrop--mimo3::before { background-image: linear-gradient(rgba(252, 246, 236, .42), rgba(251, 243, 230, .52)), url('../../../assets/christmas/mimo3-soft.jpg'); }
+.xmas-backdrop--mimo3::after { background: radial-gradient(circle at 80% 30%, rgba(255, 190, 110, .3) 0%, transparent 30%); }
+
+/* Let the backdrop show through each machine's own screen backgrounds (theme on only). */
+html.kiosk-xmas .cv001-bg-wrapper { display: none; }
+html.kiosk-xmas .screen.visible[class*="mimo1-"] { background: transparent !important; background-image: none !important; }
+html.kiosk-xmas.theme-mimo1-diwali, html.kiosk-xmas body.theme-mimo1-diwali, html.kiosk-xmas #root.theme-mimo1-diwali { background: #F6EEDC !important; }
+html.kiosk-xmas.mimo2-lily .kiosk-bg { background: transparent !important; }
+html.kiosk-xmas.mimo2-lily .kiosk-bg::before, html.kiosk-xmas.mimo2-lily .kiosk-bg::after { display: none !important; }
+html.kiosk-xmas.mimo2-lily #root { background: #EEF2F4 !important; }
+html.kiosk-xmas .mimo3-xmas .h-full.w-full.bg-gradient-to-br { background: transparent !important; }
+
+/* Accessibility and the Pi: no motion when the device asks for it. */
+@media (prefers-reduced-motion: reduce) {
+  .xmas-kenburns, .xmas-pan, .xmas-flake, .xmas-mote, .xmas-3-flicker, .xmas-backdrop::before, .xmas-backdrop::after, .xmas-swipe-thumb::after, .xmas-bokeh, .xmas-sweep { animation: none !important; }
+  .xmas-sweep { display: none; }
+  .xmas-snow, .xmas-dust { display: none; }
+  .xmas-reveal { animation: none; opacity: 1; transform: none; }
+  .xmas-2-swipe.xmas-reveal { transform: translateX(-50%); }
+}

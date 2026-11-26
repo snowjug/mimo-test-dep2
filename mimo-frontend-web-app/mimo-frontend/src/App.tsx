@@ -20,6 +20,8 @@ import { Adds } from './components/screens/adds/Adds';
 import { isFestivalActive } from './config/festivalConfig';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useKioskIdle } from './hooks/useKioskIdle';
+import { useKioskTheme } from './hooks/useKioskTheme';
+import { ChristmasWelcome, ChristmasBackdrop, christmasVariantFor } from './components/festive/christmas/ChristmasWelcome';
 import { loadActivePrint, saveActivePrint, clearActivePrint, markActivePrintCompleted, type ActivePrintJob } from './utils/activePrint';
 
 
@@ -53,6 +55,7 @@ function App() {
   // SV-002 never uses a festival theme: it always shows the white-lily screens.
   const isMimo2Lily = dynamicKioskId === 'SV-002';
   const isFestiveForKiosk = dynamicKioskId === 'CV-001' || (!isMimo2Lily && isFestive);
+  const kioskTheme = useKioskTheme(dynamicKioskId);
 
   useEffect(() => {
     const rootEl = document.getElementById('root');
@@ -366,7 +369,8 @@ function App() {
   const goToSummary = useCallback(() => setCurrentScreen('summary-screen'), []);
 
   // Setup screen removed as per user request to drop URL parameters
-  const MainScreenView = isMimo2Lily ? Mimo2MainScreen : MainScreen;
+  // Festival UI chosen in the admin dashboard (Configuration → Kiosk Theme); 'default' keeps the normal screens.
+  const MainScreenView = kioskTheme === 'christmas' ? ChristmasWelcome : isMimo2Lily ? Mimo2MainScreen : MainScreen;
   const CodeEntryScreenView = isMimo2Lily ? Mimo2CodeEntryScreen : CodeEntryScreen;
   const PrintingScreenView = isMimo2Lily ? Mimo2PrintingScreen : PrintingScreen;
   const SummaryScreenView = isMimo2Lily ? Mimo2SummaryScreen : SummaryScreen;
@@ -434,6 +438,7 @@ function App() {
 
       {/* ================= SCREENS ================= */}
       {isFestiveForKiosk && <CV001Background />}
+      {kioskTheme === 'christmas' && <ChristmasBackdrop variant={christmasVariantFor(dynamicKioskId)} />}
 
       <MainScreenView
         isActive={currentScreen === 'main-interface'}

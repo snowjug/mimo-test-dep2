@@ -9,6 +9,7 @@ const adminReports = require("../controllers/adminReports.controller");
 const ads = require("../controllers/ads.controller");
 const tools = require("../controllers/technicalTools.controller");
 const outage = require("../controllers/outage.controller");
+const kioskTheme = require("../controllers/kioskTheme.controller");
 
 const router = express.Router();
 const { loginLimiter } = createLimiters(db);
@@ -22,6 +23,8 @@ router.get("/admin/settings", adminAuthMiddleware, admin.getAdminSettings);
 router.post("/admin/settings", adminAuthMiddleware, admin.postAdminSettings);
 router.get("/admin/screensaver", adminAuthMiddleware, admin.getAdminScreensaver);
 router.post("/admin/screensaver", adminAuthMiddleware, admin.postAdminScreensaver);
+router.get("/admin/kiosk-themes", adminAuthMiddleware, kioskTheme.getAdminKioskThemes);
+router.post("/admin/kiosk-themes", adminAuthMiddleware, kioskTheme.postAdminKioskThemes);
 router.post("/admin/upload-url", adminAuthMiddleware, admin.postGetAdminUploadUrl);
 router.get("/admin/hardware", adminAuthMiddleware, admin.getAdminHardware);
 router.post("/admin/hardware", adminAuthMiddleware, admin.postAdminHardware);
