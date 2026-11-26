@@ -4,6 +4,7 @@ import { Mimo3Screensaver } from './Mimo3Screensaver';
 import { Mimo3MainScreen } from './Mimo3MainScreen';
 import { useKioskTheme } from '../../hooks/useKioskTheme';
 import { ChristmasWelcome, ChristmasBackdrop } from '../festive/christmas/ChristmasWelcome';
+import { ChristmasScreenDecor } from '../festive/christmas/screens/ChristmasScreenDecor';
 import { Mimo3CodeEntry } from './Mimo3CodeEntry';
 import { Mimo3PrintingScreen } from './Mimo3PrintingScreen';
 import { Mimo3SummaryScreen } from './Mimo3SummaryScreen';
@@ -551,6 +552,7 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
           </div>
         </div>
       )}
+      {kioskTheme === 'christmas' && <ChristmasScreenDecor variant="mimo3" screen={currentScreen} />}
     </div>
   );
 };

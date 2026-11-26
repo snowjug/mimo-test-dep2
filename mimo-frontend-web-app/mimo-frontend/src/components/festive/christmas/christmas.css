@@ -135,3 +135,7 @@ html.kiosk-xmas .mimo3-xmas .h-full.w-full.bg-gradient-to-br { background: trans
   .xmas-reveal { animation: none; opacity: 1; transform: none; }
   .xmas-2-swipe.xmas-reveal { transform: translateX(-50%); }
 }
+
+/* Per-screen Christmas decor layer (screens/ChristmasScreenDecor.tsx): above the screens, never takes taps. */
+.xmas-decor { position: absolute; inset: 0; z-index: 50; pointer-events: none; overflow: hidden; }
+.xmas-decor * { pointer-events: none; }

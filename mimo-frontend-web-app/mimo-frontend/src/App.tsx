@@ -22,6 +22,7 @@ import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useKioskIdle } from './hooks/useKioskIdle';
 import { useKioskTheme } from './hooks/useKioskTheme';
 import { ChristmasWelcome, ChristmasBackdrop, christmasVariantFor } from './components/festive/christmas/ChristmasWelcome';
+import { ChristmasScreenDecor } from './components/festive/christmas/screens/ChristmasScreenDecor';
 import { loadActivePrint, saveActivePrint, clearActivePrint, markActivePrintCompleted, type ActivePrintJob } from './utils/activePrint';
 
 
@@ -520,6 +521,8 @@ function App() {
         onReset={handleReset}
         kioskId={dynamicKioskId}
       />
+
+      {kioskTheme === 'christmas' && <ChristmasScreenDecor variant={christmasVariantFor(dynamicKioskId)} screen={currentScreen} />}
 
       {/* DEBUG BUTTON */}
       <div
