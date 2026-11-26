@@ -6,6 +6,7 @@ const { admin, db } = require("../config/firebase");
 const { getPDFDocument } = require("../services/pdf.service");
 const { generateUniquePrintCode } = require("../services/printCode.service");
 const { loadMachinesMap, loadMachineTemplatesMap, describeDestination } = require("../services/machineRegistry.service");
+const { incrementCouponRedemption } = require("../services/coupon.service");
 
 /** Every ACTIVE, known machine, as {kioskId, name, supportsColor} — same source of truth the website and kiosk
  * print routing already use. A new machine becomes orderable over WhatsApp the moment it's provisioned and
@@ -142,6 +143,10 @@ const getWaPaySuccess = async (req, res) => {
         // Notify on WhatsApp with native order card -- only for the call that actually issued the code, so a
         // concurrent duplicate call (which observed alreadyIssued above) doesn't send a second notification.
         if (!outcome.alreadyIssued) {
+          const usedCoupon = waJobs.docs.map((d) => d.data().couponCode || d.data().couponUsed).find(Boolean);
+          if (usedCoupon) {
+            await incrementCouponRedemption(db, admin, usedCoupon);
+          }
           const waSession = await db.collection("whatsapp_sessions").where("jobId", "==", waJobs.docs[0]?.id).get();
           if (!waSession.empty) {
             const phone = waSession.docs[0].id;

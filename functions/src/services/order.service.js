@@ -22,6 +22,7 @@ const { getTransporter } = require("../services/email.service");
 const { loadPricing } = require("../services/pricing.service");
 const { generateUniquePrintCode } = require("../services/printCode.service");
 const { loadMachinesMap, loadMachineTemplatesMap, describeDestination } = require("../services/machineRegistry.service");
+const { normalizeCouponCode, incrementCouponRedemption } = require("../services/coupon.service");
 
 // Upper bound for copies of one order (the customer site allows 1-99). Verbatim from payment.controller.js.
 const MAX_COPIES = 100;
@@ -359,14 +360,19 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
     throw new OrderServiceError(400, `Print job not found: ${missingJobId}`);
   }
 
+  let appliedCouponCode = null;
   let discountPercentage = 0;
-  if (couponCode) {
-    const couponDoc = await db.collection("coupons").doc(couponCode.toUpperCase()).get();
+  const candidateCouponCode = normalizeCouponCode(couponCode);
+  if (candidateCouponCode) {
+    const couponDoc = await db.collection("coupons").doc(candidateCouponCode).get();
     if (couponDoc.exists) {
       const couponData = couponDoc.data();
       const now = new Date();
       if (couponData.isActive && (!couponData.expiryDate || couponData.expiryDate.toDate() > now)) {
         discountPercentage = Math.min(100, Math.max(0, Number(couponData.discountPercentage) || 0));
+        if (discountPercentage > 0) {
+          appliedCouponCode = candidateCouponCode;
+        }
       }
     }
   }
@@ -567,14 +573,31 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
     coinsApplied = Math.min(coinsRequested, totalAmount);
   }
   const coinsDiscount = coinsApplied * 0.5;
+  const coinsValue = Number(coinsDiscount.toFixed(2));
 
   const finalAmountToPay = Math.max(0, totalAmount - coinsDiscount);
   let amount = Number(finalAmountToPay.toFixed(2));
   if (discountPercentage > 0) {
     amount = Number((amount - (amount * (discountPercentage / 100))).toFixed(2));
   }
+  const couponDiscountAmount = appliedCouponCode
+    ? Number((finalAmountToPay * (discountPercentage / 100)).toFixed(2))
+    : 0;
   if (!Number.isFinite(amount) || amount < 0) {
     throw new OrderServiceError(400, "Invalid order amount.");
+  }
+
+  newJobData.originalCost = totalAmount;
+  newJobData.grossAmount = totalAmount;
+  if (appliedCouponCode) {
+    newJobData.couponCode = appliedCouponCode;
+    newJobData.discountPercentage = discountPercentage;
+    newJobData.discount = couponDiscountAmount;
+    newJobData.discountAmount = couponDiscountAmount;
+  }
+  if (coinsApplied > 0) {
+    newJobData.coinsUsed = coinsApplied;
+    newJobData.coinsValue = coinsValue;
   }
 
   const isFreeOrder = amount <= 0 || amount < 1.00;
@@ -667,12 +690,18 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
 
     const isRealCustEmail = typeof customerEmail === "string" && customerEmail.includes("@") && !customerEmail.toLowerCase().includes("user@printmimo.tech");
     await db.collection("orders").add({
-      orderId, userId, amount: 0, totalPages: totalRawPages, totalDocs: mergedFiles.length,
+      orderId, userId, amount: 0, gross: totalAmount, totalPages: totalRawPages, totalDocs: mergedFiles.length,
       status: "PAID", orderStatus: "completed", printJobs: [newJobRef.id],
-      createdAt: now, couponCode: couponCode || null, discountPercentage,
+      createdAt: now, couponCode: appliedCouponCode, discountPercentage,
+      discount: couponDiscountAmount, discountAmount: couponDiscountAmount,
       coinsUsed: coinsApplied,
+      ...(coinsApplied > 0 ? { coinsValue } : {}),
       ...(isRealCustEmail ? { customerEmail: customerEmail.trim() } : {}),
     });
+
+    if (appliedCouponCode) {
+      await incrementCouponRedemption(db, admin, appliedCouponCode);
+    }
 
     try {
       const userEmail = await resolveCustomerEmail({ db, userId, orderId, reqUser, explicitEmail: customer?.email });
@@ -733,6 +762,13 @@ async function createOrderForUser({ db = defaultDb, userId, jobIds, printOptions
     orderId,
     userId,
     amount,
+    gross: totalAmount,
+    couponCode: appliedCouponCode,
+    discountPercentage,
+    discount: couponDiscountAmount,
+    discountAmount: couponDiscountAmount,
+    coinsUsed: coinsApplied,
+    ...(coinsApplied > 0 ? { coinsValue } : {}),
     sourceJobIds,
     paymentSessionId: response ? response.data.payment_session_id : null,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -805,10 +841,15 @@ async function fulfillPaidOrder({ db = defaultDb, userId, orderId, reqUser, cust
 
     const printCode = await generateUniquePrintCode(db, tx);
     let directKioskId = null;
+    let redeemedCouponCode = null;
 
     let coinsToCharge = 0;
     jobsToUpdate.forEach((doc) => {
       const data = doc.data();
+      const jobCoupon = data.couponCode || data.couponUsed || null;
+      if (jobCoupon && !redeemedCouponCode) {
+        redeemedCouponCode = jobCoupon;
+      }
       // Current main has NO kiosk fallback here (not even data.kioskId) — preserved exactly.
       const explicitKioskId = data.printOptions?.directKioskId || data.settings?.directKioskId || null;
       const targetKiosk = explicitKioskId || null;
@@ -838,7 +879,7 @@ async function fulfillPaidOrder({ db = defaultDb, userId, orderId, reqUser, cust
       });
     }
 
-    return { status: 200, body: { printCode, directKioskId } };
+    return { status: 200, body: { printCode, directKioskId, redeemedCouponCode } };
   });
 
   if (outcome.status !== 200) {
@@ -849,7 +890,10 @@ async function fulfillPaidOrder({ db = defaultDb, userId, orderId, reqUser, cust
     return { ...outcome.body, alreadyIssued: true };
   }
 
-  const { printCode, directKioskId } = outcome.body;
+  const { printCode, directKioskId, redeemedCouponCode } = outcome.body;
+  if (redeemedCouponCode) {
+    await incrementCouponRedemption(db, admin, redeemedCouponCode);
+  }
 
   try {
     const userEmail = await resolveCustomerEmail({ db, userId, orderId, reqUser, explicitEmail: customerEmail });

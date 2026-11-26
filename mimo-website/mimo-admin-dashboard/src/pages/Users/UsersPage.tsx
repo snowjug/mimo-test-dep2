@@ -427,6 +427,30 @@ export const UsersPage: React.FC = () => {
                 <span className="text-[var(--text-3)]">Registration Date</span>
                 <span>{selectedUser.joinedAt ? new Date(selectedUser.joinedAt).toLocaleString() : '—'}</span>
               </div>
+              <div className="flex justify-between py-1.5 border-b border-[var(--border)]">
+                <span className="text-[var(--text-3)]">MIMO Coins</span>
+                <span className="font-semibold">
+                  {selectedUser.mimoCoins
+                    ? `${selectedUser.mimoCoins.balance} avail · ${selectedUser.mimoCoins.totalUsed} used`
+                    : 'Not used'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center gap-2 py-1.5 border-b border-[var(--border)]">
+                <span className="text-[var(--text-3)] shrink-0">Coupons Used</span>
+                <span className="font-mono font-semibold text-right break-all">
+                  {selectedUser.couponsUsed && selectedUser.couponsUsed.length > 0
+                    ? selectedUser.couponsUsed.join(', ')
+                    : 'None'}
+                </span>
+              </div>
+              {(selectedUser.totalDiscountSaved ?? 0) > 0 && (
+                <div className="flex justify-between py-1.5 border-b border-[var(--border)]">
+                  <span className="text-[var(--text-3)]">Total Discount Saved</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    ₹{Number(selectedUser.totalDiscountSaved).toFixed(2)}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="pt-2 flex justify-end">

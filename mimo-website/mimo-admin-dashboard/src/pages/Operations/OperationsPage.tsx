@@ -46,7 +46,8 @@ export const OperationsPage: React.FC = () => {
     setIsRefunding(true);
     setRefundMessage(null);
     try {
-      const res = await api.post('/admin/refund', { orderId: refundJob.orderId, refundAmount: refundJob.cost, note: refundNote });
+      const actualPaid = (refundJob.actualAmountPaid !== null && refundJob.actualAmountPaid !== undefined) ? refundJob.actualAmountPaid : refundJob.cost;
+      const res = await api.post('/admin/refund', { orderId: refundJob.orderId, refundAmount: actualPaid, note: refundNote });
       setRefundMessage({ type: 'success', text: res.data.message || 'Refund processed successfully.' });
       setTimeout(() => { setRefundJob(null); setRefundMessage(null); jobsQ.refresh(); }, 1500);
     } catch (err: unknown) {

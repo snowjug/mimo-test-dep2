@@ -5,6 +5,7 @@ const { admin, db } = require("../config/firebase");
 const { loadPricing } = require("./pricing.service");
 const { generateUniquePrintCode } = require("./printCode.service");
 const { loadMachinesMap } = require("./machineRegistry.service");
+const { normalizeCouponCode, incrementCouponRedemption } = require("./coupon.service");
 
 const waContext = new AsyncLocalStorage();
 
@@ -332,12 +333,16 @@ Type the code below, or click *Skip & Pay* to proceed.`;
 }
 
 async function _finalizePayment(from, session, sessionRef, couponCode) {
-  let totalAmount = session.rawTotal || 1.00;
+  const rawTotal = Number(session.rawTotal || 1.00);
+  let totalAmount = rawTotal;
   let discountAmount = 0;
+  let discountPercentage = 0;
+  let appliedCouponCode = null;
 
-  if (couponCode) {
+  const normalizedCoupon = normalizeCouponCode(couponCode);
+  if (normalizedCoupon) {
     try {
-      const couponDoc = await db.collection("coupons").doc(couponCode).get();
+      const couponDoc = await db.collection("coupons").doc(normalizedCoupon).get();
       // A disabled coupon is treated like an unknown one (same rule as the web checkout).
       if (couponDoc.exists && couponDoc.data().isActive) {
         const data = couponDoc.data();
@@ -349,9 +354,11 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
         }
 
         if (!isExpired) {
-          const discountPct = data.discountPercentage || 0;
-          discountAmount = (totalAmount * discountPct) / 100;
+          const discountPct = Number(data.discountPercentage) || 0;
+          discountPercentage = discountPct;
+          discountAmount = Number(((totalAmount * discountPct) / 100).toFixed(2));
           totalAmount = Number((totalAmount - discountAmount).toFixed(2));
+          if (discountPct > 0) appliedCouponCode = normalizedCoupon;
           await sendWhatsAppMessage(from, `✅ Coupon applied! ₹${discountAmount.toFixed(2)} off.`);
         } else {
           await sendWhatsAppMessage(from, `❌ Coupon expired. Proceeding with original amount.`);
@@ -374,13 +381,25 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
     // document to read -- without this, a WhatsApp order has no orders/payment_transactions record at all,
     // and a genuinely-paid order further down would get silently misread as "free, no refund needed".
     await db.collection("payment_transactions").doc().set({
-      orderId, userId: `wa:${from}`, amount: 0, createdAt: now, status: "PAID", paymentMethod: "whatsapp_free",
+      orderId,
+      userId: `wa:${from}`,
+      amount: 0,
+      gross: rawTotal,
+      couponCode: appliedCouponCode,
+      discountPercentage,
+      discount: discountAmount,
+      discountAmount,
+      createdAt: now,
+      status: "PAID",
+      paymentMethod: "whatsapp_free",
     });
     await db.collection("print_jobs").doc(session.jobId).update({
       orderId,
       colorMode: session.colorMode,
       copies: session.copies,
       pageCount: session.pageCount,
+      originalCost: rawTotal,
+      grossAmount: rawTotal,
       totalCost: 0,
       printDestination: targetKioskId,
       kioskId: targetKioskId,
@@ -389,8 +408,15 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
       codeCreatedAt: now,
       paymentTime: now,
       retentionStartAt: now,
-      couponUsed: couponCode || null
+      couponUsed: couponCode || null,
+      couponCode: appliedCouponCode,
+      discountPercentage,
+      discount: discountAmount,
+      discountAmount,
     });
+    if (appliedCouponCode) {
+      await incrementCouponRedemption(db, admin, appliedCouponCode);
+    }
     await sessionRef.update({ state: "idle" });
     await sendWhatsAppMessage(from, `🎉 *100% Free!* Your order is fully covered.\n\nYour Print Code is:\n*${printCode}*\n\nHead to the Mimo kiosk and enter this code! 🖨️`);
     return;
@@ -420,13 +446,35 @@ async function _finalizePayment(from, session, sessionRef, couponCode) {
     // (postCashfreeWebhook) already updates any orders/payment_transactions doc matching this orderId to
     // PAID on success -- it needs this doc to exist first, which until now it never did for WhatsApp.
     await db.collection("payment_transactions").doc().set({
-      orderId, userId: `wa:${from}`, amount: totalAmount, createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "INITIATED", paymentMethod: "whatsapp_link",
+      orderId,
+      userId: `wa:${from}`,
+      amount: totalAmount,
+      gross: rawTotal,
+      couponCode: appliedCouponCode,
+      discountPercentage,
+      discount: discountAmount,
+      discountAmount,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: "INITIATED",
+      paymentMethod: "whatsapp_link",
     });
 
     const targetKioskId = session.kioskId || session.destination || "SV-002";
     await db.collection("print_jobs").doc(session.jobId).update({
-      orderId, colorMode: session.colorMode, copies: session.copies, pageCount: session.pageCount, totalCost: totalAmount, printDestination: targetKioskId, kioskId: targetKioskId, couponUsed: couponCode || null
+      orderId,
+      colorMode: session.colorMode,
+      copies: session.copies,
+      pageCount: session.pageCount,
+      originalCost: rawTotal,
+      grossAmount: rawTotal,
+      totalCost: totalAmount,
+      printDestination: targetKioskId,
+      kioskId: targetKioskId,
+      couponUsed: couponCode || null,
+      couponCode: appliedCouponCode,
+      discountPercentage,
+      discount: discountAmount,
+      discountAmount,
     });
 
     await sessionRef.update({ state: "idle" });
