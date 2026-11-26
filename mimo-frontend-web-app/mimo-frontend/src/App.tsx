@@ -31,6 +31,8 @@ export type ScreenState =
   | 'system-error-screen'
   | 'maintenance-screen';
 
+const SCREENSAVER_ENABLED = false;
+
 function App() {
   const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const currentKioskId = urlParams.get("kioskId");
@@ -326,7 +328,10 @@ function App() {
   // ================= HARDWARE-SAFE IDLE & SCREENSAVER DETECTION =================
   // These must be stable: useKioskIdle restarts its idle timer whenever they change, so inline arrows
   // (new on every render) let the 30s outage poll keep resetting the 60s timer and the screensaver never showed.
-  const triggerScreensaver = useCallback(() => setShowScreensaver(true), []);
+  // Screensaver switched off on MIMO 1.0 / 2.0 (owner's decision, 2026-11-26): idle kiosks stay on the normal
+  // welcome screen. Idle resets of the code-entry / summary screens in useKioskIdle are unaffected.
+  // To re-enable, set SCREENSAVER_ENABLED back to true.
+  const triggerScreensaver = useCallback(() => { if (SCREENSAVER_ENABLED) setShowScreensaver(true); }, []);
   const hideScreensaver = useCallback(() => setShowScreensaver(false), []);
   const handleIdleTimeoutChange = useCallback((sec: number) => setIdleTimeout(sec), []);
   // Pause the (hidden) screens' animations while the opaque screensaver covers them — see index.css.
