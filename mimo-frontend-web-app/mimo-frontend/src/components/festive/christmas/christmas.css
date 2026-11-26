@@ -106,17 +106,19 @@
 @keyframes xmas-sweep { 0%, 15% { transform: translate3d(-120%, 0, 0) rotate(8deg); } 70%, 100% { transform: translate3d(400%, 0, 0) rotate(8deg); } }
 
 /* ─────────── every other screen: breathing festive backdrop ─────────── */
+/* Inner screens: the backdrop lights only twinkle (no drift), halving their running animations. */
+.xmas-backdrop .xmas-bokeh { animation-name: xmas-bokeh-twinkle; animation-duration: 3.4s; animation-iteration-count: infinite; animation-direction: alternate; }
+
 .xmas-backdrop { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.xmas-backdrop::before { content: ''; position: absolute; inset: -4%; background-size: cover; background-position: center; animation: xmas-breathe 14s ease-in-out infinite alternate; will-change: transform; }
-.xmas-backdrop::after { content: ''; position: absolute; inset: 0; animation: xmas-glow 6s ease-in-out infinite; }
-@keyframes xmas-breathe { from { transform: scale(1); } to { transform: scale(1.06) translate3d(-1%, -.6%, 0); } }
-@keyframes xmas-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-.xmas-backdrop--mimo1::before { background-image: linear-gradient(rgba(255, 248, 232, .42), rgba(255, 244, 222, .52)), url('../../../assets/christmas/mimo1-soft.jpg'); }
-.xmas-backdrop--mimo1::after { background: radial-gradient(circle at 12% 18%, rgba(255, 214, 120, .35) 0%, transparent 28%), radial-gradient(circle at 88% 82%, rgba(255, 196, 96, .3) 0%, transparent 30%); }
-.xmas-backdrop--mimo2::before { background-image: linear-gradient(rgba(255, 255, 255, .38), rgba(246, 250, 252, .46)), url('../../../assets/christmas/mimo2-soft.jpg'); }
-.xmas-backdrop--mimo2::after { background: radial-gradient(circle at 15% 85%, rgba(200, 36, 58, .1) 0%, transparent 26%), radial-gradient(circle at 85% 15%, rgba(200, 36, 58, .08) 0%, transparent 24%); }
-.xmas-backdrop--mimo3::before { background-image: linear-gradient(rgba(252, 246, 236, .42), rgba(251, 243, 230, .52)), url('../../../assets/christmas/mimo3-soft.jpg'); }
-.xmas-backdrop--mimo3::after { background: radial-gradient(circle at 80% 30%, rgba(255, 190, 110, .3) 0%, transparent 30%); }
+.xmas-backdrop::before { content: ''; position: absolute; inset: 0; }
+.xmas-backdrop::after { content: ''; position: absolute; inset: 0; }
+/* Clean, bright, static washes (performance: no photo, no blur, nothing animating at full-screen size). */
+.xmas-backdrop--mimo1::before { background: linear-gradient(160deg, #FFFBF2 0%, #FBF1DC 55%, #F6E6C4 100%); }
+.xmas-backdrop--mimo1::after { background: radial-gradient(circle at 10% 12%, rgba(232, 188, 92, .22) 0%, transparent 32%), radial-gradient(circle at 92% 88%, rgba(196, 42, 52, .08) 0%, transparent 30%); }
+.xmas-backdrop--mimo2::before { background: linear-gradient(180deg, #FFFFFF 0%, #F3F7FA 60%, #E9F0F5 100%); }
+.xmas-backdrop--mimo2::after { background: radial-gradient(circle at 12% 88%, rgba(200, 36, 58, .07) 0%, transparent 28%), radial-gradient(circle at 90% 10%, rgba(47, 125, 79, .07) 0%, transparent 28%); }
+.xmas-backdrop--mimo3::before { background: linear-gradient(165deg, #FFFCF6 0%, #FBF3E6 60%, #F6EAD6 100%); }
+.xmas-backdrop--mimo3::after { background: radial-gradient(circle at 85% 18%, rgba(255, 186, 104, .18) 0%, transparent 32%), radial-gradient(circle at 8% 90%, rgba(200, 36, 58, .06) 0%, transparent 28%); }
 
 /* Let the backdrop show through each machine's own screen backgrounds (theme on only). */
 html.kiosk-xmas .cv001-bg-wrapper { display: none; }

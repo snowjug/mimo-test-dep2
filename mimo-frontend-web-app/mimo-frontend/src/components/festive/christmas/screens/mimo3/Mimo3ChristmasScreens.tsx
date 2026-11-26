@@ -10,7 +10,7 @@ import './mimo3-christmas-screens.css';
 /**
  * MIMO 3.0 "Candlelight" Christmas design for code entry, printing, summary and error.
  * Decorative only (see ChristmasScreenDecor): this layer never takes pointer events and never writes to the
- * real screens. It only READS their DOM (slot contents, the displayed progress, card positions) every 200 ms
+ * real screens. It only READS their DOM (slot contents, the displayed progress, card positions) about once a second and on real changes
  * so the festive visuals line up with, and stay in sync with, what the real screen shows.
  */
 
@@ -50,19 +50,28 @@ function useDomReading<T>(rootRef: React.RefObject<HTMLDivElement | null>, read:
     tick();
     // A slow poll catches layout changes; a MutationObserver reacts at once when the real screen's text changes
     // (a digit typed, the progress moving). Both only read.
-    const id = window.setInterval(tick, 250);
+    // Performance (Pi): poll once a second, and react to real-screen changes at most ~5 times a second.
+    const id = window.setInterval(tick, 1000);
     let raf = 0;
+    let lastRun = 0;
+    let pending = 0;
     const page = rootRef.current?.closest('.mimo3-xmas');
     const mo = new MutationObserver((records) => {
       const own = rootRef.current;
       if (own && records.every((m) => own.contains(m.target))) return;
-      if (!raf) raf = window.requestAnimationFrame(() => { raf = 0; tick(); });
+      if (raf || pending) return;
+      const wait = Math.max(0, 200 - (performance.now() - lastRun));
+      pending = window.setTimeout(() => {
+        pending = 0;
+        raf = window.requestAnimationFrame(() => { raf = 0; lastRun = performance.now(); tick(); });
+      }, wait);
     });
     if (page) mo.observe(page, { subtree: true, childList: true, characterData: true });
     return () => {
       window.clearInterval(id);
       mo.disconnect();
       if (raf) window.cancelAnimationFrame(raf);
+      if (pending) window.clearTimeout(pending);
     };
   }, [rootRef]);
   return value;
@@ -178,6 +187,13 @@ const sideArches = (card: Box, vw: number, height = 330) => {
 
 type CodeReading = { vw: number; slots: (Box & { lit: boolean })[]; pill: Box | null; heading: Box | null; pad: Box | null };
 
+// Performance: the static pieces re-render only when their props really change (compared by value, because
+// the DOM readings hand over fresh objects), so typing a digit only re-renders the candle that changed.
+const sameProps = (a: object, b: object) => JSON.stringify(a) === JSON.stringify(b);
+const GarlandM = React.memo(Garland);
+const ArchPhotoM = React.memo(ArchPhoto, sameProps);
+const TwinklesM = React.memo(Twinkles, sameProps);
+
 const CodeEntryDecor: React.FC<{ rootRef: React.RefObject<HTMLDivElement | null> }> = ({ rootRef }) => {
   const r = useDomReading<CodeReading>(rootRef, (page, o) => {
     const one = page.querySelector('#keypad-btn-1');
@@ -234,9 +250,9 @@ const CodeEntryDecor: React.FC<{ rootRef: React.RefObject<HTMLDivElement | null>
         </div>
       )}
 
-      {arch && <ArchPhoto src={heroPhoto} box={arch} pos="62% 55%" caption="Season's greetings" />}
+      {arch && <ArchPhotoM src={heroPhoto} box={arch} pos="62% 55%" caption="Season's greetings" />}
       {arch && (
-        <Twinkles
+        <TwinklesM
           points={[
             { x: arch.x - 26, y: arch.y + 40, s: 16 },
             { x: arch.x + arch.w + 10, y: arch.y + 110, s: 20 },
@@ -340,8 +356,8 @@ const PrintingDecor: React.FC<{ rootRef: React.RefObject<HTMLDivElement | null> 
         </span>
       )}
 
-      {arches && <ArchPhoto src={candlesPhoto} box={arches.left} pos="50% 30%" caption="Lighting up your pages" />}
-      {arches && <ArchPhoto src={baublesPhoto} box={arches.right} pos="50% 40%" flicker={false} delay={1.2} caption="Wrapped with care" />}
+      {arches && <ArchPhotoM src={candlesPhoto} box={arches.left} pos="50% 30%" caption="Lighting up your pages" />}
+      {arches && <ArchPhotoM src={baublesPhoto} box={arches.right} pos="50% 40%" flicker={false} delay={1.2} caption="Wrapped with care" />}
     </>
   );
 };
@@ -401,7 +417,7 @@ const SummaryDecor: React.FC<{ rootRef: React.RefObject<HTMLDivElement | null> }
           <div className="x3-gift-photo">
             <img src={giftPhoto} alt="" draggable={false} />
           </div>
-          <Twinkles
+          <TwinklesM
             points={[
               { x: giftW * 0.12, y: giftH * 0.18, s: 22 },
               { x: giftW * 0.86, y: giftH * 0.1, s: 18 },
@@ -413,7 +429,7 @@ const SummaryDecor: React.FC<{ rootRef: React.RefObject<HTMLDivElement | null> }
       )}
 
       {arches && rightSpace > 300 && (
-        <ArchPhoto src={heroPhoto} box={{ ...arches.right, y: Math.max(headerBottom + 30, arches.right.y + 20) }} pos="62% 55%" caption="Happy holidays" />
+        <ArchPhotoM src={heroPhoto} box={{ ...arches.right, y: Math.max(headerBottom + 30, arches.right.y + 20) }} pos="62% 55%" caption="Happy holidays" />
       )}
 
       {belowSpace > 90 && (
@@ -460,8 +476,8 @@ const ErrorDecor: React.FC<{ rootRef: React.RefObject<HTMLDivElement | null> }> 
           style={{ left: f.x, width: f.size, height: f.size, animationDuration: `${f.dur}s`, animationDelay: `${f.delay}s` }}
         />
       ))}
-      {arches && <ArchPhoto src={heroPhoto} box={arches.left} pos="30% 40%" caption="Warm wishes" />}
-      {arches && <ArchPhoto src={candlesPhoto} box={arches.right} pos="50% 30%" delay={1.4} caption="Thank you for your patience" />}
+      {arches && <ArchPhotoM src={heroPhoto} box={arches.left} pos="30% 40%" caption="Warm wishes" />}
+      {arches && <ArchPhotoM src={candlesPhoto} box={arches.right} pos="50% 30%" delay={1.4} caption="Thank you for your patience" />}
     </>
   );
 };
@@ -472,7 +488,7 @@ export const Mimo3ChristmasScreens: React.FC<ChristmasScreensProps> = ({ screen 
   const rootRef = useRef<HTMLDivElement>(null);
   return (
     <div className="x3" data-screen={screen} ref={rootRef}>
-      <Garland />
+      <GarlandM />
       {screen === 'code-entry-screen' && <CodeEntryDecor rootRef={rootRef} />}
       {screen === 'printing-screen' && <PrintingDecor rootRef={rootRef} />}
       {screen === 'summary-screen' && <SummaryDecor rootRef={rootRef} />}

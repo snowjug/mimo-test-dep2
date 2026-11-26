@@ -127,7 +127,7 @@ const useShownProgress = () => {
       if (!Number.isNaN(n)) setPct(Math.max(0, Math.min(100, n)));
     };
     read();
-    const id = window.setInterval(read, 250);
+    const id = window.setInterval(read, 500);
     return () => window.clearInterval(id);
   }, []);
   return pct;

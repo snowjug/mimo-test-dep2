@@ -35,9 +35,9 @@ const LAYERS = [
   { flakes: makeFlakes(6, 3), size: 8, duration: 9, opacity: 0.9 },
 ];
 
-export const ChristmasSnow: React.FC<{ color?: string; dense?: boolean }> = ({ color = '#FFFFFF', dense = true }) => (
+export const ChristmasSnow: React.FC<{ color?: string; dense?: boolean; light?: boolean }> = ({ color = '#FFFFFF', dense = true, light = false }) => (
   <div className="xmas-snow" aria-hidden>
-    {(dense ? LAYERS : LAYERS.slice(0, 2)).map((layer, li) =>
+    {(light ? [{ ...LAYERS[1], flakes: LAYERS[1].flakes.slice(0, 8) }] : dense ? LAYERS : LAYERS.slice(0, 2)).map((layer, li) =>
       layer.flakes.map((f, i) => (
         <span
           key={`${li}-${i}`}
@@ -85,9 +85,9 @@ const BOKEH_COLORS: Record<ChristmasVariant, string[]> = {
   mimo2: ['255,255,255', '214,232,255', '255,120,130', '255,244,214'],
   mimo3: ['255,196,110', '255,170,90', '255,226,170', '255,140,70'],
 };
-export const ChristmasLights: React.FC<{ variant: ChristmasVariant; sweep?: boolean }> = ({ variant, sweep = true }) => (
+export const ChristmasLights: React.FC<{ variant: ChristmasVariant; sweep?: boolean; count?: number }> = ({ variant, sweep = true, count = BOKEH_SPOTS.length }) => (
   <div className="xmas-lights" aria-hidden>
-    {BOKEH_SPOTS.map(([x, y], i) => {
+    {BOKEH_SPOTS.slice(0, count).map(([x, y], i) => {
       const size = 70 + ((i * 37) % 110);
       const rgb = BOKEH_COLORS[variant][i % 4];
       return (
@@ -308,12 +308,12 @@ export const ChristmasWelcome: React.FC<ChristmasWelcomeProps> = ({ isActive, on
 };
 
 /**
- * Festive background for every non-welcome screen while the Christmas theme is on: the machine's photo,
- * pre-blurred and lightened so the screens' existing text stays readable, plus light snow.
+ * Festive background for every non-welcome screen while the Christmas theme is on: a clean, bright, static
+ * colour wash per machine (no blurred photo, nothing scaling), a few twinkling lights and a light dusting of snow.
  */
 export const ChristmasBackdrop: React.FC<{ variant: ChristmasVariant }> = ({ variant }) => (
   <div className={`xmas-backdrop xmas-backdrop--${variant}`} aria-hidden>
-    <ChristmasLights variant={variant} />
-    <ChristmasSnow color={variant === 'mimo1' ? '#FFF3D6' : variant === 'mimo3' ? '#E9D9C2' : '#FFFFFF'} dense={false} />
+    <ChristmasLights variant={variant} count={6} sweep={false} />
+    <ChristmasSnow color={variant === 'mimo1' ? '#E6C98A' : variant === 'mimo3' ? '#E2C9A6' : '#B9CCDA'} light />
   </div>
 );

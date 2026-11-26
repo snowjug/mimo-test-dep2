@@ -286,3 +286,10 @@ html.kiosk-xmas .x3-flake {
   html.kiosk-xmas .x3-spark, html.kiosk-xmas .x3-page, html.kiosk-xmas .x3-flake, html.kiosk-xmas .x3-plight-pop { display: none; }
   html.kiosk-xmas .x3-twinkle > svg { opacity: .7; }
 }
+
+/* ─────────── performance budget (Pi): far fewer running animations, same look ─────────── */
+html.kiosk-xmas .x3-bulb { animation: none !important; }
+html.kiosk-xmas .x3-garland { animation: x3-lite-glow 3.2s ease-in-out infinite alternate; }
+@keyframes x3-lite-glow { from { opacity: .8; } to { opacity: 1; } }
+html.kiosk-xmas .x3-arch-float, html.kiosk-xmas .x3-arch-img { animation: none !important; }
+html.kiosk-xmas .x3-twinkle:nth-of-type(n+3) > svg { animation: none !important; }

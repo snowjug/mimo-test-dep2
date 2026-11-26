@@ -176,3 +176,7 @@ html.kiosk-xmas #root.theme-mimo1-diwali .maint-screen .my-6 > * { visibility: h
   html.kiosk-xmas .m1x-burst, html.kiosk-xmas .m1x-globe-flake { display: none; }
   html.kiosk-xmas .m1x-twinkle { opacity: .85; }
 }
+
+/* ─────────── performance budget: cap the always-on twinkles and globe snow, same look ─────────── */
+html.kiosk-xmas .m1x-twinkle:nth-of-type(n+5) { animation: none !important; }
+html.kiosk-xmas .m1x-globe-flake:nth-of-type(n+7) { display: none !important; }

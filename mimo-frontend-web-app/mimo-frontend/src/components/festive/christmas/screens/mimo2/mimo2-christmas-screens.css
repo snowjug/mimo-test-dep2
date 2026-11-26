@@ -20,9 +20,6 @@ html.kiosk-xmas.mimo2-lily {
 html.kiosk-xmas.mimo2-lily .xmas-backdrop--mimo2 .xmas-bokeh:nth-child(n+7),
 html.kiosk-xmas.mimo2-lily .xmas-backdrop--mimo2 .xmas-sweep,
 html.kiosk-xmas.mimo2-lily .xmas-backdrop--mimo2 .xmas-flake:nth-child(odd) { display: none; }
-html.kiosk-xmas.mimo2-lily .xmas-backdrop--mimo2::before {
-  background-image: linear-gradient(rgba(255, 255, 255, .64), rgba(248, 251, 252, .74)), url('../../../../../assets/christmas/mimo2-soft.jpg');
-}
 /* the lily screens' 1000 px blurred, blend-mode glow orbs are invisible over the backdrop: drop them on the Pi */
 html.kiosk-xmas.mimo2-lily .ambient-glow { display: none !important; }
 
@@ -312,3 +309,6 @@ html.kiosk-xmas.mimo2-lily .maint-screen .maint-glass-line { background: linear-
   html.kiosk-xmas.mimo2-lily .code-entry-wrap .code-slot.active::after,
   html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn.submit-btn.ready::after { opacity: .6; }
 }
+
+/* ─────────── performance budget (Pi 1 GB): idle bulbs stay lit instead of twinkling one by one ─────────── */
+html.kiosk-xmas.mimo2-lily .m2x-bulb.is-twinkle::after { animation: none !important; }
