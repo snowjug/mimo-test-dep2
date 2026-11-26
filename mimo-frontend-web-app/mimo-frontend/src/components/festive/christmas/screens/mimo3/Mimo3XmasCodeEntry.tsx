@@ -70,7 +70,7 @@ export const Mimo3XmasCodeEntry: React.FC<Mimo3XmasCodeEntryProps> = ({ code, is
         ) : (
           <p className="x3f-note">
             <span className="x3f-note-i">i</span>
-            Test codes: 0000 (B&amp;W demo) • 9999 (Colour demo)
+            Press Print once all 4 digits are entered.
           </p>
         )}
       </section>
@@ -106,8 +106,8 @@ export const Mimo3XmasCodeEntry: React.FC<Mimo3XmasCodeEntryProps> = ({ code, is
       </section>
 
       <footer className="x3f-foot">
-        <span>MIMO Secure Automated Spooler</span>
-        <span>Having trouble? Call Helpline 1800-MIMO-HELP</span>
+        <span>MIMO 3.0 • Self-Service Printing</span>
+        <span>Powered by VisionPrintt</span>
       </footer>
     </Mimo3XmasShell>
   );

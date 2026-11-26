@@ -339,7 +339,7 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
       {!isOnline && (
         <div className="fixed top-0 inset-x-0 z-[998] flex items-center justify-center gap-3 bg-amber-100 py-2 text-[14px] font-bold text-amber-900 border-b border-amber-200 shadow-sm">
           <WifiSlash size={18} weight="bold" />
-          <span>Campus Network Offline • Local Spooler &amp; Demo Self-Tests Active</span>
+          <span>Network offline • Reconnecting…</span>
         </div>
       )}
 

@@ -210,8 +210,8 @@ export const Mimo3SummaryScreen: React.FC<Mimo3SummaryScreenProps> = ({
 
       {/* Footer Bar */}
       <footer className="relative z-10 flex w-full items-center justify-between px-14 pb-6 pt-2 text-[13px] font-semibold text-[#64748B]">
-        <div>MIMO 3.0 High-Speed Service • Have a wonderful day!</div>
-        <div>Customer Care: 1800-MIMO-HELP</div>
+        <div>MIMO 3.0 • Have a wonderful day!</div>
+        <div>Powered by VisionPrintt</div>
       </footer>
     </div>
   );

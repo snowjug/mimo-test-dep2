@@ -164,9 +164,9 @@ export const Mimo3ErrorScreen: React.FC<Mimo3ErrorScreenProps> = ({
       {/* Footer Bar */}
       <footer className="relative z-10 flex w-full items-center justify-between px-14 pb-6 pt-2 text-[13px] font-semibold text-[#64748B]">
         <div>
-          MIMO Customer Care Desk: 1800-MIMO-HELP (Toll-Free, 24/7)
+          MIMO 3.0 • Self-Service Printing
         </div>
-        <div>MIMO 3.0 Instant Failure Protection Active</div>
+        <div>Powered by VisionPrintt</div>
       </footer>
     </div>
   );

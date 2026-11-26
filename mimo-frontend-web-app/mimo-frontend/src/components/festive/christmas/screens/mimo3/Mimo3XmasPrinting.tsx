@@ -109,7 +109,7 @@ export const Mimo3XmasPrinting: React.FC<Mimo3XmasPrintingProps> = ({ progress, 
 
       <footer className="x3f-foot">
         <span>Do not pull paper while feeding. It will eject automatically.</span>
-        <span>Having trouble? Call Helpline 1800-MIMO-HELP</span>
+        <span>Powered by VisionPrintt</span>
       </footer>
     </Mimo3XmasShell>
   );

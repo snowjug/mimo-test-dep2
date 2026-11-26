@@ -206,7 +206,7 @@ export const Mimo3PrintingScreen: React.FC<Mimo3PrintingScreenProps> = ({
           </div>
           <div>
             <div className="text-[20px] font-black tracking-wide text-[#0F172A]">
-              MIMO 3.0 Spooler Engine
+              MIMO 3.0 Print Station
             </div>
             <div className="text-[12px] font-bold tracking-widest text-[#64748B] uppercase">
               Station {kioskId || 'SV-003'} • Active Hardware Job
@@ -241,7 +241,7 @@ export const Mimo3PrintingScreen: React.FC<Mimo3PrintingScreenProps> = ({
           </div>
 
           <p className="mt-2 text-[17px] font-medium text-[#475569]">
-            Please wait while the kiosk communicates with the thermal laser engine.
+            Please wait while your pages are printed.
           </p>
 
           {/* Job Metadata Pill Strip */}
@@ -301,7 +301,7 @@ export const Mimo3PrintingScreen: React.FC<Mimo3PrintingScreenProps> = ({
         <div>
           Hardware safety: Do not pull paper while feeding. It will eject automatically.
         </div>
-        <div>MIMO 3.0 Self-Healing Engine Active</div>
+        <div>Powered by VisionPrintt</div>
       </footer>
     </div>
   );

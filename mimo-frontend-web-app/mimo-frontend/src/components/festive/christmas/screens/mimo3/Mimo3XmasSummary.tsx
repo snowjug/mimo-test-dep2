@@ -91,8 +91,8 @@ export const Mimo3XmasSummary: React.FC<Mimo3XmasSummaryProps> = ({ countdown, f
     </div>
 
     <footer className="x3f-foot">
-      <span>MIMO 3.0 High-Speed Service • Have a wonderful day!</span>
-      <span>Customer Care: 1800-MIMO-HELP</span>
+      <span>MIMO 3.0 • Have a wonderful day!</span>
+      <span>Powered by VisionPrintt</span>
     </footer>
   </Mimo3XmasShell>
 );

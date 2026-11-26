@@ -65,8 +65,8 @@ export const Mimo3XmasError: React.FC<Mimo3XmasErrorProps> = ({ countdown, first
     </section>
 
     <footer className="x3f-foot">
-      <span>MIMO Customer Care Desk: 1800-MIMO-HELP (Toll-Free, 24/7)</span>
-      <span>MIMO 3.0 Instant Failure Protection Active</span>
+      <span>MIMO 3.0 • Self-Service Printing</span>
+      <span>Powered by VisionPrintt</span>
     </footer>
   </Mimo3XmasShell>
 );

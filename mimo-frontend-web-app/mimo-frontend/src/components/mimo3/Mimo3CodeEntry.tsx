@@ -170,7 +170,7 @@ export const Mimo3CodeEntry: React.FC<Mimo3CodeEntryProps> = ({
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#FEF3C7] text-[11px] font-bold text-[#D97706]">
               i
             </span>
-            <span>Test Codes: 0000 (B&amp;W demo) • 9999 (Colour demo)</span>
+            <span>Your code is on your phone, or on the MIMO website after payment.</span>
           </div>
         </div>
 
@@ -234,9 +234,9 @@ export const Mimo3CodeEntry: React.FC<Mimo3CodeEntryProps> = ({
       {/* Footer Bar */}
       <footer className="relative z-10 flex w-full items-center justify-between px-14 pb-6 pt-2 text-[13px] font-semibold text-[#64748B]">
         <div>
-          MIMO Secure Automated Spooler • Real-time Hardware Encryption
+          MIMO 3.0 • Self-Service Printing
         </div>
-        <div>Having trouble? Call Helpline 1800-MIMO-HELP</div>
+        <div>Powered by VisionPrintt</div>
       </footer>
     </div>
   );
