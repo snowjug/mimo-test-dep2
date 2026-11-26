@@ -123,66 +123,92 @@ const ChristmasSwipe: React.FC<{ onNext: () => void; isActive: boolean; tone: 'g
   const THUMB = 70;
   const PAD = 8;
   const trackRef = useRef<HTMLDivElement>(null);
-  const start = useRef<{ x: number; base: number } | null>(null);
-  const [dragX, setDragX] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const thumbRef = useRef<HTMLDivElement>(null);
+  const fillRef = useRef<HTMLDivElement>(null);
+  const labelRef = useRef<HTMLDivElement>(null);
+  // The drag lives in refs and is painted straight onto the elements: no React re-render per pointer move
+  // (smooth on the Pi), and the release always sees the true latest position (a fast flick used to read a
+  // stale React value and snap back).
+  const drag = useRef({ active: false, startX: 0, base: 0, x: 0, max: 0, scale: 1, lastX: 0, lastT: 0, velocity: 0 });
+  const doneRef = useRef(false);
   const [done, setDone] = useState(false);
-  const [trackW, setTrackW] = useState(width);
+
+  const paint = useCallback((x: number, animate: boolean) => {
+    const ease = 'cubic-bezier(0.16, 1, 0.3, 1)';
+    const t = thumbRef.current, f = fillRef.current, l = labelRef.current;
+    if (t) { t.style.transition = animate ? `transform .35s ${ease}` : 'none'; t.style.transform = `translate3d(${x}px,0,0)`; }
+    if (f) { f.style.transition = animate ? `transform .35s ${ease}` : 'none'; f.style.transform = `scaleX(${(x + THUMB + PAD * 2) / (drag.current.max + THUMB + PAD * 2 || 1)})`; }
+    if (l) l.style.opacity = String(Math.max(0, 1 - (drag.current.max ? x / drag.current.max : 0) * 1.6));
+  }, []);
+
+  const measure = useCallback(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    drag.current.max = Math.max(0, el.clientWidth - THUMB - PAD * 2);
+    drag.current.scale = el.clientWidth ? el.getBoundingClientRect().width / el.clientWidth : 1;
+  }, []);
 
   useEffect(() => {
     if (!isActive) return;
-    setDragX(0);
+    doneRef.current = false;
     setDone(false);
-    setDragging(false);
-    start.current = null;
-    if (trackRef.current) setTrackW(trackRef.current.clientWidth);
-  }, [isActive]);
+    drag.current.active = false;
+    drag.current.x = 0;
+    measure();
+    paint(0, false);
+  }, [isActive, measure, paint]);
 
-  const max = Math.max(0, trackW - THUMB - PAD * 2);
-  const progress = max > 0 ? dragX / max : 0;
-
-  const finish = useCallback(() => {
-    if (!start.current || done) return;
-    start.current = null;
-    setDragging(false);
-    if (max > 0 && dragX >= max * 0.82) {
-      setDragX(max);
+  const release = (clientX?: number) => {
+    const d = drag.current;
+    if (!d.active || doneRef.current) return;
+    d.active = false;
+    if (typeof clientX === 'number') d.x = Math.min(d.max, Math.max(0, d.base + (clientX - d.startX) / (d.scale || 1)));
+    const flick = d.velocity > 0.9 && d.x >= d.max * 0.45; // px per ms, towards the end
+    if (d.max > 0 && (d.x >= d.max * 0.8 || flick)) {
+      d.x = d.max;
+      doneRef.current = true;
       setDone(true);
-      window.setTimeout(onNext, 320);
+      paint(d.max, true);
+      window.setTimeout(onNext, 300);
     } else {
-      setDragX(0);
+      d.x = 0;
+      paint(0, true);
     }
-  }, [done, dragX, max, onNext]);
+  };
 
-  const ease = 'cubic-bezier(0.16, 1, 0.3, 1)';
   return (
     <div ref={trackRef} className={`xmas-swipe xmas-swipe--${tone}`} style={{ width, height: THUMB + PAD * 2, touchAction: 'none' }}>
-      <div className="xmas-swipe-fill" style={{ width: dragX + THUMB + PAD * 2, transition: dragging ? 'none' : `width .35s ${ease}` }} />
-      <div className="xmas-swipe-label" style={{ opacity: Math.max(0, 1 - progress * 1.6) }}>
-        Swipe to start
-      </div>
+      <div ref={fillRef} className="xmas-swipe-fill" style={{ width: '100%', transformOrigin: 'left center', transform: `scaleX(${(THUMB + PAD * 2) / width})` }} />
+      <div ref={labelRef} className="xmas-swipe-label">Swipe to start</div>
       <div
+        ref={thumbRef}
         role="slider"
         aria-label="Swipe to start"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={Math.round(progress * 100)}
         className={`xmas-swipe-thumb ${done ? 'is-done' : ''}`}
         onPointerDown={(e) => {
-          if (done) return;
+          if (doneRef.current) return;
           e.currentTarget.setPointerCapture(e.pointerId);
-          start.current = { x: e.clientX, base: dragX };
-          setDragging(true);
+          measure();
+          const d = drag.current;
+          Object.assign(d, { active: true, startX: e.clientX, base: d.x, lastX: e.clientX, lastT: performance.now(), velocity: 0 });
         }}
         onPointerMove={(e) => {
-          if (!start.current || done) return;
-          const el = trackRef.current;
-          const scale = el && el.clientWidth ? el.getBoundingClientRect().width / el.clientWidth : 1;
-          setDragX(Math.min(max, Math.max(0, start.current.base + (e.clientX - start.current.x) / (scale || 1))));
+          const d = drag.current;
+          if (!d.active || doneRef.current) return;
+          const now = performance.now();
+          const dt = Math.max(1, now - d.lastT);
+          d.velocity = 0.7 * d.velocity + 0.3 * ((e.clientX - d.lastX) / (d.scale || 1) / dt);
+          d.lastX = e.clientX;
+          d.lastT = now;
+          d.x = Math.min(d.max, Math.max(0, d.base + (e.clientX - d.startX) / (d.scale || 1)));
+          paint(d.x, false);
         }}
-        onPointerUp={finish}
-        onPointerCancel={finish}
-        style={{ width: THUMB, height: THUMB, top: PAD, left: PAD, transform: `translateX(${dragX}px)`, transition: dragging ? 'none' : `transform .35s ${ease}` }}
+        onPointerUp={(e) => release(e.clientX)}
+        onPointerCancel={() => release()}
+        onLostPointerCapture={() => release()}
+        style={{ width: THUMB, height: THUMB, top: PAD, left: PAD, willChange: 'transform' }}
       >
         {done ? <Check size={30} weight="bold" /> : <ArrowRight size={30} weight="bold" />}
       </div>
