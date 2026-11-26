@@ -124,7 +124,7 @@
 .x3f-slots.is-shaking { animation: x3f-shake .5s cubic-bezier(.36, .07, .19, .97) both; }
 .x3f-slot {
   position: relative; display: flex; align-items: center; justify-content: center;
-  width: 104px; height: 128px; border-radius: 22px;
+  width: 112px; height: 138px; border-radius: 22px;
   border: 2px solid var(--x3f-line); background: var(--x3f-card);
   box-shadow: 0 10px 22px rgba(90, 50, 15, .10);
 }
@@ -142,14 +142,14 @@
 .x3f-note-i { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #FBEBCB; color: #9A6A1C; font-size: 11px; font-weight: 800; }
 .x3f-note--error { padding: 11px 18px; border-radius: 14px; border: 1.5px solid #F2C4C0; background: #FFF2F0; color: var(--x3f-red); font-weight: 700; }
 
-/* keypad: big round keys, about 70% of the screen height */
-.x3f-pad { position: absolute; z-index: 1; right: 76px; top: 50%; display: grid; grid-template-columns: repeat(3, 126px); grid-auto-rows: 126px; gap: 18px 22px; transform: translate3d(0, -47%, 0); }
+/* keypad: big round keys, about 78% of the screen height */
+.x3f-pad { position: absolute; z-index: 1; right: 60px; top: 50%; display: grid; grid-template-columns: repeat(3, 146px); grid-auto-rows: 146px; gap: 16px 22px; transform: translate3d(0, -46%, 0); }
 .x3f-key {
   position: relative; display: flex; align-items: center; justify-content: center; gap: 2px;
   border-radius: 50%; cursor: pointer; overflow: hidden;
   border: 1.5px solid #F0E3CD;
   background: radial-gradient(circle at 50% 30%, #FFFFFF 0%, #FFFBF3 55%, #F7ECDB 100%);
-  font-size: 50px; font-weight: 800; color: var(--x3f-ink); font-variant-numeric: tabular-nums;
+  font-size: 60px; font-weight: 800; color: var(--x3f-ink); font-variant-numeric: tabular-nums;
   box-shadow: 0 4px 0 #E4D0AE, 0 16px 28px rgba(90, 50, 15, .20);
   transition: transform .08s ease, box-shadow .08s ease;
 }
