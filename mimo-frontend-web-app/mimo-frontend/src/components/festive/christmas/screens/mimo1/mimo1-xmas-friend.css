@@ -333,3 +333,14 @@ html.kiosk-xmas.m1f-inner .xmas-backdrop { display: none; }
   .m1w-lights, .m1w-glow, .m1f-dial-halo, .m1f-feed-sheet { animation: none !important; }
   .xmas-swipe--tree::before, .m1f-shimmer-text::after { display: none; }
 }
+
+/* ── no boxes (owner: "remove that box… like 2.0"): content sits straight on the background. A soft, edge-less
+   cream glow behind each group keeps the text readable where it meets the trees. ── */
+.m1f-card {
+  background: radial-gradient(ellipse 62% 58% at 50% 50%, rgba(255, 251, 243, 0.9) 0%, rgba(255, 251, 243, 0.62) 48%, rgba(255, 251, 243, 0) 76%);
+  border: 0; border-radius: 0; box-shadow: none;
+}
+.m1f-card::after { display: none; }
+/* printing without boxes: keep greeting + dial on the light centre, clear of the dark tree on the right */
+.m1f-print-stack { left: 44%; width: 780px; margin-left: -390px; gap: 0; }
+.m1f-print-dialcard { background: radial-gradient(ellipse 70% 62% at 50% 50%, rgba(255, 251, 243, 0.95) 0%, rgba(255, 251, 243, 0.78) 52%, rgba(255, 251, 243, 0) 80%); }
