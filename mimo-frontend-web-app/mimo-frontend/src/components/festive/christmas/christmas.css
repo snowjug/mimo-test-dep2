@@ -115,8 +115,10 @@
 /* Clean, bright, static washes (performance: no photo, no blur, nothing animating at full-screen size). */
 .xmas-backdrop--mimo1::before { background: linear-gradient(160deg, #FFFBF2 0%, #FBF1DC 55%, #F6E6C4 100%); }
 .xmas-backdrop--mimo1::after { background: radial-gradient(circle at 10% 12%, rgba(232, 188, 92, .22) 0%, transparent 32%), radial-gradient(circle at 92% 88%, rgba(196, 42, 52, .08) 0%, transparent 30%); }
-.xmas-backdrop--mimo2::before { background: linear-gradient(180deg, #FFFFFF 0%, #F3F7FA 60%, #E9F0F5 100%); }
-.xmas-backdrop--mimo2::after { background: radial-gradient(circle at 12% 88%, rgba(200, 36, 58, .07) 0%, transparent 28%), radial-gradient(circle at 90% 10%, rgba(47, 125, 79, .07) 0%, transparent 28%); }
+/* 2.0: a sharp, full-screen snowy pine forest (real CC0 photo, no blur); a white wash only where text and keys sit. */
+.xmas-backdrop--mimo2::before { background: url('../../../assets/christmas/mimo2-hero.jpg') center 40% / cover no-repeat; }
+.xmas-backdrop--mimo2::after { background: linear-gradient(90deg, rgba(255, 255, 255, .82) 0%, rgba(255, 255, 255, .62) 30%, rgba(255, 255, 255, .10) 52%, rgba(255, 255, 255, 0) 62%, rgba(255, 255, 255, .18) 100%); }
+.xmas-backdrop--mimo2 .xmas-bokeh { display: none; }
 .xmas-backdrop--mimo3::before { background: linear-gradient(165deg, #FFFCF6 0%, #FBF3E6 60%, #F6EAD6 100%); }
 .xmas-backdrop--mimo3::after { background: radial-gradient(circle at 85% 18%, rgba(255, 186, 104, .18) 0%, transparent 32%), radial-gradient(circle at 8% 90%, rgba(200, 36, 58, .06) 0%, transparent 28%); }
 

@@ -312,3 +312,6 @@ html.kiosk-xmas.mimo2-lily .maint-screen .maint-glass-line { background: linear-
 
 /* ─────────── performance budget (Pi 1 GB): idle bulbs stay lit instead of twinkling one by one ─────────── */
 html.kiosk-xmas.mimo2-lily .m2x-bulb.is-twinkle::after { animation: none !important; }
+
+/* the full-screen forest photo replaces the feathered corner branches (they read as blur) */
+html.kiosk-xmas.mimo2-lily .m2x-pine { display: none !important; }
