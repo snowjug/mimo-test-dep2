@@ -77,6 +77,23 @@ function ScreensaverClock({ className }: { className?: string }) {
   );
 }
 
+// Drop videos this browser cannot play. An iPhone .mov (QuickTime) never even starts loading in the
+// kiosks' Chromium / Android WebView (canPlayType('video/quicktime') === ''), which left the screensaver
+// stuck on its dark placeholder ("blue screen" on MIMO 2.0, 2026-11-26). Upload .mp4 (H.264) instead.
+const VIDEO_MIME: Record<string, string> = { mov: 'video/quicktime', qt: 'video/quicktime', mkv: 'video/x-matroska', avi: 'video/x-msvideo', wmv: 'video/x-ms-wmv' };
+function playableOnly(urls: string[]): string[] {
+  if (typeof document === 'undefined') return urls;
+  const probe = document.createElement('video');
+  return urls.filter((u) => {
+    const ext = (u.split('?')[0].split('.').pop() || '').toLowerCase();
+    const mime = VIDEO_MIME[ext];
+    if (!mime) return true;
+    const ok = probe.canPlayType(mime) !== '';
+    if (!ok) console.warn(`[screensaver] skipping ${ext} file this browser cannot play:`, u.slice(0, 120));
+    return ok;
+  });
+}
+
 export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [videos, setVideos] = useState<string[]>([]);
@@ -107,7 +124,7 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
                 .map((v: any) => resolveScreensaverMediaUrl(v.stringValue))
                 .filter(Boolean);
               if (videoUrls.length > 0) {
-                setVideos(videoUrls);
+                setVideos(playableOnly(videoUrls));
                 if (fields.playSound && typeof fields.playSound.booleanValue === 'boolean') {
                   setPlaySound(fields.playSound.booleanValue);
                 }
@@ -142,7 +159,7 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
               .map((v: any) => resolveScreensaverMediaUrl(v.stringValue))
               .filter(Boolean);
             if (videoUrls.length > 0) {
-              setVideos(videoUrls);
+              setVideos(playableOnly(videoUrls));
               hasGlobalVideos = true;
             }
           }
@@ -175,7 +192,7 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
               .map((v: string) => resolveScreensaverMediaUrl(v))
               .filter(Boolean);
             if (videoUrls.length > 0) {
-              setVideos(videoUrls);
+              setVideos(playableOnly(videoUrls));
             }
           }
           if (typeof data.playSound === 'boolean') {
@@ -306,7 +323,15 @@ export function Adds({ isActive, onTap, onTimeoutChange, kioskId }: AddsProps) {
     }
   }, [isActive, currentVideoIndex, playSound, isMutedFallback, videos]);
 
-  if (!isActive) return null;
+  // No ads/videos uploaded for this kiosk: keep the normal welcome screen instead of covering it with the
+  // dark built-in placeholder, which customers took for an error screen ("blue screen", MIMO 2.0, 2026-11-26).
+  // Upload media in the admin screensaver page and the screensaver shows again automatically.
+  const hasUploadedMedia = videos.length > 0;
+  useEffect(() => {
+    if (isActive && !hasUploadedMedia) onTap();
+  }, [isActive, hasUploadedMedia, onTap]);
+
+  if (!isActive || !hasUploadedMedia) return null;
 
   const hasMediaPlaylist = videos.length > 0;
   const currentMediaUrl = hasMediaPlaylist ? videos[currentVideoIndex] : null;
