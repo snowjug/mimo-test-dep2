@@ -550,14 +550,18 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
     if (christmas) {
       const totalSheets = Math.max(1, pages * copies);
+      // Same sheet estimate the status line uses (progress 15 -> 95 spans the sheets), so the dial and the
+      // left card always show the same page; a real printed-sheet count wins when it is further along.
+      const estSheet = progress <= 15 ? 1 : Math.min(totalSheets, Math.max(1, Math.ceil(((progress - 15) / 80) * totalSheets)));
+      const curSheet = Math.min(totalSheets, Math.max(estSheet, sheetsCompletedRef.current + 1));
       return (
         <Mimo1XmasPrinting
           title={finalTitle}
           sub={finalSub}
           statusMsg={leftStatusText}
           progress={progress}
-          pageText={progress >= 100 ? `Page ${totalSheets} of ${totalSheets}` : `Page ${Math.min(totalSheets, sheetsCompletedRef.current + 1)} of ${totalSheets}`}
-          sheetsDone={progress >= 100 ? totalSheets : Math.min(totalSheets, sheetsCompletedRef.current)}
+          pageText={progress >= 100 ? `Page ${totalSheets} of ${totalSheets}` : `Page ${curSheet} of ${totalSheets}`}
+          sheetsDone={progress >= 100 ? totalSheets : curSheet - 1}
           totalSheets={totalSheets}
           collectingPages={collectingPages}
           collectCountdown={collectCountdown}
