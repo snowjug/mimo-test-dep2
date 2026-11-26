@@ -1,9 +1,10 @@
-/* MIMO 3.0 Christmas screens: "Candlelight". Every rule is scoped under html.kiosk-xmas so the default UI is untouched.
+/* MIMO 3.0 Christmas summary and error screens: "Candlelight" (code entry and printing have their own
+   Christmas presentation, see Mimo3XmasShell.tsx / mimo3-xmas-flow.css). Every rule is scoped under html.kiosk-xmas so the default UI is untouched.
    Part 1 restyles the real screens (colours, borders, radii, backgrounds only: no size, layout or behaviour changes).
    Part 2 is the decorative layer (Mimo3ChristmasScreens.tsx). Raspberry Pi friendly: motion is transform / opacity only,
    no filter / blur / blend modes, no animated shadows. All motion stops under prefers-reduced-motion. */
 
-/* ═════════════════════ Part 1: the real screens (code entry, printing, summary, error) ═════════════════════ */
+/* ═════════════════════ Part 1: the real screens (summary, error) ═════════════════════ */
 
 /* Red velvet ribbon with a gold edge instead of the zari border; hide the mandala watermark (opacity only, no layout change). */
 html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br > .h-2.w-full {
@@ -41,63 +42,6 @@ html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .rounded-\[36px\] {
   outline: 1.5px solid rgba(214, 162, 70, .4);
   outline-offset: 7px;
   box-shadow: 0 30px 70px rgba(140, 80, 24, .16), 0 2px 0 rgba(255, 255, 255, .9) inset;
-}
-
-/* ── Code entry: slots are wax candles ── */
-html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .h-\[88px\].w-\[76px\] {
-  border-radius: 16px 16px 24px 24px;
-  background: linear-gradient(180deg, #FFFFFF 0%, #FBF0DF 100%);
-  border-color: #E6D0AC;
-  color: #5A1A0C;
-  box-shadow: inset 0 -7px 0 rgba(214, 168, 70, .14), 0 10px 20px rgba(150, 90, 30, .10) !important;
-}
-html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .h-\[88px\].w-\[76px\].border-\[\#F59E0B\] {
-  background: linear-gradient(180deg, #FFFAF0 0%, #FCE3B8 100%);
-  border-color: #D6A246;
-  box-shadow: 0 0 0 4px rgba(233, 181, 74, .22), 0 12px 28px rgba(214, 140, 40, .30), inset 0 -7px 0 rgba(181, 86, 28, .14) !important;
-}
-html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .h-\[88px\].w-\[76px\].border-\[\#EA580C\] {
-  border-color: #C8243A;
-  box-shadow: 0 0 0 5px rgba(200, 36, 58, .12), 0 10px 20px rgba(150, 90, 30, .10) !important;
-}
-html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .bg-\[\#CBD5E1\] { background-color: #E3C68C; }
-
-/* The Hindi greeting pill is replaced (visually) by a "Merry Christmas" pill drawn at the same spot. */
-html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .inline-flex.rounded-full.px-4 { visibility: hidden; }
-
-/* Keypad: candle-glass keys */
-html.kiosk-xmas .mimo3-xmas [id^="keypad-btn-"]:not(#keypad-btn-del):not(#keypad-btn-submit) {
-  background: linear-gradient(180deg, #FFFFFF 0%, #FFF4E2 100%) !important;
-  border-color: #EAD3AE !important;
-  color: #3A160A !important;
-  box-shadow: inset 0 -4px 0 rgba(214, 168, 70, .2), inset 0 1px 0 #FFFFFF, 0 6px 14px rgba(150, 90, 30, .10) !important;
-}
-html.kiosk-xmas .mimo3-xmas [id^="keypad-btn-"]:not(#keypad-btn-del):not(#keypad-btn-submit):active { background: #FCE3B8 !important; }
-html.kiosk-xmas .mimo3-xmas #keypad-btn-del {
-  background: linear-gradient(180deg, #FFF6F5 0%, #FDE8E8 100%) !important;
-  border-color: #F1C0C5 !important;
-  color: #B3202F !important;
-}
-html.kiosk-xmas .mimo3-xmas #keypad-btn-submit:not(:disabled) {
-  background: linear-gradient(135deg, #D3263A 0%, #A81C2E 100%) !important;
-  border-color: #E2B04E !important;
-  box-shadow: 0 10px 26px rgba(158, 27, 44, .32), inset 0 1px 0 rgba(255, 255, 255, .25) !important;
-}
-html.kiosk-xmas .mimo3-xmas #keypad-btn-submit:disabled {
-  background: #F6EDE0 !important;
-  border-color: #EAD8BC !important;
-  color: #A08A70 !important;
-}
-
-/* ── Printing ── */
-html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .h-6.w-full.rounded-full > .bg-gradient-to-r {
-  background-image:
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, .22) 0 9px, rgba(255, 255, 255, 0) 9px 18px),
-    linear-gradient(90deg, #9E1B2C 0%, #D3263A 55%, #E9B54A 100%) !important;
-}
-html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .from-\[\#FFFDF7\].to-\[\#FEF3C7\] {
-  background-image: linear-gradient(135deg, #FFF8EA 0%, #FBE3B6 100%) !important;
-  border-color: #E2B04E;
 }
 
 /* ── Summary ── */
@@ -159,66 +103,6 @@ html.kiosk-xmas .x3-twinkle > svg { position: absolute; transform: translate(-50
 html.kiosk-xmas .x3-burst { position: absolute; width: 0; height: 0; }
 html.kiosk-xmas .x3-spark { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; animation: x3-spark .9s cubic-bezier(.2, .8, .3, 1) both; }
 
-/* Code entry: candle slots */
-html.kiosk-xmas .x3-pill {
-  position: absolute; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-radius: 999px;
-  background: linear-gradient(90deg, #FFF3F1 0%, #FFFCF5 100%); border: 1px solid #EFC0C5;
-  color: #9E1B2C; font-size: 15px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(158, 27, 44, .08); animation: x3-rise .8s cubic-bezier(.16, 1, .3, 1) both;
-}
-html.kiosk-xmas .x3-pill > svg { color: #2F7D4F; }
-html.kiosk-xmas .x3-wick { position: absolute; width: 3px; height: 10px; margin-left: -1.5px; border-radius: 2px; background: #6B4A2E; opacity: .55; }
-html.kiosk-xmas .x3-wick.is-lit { background: #3A2414; opacity: .9; }
-html.kiosk-xmas .x3-slot-halo {
-  position: absolute; width: 110px; height: 110px; margin: -71px 0 0 -55px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 196, 96, .55) 0%, rgba(255, 196, 96, .18) 40%, rgba(255, 196, 96, 0) 68%);
-  opacity: 0; transform: scale(.5); transition: opacity .5s ease, transform .5s cubic-bezier(.16, 1, .3, 1);
-}
-html.kiosk-xmas .x3-slot-halo.is-lit { opacity: 1; transform: scale(1); animation: x3-glow 2.8s ease-in-out .5s infinite; }
-html.kiosk-xmas .x3-flame-pos { position: absolute; width: 0; height: 0; }
-html.kiosk-xmas .x3-flame {
-  position: absolute; left: -10px; bottom: 2px; width: 20px; height: 34px; transform-origin: 50% 100%;
-  border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
-  background: radial-gradient(ellipse 50% 60% at 50% 72%, #FFFFFF 0%, #FFF4C2 26%, #FFC24A 52%, #F07A28 74%, rgba(240, 122, 40, 0) 100%);
-  animation: x3-flame-in .5s cubic-bezier(.2, 1.4, .4, 1) both, x3-flame 1.8s ease-in-out .5s infinite alternate;
-}
-html.kiosk-xmas .x3-pad-star {
-  position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; color: #D6A246;
-  background: radial-gradient(circle at 50% 40%, #FFFFFF 0%, #FFF6E4 100%); border: 1.5px solid #E2B04E;
-  box-shadow: 0 6px 16px rgba(150, 90, 30, .18);
-}
-html.kiosk-xmas .x3-pad-star > svg { transition: transform .5s cubic-bezier(.2, 1.4, .4, 1); }
-html.kiosk-xmas .x3-pad-star.is-ready { color: #C8243A; }
-html.kiosk-xmas .x3-pad-star.is-ready > svg { animation: x3-star-ready 2s ease-in-out infinite; }
-
-/* Printing: a string of lights that comes on with the real progress, and a star riding the progress bar */
-html.kiosk-xmas .x3-string { position: absolute; overflow: hidden; }
-html.kiosk-xmas .x3-string-curve { position: absolute; left: 0; right: 0; border: 2px solid transparent; border-bottom-color: #7A5634; border-radius: 50%; opacity: .8; }
-html.kiosk-xmas .x3-plight { position: absolute; width: 0; height: 0; transform-origin: 0 0; }
-html.kiosk-xmas .x3-plight-cap { position: absolute; left: -6px; top: -1px; width: 12px; height: 9px; border-radius: 2px 2px 3px 3px; background: linear-gradient(180deg, #A07A4E, #6E5033); }
-html.kiosk-xmas .x3-plight-glass {
-  position: absolute; left: -10px; top: 7px; width: 20px; height: 30px;
-  border-radius: 50% 50% 46% 46% / 38% 38% 62% 62%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .9) 0%, rgba(245, 232, 212, .9) 100%);
-  border: 1.5px solid rgba(176, 132, 80, .45);
-}
-html.kiosk-xmas .x3-plight-glass::after {
-  content: ''; position: absolute; left: 50%; top: 50%; width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%;
-  background: radial-gradient(circle, var(--c) 0%, rgba(255, 255, 255, 0) 62%); opacity: 0; transition: opacity .6s ease;
-}
-html.kiosk-xmas .x3-plight-glass.is-on {
-  background: radial-gradient(circle at 42% 36%, #FFFFFF 0%, var(--c) 46%, var(--c) 100%);
-  border-color: rgba(255, 255, 255, .7);
-  animation: x3-twinkle-bulb 1.8s ease-in-out infinite alternate;
-}
-html.kiosk-xmas .x3-plight-glass.is-on::after { opacity: .5; }
-html.kiosk-xmas .x3-plight-pop { position: absolute; inset: -12px; border-radius: 50%; border: 2px solid var(--c); animation: x3-pop .8s ease-out both; }
-html.kiosk-xmas .x3-rider { position: absolute; left: 0; top: 0; width: 0; height: 0; transition: transform .3s cubic-bezier(.4, 0, .2, 1); }
-html.kiosk-xmas .x3-rider-glow { position: absolute; left: -40px; top: -40px; width: 80px; height: 80px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 214, 120, .85) 0%, rgba(255, 214, 120, 0) 65%); animation: x3-glow 1.6s ease-in-out infinite; }
-html.kiosk-xmas .x3-rider-star { position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; color: #E2A93B; animation: x3-spin 7s linear infinite; }
-html.kiosk-xmas .x3-rider-star > svg { display: block; }
-
 /* Summary: Merry Christmas banner, gift with pages rising, chevrons to the tray */
 html.kiosk-xmas .x3-banner { position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; animation: x3-rise 1s cubic-bezier(.16, 1, .3, 1) .15s both; }
 html.kiosk-xmas .x3-banner-script { font-family: 'Great Vibes', cursive; font-size: 74px; line-height: 1.05; color: #B3202F; padding: 0 12px; }
@@ -265,10 +149,6 @@ html.kiosk-xmas .x3-flake {
 @keyframes x3-twinkle { 0%, 100% { opacity: .15; transform: translate(-50%, -50%) scale(.55) rotate(0deg); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1) rotate(25deg); } }
 @keyframes x3-spark { 0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1.1); } 100% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) scale(.2); } }
 @keyframes x3-glow { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
-@keyframes x3-flame-in { from { opacity: 0; transform: scale(.2, .1); } to { opacity: 1; transform: scale(1, 1); } }
-@keyframes x3-flame { 0% { transform: scale(1, 1) rotate(-2deg); } 35% { transform: scale(.92, 1.08) rotate(1.5deg); } 70% { transform: scale(1.05, .95) rotate(-1deg); } 100% { transform: scale(.97, 1.04) rotate(2.5deg); } }
-@keyframes x3-star-ready { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.18) rotate(18deg); } }
-@keyframes x3-pop { from { opacity: 1; transform: scale(.4); } to { opacity: 0; transform: scale(1.9); } }
 @keyframes x3-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes x3-bob { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, -8px, 0); } }
 @keyframes x3-page-rise {
@@ -283,7 +163,7 @@ html.kiosk-xmas .x3-flake {
 /* Accessibility and the Pi: no motion at all when the device asks for it (everything rests in its final, visible state). */
 @media (prefers-reduced-motion: reduce) {
   html.kiosk-xmas .x3 *, html.kiosk-xmas .x3 *::before, html.kiosk-xmas .x3 *::after { animation: none !important; transition: none !important; }
-  html.kiosk-xmas .x3-spark, html.kiosk-xmas .x3-page, html.kiosk-xmas .x3-flake, html.kiosk-xmas .x3-plight-pop { display: none; }
+  html.kiosk-xmas .x3-spark, html.kiosk-xmas .x3-page, html.kiosk-xmas .x3-flake { display: none; }
   html.kiosk-xmas .x3-twinkle > svg { opacity: .7; }
 }
 

@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Star, Sparkle, CaretDown, TreeEvergreen } from '@phosphor-icons/react';
+import { Star, Sparkle, CaretDown } from '@phosphor-icons/react';
 import type { ChristmasScreensProps } from '../ChristmasScreenDecor';
 import heroPhoto from '../../../../../assets/christmas/mimo3-hero.jpg';
 import candlesPhoto from '../../../../../assets/christmas/mimo3/candles.jpg';
-import baublesPhoto from '../../../../../assets/christmas/mimo3/baubles.jpg';
 import giftPhoto from '../../../../../assets/christmas/mimo3/gift.jpg';
 import './mimo3-christmas-screens.css';
 
 /**
- * MIMO 3.0 "Candlelight" Christmas design for code entry, printing, summary and error.
+ * MIMO 3.0 "Candlelight" Christmas decor for the summary and error screens. Code entry and printing render their
+ * own Christmas presentation (Mimo3XmasCodeEntry / Mimo3XmasPrinting, chosen inside the real screens), so this
+ * layer draws nothing there and does no DOM polling while the customer types or prints.
  * Decorative only (see ChristmasScreenDecor): this layer never takes pointer events and never writes to the
  * real screens. It only READS their DOM (slot contents, the displayed progress, card positions) about once a second and on real changes
  * so the festive visuals line up with, and stay in sync with, what the real screen shows.
@@ -183,184 +184,12 @@ const sideArches = (card: Box, vw: number, height = 330) => {
   };
 };
 
-/* ───────────────────────── code entry ───────────────────────── */
-
-type CodeReading = { vw: number; slots: (Box & { lit: boolean })[]; pill: Box | null; heading: Box | null; pad: Box | null };
-
 // Performance: the static pieces re-render only when their props really change (compared by value, because
-// the DOM readings hand over fresh objects), so typing a digit only re-renders the candle that changed.
+// the DOM readings hand over fresh objects).
 const sameProps = (a: object, b: object) => JSON.stringify(a) === JSON.stringify(b);
 const GarlandM = React.memo(Garland);
 const ArchPhotoM = React.memo(ArchPhoto, sameProps);
 const TwinklesM = React.memo(Twinkles, sameProps);
-
-const CodeEntryDecor: React.FC<{ rootRef: React.RefObject<HTMLDivElement | null> }> = ({ rootRef }) => {
-  const r = useDomReading<CodeReading>(rootRef, (page, o) => {
-    const one = page.querySelector('#keypad-btn-1');
-    const screen = one?.closest('.h-full.w-full');
-    if (!screen) return null;
-    const slots = Array.from(screen.querySelectorAll('.h-\\[88px\\].w-\\[76px\\]')).map((el) => ({
-      ...(rel(el, o) as Box),
-      lit: (el.textContent || '').trim().length > 0,
-    }));
-    return {
-      vw: Math.round(o.width),
-      slots,
-      pill: rel(screen.querySelector('.inline-flex.rounded-full.px-4'), o),
-      heading: rel(screen.querySelector('h2'), o),
-      pad: rel(one?.closest('.rounded-\\[36px\\]'), o),
-    };
-  });
-
-  // Fire a spark burst over each slot the moment it lights.
-  const prevLit = useRef<boolean[]>([]);
-  const [bursts, setBursts] = useState<Record<number, number>>({});
-  useEffect(() => {
-    if (!r) return;
-    const lit = r.slots.map((s) => s.lit);
-    const fired: Record<number, number> = {};
-    lit.forEach((on, i) => {
-      if (on && !prevLit.current[i]) fired[i] = Date.now();
-    });
-    prevLit.current = lit;
-    if (Object.keys(fired).length) setBursts((b) => ({ ...b, ...fired }));
-  }, [r]);
-
-  if (!r) return null;
-  const litCount = r.slots.filter((s) => s.lit).length;
-
-  // Arched photo in the gap between the instructions and the keypad.
-  let arch: Box | null = null;
-  if (r.pad && r.heading) {
-    const gapL = Math.max(...r.slots.map((s) => s.x + s.w), r.heading.x + r.heading.w, 0) + 44;
-    const gapR = r.pad.x - 44;
-    const w = Math.min(240, gapR - gapL);
-    if (w >= 150) {
-      const h = Math.round(w * 1.42);
-      arch = { x: Math.round((gapL + gapR) / 2 - w / 2), y: Math.round(r.pad.y + r.pad.h / 2 - h / 2 - 18), w, h };
-    }
-  }
-
-  return (
-    <>
-      {r.pill && (
-        <div className="x3-pill" style={{ left: r.pill.x, top: r.pill.y, height: r.pill.h }}>
-          <TreeEvergreen size={18} weight="fill" />
-          <span>Merry Christmas</span>
-        </div>
-      )}
-
-      {arch && <ArchPhotoM src={heroPhoto} box={arch} pos="62% 55%" caption="Season's greetings" />}
-      {arch && (
-        <TwinklesM
-          points={[
-            { x: arch.x - 26, y: arch.y + 40, s: 16 },
-            { x: arch.x + arch.w + 10, y: arch.y + 110, s: 20 },
-            { x: arch.x - 10, y: arch.y + arch.h - 60, s: 14 },
-            { x: arch.x + arch.w + 2, y: arch.y + arch.h - 10, s: 16 },
-          ]}
-        />
-      )}
-
-      {/* Each code slot is a candle: it lights as its digit is typed. */}
-      {r.slots.map((s, i) => (
-        <React.Fragment key={i}>
-          <span className={`x3-slot-halo${s.lit ? ' is-lit' : ''}`} style={{ left: s.x + s.w / 2, top: s.y - 6 }} />
-          <span className={`x3-wick${s.lit ? ' is-lit' : ''}`} style={{ left: s.x + s.w / 2, top: s.y - 9 }} />
-          {s.lit && (
-            <span className="x3-flame-pos" style={{ left: s.x + s.w / 2, top: s.y - 6 }}>
-              <span className="x3-flame" style={{ animationDelay: `${i * 0.31}s` }} />
-            </span>
-          )}
-          {s.lit && bursts[i] && <Burst key={bursts[i]} x={s.x + s.w / 2} y={s.y - 22} n={8} dist={40} />}
-        </React.Fragment>
-      ))}
-
-      {r.pad && (
-        <span className={`x3-pad-star${litCount === 4 ? ' is-ready' : ''}`} style={{ left: r.pad.x + r.pad.w / 2, top: r.pad.y }}>
-          <Star size={30} weight="fill" />
-        </span>
-      )}
-    </>
-  );
-};
-
-/* ───────────────────────── printing ───────────────────────── */
-
-type PrintReading = { vw: number; progress: number | null; card: Box | null; header: Box | null; track: Box | null; fillPct: number | null };
-const LIGHTS = 12;
-
-const PrintingDecor: React.FC<{ rootRef: React.RefObject<HTMLDivElement | null> }> = ({ rootRef }) => {
-  const r = useDomReading<PrintReading>(rootRef, (page, o) => {
-    const track = page.querySelector('.h-6.w-full.overflow-hidden.rounded-full');
-    if (!track) return null;
-    const { card, header } = ScreenCard(page, '.h-6.w-full.overflow-hidden.rounded-full');
-    // The progress the real screen is showing (its "NN% Completed" pill); never invented here.
-    let progress: number | null = null;
-    const pct = header?.textContent?.match(/(\d{1,3})% Completed/);
-    if (pct) progress = Math.max(0, Math.min(100, Number(pct[1])));
-    // The bar's target width (its inline style), so the star glides with the bar's own 300 ms transition.
-    const w = (track.firstElementChild as HTMLElement | null)?.style.width ?? '';
-    const fillPct = /%$/.test(w) ? Math.max(0, Math.min(100, parseFloat(w))) : null;
-    return { vw: Math.round(o.width), progress, card: rel(card, o), header: rel(header, o), track: rel(track, o), fillPct };
-  });
-  if (!r || !r.card) return null;
-
-  const lit = r.progress === null ? 0 : Math.floor((r.progress / 100) * LIGHTS + 1e-6);
-  const c = r.card;
-  const headerBottom = r.header ? r.header.y + r.header.h : 0;
-  const anchorY = Math.max(headerBottom + 16, c.y - 120);
-  const sagY = c.y - 34;
-  const x0 = c.x - 40;
-  const x1 = c.x + c.w + 40;
-  const sag = sagY - anchorY;
-  // Bulbs sit on the lower half of an ellipse, the same curve the string is drawn with.
-  const lights = Array.from({ length: LIGHTS }).map((_, i) => {
-    const t = (i + 0.5) / LIGHTS;
-    const u = 2 * t - 1;
-    const root = Math.sqrt(1 - u * u);
-    const x = x0 + (x1 - x0) * t;
-    const y = anchorY + sag * root;
-    const slope = (sag * (-u / root) * 2) / (x1 - x0);
-    const rot = Math.max(-38, Math.min(38, Math.atan(slope) * (180 / Math.PI)));
-    return { x, y, rot, color: BULB_COLORS[i % BULB_COLORS.length] };
-  });
-  const arches = sideArches(c, r.vw);
-
-  return (
-    <>
-      {sag > 20 && (
-        <div className="x3-string" style={{ left: x0, top: anchorY, width: x1 - x0, height: sag + 2 }}>
-          <span className="x3-string-curve" style={{ height: sag * 2, top: -sag }} />
-        </div>
-      )}
-      {lights.map((l, i) => {
-        const on = i < lit;
-        return (
-          <span key={i} className="x3-plight" style={{ left: l.x, top: l.y, transform: `rotate(${l.rot}deg)` }}>
-            <span className="x3-plight-cap" />
-            <span className={`x3-plight-glass${on ? ' is-on' : ''}`} style={{ ['--c' as string]: l.color, animationDelay: `${(i * 0.41) % 2}s` } as React.CSSProperties}>
-              {on && <span className="x3-plight-pop" />}
-            </span>
-          </span>
-        );
-      })}
-
-      {r.track && r.fillPct !== null && r.progress !== null && (
-        <span
-          className="x3-rider"
-          style={{ transform: `translate3d(${r.track.x + 5 + ((r.track.w - 10) * r.fillPct) / 100}px, ${r.track.y + r.track.h / 2}px, 0)` }}
-        >
-          <span className="x3-rider-glow" />
-          <span className="x3-rider-star"><Star size={30} weight="fill" /></span>
-        </span>
-      )}
-
-      {arches && <ArchPhotoM src={candlesPhoto} box={arches.left} pos="50% 30%" caption="Lighting up your pages" />}
-      {arches && <ArchPhotoM src={baublesPhoto} box={arches.right} pos="50% 40%" flicker={false} delay={1.2} caption="Wrapped with care" />}
-    </>
-  );
-};
 
 /* ───────────────────────── summary: your pages are a gift ───────────────────────── */
 
@@ -486,11 +315,10 @@ const ErrorDecor: React.FC<{ rootRef: React.RefObject<HTMLDivElement | null> }> 
 
 export const Mimo3ChristmasScreens: React.FC<ChristmasScreensProps> = ({ screen }) => {
   const rootRef = useRef<HTMLDivElement>(null);
+  if (screen === 'code-entry-screen' || screen === 'printing-screen') return null;
   return (
     <div className="x3" data-screen={screen} ref={rootRef}>
       <GarlandM />
-      {screen === 'code-entry-screen' && <CodeEntryDecor rootRef={rootRef} />}
-      {screen === 'printing-screen' && <PrintingDecor rootRef={rootRef} />}
       {screen === 'summary-screen' && <SummaryDecor rootRef={rootRef} />}
       {screen === 'system-error-screen' && <ErrorDecor rootRef={rootRef} />}
     </div>

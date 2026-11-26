@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { CircleNotch, Printer } from '@phosphor-icons/react';
 import { SacredMandala, TempleZariBorder, DiyaLamp } from './Mimo3Motifs';
+import { Mimo3XmasPrinting } from '../festive/christmas/screens/mimo3/Mimo3XmasPrinting';
 
 interface Mimo3PrintingScreenProps {
   isActive: boolean;
@@ -13,6 +14,8 @@ interface Mimo3PrintingScreenProps {
   statusSub?: string;
   onComplete: () => void;
   onError?: (errorMsg?: string) => void;
+  /** Christmas theme: same print logic, festive presentation (the default look is unchanged). */
+  christmas?: boolean;
 }
 
 const BACKEND_URL = 'https://api-upqxuj7evq-uc.a.run.app';
@@ -28,6 +31,7 @@ export const Mimo3PrintingScreen: React.FC<Mimo3PrintingScreenProps> = ({
   statusTitle,
   onComplete,
   onError,
+  christmas = false,
 }) => {
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState('Initiating secure print spooler…');
@@ -166,6 +170,21 @@ export const Mimo3PrintingScreen: React.FC<Mimo3PrintingScreenProps> = ({
   }, [isActive, printCode, pages, copies, clearTimers, finishJob, onError]);
 
   if (!isActive) return null;
+
+  if (christmas) {
+    return (
+      <Mimo3XmasPrinting
+        progress={progress}
+        statusMsg={statusMsg}
+        statusTitle={statusTitle}
+        pages={pages}
+        copies={copies}
+        printCode={printCode}
+        colorMode={colorMode}
+        kioskId={kioskId}
+      />
+    );
+  }
 
   return (
     <div

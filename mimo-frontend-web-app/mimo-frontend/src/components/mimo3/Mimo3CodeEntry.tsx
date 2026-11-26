@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Backspace, Check, CircleNotch, ShieldCheck } from '@phosphor-icons/react';
 import { SacredMandala, TempleZariBorder } from './Mimo3Motifs';
+import { Mimo3XmasCodeEntry } from '../festive/christmas/screens/mimo3/Mimo3XmasCodeEntry';
 
 interface Mimo3CodeEntryProps {
   isActive: boolean;
@@ -10,6 +11,8 @@ interface Mimo3CodeEntryProps {
   onBack: () => void;
   hasError?: boolean;
   kioskId?: string | null;
+  /** Christmas theme: same state and handlers, festive presentation (the default look is unchanged). */
+  christmas?: boolean;
 }
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
@@ -22,6 +25,7 @@ export const Mimo3CodeEntry: React.FC<Mimo3CodeEntryProps> = ({
   onBack,
   hasError,
   kioskId = 'SV-003',
+  christmas = false,
 }) => {
   const [isShaking, setIsShaking] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,6 +62,21 @@ export const Mimo3CodeEntry: React.FC<Mimo3CodeEntryProps> = ({
   };
 
   if (!isActive) return null;
+
+  if (christmas) {
+    return (
+      <Mimo3XmasCodeEntry
+        code={code}
+        isShaking={isShaking}
+        loading={loading}
+        hasError={hasError}
+        kioskId={kioskId}
+        onKey={handleNumClick}
+        onSubmit={handleSubmit}
+        onBack={onBack}
+      />
+    );
+  }
 
   return (
     <div

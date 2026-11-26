@@ -312,7 +312,10 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
         kioskTheme === 'christmas' ? 'mimo3-xmas bg-[#FBF5EC]' : 'bg-gradient-to-br from-[#FAFAF9] via-[#F8FAFC] to-[#F1F5F9]'
       }`}
     >
-      {kioskTheme === 'christmas' && <ChristmasBackdrop variant="mimo3" />}
+      {/* Code entry and printing draw their own Christmas background (Mimo3XmasShell), so the animated backdrop is skipped there. */}
+      {kioskTheme === 'christmas' && currentScreen !== 'code-entry-screen' && currentScreen !== 'printing-screen' && (
+        <ChristmasBackdrop variant="mimo3" />
+      )}
       {/* ================= TOAST NOTIFICATION ================= */}
       {toastMsg && (
         <div
@@ -393,6 +396,7 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
         }}
         hasError={toastError && currentScreen === 'code-entry-screen'}
         kioskId={activeKioskId}
+        christmas={kioskTheme === 'christmas'}
       />
 
       {/* ================= STEP 4: PRINT PROGRESS SCREEN ================= */}
@@ -410,6 +414,7 @@ export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-00
         printCode={code}
         colorMode={jobData?.mode?.toLowerCase().match(/color|colour/) ? 'color' : 'bw'}
         kioskId={activeKioskId}
+        christmas={kioskTheme === 'christmas'}
         onComplete={() => {
           setPrintStatus('completed');
           setCurrentScreen('summary-screen');
