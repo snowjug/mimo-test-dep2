@@ -45,6 +45,7 @@ import {
 // /kiosk/print moves the job to "printing" before it answers, so a job still "paid" this long after the
 // printing screen opened was never started (the print request was lost or refused): say so, don't keep waiting.
 const PRINT_START_GRACE_MS = 20000;
+const PI_PICKUP_FALLBACK_TIMEOUT_MS = 65000; // 60s backend window + 5s slack so backend DB transition wins first
 
 export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   isActive,
@@ -76,6 +77,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const milestoneCeilingRef = useRef(0);   // current milestone ceiling
   const sheetsCompletedRef  = useRef(0);   // verified sheets completed (from the printer's page counter)
   const hasStartedRef       = useRef(false); // backend has reported the job as printing at least once
+  const piReachedRef        = useRef(false); // true once Pi confirms pickup (piReceivedAt / sentToPrinterAt / sheet)
   const activePrintCodeRef  = useRef(printCode);
   const isPollingRef        = useRef(false);
   const tickTimerRef        = useRef<number | null>(null);
@@ -231,6 +233,15 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
         }
 
         lastSuccessfulPollTimeRef.current = Date.now();
+        if (
+          data.piReceivedAt ||
+          data.sentToPrinterAt ||
+          Number(data.sheetsCompleted) > 0 ||
+          data.status === 'completed' ||
+          data.isPrinted === true
+        ) {
+          piReachedRef.current = true;
+        }
 
         const errMsg = data.printerStatus || data.error || (data.status === 'refunded' ? 'Print refunded' : 'Printer reported an error.');
         const result = calculatePrintProgress({
@@ -358,6 +369,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       milestoneCeilingRef.current = 0;
       sheetsCompletedRef.current = 0;
       hasStartedRef.current = false;
+      piReachedRef.current = false;
       isPollingRef.current = false;
       lastProgressRef.current = 0;
       startTimeRef.current = Date.now();
@@ -379,6 +391,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     milestoneCeilingRef.current = 0;
     sheetsCompletedRef.current = 0;
     hasStartedRef.current = false;
+    piReachedRef.current = false;
     isPollingRef.current = false;
     isCompletingRef.current = false;
     lastProgressRef.current = 0;
@@ -457,6 +470,16 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
       const elapsedMs = Date.now() - startTimeRef.current;
       const msSinceLastPoll = Date.now() - lastSuccessfulPollTimeRef.current;
+
+      // Fail within ~60s if the Pi never reached/picked up the job
+      if (!piReachedRef.current && elapsedMs >= PI_PICKUP_FALLBACK_TIMEOUT_MS) {
+        console.warn(`[PrintingScreen] Pi did not reach job within ${elapsedMs}ms. Surfacing error.`);
+        clearAllTimers();
+        if (onError) {
+          onError('Print job failed: Pi is not able to reach the job (timeout after 60s).');
+        }
+        return;
+      }
 
       // Enforce the colour/page-aware print deadline from start of printing
       if (elapsedMs >= printTimeoutMs) {

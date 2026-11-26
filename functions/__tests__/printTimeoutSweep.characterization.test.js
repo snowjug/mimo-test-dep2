@@ -8,6 +8,7 @@ const { createFakeFirestore } = require("./helpers/fakeFirestore");
 const fake = createFakeFirestore();
 fake.install();
 const { runPrintTimeoutSweep } = require("../src/triggers/printTimeout.trigger");
+const { PI_PICKUP_TIMEOUT_MS, PI_PICKUP_TIMEOUT_MESSAGE, PRINT_TIMEOUT_MESSAGE } = require("../src/services/printTimeout.service");
 
 // A B&W 1-page job's timeout is 600s + 15s = 615s. A colour 1-page job's is 600s + 360s = 960s.
 const BW_TIMEOUT_MS = 615 * 1000;
@@ -22,6 +23,7 @@ function job(overrides = {}) {
     printOptions: { copies: 1 },
     printStartedAt: new Date(),
     updatedAt: new Date(),
+    piReceivedAt: new Date(),
     ...overrides,
   };
 }
@@ -35,7 +37,33 @@ test("a B&W job well past its 615s timeout is marked failed with the timeout rea
   await runPrintTimeoutSweep();
   const after = fake.data("print_jobs").j1;
   assert.strictEqual(after.status, "failed");
-  assert.strictEqual(after.printerStatus, "Print timeout: Printer not responding (check power/cable)");
+  assert.strictEqual(after.printerStatus, PRINT_TIMEOUT_MESSAGE);
+});
+
+test("an un-picked-up job (< 60s since code entry) is left untouched", async () => {
+  fake.reset({ print_jobs: { j1: job({ piReceivedAt: null, printStartedAt: new Date(Date.now() - (PI_PICKUP_TIMEOUT_MS - 5000)) }) } });
+  await runPrintTimeoutSweep();
+  const after = fake.data("print_jobs").j1;
+  assert.strictEqual(after.status, "printing");
+});
+
+test("an un-picked-up job (>= 60s since code entry without Pi pickup) fails promptly as Pi unreachable", async () => {
+  fake.reset({ print_jobs: { j1: job({ colorMode: "color", piReceivedAt: null, printStartedAt: new Date(Date.now() - (PI_PICKUP_TIMEOUT_MS + 2000)) }) } });
+  await runPrintTimeoutSweep();
+  const after = fake.data("print_jobs").j1;
+  assert.strictEqual(after.status, "failed");
+  assert.strictEqual(after.printerStatus, PI_PICKUP_TIMEOUT_MESSAGE);
+});
+
+test("an un-picked-up job queued behind an active job on the same busy kiosk is NOT killed at 60s", async () => {
+  fake.reset({
+    print_jobs: {
+      active_j: job({ kioskId: "SV-002", piReceivedAt: new Date(), printStartedAt: new Date(Date.now() - 120 * 1000) }),
+      queued_j: job({ kioskId: "SV-002", piReceivedAt: null, printStartedAt: new Date(Date.now() - 75 * 1000) }),
+    },
+  });
+  await runPrintTimeoutSweep();
+  assert.strictEqual(fake.data("print_jobs").queued_j.status, "printing");
 });
 
 test("a B&W job well within its 615s timeout is left untouched", async () => {

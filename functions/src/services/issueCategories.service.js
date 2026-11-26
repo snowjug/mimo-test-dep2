@@ -11,7 +11,7 @@
  *  - basis "customer": raised by a customer (problem report, refund request), not proven by the machine
  *  - basis "unknown":  no reason recorded, or a reason no rule recognises (category "other")
  */
-const { PRINT_TIMEOUT_MESSAGE } = require("./printTimeout.service");
+const { PRINT_TIMEOUT_MESSAGE, PI_PICKUP_TIMEOUT_MESSAGE } = require("./printTimeout.service");
 
 const ISSUE_CATEGORIES = [
   { id: "paper", label: "Paper" },
@@ -30,6 +30,7 @@ const CATEGORY_LABEL = Object.fromEntries(ISSUE_CATEGORIES.map((c) => [c.id, c.l
 // expiry). Matched in full, so they are "exact" rather than "inferred".
 const EXACT_MESSAGES = new Map([
   [PRINT_TIMEOUT_MESSAGE.toLowerCase(), "timeout"],
+  [PI_PICKUP_TIMEOUT_MESSAGE.toLowerCase(), "timeout"],
   ["job expired", "timeout"],
 ]);
 
