@@ -1,1 +1,314 @@
-/* MIMO 2.0 Christmas screens. Every rule must be scoped under html.kiosk-xmas so the default UI is untouched. */
+/* MIMO 2.0 Christmas screens ("First Snow"). Every rule is scoped under html.kiosk-xmas.mimo2-lily, so the default
+   UI is untouched while the theme is off. Restyles only change colours, borders, radii and backgrounds of the real
+   screens: layout, sizes, hit areas and behaviour stay exactly the same.
+   Raspberry Pi 5 (1 GB): photos are static textures, animations only use transform and opacity, no filter / blur /
+   backdrop-filter / blend modes, and the expensive glass blur of the lily screens is switched off while the theme is on. */
+
+html.kiosk-xmas.mimo2-lily {
+  --m2x-red: #C2203A;
+  --m2x-red-deep: #9C1729;
+  --m2x-pine: #1D4D35;
+  --m2x-pine-deep: #143726;
+  --m2x-gold: #D9AE55;
+  --m2x-gold-deep: #A97A22;
+  --m2x-ink: #15261D;
+}
+
+/* ─────────────── budget: a lighter, brighter backdrop on the inner screens ───────────────
+   The shared backdrop alone runs ~41 animated elements. On MIMO 2.0 we keep 6 bokeh lights and half the snow
+   (20 animated elements in total), so each screen stays under 40 with its own decoration. Brighter veil too. */
+html.kiosk-xmas.mimo2-lily .xmas-backdrop--mimo2 .xmas-bokeh:nth-child(n+7),
+html.kiosk-xmas.mimo2-lily .xmas-backdrop--mimo2 .xmas-sweep,
+html.kiosk-xmas.mimo2-lily .xmas-backdrop--mimo2 .xmas-flake:nth-child(odd) { display: none; }
+html.kiosk-xmas.mimo2-lily .xmas-backdrop--mimo2::before {
+  background-image: linear-gradient(rgba(255, 255, 255, .64), rgba(248, 251, 252, .74)), url('../../../../../assets/christmas/mimo2-soft.jpg');
+}
+/* the lily screens' 1000 px blurred, blend-mode glow orbs are invisible over the backdrop: drop them on the Pi */
+html.kiosk-xmas.mimo2-lily .ambient-glow { display: none !important; }
+
+/* ─────────────── shared decoration ─────────────── */
+html.kiosk-xmas.mimo2-lily .m2x { position: absolute; inset: 0; overflow: hidden; pointer-events: none; font-family: 'Plus Jakarta Sans', sans-serif; }
+html.kiosk-xmas.mimo2-lily .m2x img { display: block; width: 100%; height: auto; user-select: none; }
+html.kiosk-xmas.mimo2-lily .m2x-script { position: absolute; margin: 0; font-family: 'Great Vibes', cursive; line-height: 1.1; color: var(--m2x-red); white-space: nowrap; }
+
+/* snowy spruce branch (real photo) tucked into a top corner, feathered into the scene with a static mask */
+html.kiosk-xmas.mimo2-lily .m2x-pine {
+  position: absolute; top: -44px; width: calc(430px * var(--s, 1)); will-change: transform;
+  animation: m2x-sway 9s ease-in-out infinite alternate;
+}
+html.kiosk-xmas.mimo2-lily .m2x-pine--left { left: -34px; transform-origin: 0 0; -webkit-mask-image: radial-gradient(ellipse 118% 108% at 0% 0%, #000 42%, rgba(0, 0, 0, .55) 58%, transparent 76%); mask-image: radial-gradient(ellipse 118% 108% at 0% 0%, #000 42%, rgba(0, 0, 0, .55) 58%, transparent 76%); }
+html.kiosk-xmas.mimo2-lily .m2x-pine--right { right: -34px; transform-origin: 100% 0; animation-delay: -4.5s; -webkit-mask-image: radial-gradient(ellipse 118% 108% at 100% 0%, #000 42%, rgba(0, 0, 0, .55) 58%, transparent 76%); mask-image: radial-gradient(ellipse 118% 108% at 100% 0%, #000 42%, rgba(0, 0, 0, .55) 58%, transparent 76%); }
+html.kiosk-xmas.mimo2-lily .m2x-pine--right img { transform: scaleX(-1); }
+@keyframes m2x-sway { from { transform: rotate(-1.4deg); } to { transform: rotate(1.2deg); } }
+
+/* fairy-light string: a thin wire and glass bulbs; lit bulbs glow, a few twinkle */
+html.kiosk-xmas.mimo2-lily .m2x-lights { position: absolute; inset: 0; }
+html.kiosk-xmas.mimo2-lily .m2x-wire { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+html.kiosk-xmas.mimo2-lily .m2x-wire path { fill: none; stroke: #2B4A39; stroke-width: 2.2; stroke-linecap: round; opacity: .8; }
+html.kiosk-xmas.mimo2-lily .m2x-bulb {
+  position: absolute; width: 13px; height: 20px; margin: -2px 0 0 -6.5px; border-radius: 50% 50% 46% 46% / 40% 40% 60% 60%;
+  background: radial-gradient(circle at 40% 30%, rgba(255, 255, 255, .95) 0 14%, rgba(236, 240, 242, .9) 30%, rgba(190, 200, 206, .9) 100%);
+  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, .12);
+}
+html.kiosk-xmas.mimo2-lily .m2x-bulb::before { /* the little socket on the wire */
+  content: ''; position: absolute; left: 3px; top: -5px; width: 7px; height: 7px; border-radius: 2px; background: linear-gradient(#3A5A48, #1E3A2B);
+}
+html.kiosk-xmas.mimo2-lily .m2x-bulb::after { /* the glow: a soft halo that only fades in and out */
+  content: ''; position: absolute; left: 50%; top: 58%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle, var(--glow) 0%, transparent 66%); transition: opacity .6s ease;
+}
+html.kiosk-xmas.mimo2-lily .m2x-bulb--red { --core: #FF4B5E; --core2: #C2203A; --glow: rgba(255, 70, 90, .55); }
+html.kiosk-xmas.mimo2-lily .m2x-bulb--gold { --core: #FFE29A; --core2: #E0A93A; --glow: rgba(255, 205, 100, .6); }
+html.kiosk-xmas.mimo2-lily .m2x-bulb--green { --core: #7BE0A2; --core2: #1F8A52; --glow: rgba(90, 220, 140, .5); }
+html.kiosk-xmas.mimo2-lily .m2x-bulb--snow { --core: #FFFFFF; --core2: #CFE6FF; --glow: rgba(200, 228, 255, .7); }
+html.kiosk-xmas.mimo2-lily .m2x-bulb.is-on { background: radial-gradient(circle at 40% 30%, #FFFFFF 0 12%, var(--core) 34%, var(--core2) 100%); box-shadow: none; }
+html.kiosk-xmas.mimo2-lily .m2x-bulb.is-on::after { opacity: 1; }
+html.kiosk-xmas.mimo2-lily .m2x-bulb.is-twinkle::after { animation: m2x-twinkle 2.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
+html.kiosk-xmas.mimo2-lily .m2x-bulb.is-fresh { animation: m2x-bulb-pop .7s cubic-bezier(.34, 1.56, .64, 1) both; }
+@keyframes m2x-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@keyframes m2x-bulb-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+/* real red baubles on gold threads */
+html.kiosk-xmas.mimo2-lily .m2x-bauble { position: absolute; top: 0; padding-top: var(--len); transform-origin: 50% 0; will-change: transform; animation: m2x-swing 5.5s ease-in-out infinite alternate; animation-delay: var(--d, 0s); }
+html.kiosk-xmas.mimo2-lily .m2x-thread { position: absolute; left: 50%; top: 0; width: 2px; height: calc(var(--len) + 6px); margin-left: 1px; background: linear-gradient(#E9CF8A, #B98A2E); }
+@keyframes m2x-swing { from { transform: rotate(-3.5deg); } to { transform: rotate(3.5deg); } }
+
+/* four-point sparkles */
+html.kiosk-xmas.mimo2-lily .m2x-sparkle {
+  position: absolute; opacity: 0;
+  background:
+    radial-gradient(circle, #FFF8E0 0 10%, rgba(233, 180, 70, .9) 16%, rgba(233, 180, 70, 0) 36%),
+    linear-gradient(90deg, transparent 46%, #E3AE45 50%, transparent 54%),
+    linear-gradient(0deg, transparent 46%, #E3AE45 50%, transparent 54%);
+  animation: m2x-sparkle 2.4s ease-in-out infinite; animation-delay: var(--d, 0s);
+}
+@keyframes m2x-sparkle { 0%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); } 45% { opacity: 1; transform: scale(1.15) rotate(45deg); } 70% { opacity: .7; transform: scale(.9) rotate(60deg); } }
+
+/* ─────────────── code entry ─────────────── */
+html.kiosk-xmas.mimo2-lily .m2x-code-eyebrow { left: 142px; top: 196px; font-size: 52px; }
+html.kiosk-xmas.mimo2-lily .m2x--code .m2x-pine { --s: .66; }
+
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .entry-instruction h2 { color: var(--m2x-ink); }
+
+/* keypad: frosted snow keys with a little cap of snow on top */
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn {
+  position: relative;
+  background: radial-gradient(circle at 34% 26%, #FFFFFF 0%, #F8FBFC 52%, #E7EFF3 100%);
+  border: 1.5px solid #FFFFFF;
+  color: var(--m2x-pine);
+  font-weight: 700;
+  text-shadow: none;
+  box-shadow: 0 10px 22px rgba(20, 55, 38, .16), inset 0 -4px 0 rgba(170, 192, 204, .32);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn::before {
+  content: ''; position: absolute; top: -3px; left: 24%; right: 30%; height: 12px; border-radius: 50% 50% 40% 40% / 70% 70% 30% 30%;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F2F7FA 100%); box-shadow: 0 2px 3px rgba(110, 140, 160, .25); pointer-events: none;
+}
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn:active { background: radial-gradient(circle at 34% 26%, #FFFFFF 0%, #FDEFF1 60%, #F7DDE1 100%); color: var(--m2x-red-deep); }
+/* delete: a glossy red bauble */
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn.accent-red {
+  background: radial-gradient(circle at 34% 26%, #FF7083 0%, #D02A43 42%, #9C1729 100%);
+  border-color: rgba(255, 255, 255, .85);
+  color: #FFFFFF;
+  box-shadow: 0 10px 22px rgba(156, 23, 41, .28), inset 0 -4px 0 rgba(90, 10, 20, .22);
+}
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn.accent-red:active { background: radial-gradient(circle at 34% 26%, #FF8A9A 0%, #B71F35 60%, #8A1222 100%); color: #FFFFFF; }
+/* submit: frosted and quiet until the code is complete, then evergreen with a gold ring */
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn.submit-btn { background: radial-gradient(circle at 34% 26%, #FFFFFF 0%, #F1F5F7 60%, #E2E9ED 100%); color: rgba(29, 77, 53, .32); }
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn.submit-btn.ready {
+  background: radial-gradient(circle at 34% 26%, #4FB07A 0%, #23704A 48%, #154A31 100%);
+  border-color: var(--m2x-gold);
+  color: #FFFFFF;
+  box-shadow: 0 10px 24px rgba(20, 74, 49, .32), 0 0 0 3px rgba(217, 174, 85, .45);
+  animation: none;
+}
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn.submit-btn.ready::after {
+  content: ''; position: absolute; inset: -8px; border-radius: 50%; border: 2.5px solid var(--m2x-gold); opacity: 0; pointer-events: none;
+  animation: m2x-ring 2s ease-out infinite;
+}
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn.submit-btn.ready:active { background: radial-gradient(circle at 34% 26%, #46A06F 0%, #1C5E3D 60%, #12402A 100%); }
+@keyframes m2x-ring { 0% { transform: scale(.92); opacity: .8; } 100% { transform: scale(1.25); opacity: 0; } }
+
+/* code slots: four baubles waiting on gold threads; each fills red and pops as a digit goes in */
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .code-slot {
+  position: relative; overflow: visible;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #FFFFFF 0%, #F6F9FB 55%, #E4ECF0 100%);
+  border: 2px dashed rgba(194, 32, 58, .38);
+  color: #FFFFFF;
+  text-shadow: none;
+  box-shadow: 0 10px 22px rgba(20, 55, 38, .12);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .code-slot::before { /* gold thread + cap */
+  content: ''; position: absolute; left: 50%; top: -24px; width: 20px; height: 24px; margin-left: -10px; pointer-events: none;
+  background:
+    linear-gradient(#C9A24A, #C9A24A) 50% 0 / 2px 14px no-repeat,
+    linear-gradient(180deg, #F6DE96 0%, #C99A3A 60%, #9E7424 100%) 50% 100% / 18px 11px no-repeat;
+}
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .code-slot.active {
+  border: 2.5px solid var(--m2x-gold);
+  background: radial-gradient(circle at 36% 30%, #FFFFFF 0%, #FFFBF0 60%, #F6EBD0 100%);
+  box-shadow: 0 12px 26px rgba(169, 122, 34, .2);
+  animation: none;
+}
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .code-slot.active::after { /* waiting halo */
+  content: ''; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid rgba(217, 174, 85, .7); pointer-events: none;
+  animation: m2x-ring 1.8s ease-out infinite;
+}
+html.kiosk-xmas.mimo2-lily .code-entry-wrap .code-slot.filled {
+  border: 2px solid rgba(255, 255, 255, .9);
+  background: radial-gradient(circle at 34% 28%, #FF8A9A 0%, #E0334C 26%, #B51C33 62%, #7E0F1F 100%);
+  box-shadow: 0 12px 24px rgba(156, 23, 41, .3), inset 0 -5px 8px rgba(80, 6, 16, .25);
+  animation: m2x-slot-pop .55s cubic-bezier(.34, 1.56, .64, 1) both;
+}
+@keyframes m2x-slot-pop { 0% { transform: translateY(-2px) scale(.7); } 60% { transform: translateY(-2px) scale(1.12); } 100% { transform: translateY(-2px) scale(1); } }
+
+/* ─────────────── printing ─────────────── */
+html.kiosk-xmas.mimo2-lily .m2x--print .m2x-pine { --s: .62; }
+html.kiosk-xmas.mimo2-lily .m2x-print-caption {
+  position: absolute; left: 50%; top: 118px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 10px 22px; border-radius: 999px;
+  background: rgba(255, 255, 255, .9); border: 1px solid rgba(255, 255, 255, .95); box-shadow: 0 10px 26px rgba(20, 55, 38, .1);
+  font-size: 18px; font-weight: 700; letter-spacing: .02em; color: var(--m2x-pine); white-space: nowrap;
+}
+html.kiosk-xmas.mimo2-lily .m2x-print-caption-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--m2x-red); box-shadow: 0 0 0 4px rgba(194, 32, 58, .15); }
+html.kiosk-xmas.mimo2-lily .m2x--print.is-done .m2x-bulb::after { animation: m2x-twinkle 1.2s ease-in-out infinite; animation-delay: var(--d, 0s); }
+
+/* the left card: bright snow glass without the costly backdrop blur, with a red ribbon on top */
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="backdrop-filter"] {
+  background: linear-gradient(160deg, rgba(255, 255, 255, .96) 0%, rgba(250, 252, 253, .92) 100%) !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  border: 1.5px solid #FFFFFF !important;
+  box-shadow: 0 22px 50px rgba(20, 55, 38, .12) !important;
+  overflow: hidden;
+}
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="backdrop-filter"]::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px;
+  background: linear-gradient(90deg, var(--m2x-red-deep), var(--m2x-red) 50%, var(--m2x-red-deep));
+}
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="backdrop-filter"] h2 span { color: var(--m2x-ink) !important; }
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="backdrop-filter"] p { color: #4A5A52 !important; }
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="backdrop-filter"] p + p { color: var(--m2x-red-deep) !important; }
+/* the progress ring: Christmas red on frost, gold dotted inner ring */
+html.kiosk-xmas.mimo2-lily .printing-wrap circle[stroke="#ba924b"] { stroke: var(--m2x-red); }
+html.kiosk-xmas.mimo2-lily .printing-wrap circle[fill="#ba924b"] { fill: var(--m2x-red); }
+html.kiosk-xmas.mimo2-lily .printing-wrap circle[stroke="#f0ede6"] { stroke: #F4E6E8; }
+html.kiosk-xmas.mimo2-lily .printing-wrap circle[stroke="#e0d5c1"] { stroke: var(--m2x-gold); }
+html.kiosk-xmas.mimo2-lily .printing-wrap svg tspan { fill: var(--m2x-ink); }
+/* colour prints: the "collecting your pages" overlay turns snowy and readable */
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="z-index: 200"] { background: linear-gradient(160deg, #FFFFFF 0%, #EEF4F1 100%) !important; }
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="z-index: 200"] h2 { background: linear-gradient(135deg, var(--m2x-red-deep), var(--m2x-pine)) !important; -webkit-background-clip: text !important; background-clip: text !important; }
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="z-index: 200"] p { color: #34463C !important; }
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="z-index: 200"] strong { color: var(--m2x-red-deep) !important; }
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="z-index: 200"] span { color: var(--m2x-red) !important; filter: none !important; }
+html.kiosk-xmas.mimo2-lily .printing-wrap > div[style*="z-index: 200"] div[style*="border-radius: 50%"] { border-color: rgba(194, 32, 58, .4) !important; background: rgba(194, 32, 58, .06) !important; box-shadow: none !important; animation: none !important; }
+
+/* ─────────────── summary: your pages are a gift ─────────────── */
+html.kiosk-xmas.mimo2-lily .m2x--summary .m2x-pine { --s: .66; }
+html.kiosk-xmas.mimo2-lily .m2x-summary-script {
+  left: 0; right: 0; top: 104px; text-align: center; font-size: 64px;
+  opacity: 0; animation: m2x-rise .9s cubic-bezier(.16, 1, .3, 1) .15s forwards;
+}
+html.kiosk-xmas.mimo2-lily .m2x-gift-stage { position: absolute; left: 470px; top: 240px; width: 500px; height: 330px; }
+html.kiosk-xmas.mimo2-lily .m2x-rays {
+  position: absolute; left: 50%; top: 52%; width: 620px; height: 620px; margin: -310px 0 0 -310px; border-radius: 50%; opacity: .55;
+  background: repeating-conic-gradient(from 0deg, rgba(233, 190, 95, .55) 0deg 6deg, rgba(233, 190, 95, 0) 6deg 18deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, .6) 30%, transparent 64%); mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, .6) 30%, transparent 64%);
+  will-change: transform; animation: m2x-spin 60s linear infinite;
+}
+@keyframes m2x-spin { to { transform: rotate(360deg); } }
+html.kiosk-xmas.mimo2-lily .m2x-gift {
+  position: absolute; left: 100px; top: 118px; width: 300px; border-radius: 8px; overflow: hidden;
+  box-shadow: 0 22px 40px rgba(90, 30, 20, .28), 0 0 0 3px rgba(255, 255, 255, .9);
+  opacity: 0; animation: m2x-gift-in .9s cubic-bezier(.34, 1.4, .64, 1) .1s forwards;
+}
+@keyframes m2x-gift-in { 0% { opacity: 0; transform: translateY(40px) scale(.82) rotate(-2deg); } 100% { opacity: 1; transform: translateY(0) scale(1) rotate(-2deg); } }
+html.kiosk-xmas.mimo2-lily .m2x-pages { position: absolute; left: 190px; top: 0; width: 120px; height: 200px; will-change: transform; animation: m2x-float 4.5s ease-in-out 2.2s infinite alternate; }
+@keyframes m2x-float { from { transform: translateY(0); } to { transform: translateY(-8px); } }
+html.kiosk-xmas.mimo2-lily .m2x-page {
+  position: absolute; left: 0; top: 18px; width: 120px; height: 156px; padding: 30px 16px 0; border-radius: 6px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F7F9FA 100%); box-shadow: 0 10px 22px rgba(20, 40, 30, .16), 0 0 0 1px rgba(20, 40, 30, .05);
+  display: flex; flex-direction: column; gap: 10px; opacity: 0;
+  animation: m2x-page-up 1.2s cubic-bezier(.2, .9, .25, 1.15) forwards;
+}
+html.kiosk-xmas.mimo2-lily .m2x-page i { display: block; height: 7px; border-radius: 4px; background: #DCE4E8; }
+html.kiosk-xmas.mimo2-lily .m2x-page i:nth-of-type(2) { width: 80%; }
+html.kiosk-xmas.mimo2-lily .m2x-page i:nth-of-type(3) { width: 60%; }
+html.kiosk-xmas.mimo2-lily .m2x-page b { position: absolute; top: 9px; left: 16px; font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--m2x-red-deep); }
+html.kiosk-xmas.mimo2-lily .m2x-page--1 { --to: translate3d(-58px, 22px, 0) rotate(-13deg); animation-delay: .75s; }
+html.kiosk-xmas.mimo2-lily .m2x-page--2 { --to: translate3d(58px, 22px, 0) rotate(12deg); animation-delay: .9s; }
+html.kiosk-xmas.mimo2-lily .m2x-page--3 { --to: translate3d(0, 0, 0) rotate(-1deg); animation-delay: 1.05s; }
+@keyframes m2x-page-up { 0% { opacity: 0; transform: translate3d(0, 150px, 0) scale(.9); } 25% { opacity: 1; } 100% { opacity: 1; transform: var(--to); } }
+@keyframes m2x-rise { from { opacity: 0; transform: translate3d(0, 16px, 0); } to { opacity: 1; transform: none; } }
+
+/* the real summary screen: the printer-slot drawing gives way to the gift (layout kept, its loops stopped) */
+html.kiosk-xmas.mimo2-lily .summary-wrapper > div:nth-child(5) { visibility: hidden; }
+html.kiosk-xmas.mimo2-lily .summary-wrapper > div:nth-child(5) * { animation: none !important; }
+html.kiosk-xmas.mimo2-lily .summary-wrapper > div:nth-child(4) > div { color: var(--m2x-ink) !important; }
+html.kiosk-xmas.mimo2-lily .summary-wrapper > div:nth-child(4) span { color: var(--m2x-red-deep) !important; }
+html.kiosk-xmas.mimo2-lily .summary-wrapper span.material-symbols-outlined[style*="bounce"] { color: var(--m2x-red) !important; }
+html.kiosk-xmas.mimo2-lily .summary-wrapper .done-button-dynamic {
+  background: linear-gradient(135deg, #D52A44 0%, var(--m2x-red) 45%, var(--m2x-red-deep) 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 16px 34px rgba(156, 23, 41, .3), 0 0 0 3px rgba(255, 255, 255, .85) !important;
+}
+
+/* ─────────────── system error and maintenance: calm and kind ─────────────── */
+html.kiosk-xmas.mimo2-lily .m2x--calm .m2x-pine { --s: .74; }
+html.kiosk-xmas.mimo2-lily .m2x-maint-note {
+  position: absolute; left: 0; right: 0; bottom: 96px; margin: 0; text-align: center;
+  font-family: 'Great Vibes', cursive; font-size: 54px; line-height: 1.1; color: var(--m2x-red);
+  opacity: 0; animation: m2x-rise 1s cubic-bezier(.16, 1, .3, 1) .6s forwards;
+}
+
+html.kiosk-xmas.mimo2-lily .err-screen .err-pop-badge {
+  background: linear-gradient(135deg, #D52A44 0%, var(--m2x-red) 50%, var(--m2x-red-deep) 100%);
+  box-shadow: 0 16px 36px rgba(156, 23, 41, .25), 0 0 0 4px rgba(255, 255, 255, .8);
+}
+html.kiosk-xmas.mimo2-lily .err-screen .err-hey-label { color: var(--m2x-ink); }
+html.kiosk-xmas.mimo2-lily .err-screen .err-hey-name { color: var(--m2x-red-deep) !important; }
+html.kiosk-xmas.mimo2-lily .err-screen .err-glass-card {
+  background: rgba(255, 255, 255, .94) !important;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  box-shadow: 0 22px 50px rgba(20, 55, 38, .1) !important;
+}
+html.kiosk-xmas.mimo2-lily .err-screen .err-card-border { background: linear-gradient(180deg, var(--m2x-pine) 0%, #2F7A52 100%); }
+html.kiosk-xmas.mimo2-lily .err-screen .err-retry-line { color: var(--m2x-pine) !important; }
+html.kiosk-xmas.mimo2-lily .err-screen .err-auto-return strong { color: var(--m2x-red-deep) !important; }
+html.kiosk-xmas.mimo2-lily .err-screen .err-btn-white {
+  background: linear-gradient(135deg, #D52A44 0%, var(--m2x-red) 45%, var(--m2x-red-deep) 100%);
+  color: #FFFFFF; border-color: transparent;
+  box-shadow: 0 14px 30px rgba(156, 23, 41, .26);
+}
+html.kiosk-xmas.mimo2-lily .err-screen .err-btn-white * { color: #FFFFFF; }
+html.kiosk-xmas.mimo2-lily .err-screen .err-btn-glass {
+  background: rgba(255, 255, 255, .95) !important;
+  color: var(--m2x-pine) !important;
+  border-color: rgba(29, 77, 53, .35) !important;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+
+html.kiosk-xmas.mimo2-lily .maint-screen .maint-warning-icon { color: var(--m2x-red); text-shadow: none; }
+html.kiosk-xmas.mimo2-lily .maint-screen .maint-main-headline { color: var(--m2x-ink) !important; }
+html.kiosk-xmas.mimo2-lily .maint-screen .maint-glass-line { background: linear-gradient(90deg, transparent, rgba(194, 32, 58, .35), transparent); }
+
+/* ─────────────── accessibility and the Pi: no motion when asked ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html.kiosk-xmas.mimo2-lily .m2x *,
+  html.kiosk-xmas.mimo2-lily .m2x *::before,
+  html.kiosk-xmas.mimo2-lily .m2x *::after,
+  html.kiosk-xmas.mimo2-lily .code-entry-wrap .code-slot,
+  html.kiosk-xmas.mimo2-lily .code-entry-wrap .code-slot::after,
+  html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn::after { animation: none !important; transition: none !important; }
+  html.kiosk-xmas.mimo2-lily .m2x-summary-script,
+  html.kiosk-xmas.mimo2-lily .m2x-gift,
+  html.kiosk-xmas.mimo2-lily .m2x-page,
+  html.kiosk-xmas.mimo2-lily .m2x-maint-note { opacity: 1; }
+  html.kiosk-xmas.mimo2-lily .m2x-gift { transform: rotate(-2deg); }
+  html.kiosk-xmas.mimo2-lily .m2x-page { transform: var(--to); }
+  html.kiosk-xmas.mimo2-lily .m2x-sparkle { opacity: .8; }
+  html.kiosk-xmas.mimo2-lily .code-entry-wrap .code-slot.active::after,
+  html.kiosk-xmas.mimo2-lily .code-entry-wrap .num-btn.submit-btn.ready::after { opacity: .6; }
+}
