@@ -3,12 +3,13 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const C = require("../src/services/issueCategories.service");
-const { PRINT_TIMEOUT_MESSAGE } = require("../src/services/printTimeout.service");
+const { PRINT_TIMEOUT_MESSAGE, PI_PICKUP_TIMEOUT_MESSAGE } = require("../src/services/printTimeout.service");
 
 // Every failure reason the backend and both Pi listeners write into print_jobs.printerStatus, with the category a
 // person reading it would pick. Strings are copied from the source (f-strings filled with sample values).
 const KNOWN_REASONS = [
   [PRINT_TIMEOUT_MESSAGE, "timeout", "exact"],
+  [PI_PICKUP_TIMEOUT_MESSAGE, "timeout", "exact"],
   ["Job expired", "timeout", "exact"],
   ["Print timeout — no response from printer", "timeout", "inferred"],
   ["Printer out of paper", "paper", "inferred"],

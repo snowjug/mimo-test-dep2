@@ -299,6 +299,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
   const milestoneFloorRef   = useRef(0);   // lowest % the printer's current stage justifies
   const milestoneCeilingRef = useRef(0);   // highest % allowed before the printer confirms the next stage
   const sheetsCompletedRef  = useRef(0);   // sheets confirmed by the printer's page counter
+  const piReachedRef        = useRef(false); // true once Pi confirms pickup (piReceivedAt / sentToPrinterAt / sheet)
   const tickTimerRef        = useRef<number | null>(null);
   const pollTimerRef        = useRef<number | null>(null);
   const completionTimerRef  = useRef<number | null>(null);
@@ -430,6 +431,15 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
 
         // Reset last successful poll timestamp — the network is alive
         lastSuccessfulPollTimeRef.current = Date.now();
+        if (
+          data.piReceivedAt ||
+          data.sentToPrinterAt ||
+          Number(data.sheetsCompleted) > 0 ||
+          data.status === 'completed' ||
+          data.isPrinted === true
+        ) {
+          piReachedRef.current = true;
+        }
 
         // Authoritative completion signal from backend
         if (data.status === 'completed' || data.isPrinted === true) {
@@ -546,6 +556,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
       milestoneFloorRef.current = 0;
       milestoneCeilingRef.current = 0;
       sheetsCompletedRef.current = 0;
+      piReachedRef.current = false;
       startTimeRef.current = Date.now();
       lastSuccessfulPollTimeRef.current = Date.now();
       setTypedTitle('');
@@ -565,6 +576,7 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     milestoneFloorRef.current = 0;
     milestoneCeilingRef.current = 0;
     sheetsCompletedRef.current = 0;
+    piReachedRef.current = false;
     setTypedTitle('');
     setTypedSub('');
     startTimeRef.current = Date.now();
@@ -622,12 +634,23 @@ export const PrintingScreen: React.FC<PrintingScreenProps> = ({
     if (!isActive || !printCode || printCode === '0000') return;
 
     const networkStallThresholdMs = 45000; // 45 seconds with no network response
+    const piPickupFallbackMs = 65000; // 60s backend Pi-pickup window + 5s buffer so backend refund transition wins first
 
     const checkTimeout = () => {
       if (isCompletingRef.current) return; // already finishing — no action needed
 
       const elapsedMs = Date.now() - startTimeRef.current;
       const msSinceLastPoll = Date.now() - lastSuccessfulPollTimeRef.current;
+
+      // Fail within ~60s if the Pi never reached/picked up the job
+      if (!piReachedRef.current && elapsedMs >= piPickupFallbackMs) {
+        console.warn(`[PrintingScreen] Pi did not reach job within ${elapsedMs}ms. Surfacing error.`);
+        clearAllTimers();
+        if (onError) {
+          onError('Print job failed: Pi is not able to reach the job (timeout after 60s).');
+        }
+        return;
+      }
 
       // Enforce the colour/page-aware print deadline from start of printing
       if (elapsedMs >= printTimeoutMs) {

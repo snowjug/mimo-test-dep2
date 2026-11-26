@@ -11,7 +11,10 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { admin, db } = require("../config/firebase");
 const { isColorJob } = require("../services/printJob.service");
-const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
+const {
+  evaluatePrintingJobTimeout,
+  hasPiReachedJob,
+} = require("../services/printTimeout.service");
 
 // Plain, framework-free function so it can be unit tested directly (onSchedule's HTTP-shaped
 // invocation wrapper is not worth fighting in tests just to exercise this logic).
@@ -22,30 +25,44 @@ async function runPrintTimeoutSweep() {
   const nowMs = Date.now();
   let resolvedCount = 0;
 
-  for (const doc of snap.docs) {
-    const d = doc.data();
-    const startTs = d.printStartedAt || d.updatedAt;
-    const startMs = startTs?.toDate ? startTs.toDate().getTime() : (startTs ? new Date(startTs).getTime() : null);
-    if (!startMs) continue;
+  const entries = snap.docs.map((doc) => ({ doc, data: doc.data() }));
+  const busyKioskIds = new Set();
+  const docsByOrder = new Map();
 
-    const totalPageCount = Math.max(1, (d.pageCount || 1) * (d.printOptions?.copies || d.copies || 1));
-    const timeoutMs = computePrintTimeoutMs({
-      totalPageCount,
+  for (const { data } of entries) {
+    if (data.kioskId && hasPiReachedJob(data)) {
+      busyKioskIds.add(data.kioskId);
+    }
+    if (data.orderId) {
+      if (!docsByOrder.has(data.orderId)) docsByOrder.set(data.orderId, []);
+      docsByOrder.get(data.orderId).push(data);
+    }
+  }
+
+  for (const { doc, data: d } of entries) {
+    const sessionDocs = d.orderId ? docsByOrder.get(d.orderId) : null;
+    const timeoutHit = evaluatePrintingJobTimeout({
+      job: d,
+      sessionDocs,
+      busyKioskIds,
       isColor: isColorJob(d),
-      fileSizeBytes: d.fileSize || d.fileSizeBytes || 0,
+      nowMs,
     });
-
-    if (nowMs - startMs <= timeoutMs) continue;
+    if (!timeoutHit) continue;
 
     // Re-check inside a transaction right before writing: the job may have legitimately
-    // completed in the time between this query and now, and we must not overwrite that.
+    // completed or been picked up by the Pi between this query and now.
     try {
       await db.runTransaction(async (tx) => {
         const fresh = await tx.get(doc.ref);
-        if (!fresh.exists || fresh.data().status !== "printing") return;
+        if (!fresh.exists) return;
+        const freshData = fresh.data();
+        if (freshData.status !== "printing") return;
+        if (timeoutHit.kind === "pi_unreachable" && hasPiReachedJob(freshData)) return;
         tx.update(doc.ref, {
           status: "failed",
-          printerStatus: PRINT_TIMEOUT_MESSAGE,
+          printerStatus: timeoutHit.reason,
+          failedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         resolvedCount++;

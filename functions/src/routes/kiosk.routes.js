@@ -15,7 +15,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { createLimiters } = require("../middleware/rateLimit");
 const { claimRefund, refundIdFor } = require("../services/refund.service");
-const { computePrintTimeoutMs, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
+const { evaluatePrintingJobTimeout, PRINT_TIMEOUT_MESSAGE } = require("../services/printTimeout.service");
 const { unprintableFilesForKiosk, unprintableFilesMessage } = require("../services/printJob.service");
 const { sessionStages } = require("../services/printStages.service");
 const { getTransporter } = require("../services/email.service");
@@ -180,7 +180,7 @@ function createKioskRouter(dependencies) {
         return res.json(responsePayload);
       }
 
-      // === 2. CHECK FOR STUCK JOBS (TIMEOUT) ===
+      // === 2. CHECK FOR STUCK JOBS (PI UNREACHABLE 60s & PRINT EXECUTION TIMEOUT) ===
       let totalPageCount = 0;
       let totalFileSizeBytes = 0;
       currentSessionDocs.forEach(d => {
@@ -190,38 +190,46 @@ function createKioskRouter(dependencies) {
         totalFileSizeBytes += d.fileSize || d.fileSizeBytes || 0;
       });
 
-      const timeoutMs = computePrintTimeoutMs({ totalPageCount, isColor, fileSizeBytes: totalFileSizeBytes });
-
-      let anyStuck = false;
+      const nowMs = Date.now();
+      let stuckReason = null;
       for (const d of currentSessionDocs) {
-        if (d.status === "printing") {
-          const startTimestamp = d.printStartedAt || d.updatedAt;
-          const updatedAt = startTimestamp ? (startTimestamp.toDate ? startTimestamp.toDate() : new Date(startTimestamp)) : new Date();
-          const elapsedMs = new Date().getTime() - updatedAt.getTime();
-          if (elapsedMs > timeoutMs) {
-            anyStuck = true;
-            try {
-              validateStateTransition(d.status, PRINT_JOB_STATUS.FAILED);
-              await db.collection("print_jobs").doc(d.id).update({
-                status: "failed",
-                printerStatus: PRINT_TIMEOUT_MESSAGE,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp()
-              });
-            } catch (err) {
-              console.error(`Failed to update stuck job ${d.id}:`, err);
-            }
+        if (d.status !== "printing") continue;
+        const timeoutHit = evaluatePrintingJobTimeout({
+          job: d,
+          sessionDocs: currentSessionDocs,
+          isColor,
+          totalPageCount,
+          totalFileSizeBytes,
+          nowMs,
+        });
+        if (timeoutHit) {
+          stuckReason = stuckReason || timeoutHit.reason;
+          try {
+            validateStateTransition(d.status, PRINT_JOB_STATUS.FAILED);
+            await db.collection("print_jobs").doc(d.id).update({
+              status: "failed",
+              printerStatus: timeoutHit.reason,
+              failedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          } catch (err) {
+            console.error(`Failed to update stuck job ${d.id}:`, err);
           }
         }
       }
 
-      if (anyStuck) {
+      if (stuckReason) {
         const responsePayload = {
           status: "failed",
           isPrinted: false,
           sheetsCompleted,
           totalSheets,
-          printerStatus: PRINT_TIMEOUT_MESSAGE
+          printerStatus: stuckReason || PRINT_TIMEOUT_MESSAGE
         };
+        const contractCheck = validateKioskJobStatusResponse(responsePayload);
+        if (!contractCheck.valid) {
+          console.error("[SYNC CONTRACT ERROR]", contractCheck.error);
+        }
         return res.json(responsePayload);
       }
 

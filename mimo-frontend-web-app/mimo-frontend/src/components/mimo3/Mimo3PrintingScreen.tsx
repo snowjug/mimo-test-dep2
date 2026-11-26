@@ -35,10 +35,12 @@ export const Mimo3PrintingScreen: React.FC<Mimo3PrintingScreenProps> = ({
 
   const pollTimerRef = useRef<number | null>(null);
   const isCompletingRef = useRef(false);
+  const piReachedRef = useRef(false);
   const startTimeRef = useRef(Date.now());
 
-  // Safe print timeout (10 minutes)
+  // Safe print timeout (10 minutes) and 60s (+5s slack) Pi-pickup fallback
   const timeoutMs = 600000;
+  const piPickupFallbackMs = 65000;
 
   const clearTimers = useCallback(() => {
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
@@ -89,13 +91,20 @@ export const Mimo3PrintingScreen: React.FC<Mimo3PrintingScreenProps> = ({
     if (!isActive || isDemoCode(printCode) || !printCode) return;
 
     isCompletingRef.current = false;
+    piReachedRef.current = false;
     startTimeRef.current = Date.now();
     setProgress(10);
     setStatusMsg('Warming up printer & rasterizing document…');
     setStage('warmup');
 
     const pollStatus = async () => {
-      if (Date.now() - startTimeRef.current >= timeoutMs) {
+      const elapsedMs = Date.now() - startTimeRef.current;
+      if (!piReachedRef.current && elapsedMs >= piPickupFallbackMs) {
+        clearTimers();
+        if (onError) onError('Print job failed: Pi is not able to reach the job (timeout after 60s).');
+        return;
+      }
+      if (elapsedMs >= timeoutMs) {
         clearTimers();
         if (onError) onError('Print timed out. Your job was not completed. Please contact support.');
         return;
@@ -108,6 +117,16 @@ export const Mimo3PrintingScreen: React.FC<Mimo3PrintingScreenProps> = ({
         );
         if (!res.ok) throw new Error('Status poll failed');
         const data = await res.json();
+
+        if (
+          data.piReceivedAt ||
+          data.sentToPrinterAt ||
+          Number(data.sheetsCompleted) > 0 ||
+          data.status === 'completed' ||
+          data.isPrinted === true
+        ) {
+          piReachedRef.current = true;
+        }
 
         if (data.status === 'completed' || data.isPrinted === true) {
           finishJob();
