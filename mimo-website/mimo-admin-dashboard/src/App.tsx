@@ -17,6 +17,7 @@ const MarketingApp = lazy(() => import('./pages/Marketing/MarketingApp').then((m
 const AdminChatPage = lazy(() => import('./pages/Chat/AdminChatPage').then((m) => ({ default: m.AdminChatPage })));
 const AdvertisementsPage = lazy(() => import('./pages/Advertisements/AdvertisementsPage').then((m) => ({ default: m.AdvertisementsPage })));
 const GuardianPage = lazy(() => import('./pages/Guardian/GuardianPage').then((m) => ({ default: m.GuardianPage })));
+const MachineUIPage = lazy(() => import('./pages/MachineUI/MachineUIPage').then((m) => ({ default: m.MachineUIPage })));
 
 const PageSkeleton = () => (
   <div aria-busy="true" aria-label="Loading" className="space-y-3">
@@ -37,6 +38,7 @@ function DashboardApp() {
   // Sync activeTab with browser URL path
   const getInitialTab = () => {
     const path = window.location.pathname.toLowerCase();
+    if (path.includes('machine-ui')) return 'machine-ui';
     if (path.includes('operation')) return 'operations';
     if (path.includes('incident')) return 'incidents';
     if (path.includes('user') || path.includes('customer')) return 'users';
@@ -130,6 +132,7 @@ function DashboardApp() {
       {activeTab === 'chat' && <AdminChatPage />}
       {activeTab === 'advertisements' && <AdvertisementsPage />}
       {activeTab === 'guardian' && <GuardianPage />}
+      {activeTab === 'machine-ui' && <MachineUIPage />}
       </Suspense>
     </AppShell>
   );

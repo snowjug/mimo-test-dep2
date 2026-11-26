@@ -70,4 +70,24 @@ test.describe("Kiosk festival themes", () => {
     await kioskTheme.getApiKioskTheme({ query: { kioskId: "CV-001" } }, res);
     assert.strictEqual(res.body.theme, "default");
   });
+
+  test("'Refresh all machines' publishes a newer refreshAt that every kiosk receives", async () => {
+    seed({});
+    const before = response();
+    await kioskTheme.getApiKioskTheme({ query: { kioskId: "SV-002" } }, before);
+    assert.strictEqual(before.body.refreshAt, null);
+    const r = response();
+    await kioskTheme.postAdminKioskRefresh({ user: { email: "admin@example.com" } }, r);
+    assert.strictEqual(r.code, 200);
+    assert.ok(r.body.refreshAt);
+    for (const id of ["CV-001", "SV-002", "SV-003"]) {
+      const k = response();
+      await kioskTheme.getApiKioskTheme({ query: { kioskId: id } }, k);
+      assert.strictEqual(k.body.refreshAt, r.body.refreshAt);
+    }
+    // a refresh never changes anyone's theme
+    const t = response();
+    await kioskTheme.getAdminKioskThemes({}, t);
+    assert.deepStrictEqual(t.body.themes, { "CV-001": "default", "SV-002": "default", "SV-003": "default" });
+  });
 });

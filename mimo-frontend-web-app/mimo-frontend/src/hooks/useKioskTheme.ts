@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Which UI this kiosk shows: its normal ("default") UI or a festival UI.
@@ -24,7 +24,12 @@ function forcedTheme(): KioskTheme | null {
   return raw && KNOWN_THEMES.includes(raw as KioskTheme) ? (raw as KioskTheme) : null;
 }
 
-export function useKioskTheme(kioskId?: string | null): KioskTheme {
+/**
+ * canReload: true only while the kiosk is idle on its welcome screen. When an admin presses "Refresh all
+ * machines" (Machine UI page), the backend's refreshAt moves forward; the kiosk then reloads itself, but only
+ * once it is idle, so a customer in the middle of entering a code or printing is never interrupted.
+ */
+export function useKioskTheme(kioskId?: string | null, canReload = false): KioskTheme {
   const forced = forcedTheme();
   const [theme, setTheme] = useState<KioskTheme>(() => {
     if (forced) return forced;
@@ -35,8 +40,11 @@ export function useKioskTheme(kioskId?: string | null): KioskTheme {
     }
   });
 
+  const baselineRefresh = useRef<string | null | undefined>(undefined); // refreshAt seen at start-up
+  const [refreshPending, setRefreshPending] = useState(false);
+
   useEffect(() => {
-    if (forced || !kioskId) return;
+    if (!kioskId) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -45,6 +53,10 @@ export function useKioskTheme(kioskId?: string | null): KioskTheme {
         const data = await res.json();
         const next = asTheme(data && data.theme);
         if (cancelled) return;
+        const refreshAt: string | null = (data && data.refreshAt) || null;
+        if (baselineRefresh.current === undefined) baselineRefresh.current = refreshAt;
+        else if (refreshAt && refreshAt !== baselineRefresh.current) setRefreshPending(true);
+        if (forced) return;
         setTheme(next);
         try {
           localStorage.setItem(CACHE_KEY, next);
@@ -62,6 +74,10 @@ export function useKioskTheme(kioskId?: string | null): KioskTheme {
       window.clearInterval(id);
     };
   }, [kioskId, forced]);
+
+  useEffect(() => {
+    if (refreshPending && canReload) window.location.reload();
+  }, [refreshPending, canReload]);
 
   const active = forced ?? theme;
   // Page-level switch for the festive overrides in components/festive/christmas/christmas.css.

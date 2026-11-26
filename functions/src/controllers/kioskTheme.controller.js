@@ -28,7 +28,12 @@ function sanitizeThemes(stored) {
 async function readThemes() {
   const doc = await themesRef().get();
   const data = doc.exists ? doc.data() || {} : {};
-  return { themes: sanitizeThemes(data.themes), updatedAt: data.updatedAt || null, updatedBy: data.updatedBy || null };
+  return {
+    themes: sanitizeThemes(data.themes),
+    updatedAt: data.updatedAt || null,
+    updatedBy: data.updatedBy || null,
+    refreshAt: data.refreshAt || null,
+  };
 }
 
 // GET /api/kiosk-theme?kioskId=SV-002 (public, polled by the kiosks)
@@ -36,20 +41,22 @@ const getApiKioskTheme = async (req, res) => {
   const kioskId = cleanKioskId(req.query && req.query.kioskId);
   if (typeof res.set === "function") res.set("Cache-Control", "no-store");
   try {
-    const { themes, updatedAt } = await readThemes();
-    res.json({ kioskId: kioskId || null, theme: themes[kioskId] || DEFAULT_THEME, updatedAt });
+    const { themes, updatedAt, refreshAt } = await readThemes();
+    // refreshAt: when an admin pressed "Refresh all machines"; a kiosk that sees a newer value than the one it
+    // started with reloads itself the next time it is idle on its welcome screen.
+    res.json({ kioskId: kioskId || null, theme: themes[kioskId] || DEFAULT_THEME, updatedAt, refreshAt });
   } catch (err) {
     console.error("[KIOSK-THEME] read failed:", err.message);
     // A kiosk must always get an answer it can render: fall back to the default UI.
-    res.json({ kioskId: kioskId || null, theme: DEFAULT_THEME, updatedAt: null, fallback: true });
+    res.json({ kioskId: kioskId || null, theme: DEFAULT_THEME, updatedAt: null, refreshAt: null, fallback: true });
   }
 };
 
 // GET /admin/kiosk-themes (admin)
 const getAdminKioskThemes = async (req, res) => {
   try {
-    const { themes, updatedAt, updatedBy } = await readThemes();
-    res.json({ themes, available: KIOSK_THEMES, kiosks: THEME_KIOSKS, updatedAt, updatedBy });
+    const { themes, updatedAt, updatedBy, refreshAt } = await readThemes();
+    res.json({ themes, available: KIOSK_THEMES, kiosks: THEME_KIOSKS, updatedAt, updatedBy, refreshAt });
   } catch (err) {
     res.status(500).json({ error: "Could not load kiosk themes." });
   }
@@ -88,4 +95,17 @@ const postAdminKioskThemes = async (req, res) => {
   }
 };
 
-module.exports = { getApiKioskTheme, getAdminKioskThemes, postAdminKioskThemes, KIOSK_THEMES, THEME_KIOSKS, DEFAULT_THEME };
+// POST /admin/kiosk-themes/refresh (admin): ask every kiosk to reload its screen (when idle).
+const postAdminKioskRefresh = async (req, res) => {
+  try {
+    const refreshAt = new Date().toISOString();
+    const refreshBy = (req.user && (req.user.email || req.user.username || req.user.uid)) || "admin";
+    await themesRef().set({ refreshAt, refreshBy }, { merge: true });
+    res.json({ success: true, refreshAt });
+  } catch (err) {
+    console.error("[KIOSK-THEME] refresh failed:", err.message);
+    res.status(500).json({ error: "Could not send the refresh." });
+  }
+};
+
+module.exports = { getApiKioskTheme, getAdminKioskThemes, postAdminKioskThemes, postAdminKioskRefresh, KIOSK_THEMES, THEME_KIOSKS, DEFAULT_THEME };

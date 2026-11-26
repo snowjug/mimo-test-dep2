@@ -12,7 +12,7 @@ import {
   PanelLeftOpen,
   Activity,
   Megaphone,
-  ShieldCheck,
+  ShieldCheck, Palette,
 } from 'lucide-react';
 
 export interface NavItemDef {
@@ -46,6 +46,7 @@ const NAV_CORE: NavItemDef[] = [
 // not as separate top-level nav entries — see GuardianPage.tsx for the boundary this preserves.
 const NAV_INFRA: NavItemDef[] = [
   { id: 'guardian',   label: 'Edge Guardian',        icon: ShieldCheck },
+  { id: 'machine-ui', label: 'Machine UI',           icon: Palette },
 ];
 
 const NAV_ANALYTICS: NavItemDef[] = [

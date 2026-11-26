@@ -25,6 +25,7 @@ router.get("/admin/screensaver", adminAuthMiddleware, admin.getAdminScreensaver)
 router.post("/admin/screensaver", adminAuthMiddleware, admin.postAdminScreensaver);
 router.get("/admin/kiosk-themes", adminAuthMiddleware, kioskTheme.getAdminKioskThemes);
 router.post("/admin/kiosk-themes", adminAuthMiddleware, kioskTheme.postAdminKioskThemes);
+router.post("/admin/kiosk-themes/refresh", adminAuthMiddleware, kioskTheme.postAdminKioskRefresh);
 router.post("/admin/upload-url", adminAuthMiddleware, admin.postGetAdminUploadUrl);
 router.get("/admin/hardware", adminAuthMiddleware, admin.getAdminHardware);
 router.post("/admin/hardware", adminAuthMiddleware, admin.postAdminHardware);

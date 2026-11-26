@@ -63,12 +63,15 @@ function playTactileClick() {
 export const Mimo3KioskPage: React.FC<Mimo3KioskPageProps> = ({ kioskId = 'SV-003' }) => {
   const activeKioskId = kioskId || 'SV-003';
   // Festival UI chosen in the admin dashboard (Configuration → Kiosk Theme); 'default' keeps Mimo3MainScreen.
-  const kioskTheme = useKioskTheme(activeKioskId);
+  const [themeCanReload, setThemeCanReload] = useState(false);
+  const kioskTheme = useKioskTheme(activeKioskId, themeCanReload);
 
   // Navigation & Screen State
   const [currentScreen, setCurrentScreen] = useState<Mimo3ScreenState>('main-interface');
   const [showScreensaver, setShowScreensaver] = useState(true);
   const [code, setCode] = useState('');
+  // Admin "Refresh all machines" may only reload this kiosk while it is idle on the welcome screen.
+  useEffect(() => { setThemeCanReload(currentScreen === 'main-interface' && code === ''); }, [currentScreen, code]);
   const [jobData, setJobData] = useState<JobData | null>(null);
   const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'completed'>('idle');
   const [printError, setPrintError] = useState<string | undefined>(undefined);

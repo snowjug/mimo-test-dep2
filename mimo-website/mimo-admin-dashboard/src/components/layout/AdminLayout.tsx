@@ -16,7 +16,7 @@ import {
   X,
   User,
   MessageCircle,
-  Megaphone,
+  Megaphone, Palette,
   Ticket,
   ShieldCheck,
 } from 'lucide-react';
@@ -64,6 +64,7 @@ const TITLES: Record<string, string> = {
   chat: 'Team Chat',
   advertisements: 'Advertisements',
   guardian: 'Edge Guardian',
+  'machine-ui': 'Machine UI',
 };
 
 // Kiosk Network and System Configuration live inside Edge Guardian as sub-tabs now, not as their
@@ -82,6 +83,7 @@ const MORE = [
   { id: 'finance',         label: 'Finance',            icon: IndianRupee },
   { id: 'chat',            label: 'Team Chat',          icon: MessageCircle },
   { id: 'advertisements',  label: 'Advertisements',     icon: Megaphone },
+  { id: 'machine-ui',      label: 'Machine UI',         icon: Palette },
 ];
 
 /** Bottom sheet used for "More" and the alerts list. */

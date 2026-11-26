@@ -108,6 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
     finance: { label: 'MIMO Finance Center', desc: 'Revenue intelligence, refunds & tariffs' },
     configuration: { label: 'System Configuration', desc: 'Platform settings & hardware thresholds' },
     advertisements: { label: 'Advertisements', desc: 'Manage customer-facing announcements & ads' },
+    'machine-ui': { label: 'Machine UI', desc: 'Kiosk screen themes & remote refresh' },
   }[activeTab] || { label: 'Command Center', desc: 'MIMO Platform' };
 
   return (

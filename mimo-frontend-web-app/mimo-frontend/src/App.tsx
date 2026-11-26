@@ -56,7 +56,8 @@ function App() {
   // SV-002 never uses a festival theme: it always shows the white-lily screens.
   const isMimo2Lily = dynamicKioskId === 'SV-002';
   const isFestiveForKiosk = dynamicKioskId === 'CV-001' || (!isMimo2Lily && isFestive);
-  const kioskTheme = useKioskTheme(dynamicKioskId);
+  const [themeCanReload, setThemeCanReload] = useState(false);
+  const kioskTheme = useKioskTheme(dynamicKioskId, themeCanReload);
 
   useEffect(() => {
     const rootEl = document.getElementById('root');
@@ -166,6 +167,9 @@ function App() {
     !showRefundBanner &&
     validationTimerRef.current === null &&
     toastMsg === '';
+
+  // Admin "Refresh all machines" may only reload the kiosk while it is idle on the welcome screen.
+  useEffect(() => { setThemeCanReload(isKioskIdle); }, [isKioskIdle]);
 
   useAutoUpdate({
     isIdle: isKioskIdle,
