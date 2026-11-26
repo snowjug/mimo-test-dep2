@@ -9,6 +9,7 @@ const { resolveRefunds, cashfreeRefundFetcher } = require("../services/refundSyn
 const R = require("../services/machineRegistry.service");
 const C = require("../services/issueCategories.service");
 const { cachedValue } = require("../utils/scanCache");
+const { normalizeCouponCode } = require("../services/coupon.service");
 
 // Cashfree refund lookups for the history (manual refunds made in the Cashfree app). Tests swap this out.
 let fetchCashfreeRefunds = (orderId) => {
@@ -70,7 +71,7 @@ async function lookupOrders(orderIds) {
           const d = doc.data();
           if (!d.orderId) return;
           map.set(d.orderId, {
-            couponCode: d.couponCode || null,
+            couponCode: d.couponCode || d.couponUsed || null,
             discountPercentage: d.discountPercentage !== undefined && d.discountPercentage !== null ? Number(d.discountPercentage) : null,
             discount: d.discount !== undefined && d.discount !== null ? Number(d.discount) : (d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null),
             discountAmount: d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null,
@@ -90,7 +91,7 @@ async function lookupOrders(orderIds) {
           const existing = map.get(d.orderId);
           if (!existing) {
             map.set(d.orderId, {
-              couponCode: d.couponCode || null,
+              couponCode: d.couponCode || d.couponUsed || null,
               discountPercentage: d.discountPercentage !== undefined && d.discountPercentage !== null ? Number(d.discountPercentage) : null,
               discount: d.discount !== undefined && d.discount !== null ? Number(d.discount) : (d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null),
               discountAmount: d.discountAmount !== undefined && d.discountAmount !== null ? Number(d.discountAmount) : null,
@@ -118,8 +119,9 @@ async function lookupOrders(orderIds) {
             if (d.gross !== undefined && d.gross !== null && existing.gross === null) {
               existing.gross = Number(d.gross);
             }
-            if (d.couponCode && !existing.couponCode) {
-              existing.couponCode = d.couponCode;
+            const txnCoupon = d.couponCode || d.couponUsed || null;
+            if (txnCoupon && !existing.couponCode) {
+              existing.couponCode = txnCoupon;
             }
             if (d.discountPercentage !== undefined && d.discountPercentage !== null && existing.discountPercentage === null) {
               existing.discountPercentage = Number(d.discountPercentage);
@@ -195,7 +197,12 @@ const getAdminTransactions = async (req, res) => {
     const users = await lookupUsers(rows.map((o) => o.userId));
     const transactions = rows.map((o) => {
       const job = jobByOrder.get(o.orderId);
-      const gross = job && job.cost > 0 ? Math.max(job.cost, o.amount) : o.amount;
+      const gross = (o.gross !== null && o.gross !== undefined && o.gross > 0)
+        ? Math.max(o.gross, o.amount)
+        : (job && job.cost > 0 ? Math.max(job.cost, o.amount) : o.amount);
+      const discount = o.discount !== null && o.discount !== undefined
+        ? A.round2(o.discount)
+        : A.round2(Math.max(0, gross - o.amount));
       return {
         id: o.orderId,
         orderId: o.orderId,
@@ -204,9 +211,11 @@ const getAdminTransactions = async (req, res) => {
         userName: users.get(o.userId)?.name || null,
         amount: o.amount,
         gross: A.round2(gross),
-        discount: A.round2(Math.max(0, gross - o.amount)),
+        discount,
+        discountPercentage: o.discountPercentage > 0 ? o.discountPercentage : null,
         couponCode: o.couponCode,
-        coinsUsed: null,
+        coinsUsed: o.coinsUsed > 0 ? o.coinsUsed : null,
+        coinsValue: o.coinsValue ?? null,
         status: o.status,
         method: o.method,
         gatewayRef: o.gatewayRef,
@@ -271,13 +280,42 @@ const getAdminJobs = async (req, res) => {
       lookupOrders(docs.map((d) => d.orderId)),
       R.loadMachinesMap(db),
     ]);
+    const couponPctByCode = new Map();
+    const missingPctCodes = [...new Set(
+      docs
+        .map((d) => {
+          const n = normalized.get(d.id);
+          const order = n.orderId ? orders.get(n.orderId) : null;
+          const code = normalizeCouponCode(d.couponCode || d.couponUsed || order?.couponCode || order?.couponUsed);
+          const hasPct = (d.discountPercentage !== undefined && d.discountPercentage !== null && Number(d.discountPercentage) > 0)
+            || (order?.discountPercentage !== undefined && order?.discountPercentage !== null && Number(order.discountPercentage) > 0);
+          return code && !hasPct ? code : null;
+        })
+        .filter(Boolean)
+    )];
+    if (missingPctCodes.length > 0) {
+      try {
+        const couponSnaps = await db.getAll(...missingPctCodes.map((code) => db.collection("coupons").doc(code)));
+        couponSnaps.forEach((s) => {
+          if (s.exists) {
+            const pct = Number(s.data()?.discountPercentage);
+            if (Number.isFinite(pct) && pct > 0) couponPctByCode.set(s.id.toUpperCase(), pct);
+          }
+        });
+      } catch (err) {
+        console.warn("[ADMIN-INSIGHTS] coupon lookup skipped:", err?.message || err);
+      }
+    }
+
     const jobs = docs.map((d) => {
       const n = normalized.get(d.id);
       const u = users.get(d.userId);
       const refund = refunds.get(d.id) || null;
       const order = n.orderId ? orders.get(n.orderId) : null;
-      const couponCode = d.couponCode || order?.couponCode || null;
-      const discountPct = d.discountPercentage || order?.discountPercentage || 0;
+      const rawCouponCode = d.couponCode || d.couponUsed || order?.couponCode || order?.couponUsed || null;
+      const couponCode = rawCouponCode ? String(rawCouponCode).trim() : null;
+      const normalizedCouponKey = normalizeCouponCode(couponCode);
+      const discountPct = d.discountPercentage || order?.discountPercentage || (normalizedCouponKey ? couponPctByCode.get(normalizedCouponKey) : 0) || 0;
       let originalCost = d.originalCost || d.grossAmount || order?.gross || n.cost;
       if (couponCode && discountPct > 0 && originalCost <= n.cost) {
         originalCost = A.round2(n.cost / (1 - discountPct / 100));
@@ -312,7 +350,9 @@ const getAdminJobs = async (req, res) => {
         ? Number(d.discountPercentage)
         : (order?.discountPercentage !== undefined && order?.discountPercentage !== null && Number(order.discountPercentage) > 0)
           ? Number(order.discountPercentage)
-          : null;
+          : (normalizedCouponKey && couponPctByCode.has(normalizedCouponKey)
+            ? couponPctByCode.get(normalizedCouponKey)
+            : null);
       const couponDiscountPercentage = rawDiscountPercentage;
 
       let rawDiscountAmount = null;
@@ -341,7 +381,7 @@ const getAdminJobs = async (req, res) => {
       // When no currency discount was explicitly persisted, but a verified coupon percentage is recorded on a known original amount,
       // and NO coins were used, the coupon discount was applied to 100% of recordedOriginalAmount.
       if (rawDiscountAmount === null && couponCode && couponDiscountPercentage && recordedOriginalAmount !== null) {
-        if (coinsUsed === 0) {
+        if (!coinsUsed) {
           rawDiscountAmount = A.round2(recordedOriginalAmount * (couponDiscountPercentage / 100));
         }
       }

@@ -31,6 +31,9 @@ export interface CouponItem {
   createdAt?: string | { _seconds?: number; seconds?: number } | null;
   maxUses?: number | null;
   usedCount?: number;
+  totalDiscountINR?: number;
+  uniqueUsersCount?: number;
+  lastRedeemedAt?: string | null;
 }
 
 export const CouponsPage: React.FC = () => {
@@ -487,12 +490,21 @@ export const CouponsPage: React.FC = () => {
 
                         {/* Redemptions */}
                         <td className="py-3.5 px-4 text-xs font-semibold text-[var(--text-2)]">
-                          <span className="text-[var(--text-1)] font-bold">{c.usedCount || 0}</span>
-                          {c.maxUses ? (
-                            <span className="text-[var(--text-3)]"> / {c.maxUses} max</span>
-                          ) : (
-                            <span className="text-[var(--text-3)]"> uses</span>
-                          )}
+                          <div className="flex flex-col">
+                            <span>
+                              <span className="text-[var(--text-1)] font-bold tabular-nums">{c.usedCount || 0}</span>
+                              {c.maxUses ? (
+                                <span className="text-[var(--text-3)]"> / {c.maxUses} max</span>
+                              ) : (
+                                <span className="text-[var(--text-3)]"> {(c.usedCount || 0) === 1 ? 'use' : 'uses'}</span>
+                              )}
+                            </span>
+                            {(c.totalDiscountINR ?? 0) > 0 && (
+                              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                ₹{Number(c.totalDiscountINR).toFixed(2)} saved{c.uniqueUsersCount ? ` · ${c.uniqueUsersCount} user${c.uniqueUsersCount === 1 ? '' : 's'}` : ''}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Actions */}

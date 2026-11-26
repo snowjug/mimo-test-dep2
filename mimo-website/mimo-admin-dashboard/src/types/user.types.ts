@@ -5,6 +5,13 @@ export interface AdminUserItem {
   mobileNumber: string;
   googleUser: boolean;
   isGuest: boolean;
+  mimoCoins?: {
+    balance: number;
+    totalEarned: number;
+    totalUsed: number;
+  } | null;
+  couponsUsed?: string[];
+  totalDiscountSaved?: number;
   totalSpend: number;
   orderCount: number;
   pagesPrinted: number;

@@ -11,6 +11,7 @@ const { logFinancialAudit } = require("../utils/auditLogger");
 const { toPaise, toRupees } = require("../utils/money");
 const { cachedCollectionGet } = require("../utils/scanCache");
 const { normalizeMediaUrl } = require("../utils/mediaUrl");
+const { normalizeCouponCode, computeCouponRedemptionStats } = require("../services/coupon.service");
 
 // Constant-time password comparison: both sides are hashed to a fixed 32-byte SHA-256 digest first, so
 // a length mismatch (almost guaranteed between a real password and an attacker's guess) can never make
@@ -68,8 +69,23 @@ const postAdminLogin = (req, res) => {
 // ================= ADMIN COUPONS =================
 const getAdminCoupons = async (req, res) => {
   try {
-    const snapshot = await db.collection("coupons").get();
-    const coupons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const [snapshot, statsByCode] = await Promise.all([
+      db.collection("coupons").get(),
+      computeCouponRedemptionStats(db),
+    ]);
+    const coupons = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      const stat = statsByCode.get(normalizeCouponCode(data.code || doc.id));
+      const usedCount = Math.max(Number(data.usedCount) || 0, stat ? stat.redemptionCount : 0);
+      return {
+        id: doc.id,
+        ...data,
+        usedCount,
+        totalDiscountINR: stat ? stat.totalDiscountINR : 0,
+        uniqueUsersCount: stat ? stat.uniqueUsersCount : 0,
+        lastRedeemedAt: stat ? stat.lastRedeemedAt : null,
+      };
+    });
     res.json(coupons);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch coupons" });
@@ -798,9 +814,12 @@ const getAdminUsers = async (req, res) => {
       if (ord.status === "PAID") {
         totalRevenue += ord.amount;
         if (ord.userId) payingUserIds.add(ord.userId);
-        if (!userStats[uid]) userStats[uid] = { totalSpend: 0, orderCount: 0, pagesPrinted: 0 };
+        if (!userStats[uid]) userStats[uid] = { totalSpend: 0, orderCount: 0, pagesPrinted: 0, couponsUsed: new Set(), totalDiscountSaved: 0 };
         userStats[uid].totalSpend += ord.amount;
         userStats[uid].orderCount += 1;
+        if (ord.couponCode) userStats[uid].couponsUsed.add(normalizeCouponCode(ord.couponCode));
+        const ordDiscount = ord.discount ?? (ord.gross ? Math.max(0, ord.gross - ord.amount) : 0);
+        if (ordDiscount > 0) userStats[uid].totalDiscountSaved += Number(ordDiscount);
       }
     });
 
@@ -808,20 +827,31 @@ const getAdminUsers = async (req, res) => {
       const job = doc.data();
       const uid = job.userId || job.userEmail || "anonymous";
       const pages = (job.pageCount || 0) * (job.copies || 1);
-      if (!userStats[uid]) userStats[uid] = { totalSpend: 0, orderCount: 0, pagesPrinted: 0 };
+      if (!userStats[uid]) userStats[uid] = { totalSpend: 0, orderCount: 0, pagesPrinted: 0, couponsUsed: new Set(), totalDiscountSaved: 0 };
       userStats[uid].pagesPrinted += pages;
+      const jobCoupon = job.couponCode || job.couponUsed;
+      if (jobCoupon) userStats[uid].couponsUsed.add(normalizeCouponCode(jobCoupon));
     });
 
     const userList = [];
     usersSnap.forEach((doc) => {
       const u = doc.data();
       const uid = doc.id;
-      const stats = userStats[uid] || userStats[u.email] || { totalSpend: 0, orderCount: 0, pagesPrinted: 0 };
+      const stats = userStats[uid] || userStats[u.email] || { totalSpend: 0, orderCount: 0, pagesPrinted: 0, couponsUsed: new Set(), totalDiscountSaved: 0 };
 
       let joinedAt = "";
       if (u.createdAt) {
         joinedAt = u.createdAt.toDate ? u.createdAt.toDate().toISOString() : new Date(u.createdAt).toISOString();
       }
+
+      const coinData = u.mimo_coins;
+      const mimoCoins = coinData
+        ? {
+            balance: Number(coinData.balance) || 0,
+            totalEarned: Number(coinData.total_earned) || 0,
+            totalUsed: Number(coinData.total_used) || 0,
+          }
+        : null;
 
       userList.push({
         id: uid,
@@ -830,7 +860,9 @@ const getAdminUsers = async (req, res) => {
         mobileNumber: u.mobileNumber || u.phoneNumber || "—",
         googleUser: Boolean(u.googleUser),
         isGuest: Boolean(u.isGuest),
-        mimoCoins: null,
+        mimoCoins,
+        couponsUsed: [...stats.couponsUsed],
+        totalDiscountSaved: Number(stats.totalDiscountSaved.toFixed(2)),
         totalSpend: Number(stats.totalSpend.toFixed(2)),
         orderCount: stats.orderCount,
         pagesPrinted: stats.pagesPrinted,
@@ -938,69 +970,8 @@ const getAdminFinancialAuditLogs = async (req, res) => {
 // ================= COUPON ANALYTICS =================
 const getAdminCouponsAnalytics = async (req, res) => {
   try {
-    const [couponSnap, ordersSnap] = await Promise.all([
-      db.collection("coupons").get().catch(() => ({ docs: [] })),
-      db.collection("orders").where("couponCode", "!=", null).limit(1000).get().catch(() => ({ docs: [] })),
-    ]);
-
-    const stats = new Map();
-    couponSnap.docs.forEach((doc) => {
-      const data = doc.data();
-      const code = (data.code || doc.id).toUpperCase().trim();
-      stats.set(code, {
-        code,
-        discountPercentage: data.discountPercentage || 0,
-        active: data.active !== false,
-        expiresAt: data.expiresAt || null,
-        redemptionCount: 0,
-        totalDiscountINR: 0,
-        uniqueUsers: new Set(),
-        orders: [],
-        lastRedeemedAt: null,
-      });
-    });
-
-    ordersSnap.docs.forEach((doc) => {
-      const d = doc.data();
-      if (!d.couponCode) return;
-      const code = String(d.couponCode).toUpperCase().trim();
-      let entry = stats.get(code);
-      if (!entry) {
-        entry = {
-          code,
-          discountPercentage: d.discountPercentage || 0,
-          active: true,
-          expiresAt: null,
-          redemptionCount: 0,
-          totalDiscountINR: 0,
-          uniqueUsers: new Set(),
-          orders: [],
-          lastRedeemedAt: null,
-        };
-        stats.set(code, entry);
-      }
-      entry.redemptionCount += 1;
-      if (d.userId) entry.uniqueUsers.add(d.userId);
-      entry.orders.push(d.orderId || doc.id);
-
-      const gross = Number(d.gross || d.totalCost || d.amount || 0);
-      const paid = Number(d.amount || 0);
-      const discount = Math.max(0, gross - paid);
-      entry.totalDiscountINR += discount;
-
-      const orderTime = d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt || null;
-      if (orderTime && (!entry.lastRedeemedAt || orderTime > entry.lastRedeemedAt)) {
-        entry.lastRedeemedAt = orderTime;
-      }
-    });
-
-    const couponAnalytics = [...stats.values()].map((c) => ({
-      ...c,
-      uniqueUsersCount: c.uniqueUsers.size,
-      uniqueUsers: undefined,
-      totalDiscountINR: Math.round(c.totalDiscountINR * 100) / 100,
-    }));
-
+    const statsByCode = await computeCouponRedemptionStats(db);
+    const couponAnalytics = [...statsByCode.values()];
     res.json({ couponAnalytics });
   } catch (err) {
     console.error("[COUPON-ANALYTICS] Error:", err.message);
