@@ -1,1 +1,288 @@
-/* MIMO 3.0 Christmas screens. Every rule must be scoped under html.kiosk-xmas so the default UI is untouched. */
+/* MIMO 3.0 Christmas screens: "Candlelight". Every rule is scoped under html.kiosk-xmas so the default UI is untouched.
+   Part 1 restyles the real screens (colours, borders, radii, backgrounds only: no size, layout or behaviour changes).
+   Part 2 is the decorative layer (Mimo3ChristmasScreens.tsx). Raspberry Pi friendly: motion is transform / opacity only,
+   no filter / blur / blend modes, no animated shadows. All motion stops under prefers-reduced-motion. */
+
+/* ═════════════════════ Part 1: the real screens (code entry, printing, summary, error) ═════════════════════ */
+
+/* Red velvet ribbon with a gold edge instead of the zari border; hide the mandala watermark (opacity only, no layout change). */
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br > .h-2.w-full {
+  background: linear-gradient(180deg, #C8243A 0%, #9E1B2C 100%) !important;
+  border-bottom-color: #E2B04E !important;
+}
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br > .pointer-events-none.absolute { opacity: 0; }
+
+/* Warm text palette */
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br h2 { color: #3A160A; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br h2 .bg-clip-text {
+  background-image: linear-gradient(90deg, #B3202F 0%, #C23A22 55%, #B5561C 100%) !important;
+}
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .text-\[\#475569\] { color: #5A4636; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .text-\[\#64748B\] { color: #765943; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .text-\[\#334155\] { color: #4A3424; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .text-\[\#0F172A\] { color: #3A160A; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .text-\[\#EA580C\] { color: #B3202F; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .text-\[\#B45309\] { color: #8A3A12; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .bg-\[\#EA580C\] { background-color: #C8243A; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .text-emerald-600 { color: #1F6B43; }
+
+/* Surfaces: ivory and gold instead of slate */
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .border-\[\#E2E8F0\] { border-color: #EBD8B8; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .bg-white { background-color: #FFFDF8; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .bg-\[\#FAFAF9\] { background-color: #FFF8EC; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .bg-\[\#F1F5F9\] { background-color: #F7ECDD; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .border-\[\#FDE68A\] { border-color: #EBC98A; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .bg-\[\#FFFDF7\] { background-color: #FFF8EA; }
+
+/* Main cards (and the keypad tray): warm glass with a fine gold frame. */
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .rounded-\[36px\] {
+  background: linear-gradient(180deg, #FFFEFA 0%, #FFF7EA 100%);
+  border-color: #E7CB98;
+  outline: 1.5px solid rgba(214, 162, 70, .4);
+  outline-offset: 7px;
+  box-shadow: 0 30px 70px rgba(140, 80, 24, .16), 0 2px 0 rgba(255, 255, 255, .9) inset;
+}
+
+/* ── Code entry: slots are wax candles ── */
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .h-\[88px\].w-\[76px\] {
+  border-radius: 16px 16px 24px 24px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FBF0DF 100%);
+  border-color: #E6D0AC;
+  color: #5A1A0C;
+  box-shadow: inset 0 -7px 0 rgba(214, 168, 70, .14), 0 10px 20px rgba(150, 90, 30, .10) !important;
+}
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .h-\[88px\].w-\[76px\].border-\[\#F59E0B\] {
+  background: linear-gradient(180deg, #FFFAF0 0%, #FCE3B8 100%);
+  border-color: #D6A246;
+  box-shadow: 0 0 0 4px rgba(233, 181, 74, .22), 0 12px 28px rgba(214, 140, 40, .30), inset 0 -7px 0 rgba(181, 86, 28, .14) !important;
+}
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .h-\[88px\].w-\[76px\].border-\[\#EA580C\] {
+  border-color: #C8243A;
+  box-shadow: 0 0 0 5px rgba(200, 36, 58, .12), 0 10px 20px rgba(150, 90, 30, .10) !important;
+}
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .bg-\[\#CBD5E1\] { background-color: #E3C68C; }
+
+/* The Hindi greeting pill is replaced (visually) by a "Merry Christmas" pill drawn at the same spot. */
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .inline-flex.rounded-full.px-4 { visibility: hidden; }
+
+/* Keypad: candle-glass keys */
+html.kiosk-xmas .mimo3-xmas [id^="keypad-btn-"]:not(#keypad-btn-del):not(#keypad-btn-submit) {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFF4E2 100%) !important;
+  border-color: #EAD3AE !important;
+  color: #3A160A !important;
+  box-shadow: inset 0 -4px 0 rgba(214, 168, 70, .2), inset 0 1px 0 #FFFFFF, 0 6px 14px rgba(150, 90, 30, .10) !important;
+}
+html.kiosk-xmas .mimo3-xmas [id^="keypad-btn-"]:not(#keypad-btn-del):not(#keypad-btn-submit):active { background: #FCE3B8 !important; }
+html.kiosk-xmas .mimo3-xmas #keypad-btn-del {
+  background: linear-gradient(180deg, #FFF6F5 0%, #FDE8E8 100%) !important;
+  border-color: #F1C0C5 !important;
+  color: #B3202F !important;
+}
+html.kiosk-xmas .mimo3-xmas #keypad-btn-submit:not(:disabled) {
+  background: linear-gradient(135deg, #D3263A 0%, #A81C2E 100%) !important;
+  border-color: #E2B04E !important;
+  box-shadow: 0 10px 26px rgba(158, 27, 44, .32), inset 0 1px 0 rgba(255, 255, 255, .25) !important;
+}
+html.kiosk-xmas .mimo3-xmas #keypad-btn-submit:disabled {
+  background: #F6EDE0 !important;
+  border-color: #EAD8BC !important;
+  color: #A08A70 !important;
+}
+
+/* ── Printing ── */
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .h-6.w-full.rounded-full > .bg-gradient-to-r {
+  background-image:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, .22) 0 9px, rgba(255, 255, 255, 0) 9px 18px),
+    linear-gradient(90deg, #9E1B2C 0%, #D3263A 55%, #E9B54A 100%) !important;
+}
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .from-\[\#FFFDF7\].to-\[\#FEF3C7\] {
+  background-image: linear-gradient(135deg, #FFF8EA 0%, #FBE3B6 100%) !important;
+  border-color: #E2B04E;
+}
+
+/* ── Summary ── */
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .from-emerald-500.to-teal-600 {
+  background-image: linear-gradient(180deg, #D3263A 0%, #9E1B2C 100%) !important;
+  box-shadow: 0 0 0 6px rgba(233, 181, 74, .28), 0 14px 30px rgba(158, 27, 44, .32) !important;
+}
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .border-emerald-300.bg-emerald-50 { background-color: #FFF4E0; border-color: #E2B04E; }
+html.kiosk-xmas .mimo3-xmas #summary-done-btn { background-color: #1F5A3A !important; box-shadow: 0 10px 24px rgba(31, 90, 58, .28) !important; }
+html.kiosk-xmas .mimo3-xmas #summary-done-btn:active { background-color: #18492F !important; }
+
+/* ── Error: kind and calm ── */
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .rounded-\[36px\].border-red-200 { border-color: #EFCFC4; }
+html.kiosk-xmas .mimo3-xmas > .relative.bg-gradient-to-br .bg-\[\#FEF2F2\] { background-color: #FFF5F0; border-color: #F3D8CF; }
+html.kiosk-xmas .mimo3-xmas #error-retry-btn {
+  background-image: linear-gradient(135deg, #D3263A 0%, #A81C2E 100%) !important;
+  border-color: #E2B04E !important;
+  box-shadow: 0 10px 24px rgba(158, 27, 44, .28) !important;
+}
+
+/* ═════════════════════ Part 2: decorative layer ═════════════════════ */
+
+html.kiosk-xmas .x3 { position: absolute; inset: 0; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; }
+
+/* Fairy-light garland along the top edge */
+html.kiosk-xmas .x3-garland { position: absolute; left: 0; right: 0; top: 0; height: 60px; }
+html.kiosk-xmas .x3-wire { position: absolute; top: -7px; height: 26px; border: 2px solid transparent; border-bottom-color: #6E4B2C; border-radius: 50%; opacity: .75; }
+html.kiosk-xmas .x3-bulb {
+  position: absolute; width: 9px; height: 14px; margin-left: -4.5px; transform-origin: 50% 0;
+  border-radius: 50% 50% 46% 46% / 38% 38% 62% 62%;
+  background: radial-gradient(circle at 42% 62%, #FFFFFF 0%, var(--c) 42%, var(--c) 100%);
+  box-shadow: 0 0 9px 2px var(--c);
+  animation: x3-twinkle-bulb 2.4s ease-in-out infinite alternate;
+}
+html.kiosk-xmas .x3-bulb::before { content: ''; position: absolute; left: 2px; top: -3px; width: 5px; height: 4px; border-radius: 1.5px; background: #6E5033; }
+@keyframes x3-twinkle-bulb { 0% { opacity: .5; } 60% { opacity: 1; } 100% { opacity: .85; } }
+
+/* Arched photo frames */
+html.kiosk-xmas .x3-arch-wrap { position: absolute; animation: x3-rise 1s cubic-bezier(.16, 1, .3, 1) both; }
+html.kiosk-xmas .x3-arch-float { position: relative; width: 100%; height: 100%; animation: x3-float 7s ease-in-out infinite alternate; }
+html.kiosk-xmas .x3-arch {
+  position: relative; width: 100%; height: calc(100% - 42px); overflow: hidden;
+  border-radius: 999px 999px 28px 28px; border: 7px solid #FFFDF8; background: #F3E3CB;
+  box-shadow: 0 0 0 1.5px #D6A246, 0 0 0 9px rgba(255, 253, 248, .55), 0 28px 56px rgba(120, 60, 20, .24);
+}
+html.kiosk-xmas .x3-arch-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform-origin: 50% 60%; animation: x3-kenburns 18s ease-in-out infinite alternate; }
+html.kiosk-xmas .x3-arch-flicker { position: absolute; inset: 0; background: radial-gradient(circle at 50% 40%, rgba(255, 200, 120, .45) 0%, rgba(255, 200, 120, 0) 55%); animation: x3-flicker 3.4s ease-in-out infinite; }
+html.kiosk-xmas .x3-arch-sheen { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255, 250, 240, .22) 0%, rgba(255, 250, 240, 0) 35%, rgba(90, 40, 10, 0) 70%, rgba(90, 40, 10, .18) 100%); }
+html.kiosk-xmas .x3-arch-star {
+  position: absolute; z-index: 2; left: 50%; top: -20px; width: 44px; height: 44px; margin-left: -22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #D6A246;
+  background: radial-gradient(circle, #FFFDF6 0%, #FFF3D6 60%, rgba(255, 243, 214, 0) 72%);
+}
+html.kiosk-xmas .x3-arch-caption { margin-top: 12px; text-align: center; font-family: 'Great Vibes', cursive; font-size: 27px; line-height: 1.2; color: #9E1B2C; white-space: nowrap; }
+
+/* Sparkles */
+html.kiosk-xmas .x3-twinkle { position: absolute; width: 0; height: 0; color: #E2A93B; }
+html.kiosk-xmas .x3-twinkle > svg { position: absolute; transform: translate(-50%, -50%); animation: x3-twinkle 2.6s ease-in-out infinite; animation-delay: inherit; }
+html.kiosk-xmas .x3-burst { position: absolute; width: 0; height: 0; }
+html.kiosk-xmas .x3-spark { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; animation: x3-spark .9s cubic-bezier(.2, .8, .3, 1) both; }
+
+/* Code entry: candle slots */
+html.kiosk-xmas .x3-pill {
+  position: absolute; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-radius: 999px;
+  background: linear-gradient(90deg, #FFF3F1 0%, #FFFCF5 100%); border: 1px solid #EFC0C5;
+  color: #9E1B2C; font-size: 15px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(158, 27, 44, .08); animation: x3-rise .8s cubic-bezier(.16, 1, .3, 1) both;
+}
+html.kiosk-xmas .x3-pill > svg { color: #2F7D4F; }
+html.kiosk-xmas .x3-wick { position: absolute; width: 3px; height: 10px; margin-left: -1.5px; border-radius: 2px; background: #6B4A2E; opacity: .55; }
+html.kiosk-xmas .x3-wick.is-lit { background: #3A2414; opacity: .9; }
+html.kiosk-xmas .x3-slot-halo {
+  position: absolute; width: 110px; height: 110px; margin: -71px 0 0 -55px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 196, 96, .55) 0%, rgba(255, 196, 96, .18) 40%, rgba(255, 196, 96, 0) 68%);
+  opacity: 0; transform: scale(.5); transition: opacity .5s ease, transform .5s cubic-bezier(.16, 1, .3, 1);
+}
+html.kiosk-xmas .x3-slot-halo.is-lit { opacity: 1; transform: scale(1); animation: x3-glow 2.8s ease-in-out .5s infinite; }
+html.kiosk-xmas .x3-flame-pos { position: absolute; width: 0; height: 0; }
+html.kiosk-xmas .x3-flame {
+  position: absolute; left: -10px; bottom: 2px; width: 20px; height: 34px; transform-origin: 50% 100%;
+  border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
+  background: radial-gradient(ellipse 50% 60% at 50% 72%, #FFFFFF 0%, #FFF4C2 26%, #FFC24A 52%, #F07A28 74%, rgba(240, 122, 40, 0) 100%);
+  animation: x3-flame-in .5s cubic-bezier(.2, 1.4, .4, 1) both, x3-flame 1.8s ease-in-out .5s infinite alternate;
+}
+html.kiosk-xmas .x3-pad-star {
+  position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #D6A246;
+  background: radial-gradient(circle at 50% 40%, #FFFFFF 0%, #FFF6E4 100%); border: 1.5px solid #E2B04E;
+  box-shadow: 0 6px 16px rgba(150, 90, 30, .18);
+}
+html.kiosk-xmas .x3-pad-star > svg { transition: transform .5s cubic-bezier(.2, 1.4, .4, 1); }
+html.kiosk-xmas .x3-pad-star.is-ready { color: #C8243A; }
+html.kiosk-xmas .x3-pad-star.is-ready > svg { animation: x3-star-ready 2s ease-in-out infinite; }
+
+/* Printing: a string of lights that comes on with the real progress, and a star riding the progress bar */
+html.kiosk-xmas .x3-string { position: absolute; overflow: hidden; }
+html.kiosk-xmas .x3-string-curve { position: absolute; left: 0; right: 0; border: 2px solid transparent; border-bottom-color: #7A5634; border-radius: 50%; opacity: .8; }
+html.kiosk-xmas .x3-plight { position: absolute; width: 0; height: 0; transform-origin: 0 0; }
+html.kiosk-xmas .x3-plight-cap { position: absolute; left: -6px; top: -1px; width: 12px; height: 9px; border-radius: 2px 2px 3px 3px; background: linear-gradient(180deg, #A07A4E, #6E5033); }
+html.kiosk-xmas .x3-plight-glass {
+  position: absolute; left: -10px; top: 7px; width: 20px; height: 30px;
+  border-radius: 50% 50% 46% 46% / 38% 38% 62% 62%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .9) 0%, rgba(245, 232, 212, .9) 100%);
+  border: 1.5px solid rgba(176, 132, 80, .45);
+}
+html.kiosk-xmas .x3-plight-glass::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%;
+  background: radial-gradient(circle, var(--c) 0%, rgba(255, 255, 255, 0) 62%); opacity: 0; transition: opacity .6s ease;
+}
+html.kiosk-xmas .x3-plight-glass.is-on {
+  background: radial-gradient(circle at 42% 36%, #FFFFFF 0%, var(--c) 46%, var(--c) 100%);
+  border-color: rgba(255, 255, 255, .7);
+  animation: x3-twinkle-bulb 1.8s ease-in-out infinite alternate;
+}
+html.kiosk-xmas .x3-plight-glass.is-on::after { opacity: .5; }
+html.kiosk-xmas .x3-plight-pop { position: absolute; inset: -12px; border-radius: 50%; border: 2px solid var(--c); animation: x3-pop .8s ease-out both; }
+html.kiosk-xmas .x3-rider { position: absolute; left: 0; top: 0; width: 0; height: 0; transition: transform .3s cubic-bezier(.4, 0, .2, 1); }
+html.kiosk-xmas .x3-rider-glow { position: absolute; left: -40px; top: -40px; width: 80px; height: 80px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 214, 120, .85) 0%, rgba(255, 214, 120, 0) 65%); animation: x3-glow 1.6s ease-in-out infinite; }
+html.kiosk-xmas .x3-rider-star { position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; color: #E2A93B; animation: x3-spin 7s linear infinite; }
+html.kiosk-xmas .x3-rider-star > svg { display: block; }
+
+/* Summary: Merry Christmas banner, gift with pages rising, chevrons to the tray */
+html.kiosk-xmas .x3-banner { position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; animation: x3-rise 1s cubic-bezier(.16, 1, .3, 1) .15s both; }
+html.kiosk-xmas .x3-banner-script { font-family: 'Great Vibes', cursive; font-size: 74px; line-height: 1.05; color: #B3202F; padding: 0 12px; }
+html.kiosk-xmas .x3-banner-sub { margin-top: 0; font-size: 21px; font-weight: 700; color: #3A2A1E; letter-spacing: .01em; }
+html.kiosk-xmas .x3-banner-script--calm { font-size: 54px; color: #8A3A12; }
+html.kiosk-xmas .x3-gift { position: absolute; animation: x3-rise 1.1s cubic-bezier(.16, 1, .3, 1) .25s both; }
+html.kiosk-xmas .x3-gift-rays {
+  position: absolute; left: -12%; top: -14%; width: 124%; height: 124%; border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 206, 120, .42) 0deg 7deg, rgba(255, 206, 120, 0) 7deg 20deg);
+  -webkit-mask-image: radial-gradient(circle, #000 18%, rgba(0, 0, 0, 0) 68%);
+  mask-image: radial-gradient(circle, #000 18%, rgba(0, 0, 0, 0) 68%);
+  animation: x3-spin 46s linear infinite;
+}
+html.kiosk-xmas .x3-gift-halo { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle at 50% 46%, rgba(255, 255, 255, .95) 0%, rgba(255, 246, 225, .7) 36%, rgba(255, 240, 210, 0) 68%); animation: x3-glow 3.2s ease-in-out infinite; }
+html.kiosk-xmas .x3-gift-photo {
+  position: absolute; left: 5%; top: 14%; width: 90%; height: 90%; animation: x3-bob 3.2s ease-in-out infinite alternate;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 66%, rgba(0, 0, 0, 0) 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 66%, rgba(0, 0, 0, 0) 100%);
+}
+html.kiosk-xmas .x3-gift-photo > img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; display: block; }
+html.kiosk-xmas .x3-page {
+  position: absolute; left: 50%; top: 30%; width: 66px; height: 86px; margin-left: -33px; border-radius: 5px;
+  background: #FFFFFF; border: 1px solid #EADBC4; box-shadow: 0 10px 20px rgba(120, 70, 20, .16);
+  opacity: 0; animation: x3-page-rise 3.5s cubic-bezier(.22, .7, .25, 1) infinite;
+}
+html.kiosk-xmas .x3-page::before { content: ''; position: absolute; left: 11px; top: 11px; width: 30px; height: 6px; border-radius: 3px; background: #D3263A; opacity: .75; }
+html.kiosk-xmas .x3-page-lines { position: absolute; left: 11px; right: 11px; top: 25px; bottom: 12px; background: repeating-linear-gradient(180deg, #DCCDB5 0 3px, rgba(255, 255, 255, 0) 3px 10px); }
+html.kiosk-xmas .x3-collect { position: absolute; width: 40px; margin-left: -20px; display: flex; flex-direction: column; align-items: center; color: #C8243A; }
+html.kiosk-xmas .x3-chev { display: block; height: 22px; animation: x3-chev 1.6s ease-in-out infinite; }
+
+/* Error: a few slow snowflakes at the sides */
+html.kiosk-xmas .x3-flake {
+  position: absolute; top: -14px; border-radius: 50%;
+  background: radial-gradient(circle, #FFFFFF 0%, #FFFFFF 40%, #EBCF9C 100%);
+  box-shadow: 0 0 0 1px rgba(214, 168, 70, .25);
+  animation-name: x3-fall; animation-timing-function: linear; animation-iteration-count: infinite;
+}
+
+/* ── keyframes (transform / opacity only) ── */
+@keyframes x3-rise { from { opacity: 0; transform: translate3d(0, 26px, 0); } to { opacity: 1; transform: none; } }
+@keyframes x3-float { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, -10px, 0); } }
+@keyframes x3-kenburns { from { transform: scale(1.04); } to { transform: scale(1.13) translate3d(-1.5%, -1%, 0); } }
+@keyframes x3-flicker { 0%, 100% { opacity: .5; } 22% { opacity: .9; } 47% { opacity: .62; } 71% { opacity: 1; } }
+@keyframes x3-twinkle { 0%, 100% { opacity: .15; transform: translate(-50%, -50%) scale(.55) rotate(0deg); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1) rotate(25deg); } }
+@keyframes x3-spark { 0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1.1); } 100% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) scale(.2); } }
+@keyframes x3-glow { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
+@keyframes x3-flame-in { from { opacity: 0; transform: scale(.2, .1); } to { opacity: 1; transform: scale(1, 1); } }
+@keyframes x3-flame { 0% { transform: scale(1, 1) rotate(-2deg); } 35% { transform: scale(.92, 1.08) rotate(1.5deg); } 70% { transform: scale(1.05, .95) rotate(-1deg); } 100% { transform: scale(.97, 1.04) rotate(2.5deg); } }
+@keyframes x3-star-ready { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.18) rotate(18deg); } }
+@keyframes x3-pop { from { opacity: 1; transform: scale(.4); } to { opacity: 0; transform: scale(1.9); } }
+@keyframes x3-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes x3-bob { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, -8px, 0); } }
+@keyframes x3-page-rise {
+  0% { opacity: 0; transform: translate3d(0, 50px, 0) scale(.8) rotate(0deg); }
+  14% { opacity: 1; }
+  72% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--px), -200px, 0) scale(1) rotate(var(--pr)); }
+}
+@keyframes x3-chev { 0%, 100% { opacity: .15; transform: translate3d(0, -4px, 0); } 50% { opacity: 1; transform: translate3d(0, 6px, 0); } }
+@keyframes x3-fall { 0% { transform: translate3d(0, -20px, 0); } 50% { transform: translate3d(16px, 50vh, 0); } 100% { transform: translate3d(0, 104vh, 0); } }
+
+/* Accessibility and the Pi: no motion at all when the device asks for it (everything rests in its final, visible state). */
+@media (prefers-reduced-motion: reduce) {
+  html.kiosk-xmas .x3 *, html.kiosk-xmas .x3 *::before, html.kiosk-xmas .x3 *::after { animation: none !important; transition: none !important; }
+  html.kiosk-xmas .x3-spark, html.kiosk-xmas .x3-page, html.kiosk-xmas .x3-flake, html.kiosk-xmas .x3-plight-pop { display: none; }
+  html.kiosk-xmas .x3-twinkle > svg { opacity: .7; }
+}
